@@ -74,15 +74,68 @@ function WebMap({ orders }: { orders: Order[] }) {
   );
 }
 
+// --- Native Map Fallback (when native maps TurboModule is unavailable) ---
+function NativeFallbackMap({ orders, selectedId, onSelect }: {
+  orders: Order[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const pending = orders.filter((o) => o.status === 'pending');
+  return (
+    <YStack flex={1} padding="$4" gap="$3" justifyContent="center" alignItems="center" backgroundColor="$color2">
+      <YStack
+        width={64}
+        height={64}
+        borderRadius={32}
+        backgroundColor="rgba(245,196,0,0.12)"
+        borderWidth={1.5}
+        borderColor="rgba(245,196,0,0.3)"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <MapPin size={32} color="#FFA000" />
+      </YStack>
+      <SizableText size="$5" fontWeight="800" textAlign="center" color="$color12">
+        Sahuarita Delivery Routes
+      </SizableText>
+      <SizableText size="$2" color="$color10" textAlign="center" paddingHorizontal="$4">
+        {pending.length} pending deliveries active. Tap any stop below to navigate directly in Apple Maps or Google Maps.
+      </SizableText>
+      <Button
+        size="$3"
+        variant="outlined"
+        borderRadius="$full"
+        icon={<Navigation size={14} />}
+        onPress={() => openMapsNavigation(APP_CONFIG.STORE_ADDRESS)}
+      >
+        Directions to Store Hub
+      </Button>
+    </YStack>
+  );
+}
+
 // --- Native Map ---
 function NativeMap({ orders, selectedId, onSelect }: {
   orders: Order[];
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
-  // Dynamic import to avoid web crash
-  const MapView = require('react-native-maps').default;
-  const { Marker, Callout } = require('react-native-maps');
+  let MapView: any = null;
+  let Marker: any = null;
+  let Callout: any = null;
+
+  try {
+    const Maps = require('react-native-maps');
+    MapView = Maps.default || Maps;
+    Marker = Maps.Marker;
+    Callout = Maps.Callout;
+  } catch (err) {
+    console.warn('[map] react-native-maps not available, using fallback:', err);
+  }
+
+  if (!MapView || !Marker) {
+    return <NativeFallbackMap orders={orders} selectedId={selectedId} onSelect={onSelect} />;
+  }
 
   const pending = orders.filter((o) => o.status === 'pending');
   const delivered = orders.filter((o) => o.status === 'delivered');
@@ -108,12 +161,14 @@ function NativeMap({ orders, selectedId, onSelect }: {
             pinColor="#FFA000"
             onPress={() => onSelect(order.id)}
           >
-            <Callout>
-              <View style={{ width: 160, padding: 8 }}>
-                <SizableText size="$3" fontWeight="700">{order.customerName}</SizableText>
-                <SizableText size="$2" color="$color10">{order.deliveryAddress}</SizableText>
-              </View>
-            </Callout>
+            {Callout ? (
+              <Callout>
+                <View style={{ width: 160, padding: 8 }}>
+                  <SizableText size="$3" fontWeight="700">{order.customerName}</SizableText>
+                  <SizableText size="$2" color="$color10">{order.deliveryAddress}</SizableText>
+                </View>
+              </Callout>
+            ) : null}
           </Marker>
         );
       })}

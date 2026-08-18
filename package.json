@@ -53,7 +53,7 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
-    "react-native-maps": "^1.27.2",
+    "react-native-maps": "1.20.1",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
@@ -80,6 +80,7 @@
     "@tamagui/lucide-icons": "1.144.4",
     "@tamagui/portal": "1.144.4",
     "@tamagui/theme": "1.144.4",
-    "@tamagui/web": "1.144.4"
+    "@tamagui/web": "1.144.4",
+    "react-native-maps": "1.20.1"
   }
 }
