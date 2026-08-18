@@ -27,7 +27,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMyVerification, useSubmitVerification } from '@/lib/verification';
 import { APP_CONFIG } from '@/lib/config';
 import { spacing, borderRadius } from '@/constants/design';
-import { StatusBanner, DocUploadCard, DocState } from './components';
+import { StatusBanner, DocUploadCard, DocState } from '@/components/auth';
 
 const EMPTY_DOC: DocState = {
   uri: null,

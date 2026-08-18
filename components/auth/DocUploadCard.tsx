@@ -119,16 +119,18 @@ export function DocUploadCard({
   );
 }
 
+export default DocUploadCard;
+
 const styles = StyleSheet.create({
   docCard: {
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: colors.glassLevel2Bg,
     borderRadius: borderRadius.DEFAULT,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    borderWidth: 1,
+    borderColor: colors.glassLevel2Border,
     padding: spacing.md,
   },
   docCardDone: {
-    borderColor: 'rgba(22,163,74,0.4)',
-    backgroundColor: 'rgba(22,163,74,0.04)',
+    borderColor: 'rgba(22, 163, 74, 0.4)',
+    backgroundColor: 'rgba(22, 163, 74, 0.06)',
   },
 });

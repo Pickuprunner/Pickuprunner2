@@ -29,7 +29,7 @@ import {
 } from '@/lib/backgroundCheck';
 import { APP_CONFIG } from '@/lib/config';
 import { colors, spacing, borderRadius } from '@/constants/design';
-import { AuthInput, StatusBanner } from './components';
+import { AuthInput, StatusBanner } from '@/components/auth';
 
 export default function BackgroundCheckScreen() {
   const { user } = useAuth();

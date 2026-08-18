@@ -26,10 +26,11 @@ export default function RoleSelectScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
     await saveRole(role);
+    setSelecting(null);
     if (role === 'customer') {
-      router.replace('/customer-auth');
+      router.push('/(auth)/customer-auth');
     } else {
-      router.replace('/sign-in');
+      router.push('/(auth)/sign-in');
     }
   };
 
@@ -49,8 +50,11 @@ export default function RoleSelectScreen() {
         contentContainerStyle={[
           styles.scrollContainer,
           {
-            paddingTop: insets.top > 0 ? insets.top + spacing.lg : spacing.xxl,
-            paddingBottom: insets.bottom > 0 ? insets.bottom + spacing.md : spacing.xl,
+            paddingTop: Math.max(
+              insets.top + spacing.xl,
+              Platform.OS === 'android' ? (StatusBar.currentHeight || 28) + 36 : 60
+            ),
+            paddingBottom: Math.max(insets.bottom + spacing.xl, 44),
           },
         ]}
         bounces={false}
@@ -60,7 +64,7 @@ export default function RoleSelectScreen() {
         <View style={styles.heroSection}>
           {/* Logo Icon */}
           <View style={styles.logoContainer}>
-            <Zap size={44} color={colors.secondaryContainer} />
+            <Zap size={56} color={colors.secondaryContainer} />
           </View>
           <Text style={styles.brandTitle}>{APP_CONFIG.APP_NAME}</Text>
           <Text style={styles.tagline}>{APP_CONFIG.TAGLINE}</Text>
@@ -183,28 +187,29 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: spacing.marginMobile,
+    gap: 24,
   },
   heroSection: {
     alignItems: 'center',
-    marginBottom: spacing.xl - 4,
+    marginBottom: 8,
   },
   logoContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: borderRadius.xl,
-    borderWidth: 2,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2.5,
     borderColor: colors.secondaryContainer,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.gutter,
+    marginBottom: 14,
     shadowColor: shadows.goldGlow.shadowColor,
     shadowOffset: shadows.goldGlow.shadowOffset,
-    shadowOpacity: shadows.goldGlow.shadowOpacity,
-    shadowRadius: shadows.goldGlow.shadowRadius,
-    elevation: shadows.goldGlow.elevation,
+    shadowOpacity: 0.45,
+    shadowRadius: 28,
+    elevation: 16,
   },
   brandTitle: {
     fontSize: 28,

@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { YStack, XStack, SizableText } from '@blinkdotnew/mobile-ui';
+import { colors, borderRadius } from '@/constants/design';
 
 interface TermsAgreementProps {
   agreed: boolean;
@@ -12,7 +13,7 @@ interface TermsAgreementProps {
 export function TermsAgreement({
   agreed,
   onToggle,
-  accentColor = '#d97706',
+  accentColor = colors.primaryContainer,
 }: TermsAgreementProps) {
   return (
     <YStack gap="$2">
@@ -24,13 +25,13 @@ export function TermsAgreement({
           <SizableText
             size="$2"
             fontWeight="700"
-            color="$yellow10"
+            color={colors.secondaryContainer}
             textDecorationLine="underline"
           >
             Terms of Use
           </SizableText>
         </Pressable>
-        <SizableText size="$2" color="$color9">
+        <SizableText size="$2" color={colors.outline}>
           ·
         </SizableText>
         <Pressable
@@ -40,7 +41,7 @@ export function TermsAgreement({
           <SizableText
             size="$2"
             fontWeight="700"
-            color="$yellow10"
+            color={colors.secondaryContainer}
             textDecorationLine="underline"
           >
             Privacy Policy
@@ -51,27 +52,29 @@ export function TermsAgreement({
         <YStack
           width={22}
           height={22}
-          borderRadius={5}
-          borderWidth={2}
-          borderColor={agreed ? accentColor : 'rgba(255, 255, 255, 0.35)'}
+          borderRadius={borderRadius.xs}
+          borderWidth={1.5}
+          borderColor={agreed ? accentColor : colors.outlineVariant}
           backgroundColor={agreed ? accentColor : 'transparent'}
           alignItems="center"
           justifyContent="center"
           flexShrink={0}
         >
           {agreed && (
-            <SizableText size="$1" fontWeight="900" color="white">
+            <SizableText size="$1" fontWeight="900" color="#FFFFFF">
               ✓
             </SizableText>
           )}
         </YStack>
-        <SizableText size="$2" color="$color10" flex={1} lineHeight={20}>
+        <SizableText size="$2" color={colors.onSurfaceVariant} flex={1} lineHeight={20}>
           I agree to the Terms of Use and Privacy Policy
         </SizableText>
       </Pressable>
     </YStack>
   );
 }
+
+export default TermsAgreement;
 
 const styles = StyleSheet.create({
   termsRow: {

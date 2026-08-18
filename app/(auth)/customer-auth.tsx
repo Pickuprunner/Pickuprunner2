@@ -24,7 +24,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { blink } from '@/lib/blink';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
-import { AuthInput, AuthHero, TermsAgreement } from './components';
+import { AuthInput, AuthHero, TermsAgreement } from '@/components/auth';
 
 const SESSION_KEY = 'customer_session_id';
 const NAME_KEY = 'customer_display_name';
@@ -143,7 +143,13 @@ export default function CustomerAuthScreen() {
         >
           {/* Back button */}
           <Pressable
-            onPress={() => router.canGoBack() ? router.back() : router.replace('/role-select')}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(landing)/role-select');
+              }
+            }}
             style={styles.backBtn}
             hitSlop={12}
           >
@@ -152,9 +158,10 @@ export default function CustomerAuthScreen() {
 
           {/* Hero Header */}
           <AuthHero
-            icon={<ShoppingBag size={36} color={colors.secondaryContainer} />}
-            iconBgColor="rgba(244, 195, 0, 0.1)"
-            iconBorderColor="rgba(244, 195, 0, 0.35)"
+            icon={<ShoppingBag size={42} color="#0F131C" />}
+            iconBgColor={colors.secondaryContainer}
+            iconBorderColor={colors.secondaryContainer}
+            glowType="gold"
             title={isSignUp ? 'Create Account' : 'Welcome Back'}
             subtitle={
               isSignUp

@@ -10,6 +10,7 @@ import { RealtimeProvider } from '@/components/RealtimeProvider';
 // expo-notifications is native-only — importing it on web causes 401 network requests
 // In Expo Go SDK 53+, remote notifications were removed on Android, so we skip it in Expo Go
 import { getOrderIdFromNotification, getScreenFromNotification } from '@/lib/notifications';
+import { colors } from '@/constants/design';
 
 const isExpoGoAndroid =
   Platform.OS === 'android' &&
@@ -89,7 +90,13 @@ export default function RootLayout() {
           <BlinkToastProvider>
             <RealtimeProvider />
             <WebStyleReset />
-            <Stack screenOptions={{ headerShown: false }}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.background },
+                animation: 'slide_from_right',
+              }}
+            >
               <Stack.Screen name="index" />
               <Stack.Screen name="(landing)" />
               <Stack.Screen name="role-select" />
@@ -97,8 +104,6 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="(customer)" />
               <Stack.Screen name="order/[id]" />
-              <Stack.Screen name="driver-verification" />
-              <Stack.Screen name="background-check" />
               <Stack.Screen name="terms" />
               <Stack.Screen name="+not-found" />
             </Stack>

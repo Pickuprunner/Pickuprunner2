@@ -6,13 +6,14 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  View,
+  Text,
+  StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  YStack,
-  XStack,
-  SizableText,
-  SafeArea,
   Truck,
   Mail,
   Lock,
@@ -22,12 +23,13 @@ import {
 import * as Haptics from 'expo-haptics';
 import { blink } from '@/lib/blink';
 import { saveDisplayName } from '@/lib/chat';
-import { colors, spacing, borderRadius } from '@/constants/design';
-import { AuthInput, AuthHero, TermsAgreement } from './components';
+import { colors, gradients, spacing, borderRadius } from '@/constants/design';
+import { AuthInput, AuthHero, TermsAgreement } from '@/components/auth';
 
 type Mode = 'signin' | 'signup';
 
 export default function SignInScreen() {
+  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -122,30 +124,53 @@ export default function SignInScreen() {
   };
 
   return (
-    <SafeArea>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {/* Hero Glow Background — matching landing role-select */}
+      <LinearGradient
+        colors={gradients.heroGlow}
+        locations={gradients.heroGlowLocations}
+        style={[styles.heroGlow, { height: 320 + insets.top }]}
+        pointerEvents="none"
+      />
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[
+            styles.scroll,
+            {
+              paddingTop: insets.top > 0 ? insets.top + spacing.sm : spacing.lg,
+              paddingBottom: insets.bottom > 0 ? insets.bottom + spacing.lg : spacing.xxl,
+            },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {/* Back button */}
           <Pressable
-            onPress={() => router.canGoBack() ? router.back() : router.replace('/role-select')}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/(landing)/role-select');
+              }
+            }}
             style={styles.backBtn}
             hitSlop={12}
           >
-            <ArrowLeft size={22} color="$color10" />
+            <ArrowLeft size={22} color={colors.onSurfaceVariant} />
           </Pressable>
 
-          {/* Hero Header Component */}
+          {/* Hero Header */}
           <AuthHero
-            icon={<Truck size={36} color="$green9" />}
-            iconBgColor="$green3"
-            iconBorderColor="$green6"
+            icon={<Truck size={42} color="#0F131C" />}
+            iconBgColor={colors.primaryContainer}
+            iconBorderColor={colors.primaryContainer}
+            glowType="cobalt"
             title={isSignUp ? 'Create Account' : 'Welcome Back'}
             subtitle={
               isSignUp
@@ -155,7 +180,7 @@ export default function SignInScreen() {
           />
 
           {/* Form */}
-          <YStack gap="$4" width="100%">
+          <View style={styles.formSection}>
             {/* Name (sign-up only) */}
             {isSignUp && (
               <AuthInput
@@ -165,7 +190,7 @@ export default function SignInScreen() {
                 placeholder="e.g. Alex Rivera"
                 autoCapitalize="words"
                 returnKeyType="next"
-                icon={<User size={18} color="$color9" />}
+                icon={<User size={18} color={colors.outline} />}
                 error={!!error && !name.trim()}
               />
             )}
@@ -180,7 +205,7 @@ export default function SignInScreen() {
               keyboardType="email-address"
               autoComplete="email"
               returnKeyType="next"
-              icon={<Mail size={18} color="$color9" />}
+              icon={<Mail size={18} color={colors.outline} />}
             />
 
             {/* Password */}
@@ -195,23 +220,14 @@ export default function SignInScreen() {
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
               returnKeyType="done"
               onSubmitEditing={handleSubmit}
-              icon={<Lock size={18} color="$color9" />}
+              icon={<Lock size={18} color={colors.outline} />}
             />
 
             {/* Error */}
             {!!error && (
-              <YStack
-                backgroundColor="$red3"
-                borderRadius={10}
-                paddingHorizontal="$4"
-                paddingVertical="$3"
-                borderWidth={1}
-                borderColor="$red6"
-              >
-                <SizableText size="$3" color="$red10">
-                  {error}
-                </SizableText>
-              </YStack>
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
             )}
 
             {/* Terms — sign-up only */}
@@ -219,11 +235,11 @@ export default function SignInScreen() {
               <TermsAgreement
                 agreed={agreedToTerms}
                 onToggle={() => setAgreedToTerms((v) => !v)}
-                accentColor="#16a34a"
+                accentColor={colors.primaryContainer}
               />
             )}
 
-            {/* Submit button */}
+            {/* Submit CTA Button */}
             <Pressable
               onPress={handleSubmit}
               disabled={loading}
@@ -234,56 +250,103 @@ export default function SignInScreen() {
               ]}
             >
               {loading ? (
-                <ActivityIndicator color="white" />
+                <ActivityIndicator color={colors.onPrimaryContainer} />
               ) : (
-                <SizableText size="$5" fontWeight="800" color="white">
+                <Text style={styles.submitBtnText}>
                   {isSignUp ? 'Create Account' : 'Sign In'}
-                </SizableText>
+                </Text>
               )}
             </Pressable>
 
             {/* Mode switch */}
-            <XStack justifyContent="center" gap="$1" marginTop="$2">
-              <SizableText size="$3" color="$color10">
+            <View style={styles.switchRow}>
+              <Text style={styles.switchModePrompt}>
                 {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-              </SizableText>
+              </Text>
               <Pressable onPress={switchMode}>
-                <SizableText size="$3" fontWeight="700" color="$green9">
+                <Text style={styles.switchModeLink}>
                   {isSignUp ? 'Sign In' : 'Sign Up'}
-                </SizableText>
+                </Text>
               </Pressable>
-            </XStack>
-          </YStack>
+            </View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeArea>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+    position: 'relative',
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+  },
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxxl,
+    paddingHorizontal: spacing.marginMobile,
   },
   backBtn: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.gutter,
     alignSelf: 'flex-start',
   },
+  formSection: {
+    gap: 16,
+  },
+  errorBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.gutter,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  errorText: {
+    color: '#ff8b8b',
+    fontSize: 13.5,
+  },
   submitBtn: {
-    height: 56,
-    borderRadius: borderRadius.xl,
-    backgroundColor: colors.primary,
+    height: 54,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.sm,
+    marginTop: 4,
   },
   submitBtnPressed: {
-    opacity: 0.85,
+    backgroundColor: 'rgba(0, 102, 255, 0.85)',
     transform: [{ scale: 0.98 }],
   },
   submitBtnDisabled: {
     opacity: 0.5,
+  },
+  submitBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.onPrimaryContainer,
+    letterSpacing: 0.2,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  switchModePrompt: {
+    fontSize: 14,
+    color: colors.onSurfaceVariant,
+  },
+  switchModeLink: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
   },
 });

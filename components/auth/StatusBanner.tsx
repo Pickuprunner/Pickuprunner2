@@ -7,7 +7,6 @@ import {
   ShieldCheck,
   Clock,
   XCircle,
-  Shield,
 } from '@blinkdotnew/mobile-ui';
 import { APP_CONFIG } from '@/lib/config';
 import { borderRadius } from '@/constants/design';
@@ -121,6 +120,8 @@ export function StatusBanner({
     </YStack>
   );
 }
+
+export default StatusBanner;
 
 const styles = StyleSheet.create({
   resubmitBtn: {
