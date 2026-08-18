@@ -1,28 +1,41 @@
 import React, { useState } from 'react';
-import { StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TextInput, Pressable, ActivityIndicator } from 'react-native';
+import {
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TextInput,
+  Pressable,
+  ActivityIndicator,
+  View,
+  Text,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import {
-  YStack,
-  XStack,
-  SizableText,
   SafeArea,
   toast,
   CheckCircle,
   PlusCircle,
   User,
   Phone,
+  Mail,
   MapPin,
   Navigation,
   Package,
   DollarSign,
+  Zap,
 } from '@blinkdotnew/mobile-ui';
 import { ordersTable, useCreateOrder } from '@/lib/orders';
 import { APP_CONFIG, ORDER_SCOPE } from '@/lib/config';
-import { blink } from '@/lib/blink';
 import { blinkDbCreate } from '@/lib/blinkApi';
 import * as Haptics from 'expo-haptics';
-import { colors, spacing, borderRadius } from '@/constants/design';
+
+const BLUE = '#0066FF';
+const GOLD = '#F5C400';
+const GREEN = '#00E676';
+const BG = '#000000';
+const CARD_BG = '#0F121C';
 
 const DELIVERY_FEE = APP_CONFIG.DELIVERY_FEE_CENTS;
 const MILEAGE_RATE = APP_CONFIG.MILEAGE_RATE_CENTS;
@@ -48,11 +61,10 @@ export default function NewOrderScreen() {
   const [miles, setMiles] = useState('');
   const [tipCents, setTipCents] = useState(500);
   const [loading, setLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const mileageCents = calcMileageCents(miles);
   const totalCents = DELIVERY_FEE + mileageCents + tipCents;
-
-  const createOrder = useCreateOrder();
 
   const handleCreateOrder = async () => {
     if (!customerName.trim() || !customerPhone.trim() || !deliveryAddress.trim() || !items.trim()) {
@@ -82,10 +94,9 @@ export default function NewOrderScreen() {
         order_scope: ORDER_SCOPE,
       };
 
-      // Direct REST first (publishable key works without auth); SDK fallback.
       const snakeData: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(orderData)) {
-        snakeData[key] = value; // already snake_case here
+        snakeData[key] = value;
       }
       try {
         await blinkDbCreate('orders', snakeData);
@@ -106,7 +117,7 @@ export default function NewOrderScreen() {
       setDeliveryAddress('');
       setItems('');
       setMiles('');
-      setTipCents(0);
+      setTipCents(500);
       router.push('/(tabs)');
     } catch (e: any) {
       console.error('[new-order] Create failed:', e?.message || e);
@@ -116,247 +127,533 @@ export default function NewOrderScreen() {
     }
   };
 
-  const TIP_OPTIONS = [5_00, 10_00, 15_00, 20_00, 25_00];
+  const fillTestData = () => {
+    setCustomerName('Jamie Test');
+    setCustomerPhone('(520) 555-1234');
+    setCustomerEmail('test@example.com');
+    setPickupAddress('5765 S Camino del Sol, Green Valley, AZ 85622');
+    setDeliveryAddress('123 E Test Ave, Sahuarita, AZ 85629');
+    setItems('#1042 — grocery order');
+    setMiles('3.5');
+    setTipCents(1000);
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  };
+
+  const TIP_OPTIONS = [500, 1000, 1500, 2000, 2500];
 
   return (
     <SafeArea>
-      <LinearGradient
-        colors={[APP_CONFIG.GRADIENT_START, APP_CONFIG.GRADIENT_MID, APP_CONFIG.GRADIENT_END]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 }}
-      >
-        <XStack gap="$3" alignItems="center">
-          <YStack
-            width={44} height={44} borderRadius={22}
-            backgroundColor="rgba(0,0,0,0.25)"
-            alignItems="center" justifyContent="center"
-            borderWidth={1.5} borderColor="rgba(255,255,255,0.3)"
+      <View style={styles.root}>
+        {/* Top Header */}
+        <View style={styles.topHeader}>
+          <View style={styles.headerLeft}>
+            <View style={styles.headerIconWrap}>
+              <PlusCircle size={20} color={GOLD} />
+            </View>
+            <View>
+              <Text style={styles.headerTitle}>New Order</Text>
+              <Text style={styles.headerSubtitle}>Create a delivery task manually</Text>
+            </View>
+          </View>
+
+          {/* Test Fill Button */}
+          <Pressable
+            onPress={fillTestData}
+            style={({ pressed }) => [styles.testFillBtn, pressed && { opacity: 0.75 }]}
           >
-            <PlusCircle size={24} color="white" />
-          </YStack>
-          <YStack>
-            <SizableText size="$7" fontWeight="900" color="white" letterSpacing={-0.5}>
-              New Order
-            </SizableText>
-            <SizableText size="$2" color="rgba(255,255,255,0.7)">
-              Add a delivery task manually
-            </SizableText>
-          </YStack>
-        </XStack>
-      </LinearGradient>
+            <Zap size={12} color={GOLD} />
+            <Text style={styles.testFillText}>Fill Test</Text>
+          </Pressable>
+        </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <YStack gap="$5">
-
-            {/* Test fill */}
-            <XStack justifyContent="flex-end" marginBottom={-8}>
-              <Pressable
-                onPress={() => {
-                  setCustomerName('Jamie Test');
-                  setCustomerPhone('(520) 555-1234');
-                  setCustomerEmail('test@example.com');
-                  setPickupAddress('5765 S Camino del Sol, Green Valley, AZ 85622');
-                  setDeliveryAddress('123 E Test Ave, Sahuarita, AZ 85629');
-                  setItems('#1042 — grocery order');
-                  setMiles('3.5');
-                  setTipCents(10_00);
-                }}
-                style={({ pressed }: { pressed: boolean }) => ({
-                  backgroundColor: pressed ? 'rgba(0,102,255,0.2)' : 'rgba(0,102,255,0.1)',
-                  borderRadius: 999,
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderWidth: 1,
-                  borderColor: 'rgba(0,102,255,0.35)',
-                })}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <ScrollView
+            contentContainerStyle={styles.scroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* ── Card 1: Customer Info ── */}
+            <View style={styles.card}>
+              <LinearGradient
+                colors={['#181C28', '#121520', '#0C0E16']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={styles.cardGradient}
               >
-                <SizableText size="$1" fontWeight="700" color="$blue9">⚡ Fill test data</SizableText>
-              </Pressable>
-            </XStack>
+                <Text style={styles.cardTitle}>CUSTOMER DETAILS</Text>
 
-            {/* Customer */}
-            <YStack gap="$3">
-              <SizableText size="$3" fontWeight="700" color="$color10">CUSTOMER</SizableText>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>NAME *</Text>
+                  <View style={[styles.inputBox, focusedField === 'name' && styles.inputBoxFocused]}>
+                    <User size={16} color={focusedField === 'name' ? GOLD : 'rgba(255,255,255,0.4)'} />
+                    <TextInput
+                      value={customerName}
+                      onChangeText={setCustomerName}
+                      onFocus={() => setFocusedField('name')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="e.g. Maria Lopez"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      autoCapitalize="words"
+                      style={[styles.input, webNoOutline]}
+                    />
+                  </View>
+                </View>
 
-              <Field label="NAME *" icon={<User size={16} color="$color9" />}>
-                <TextInput value={customerName} onChangeText={setCustomerName}
-                  placeholder="e.g. Maria Lopez" placeholderTextColor={colors.textTertiary}
-                  autoCapitalize="words" style={[styles.input, webNoOutline]} />
-              </Field>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>PHONE *</Text>
+                  <View style={[styles.inputBox, focusedField === 'phone' && styles.inputBoxFocused]}>
+                    <Phone size={16} color={focusedField === 'phone' ? GOLD : 'rgba(255,255,255,0.4)'} />
+                    <TextInput
+                      value={customerPhone}
+                      onChangeText={setCustomerPhone}
+                      onFocus={() => setFocusedField('phone')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="e.g. (520) 555-0101"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      keyboardType="phone-pad"
+                      style={[styles.input, webNoOutline]}
+                    />
+                  </View>
+                </View>
 
-              <Field label="PHONE *" icon={<Phone size={16} color="$color9" />}>
-                <TextInput value={customerPhone} onChangeText={setCustomerPhone}
-                  placeholder="e.g. (520) 555-0101" placeholderTextColor={colors.textTertiary}
-                  keyboardType="phone-pad" style={[styles.input, webNoOutline]} />
-              </Field>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>EMAIL (OPTIONAL)</Text>
+                  <View style={[styles.inputBox, focusedField === 'email' && styles.inputBoxFocused]}>
+                    <Mail size={16} color={focusedField === 'email' ? GOLD : 'rgba(255,255,255,0.4)'} />
+                    <TextInput
+                      value={customerEmail}
+                      onChangeText={setCustomerEmail}
+                      onFocus={() => setFocusedField('email')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="For delivery notification email"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      style={[styles.input, webNoOutline]}
+                    />
+                  </View>
+                </View>
+              </LinearGradient>
+            </View>
 
-              <Field label="EMAIL (optional)" icon={<Package size={16} color="$color9" />}>
-                <TextInput value={customerEmail} onChangeText={setCustomerEmail}
-                  placeholder="For delivery notification email"
-                  placeholderTextColor={colors.textTertiary}
-                  keyboardType="email-address" autoCapitalize="none"
-                  style={[styles.input, webNoOutline]} />
-              </Field>
-            </YStack>
+            {/* ── Card 2: Route & Addresses ── */}
+            <View style={styles.card}>
+              <LinearGradient
+                colors={['#181C28', '#121520', '#0C0E16']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={styles.cardGradient}
+              >
+                <Text style={styles.cardTitle}>ROUTE & ITEMS</Text>
 
-            {/* Addresses */}
-            <YStack gap="$3">
-              <SizableText size="$3" fontWeight="700" color="$color10">ADDRESSES</SizableText>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>PICKUP ADDRESS</Text>
+                  <View
+                    style={[
+                      styles.inputBox,
+                      APP_CONFIG.LOCK_PICKUP_ADDRESS && styles.inputBoxLocked,
+                      focusedField === 'pickup' && !APP_CONFIG.LOCK_PICKUP_ADDRESS && styles.inputBoxFocused,
+                    ]}
+                  >
+                    <MapPin size={16} color={GOLD} />
+                    <TextInput
+                      value={pickupAddress}
+                      onChangeText={APP_CONFIG.LOCK_PICKUP_ADDRESS ? undefined : setPickupAddress}
+                      onFocus={() => setFocusedField('pickup')}
+                      onBlur={() => setFocusedField(null)}
+                      editable={!APP_CONFIG.LOCK_PICKUP_ADDRESS}
+                      placeholder="Where to pick up"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      autoCapitalize="words"
+                      style={[styles.input, webNoOutline]}
+                    />
+                  </View>
+                </View>
 
-              <Field label="PICKUP ADDRESS" icon={<MapPin size={16} color="$color9" />}
-                locked={APP_CONFIG.LOCK_PICKUP_ADDRESS}>
-                <TextInput value={pickupAddress} onChangeText={APP_CONFIG.LOCK_PICKUP_ADDRESS ? undefined : setPickupAddress}
-                  editable={!APP_CONFIG.LOCK_PICKUP_ADDRESS}
-                  placeholder="Where to pick up"
-                  placeholderTextColor={colors.textTertiary}
-                  autoCapitalize="words" style={[styles.input, webNoOutline]} />
-              </Field>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>DELIVERY ADDRESS *</Text>
+                  <View style={[styles.inputBox, focusedField === 'delivery' && styles.inputBoxFocused]}>
+                    <Navigation size={16} color={focusedField === 'delivery' ? GOLD : BLUE} />
+                    <TextInput
+                      value={deliveryAddress}
+                      onChangeText={setDeliveryAddress}
+                      onFocus={() => setFocusedField('delivery')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="Where to drop off"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      autoCapitalize="words"
+                      style={[styles.input, webNoOutline]}
+                    />
+                  </View>
+                </View>
 
-              <Field label="DELIVERY ADDRESS *" icon={<Navigation size={16} color="$color9" />}>
-                <TextInput value={deliveryAddress} onChangeText={setDeliveryAddress}
-                  placeholder="Where to drop off"
-                  placeholderTextColor={colors.textTertiary}
-                  autoCapitalize="words" style={[styles.input, webNoOutline]} />
-              </Field>
-            </YStack>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>ORDER ITEMS *</Text>
+                  <View
+                    style={[
+                      styles.inputBox,
+                      styles.inputBoxMultiline,
+                      focusedField === 'items' && styles.inputBoxFocused,
+                    ]}
+                  >
+                    <Package
+                      size={16}
+                      color={focusedField === 'items' ? GOLD : 'rgba(255,255,255,0.4)'}
+                      style={{ marginTop: 2 }}
+                    />
+                    <TextInput
+                      value={items}
+                      onChangeText={setItems}
+                      onFocus={() => setFocusedField('items')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="e.g. 2 grocery bags, electronics, clothing..."
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      multiline
+                      numberOfLines={3}
+                      autoCapitalize="sentences"
+                      style={[styles.input, styles.multilineInput, webNoOutline]}
+                    />
+                  </View>
+                </View>
+              </LinearGradient>
+            </View>
 
-            {/* Items */}
-            <YStack gap="$1">
-              <SizableText size="$2" fontWeight="700" color="$color10">ITEMS *</SizableText>
-              <XStack backgroundColor="$color3" borderRadius={14} borderWidth={1}
-                borderColor="$color5" paddingHorizontal="$4" paddingVertical="$2" gap="$2" alignItems="flex-start">
-                <Package size={16} color="$color9" style={{ marginTop: 4 }} />
-                <TextInput value={items} onChangeText={setItems}
-                  placeholder="e.g. 2 grocery bags, electronics, clothing..."
-                  placeholderTextColor={colors.textTertiary}
-                  multiline numberOfLines={3} autoCapitalize="sentences"
-                  style={[styles.input, styles.multiline, webNoOutline]} />
-              </XStack>
-            </YStack>
+            {/* ── Card 3: Pricing & Tip Selection ── */}
+            <View style={styles.card}>
+              <LinearGradient
+                colors={['#181C28', '#121520', '#0C0E16']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0.9, y: 1 }}
+                style={styles.cardGradient}
+              >
+                <Text style={styles.cardTitle}>PRICING & DRIVER TIP</Text>
 
-            {/* Distance + pricing */}
-            <YStack gap="$3">
-              <SizableText size="$3" fontWeight="700" color="$color10">PRICING</SizableText>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>
+                    DISTANCE (MILES) · free up to {FREE_MILES} mi
+                  </Text>
+                  <View style={[styles.inputBox, focusedField === 'miles' && styles.inputBoxFocused]}>
+                    <Navigation size={16} color={focusedField === 'miles' ? GOLD : 'rgba(255,255,255,0.4)'} />
+                    <TextInput
+                      value={miles}
+                      onChangeText={setMiles}
+                      onFocus={() => setFocusedField('miles')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="e.g. 4.5"
+                      placeholderTextColor="rgba(255,255,255,0.3)"
+                      keyboardType="decimal-pad"
+                      style={[styles.input, webNoOutline]}
+                    />
+                    {mileageCents > 0 && (
+                      <View style={styles.mileagePill}>
+                        <Text style={styles.mileageText}>+{fmt(mileageCents)}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
 
-              <Field label={`DISTANCE (miles) · free up to ${FREE_MILES} mi`} icon={<Navigation size={16} color="$color9" />}>
-                <TextInput value={miles} onChangeText={setMiles}
-                  placeholder="e.g. 4.5"
-                  placeholderTextColor={colors.textTertiary}
-                  keyboardType="decimal-pad" style={[styles.input, webNoOutline]} />
-                {mileageCents > 0 && (
-                  <SizableText size="$2" color="$amber9" fontWeight="600">+{fmt(mileageCents)}</SizableText>
+                {/* Driver Tip Pills */}
+                <View style={styles.fieldGroup}>
+                  <View style={styles.tipHeaderRow}>
+                    <Text style={styles.fieldLabel}>DRIVER TIP</Text>
+                    <Text style={styles.tipCurrentAmount}>{fmt(tipCents)}</Text>
+                  </View>
+                  <View style={styles.tipPillsRow}>
+                    {TIP_OPTIONS.map((t) => (
+                      <Pressable
+                        key={t}
+                        onPress={() => {
+                          setTipCents(t);
+                          if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                        }}
+                        style={[
+                          styles.tipPill,
+                          tipCents === t && styles.tipPillActive,
+                        ]}
+                      >
+                        <Text style={[styles.tipPillText, tipCents === t && styles.tipPillTextActive]}>
+                          {fmt(t)}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Total Summary Row */}
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Total Due on Pickup</Text>
+                  <Text style={styles.totalAmount}>{fmt(totalCents)}</Text>
+                </View>
+              </LinearGradient>
+            </View>
+
+            {/* ── Submit Button ── */}
+            <Pressable
+              onPress={handleCreateOrder}
+              disabled={loading}
+              style={({ pressed }) => [
+                styles.submitBtnWrapper,
+                pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+                loading && { opacity: 0.5 },
+              ]}
+            >
+              <LinearGradient
+                colors={['#1E75FF', '#0066FF', '#004ECC']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.submitGradient}
+              >
+                {loading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <>
+                    <CheckCircle size={18} color="white" />
+                    <Text style={styles.submitText}>CREATE ORDER</Text>
+                  </>
                 )}
-              </Field>
-
-              {/* Tip selector */}
-              <YStack gap="$2">
-                <XStack justifyContent="space-between">
-                  <SizableText size="$2" fontWeight="700" color="$color10">DRIVER TIP</SizableText>
-                  <SizableText size="$2" color="$green9" fontWeight="700">{fmt(tipCents)}</SizableText>
-                </XStack>
-                <XStack gap="$2" flexWrap="wrap">
-                  {TIP_OPTIONS.map((t) => (
-                    <Pressable key={t} onPress={() => setTipCents(t)}
-                      style={[styles.tipBtn, tipCents === t && styles.tipBtnActive]}>
-                      <SizableText size="$2" fontWeight="700" color={tipCents === t ? 'white' : '$color11'}>
-                        {fmt(t)}
-                      </SizableText>
-                    </Pressable>
-                  ))}
-                </XStack>
-              </YStack>
-
-              {/* Total */}
-              <XStack backgroundColor="$color3" borderRadius={12} padding="$3" justifyContent="space-between" alignItems="center">
-                <SizableText size="$3" color="$color10" fontWeight="600">Total due on pickup</SizableText>
-                <SizableText size="$5" fontWeight="800" color="$color12">{fmt(totalCents)}</SizableText>
-              </XStack>
-            </YStack>
-
-            {/* Submit */}
-            <Pressable onPress={handleCreateOrder} disabled={loading}
-              style={({ pressed }) => [styles.submitBtn, pressed && styles.submitBtnPressed, loading && { opacity: 0.5 }]}>
-              {loading
-                ? <ActivityIndicator color="white" />
-                : (
-                  <XStack gap="$2" alignItems="center">
-                    <CheckCircle size={20} color="white" />
-                    <SizableText size="$5" fontWeight="800" color="white">CREATE ORDER</SizableText>
-                  </XStack>
-                )}
+              </LinearGradient>
             </Pressable>
-
-          </YStack>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
     </SafeArea>
-  );
-}
-
-function Field({ label, icon, children, locked }: {
-  label: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  locked?: boolean;
-}) {
-  return (
-    <YStack gap="$1">
-      <SizableText size="$2" fontWeight="700" color="$color10">{label}</SizableText>
-      <XStack
-        alignItems="center"
-        backgroundColor={locked ? 'rgba(204,0,0,0.07)' : '$color3'}
-        borderRadius={14} borderWidth={1}
-        borderColor={locked ? 'rgba(204,0,0,0.3)' : '$color5'}
-        paddingHorizontal="$4" gap="$2"
-      >
-        {icon}
-        {children}
-      </XStack>
-    </YStack>
   );
 }
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {};
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#1E2230',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 196, 0, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    marginTop: 1,
+  },
+  testFillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(245, 196, 0, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 196, 0, 0.35)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  testFillText: {
+    color: GOLD,
+    fontSize: 11,
+    fontWeight: '800',
+  },
   scroll: {
-    flexGrow: 1,
-    padding: spacing.lg,
-    paddingBottom: spacing.xxxl,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 40,
+    gap: 14,
+  },
+
+  /* Cards */
+  card: {
+    backgroundColor: CARD_BG,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  cardGradient: {
+    padding: 16,
+    width: '100%',
+    gap: 14,
+  },
+  cardTitle: {
+    color: 'rgba(255, 255, 255, 0.55)',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+
+  /* Fields */
+  fieldGroup: {
+    gap: 6,
+  },
+  fieldLabel: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  inputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#121520',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 14,
+    height: 48,
+  },
+  inputBoxFocused: {
+    borderColor: '#F5C400',
+    borderWidth: 1.5,
+  },
+  inputBoxMultiline: {
+    height: 80,
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+  },
+  inputBoxLocked: {
+    backgroundColor: 'rgba(245, 196, 0, 0.04)',
+    borderColor: 'rgba(245, 196, 0, 0.25)',
   },
   input: {
     flex: 1,
-    height: 52,
-    fontSize: 16,
-    color: colors.text,
+    color: '#FFFFFF',
+    fontSize: 14.5,
+    fontWeight: '500',
+    height: '100%',
   },
-  multiline: {
-    height: 72,
+  multilineInput: {
+    height: 60,
     textAlignVertical: 'top',
-    paddingTop: 4,
   },
-  tipBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    marginBottom: spacing.xs,
+  mileagePill: {
+    backgroundColor: 'rgba(245, 196, 0, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  tipBtnActive: {
-    backgroundColor: APP_CONFIG.PRIMARY_COLOR,
-    borderColor: APP_CONFIG.PRIMARY_COLOR,
+  mileageText: {
+    color: GOLD,
+    fontSize: 11.5,
+    fontWeight: '800',
   },
-  submitBtn: {
-    height: 56,
-    borderRadius: borderRadius.xl,
-    backgroundColor: APP_CONFIG.PRIMARY_COLOR,
+
+  /* Tips */
+  tipHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  tipCurrentAmount: {
+    color: GREEN,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  tipPillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  tipPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#141824',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  tipPillActive: {
+    backgroundColor: BLUE,
+    borderColor: BLUE,
+  },
+  tipPillText: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  tipPillTextActive: {
+    color: '#FFFFFF',
+  },
+
+  /* Total Summary */
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  totalLabel: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  totalAmount: {
+    color: GOLD,
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+
+  /* Submit Button */
+  submitBtnWrapper: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: BLUE,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+    marginTop: 4,
+  },
+  submitGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.sm,
+    gap: 8,
+    paddingVertical: 15,
+    borderRadius: 16,
   },
-  submitBtnPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  submitText: {
+    color: '#FFFFFF',
+    fontSize: 15.5,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
 });
+
