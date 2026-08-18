@@ -25,6 +25,7 @@
         "credentialsSource": "remote"
       },
       "android": {
+        "buildType": "apk",
         "credentialsSource": "local"
       }
     },
