@@ -1,15 +1,15 @@
 import { Tabs } from 'expo-router';
-import { Home, PlusCircle, User, Map, MessageCircle, DollarSign, Truck } from '@blinkdotnew/mobile-ui';
+import { Home, PlusCircle, User, Map, MessageCircle, DollarSign, Truck, ShoppingBag } from '@blinkdotnew/mobile-ui';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_CONFIG } from '@/lib/config';
 import { useOrders } from '@/lib/orders';
 import { useDriverId } from '@/hooks/useDriverId';
 
-const ACTIVE = APP_CONFIG.PRIMARY_COLOR;
-const INACTIVE = 'rgba(255,255,255,0.4)';
-const TAB_BG = '#0A0A0F';
-const TAB_BORDER = `${APP_CONFIG.PRIMARY_COLOR}40`;
+const ACTIVE = '#E5A93C';
+const INACTIVE = '#77777A';
+const TAB_BG = '#000000';
+const TAB_BORDER = '#1A1A1E';
 
 function ActiveTabIcon({ color, size }: { color: string; size: number }) {
   const { data: orders = [] } = useOrders();
@@ -20,9 +20,9 @@ function ActiveTabIcon({ color, size }: { color: string; size: number }) {
 
   return (
     <View>
-      <Truck color={color} size={size} />
+      <ShoppingBag color={color} size={size} />
       {count > 0 && (
-        <View style={[styles.badge, { backgroundColor: '#F97316' }]}>
+        <View style={[styles.badge, { backgroundColor: '#E5A93C' }]}>
           <Text style={styles.badgeText}>{count > 9 ? '9+' : count}</Text>
         </View>
       )}
@@ -44,19 +44,15 @@ export default function TabLayout() {
           backgroundColor: TAB_BG,
           borderTopWidth: 1,
           borderTopColor: TAB_BORDER,
-          height: 64 + bottomPad,
+          height: 60 + bottomPad,
           paddingBottom: bottomPad,
           paddingTop: 8,
-          shadowColor: APP_CONFIG.PRIMARY_COLOR,
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.15,
-          shadowRadius: 8,
           elevation: 12,
         },
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '700',
-          letterSpacing: 0.3,
+          letterSpacing: 0.2,
         },
       }}
     >

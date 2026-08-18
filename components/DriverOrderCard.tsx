@@ -1,13 +1,23 @@
 import React from 'react';
-import { View, Pressable, Linking, Platform, StyleSheet, Text, Alert } from 'react-native';
-import { Button, MapPin, Navigation, CheckCircle, Package, Truck, PackageCheck } from '@blinkdotnew/mobile-ui';
+import { View, Pressable, Linking, Platform, StyleSheet, Text } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  Button,
+  MapPin,
+  Navigation,
+  CheckCircle,
+  Package,
+  Truck,
+  PackageCheck,
+} from '@blinkdotnew/mobile-ui';
 import { Order, useUpdateOrderStatus } from '@/lib/orders';
 import { calcDriverEarnings } from '@/lib/config';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 
-const BLUE = '#0066FF';
-const YELLOW = '#F5C400';
+const GOLD = '#E5A93C';
+const GOLD_LIGHT = '#F5C400';
+const GOLD_DARK = '#C9851E';
 const GREEN = '#22C55E';
 const ORANGE = '#F97316';
 
@@ -18,9 +28,10 @@ function haptic() {
 function openNav(address: string) {
   if (!address) return;
   const encoded = encodeURIComponent(address);
-  const url = Platform.OS === 'ios'
-    ? `maps://?daddr=${encoded}`
-    : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
+  const url =
+    Platform.OS === 'ios'
+      ? `maps://?daddr=${encoded}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
   Linking.openURL(url);
 }
 
@@ -37,7 +48,14 @@ interface Props {
   driverDisplayName?: string;
 }
 
-export function DriverOrderCard({ order, onPress, isMyOrder = false, driverAtCapacity = false, driverUserId, driverDisplayName }: Props) {
+export function DriverOrderCard({
+  order,
+  onPress,
+  isMyOrder = false,
+  driverAtCapacity = false,
+  driverUserId,
+  driverDisplayName,
+}: Props) {
   const updateStatus = useUpdateOrderStatus();
   const { status } = order;
   const shortId = order.id ? order.id.slice(-6).toUpperCase() : '------';
@@ -46,167 +64,213 @@ export function DriverOrderCard({ order, onPress, isMyOrder = false, driverAtCap
   const earnings = calcDriverEarnings(miles, Number(order.tipAmount ?? 0));
   const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
 
+  const initial = (order.customerName?.trim() || 'U').charAt(0).toUpperCase();
+
   const badge =
-    status === 'pending'   ? { label: 'UNASSIGNED',  style: styles.badgePending,   text: styles.badgeTextPending }
-    : status === 'accepted'  ? { label: 'ACCEPTED',    style: styles.badgeAccepted,  text: styles.badgeTextAccepted }
-    : status === 'picked_up' ? { label: 'PICKED UP',   style: styles.badgePickedUp,  text: styles.badgeTextPickedUp }
-    :                          { label: 'DELIVERED',   style: styles.badgeDone,      text: styles.badgeTextDone };
+    status === 'pending'
+      ? { label: 'UNASSIGNED', style: styles.badgePending, text: styles.badgeTextPending }
+      : status === 'accepted'
+      ? { label: 'ACCEPTED', style: styles.badgeAccepted, text: styles.badgeTextAccepted }
+      : status === 'picked_up'
+      ? { label: 'PICKED UP', style: styles.badgePickedUp, text: styles.badgeTextPickedUp }
+      : { label: 'DELIVERED', style: styles.badgeDone, text: styles.badgeTextDone };
 
   const navAddress =
-    status === 'accepted'  ? order.pickupAddress :   // go pick up
-    status === 'picked_up' ? order.deliveryAddress : // go deliver
-    order.deliveryAddress;
+    status === 'accepted'
+      ? order.pickupAddress
+      : status === 'picked_up'
+      ? order.deliveryAddress
+      : order.deliveryAddress;
 
   return (
-    <View style={[
-      styles.card,
-      status === 'accepted'  && styles.cardAccepted,
-      status === 'picked_up' && styles.cardPickedUp,
-      isMyOrder && styles.cardMine,
-      driverAtCapacity && styles.cardDimmed,
-    ]}>
-
-      {/* ─── Tappable info area ─── */}
-      <Pressable onPress={onPress} style={styles.tapArea}>
-
-        {/* Header */}
-        <View style={styles.headerRow}>
-          <Text style={styles.customerName} numberOfLines={1}>{order.customerName}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {isMyOrder && (
-              <View style={styles.mineBadge}>
-                <Text style={styles.mineBadgeText}>YOURS</Text>
+    <View
+      style={[
+        styles.card,
+        status === 'accepted' && styles.cardAccepted,
+        status === 'picked_up' && styles.cardPickedUp,
+        isMyOrder && styles.cardMine,
+        driverAtCapacity && styles.cardDimmed,
+      ]}
+    >
+      <LinearGradient
+        colors={['#181C28', '#121520', '#0C0E16']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
+        style={styles.cardGradient}
+      >
+        {/* ─── Tappable info area ─── */}
+        <Pressable onPress={onPress} style={({ pressed }) => [styles.tapArea, pressed && { opacity: 0.92 }]}>
+          {/* Header with Avatar Circle, Name, ID & Status Badge */}
+          <View style={styles.headerRow}>
+            <View style={styles.headerLeft}>
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarLetter}>{initial}</Text>
               </View>
-            )}
-            <View style={[styles.badge, badge.style]}>
-              <Text style={[styles.badgeText, badge.text]}>{badge.label}</Text>
+              <View style={styles.nameContainer}>
+                <Text style={styles.customerName} numberOfLines={1}>
+                  {order.customerName || 'Customer'}
+                </Text>
+                <Text style={styles.orderId}>#{shortId}</Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {isMyOrder && (
+                <View style={styles.mineBadge}>
+                  <Text style={styles.mineBadgeText}>YOURS</Text>
+                </View>
+              )}
+              <View style={[styles.badge, badge.style]}>
+                <Text style={[styles.badgeText, badge.text]}>{badge.label}</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <Text style={styles.orderId}>#{shortId}</Text>
-
-        {/* Pickup */}
-        <View style={styles.addrRow}>
-          <Package size={14} color={YELLOW} />
-          <View style={styles.addrText}>
-            <Text style={[styles.addrLabel, { color: YELLOW }]}>PICK UP FROM</Text>
-            <Text style={styles.addrValue} numberOfLines={2}>
-              {order.pickupAddress || '—'}
-            </Text>
+          {/* Pickup Row */}
+          <View style={styles.addrRow}>
+            <View style={styles.iconBox}>
+              <Package size={15} color={GOLD} />
+            </View>
+            <View style={styles.addrText}>
+              <Text style={styles.addrLabel}>PICK UP FROM</Text>
+              <Text style={styles.addrValue} numberOfLines={2}>
+                {order.pickupAddress || '—'}
+              </Text>
+            </View>
           </View>
-        </View>
 
-        {/* Delivery */}
-        <View style={styles.addrRow}>
-          <MapPin size={14} color={BLUE} />
-          <View style={styles.addrText}>
-            <Text style={[styles.addrLabel, { color: BLUE }]}>DELIVER TO</Text>
-            <Text style={styles.addrValue} numberOfLines={2}>
-              {order.deliveryAddress || '—'}
-            </Text>
+          {/* Delivery Row */}
+          <View style={styles.addrRow}>
+            <View style={styles.iconBox}>
+              <MapPin size={15} color={GOLD} />
+            </View>
+            <View style={styles.addrText}>
+              <Text style={styles.addrLabel}>DELIVER TO</Text>
+              <Text style={styles.addrValue} numberOfLines={2}>
+                {order.deliveryAddress || '—'}
+              </Text>
+            </View>
           </View>
-        </View>
 
-        {/* Earnings pill — always visible */}
-        <View style={styles.earningsRow}>
-          <View style={styles.earningsPill}>
-            <Text style={styles.earningsAmount}>{earnings.totalDisplay}</Text>
-            <Text style={styles.earningsBreak}>
-              {earnings.mileageCents > 0 ? `${miles.toFixed(1)} mi` : ''}
-              {earnings.mileageCents > 0 && earnings.tipCents > 0 ? ' · ' : ''}
-              {earnings.tipCents > 0 ? `${(earnings.tipCents / 100).toFixed(2)} tip` : ''}
-            </Text>
+          {/* Earnings pill & Phone number row */}
+          <View style={styles.earningsRow}>
+            <View style={styles.earningsPill}>
+              <Text style={styles.earningsAmount}>${earnings.totalDisplay}</Text>
+              <Text style={styles.earningsBreak}>
+                {earnings.mileageCents > 0 ? `${miles.toFixed(1)} mi` : ''}
+                {earnings.mileageCents > 0 && earnings.tipCents > 0 ? ' · ' : ''}
+                {earnings.tipCents > 0 ? `${(earnings.tipCents / 100).toFixed(2)} tip` : '0.00 tip'}
+              </Text>
+            </View>
+
+            {!!order.customerPhone && (
+              <Text style={styles.phone}>{order.customerPhone}</Text>
+            )}
           </View>
-          {!!order.customerPhone && (
-            <Text style={styles.phone}>{order.customerPhone}</Text>
-          )}
-        </View>
+        </Pressable>
 
-      </Pressable>
-
-      {/* ─── Action buttons ─── */}
-      <View style={styles.actions}>
-
-        {/* Navigate button */}
-        <Button
-          size="$3"
-          onPress={() => { haptic(); openNav(navAddress); }}
-          backgroundColor="rgba(0,102,255,0.12)"
-          borderColor="rgba(0,102,255,0.4)"
-          borderWidth={1}
-          color={BLUE}
-          icon={<Navigation size={13} color={BLUE} />}
-          paddingHorizontal="$3"
-        >
-          {status === 'picked_up' ? 'Deliver' : 'Map'}
-        </Button>
-
-        {/* PENDING → accept (disabled when driver is at 3-order capacity) */}
-        {status === 'pending' && (
+        {/* ─── Action buttons ─── */}
+        <View style={styles.actions}>
+          {/* Map / Navigate button */}
           <Button
-            flex={1} size="$3"
-            onPress={async () => {
-              if (driverAtCapacity) return;
+            size="$3.5"
+            onPress={() => {
               haptic();
-              setCheckoutError(null);
-
-              const uid = driverUserId || `guest-${Date.now()}`;
-              const uname = driverDisplayName || 'Driver';
-
-              try {
-                if (!order.id) {
-                  throw new Error('This order is missing its ID. Refresh the Orders tab and try again.');
-                }
-                console.log('[Accept] Accepting order', order.id);
-                await updateStatus.mutateAsync({
-                  id: order.id,
-                  status: 'accepted',
-                  driverUserId: uid,
-                  driverName: uname,
-                });
-                console.log('[Accept] Order accepted');
-              } catch (err: any) {
-                console.error('[Accept] Failed to accept order:', err);
-                setCheckoutError(err?.message || 'Could not accept order');
-              }
+              openNav(navAddress);
             }}
-            disabled={updateStatus.isPending || driverAtCapacity}
-            backgroundColor={driverAtCapacity ? 'rgba(100,100,100,0.2)' : YELLOW}
-            color={driverAtCapacity ? '#888' : '#000'}
-            fontWeight="800"
-            borderColor={driverAtCapacity ? 'rgba(100,100,100,0.3)' : undefined}
-            borderWidth={driverAtCapacity ? 1 : 0}
-            icon={<Truck size={14} color={driverAtCapacity ? '#888' : '#000'} />}
+            backgroundColor="rgba(255,255,255,0.06)"
+            borderColor="rgba(255,255,255,0.18)"
+            borderWidth={1}
+            color="#FFFFFF"
+            icon={<Navigation size={13} color="#93C5FD" />}
+            paddingHorizontal="$4"
+            borderRadius={12}
           >
-            {updateStatus.isPending ? '…' : driverAtCapacity ? 'Queue Full' : 'Accept'}
+            {status === 'picked_up' ? 'Deliver' : 'Map'}
           </Button>
-        )}
 
-        {/* ACCEPTED → order picked up */}
+          {/* PENDING -> Accept Order */}
+          {status === 'pending' && (
+            <Pressable
+              onPress={async () => {
+                if (driverAtCapacity) return;
+                haptic();
+                setCheckoutError(null);
+
+                const uid = driverUserId || `guest-${Date.now()}`;
+                const uname = driverDisplayName || 'Driver';
+
+                try {
+                  if (!order.id) {
+                    throw new Error('This order is missing its ID. Refresh the Orders tab and try again.');
+                  }
+                  await updateStatus.mutateAsync({
+                    id: order.id,
+                    status: 'accepted',
+                    driverUserId: uid,
+                    driverName: uname,
+                  });
+                } catch (err: any) {
+                  console.error('[Accept] Failed to accept order:', err);
+                  setCheckoutError(err?.message || 'Could not accept order');
+                }
+              }}
+              disabled={updateStatus.isPending || driverAtCapacity}
+              style={({ pressed }) => [
+                styles.acceptButtonWrapper,
+                pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+                driverAtCapacity && { opacity: 0.4 },
+              ]}
+            >
+              <LinearGradient
+                colors={driverAtCapacity ? ['#333338', '#222225'] : ['#1E75FF', '#0066FF', '#004ECC']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.acceptGradient}
+              >
+                <Truck size={16} color="#FFFFFF" />
+                <Text style={[styles.acceptButtonText, driverAtCapacity && { color: '#888' }]}>
+                  {updateStatus.isPending ? 'Processing…' : driverAtCapacity ? 'Queue Full' : 'Accept'}
+                </Text>
+              </LinearGradient>
+            </Pressable>
+          )}
+
+        {/* ACCEPTED -> Order Picked Up */}
         {status === 'accepted' && (
           <Button
-            flex={1} size="$3"
-            onPress={() => { haptic(); updateStatus.mutate({ id: order.id, status: 'picked_up' }); }}
+            flex={1}
+            size="$3.5"
+            onPress={() => {
+              haptic();
+              updateStatus.mutate({ id: order.id, status: 'picked_up' });
+            }}
             disabled={updateStatus.isPending}
-            backgroundColor={ORANGE} color="#000" fontWeight="800"
-            icon={<PackageCheck size={14} color="#000" />}
+            backgroundColor={ORANGE}
+            color="#000"
+            fontWeight="800"
+            borderRadius={12}
+            icon={<PackageCheck size={15} color="#000" />}
           >
             {updateStatus.isPending ? '…' : 'Order Picked Up'}
           </Button>
         )}
 
-        {/* PICKED_UP → open delivery flow so a photo is captured and texted */}
+        {/* PICKED_UP -> Complete with Photo */}
         {status === 'picked_up' && (
           <Button
-            flex={1} size="$3"
+            flex={1}
+            size="$3.5"
             onPress={() => {
               haptic();
               router.push(`/order/${order.id}`);
             }}
             disabled={updateStatus.isPending}
-            backgroundColor={GREEN} color="#000" fontWeight="800"
-            icon={<CheckCircle size={14} color="#000" />}
+            backgroundColor={GREEN}
+            color="#000"
+            fontWeight="800"
+            borderRadius={12}
+            icon={<CheckCircle size={15} color="#000" />}
           >
             Complete with Photo
           </Button>
@@ -215,81 +279,235 @@ export function DriverOrderCard({ order, onPress, isMyOrder = false, driverAtCap
         {/* DELIVERED */}
         {status === 'delivered' && (
           <Button
-            flex={1} size="$3" disabled
-            backgroundColor="rgba(34,197,94,0.1)"
-            borderColor="rgba(34,197,94,0.3)" borderWidth={1}
-            color={GREEN} icon={<CheckCircle size={14} color={GREEN} />}
+            flex={1}
+            size="$3.5"
+            disabled
+            backgroundColor="rgba(34,197,94,0.12)"
+            borderColor="rgba(34,197,94,0.3)"
+            borderWidth={1}
+            color={GREEN}
+            borderRadius={12}
+            icon={<CheckCircle size={15} color={GREEN} />}
           >
             Delivered ✓
           </Button>
         )}
-
       </View>
 
-      {/* ─── Error message (only shown if accept/pickup/deliver fails) ─── */}
+      {/* ─── Error message ─── */}
       {checkoutError && (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>⚠️ {checkoutError}</Text>
         </View>
       )}
+      </LinearGradient>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#0F172A',
-    borderRadius: 16,
+    backgroundColor: '#0F121C',
+    borderRadius: 18,
     marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.09)',
     overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 5,
   },
-  cardAccepted:  { borderColor: 'rgba(0,102,255,0.45)',  backgroundColor: '#0A1628' },
-  cardPickedUp:  { borderColor: 'rgba(249,115,22,0.5)',  backgroundColor: '#1A0E00' },
-  cardMine:      { borderColor: 'rgba(34,197,94,0.5)',   borderWidth: 1.5 },
-  cardDimmed:    { opacity: 0.45 },
-  mineBadge:     { backgroundColor: 'rgba(34,197,94,0.18)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.5)', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  cardGradient: {
+    width: '100%',
+  },
+  cardAccepted: { borderColor: 'rgba(0,102,255,0.45)' },
+  cardPickedUp: { borderColor: 'rgba(249,115,22,0.5)' },
+  cardMine: { borderColor: 'rgba(34,197,94,0.55)', borderWidth: 1.5 },
+  cardDimmed: { opacity: 0.45 },
+
+  mineBadge: {
+    backgroundColor: 'rgba(34,197,94,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.5)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
   mineBadgeText: { color: '#22C55E', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
 
-  tapArea: { padding: 16, paddingBottom: 8 },
+  tapArea: { padding: 16, paddingBottom: 10 },
 
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
-  customerName: { color: 'white', fontSize: 17, fontWeight: '800', flex: 1, marginRight: 8 },
-  orderId: { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontFamily: 'monospace', marginBottom: 12 },
-
-  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
-  badgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-  badgePending:       { backgroundColor: 'rgba(245,196,0,0.1)',   borderColor: 'rgba(245,196,0,0.35)' },
-  badgeTextPending:   { color: '#F5C400' },
-  badgeAccepted:      { backgroundColor: 'rgba(0,102,255,0.15)',  borderColor: 'rgba(0,102,255,0.5)' },
-  badgeTextAccepted:  { color: '#60A5FA' },
-  badgePickedUp:      { backgroundColor: 'rgba(249,115,22,0.15)', borderColor: 'rgba(249,115,22,0.5)' },
-  badgeTextPickedUp:  { color: '#FB923C' },
-  badgeDone:          { backgroundColor: 'rgba(34,197,94,0.1)',   borderColor: 'rgba(34,197,94,0.35)' },
-  badgeTextDone:      { color: '#22C55E' },
-
-  addrRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 8 },
-  addrText:  { flex: 1 },
-  addrLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, marginBottom: 2 },
-  addrValue: { color: 'white', fontSize: 13, lineHeight: 18 },
-
-  earningsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 4 },
-  earningsPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(245,196,0,0.12)',
-    borderWidth: 1, borderColor: 'rgba(245,196,0,0.3)',
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+  /* Header */
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
   },
-  earningsAmount: { color: YELLOW, fontSize: 15, fontWeight: '900' },
-  earningsBreak:  { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
-  phone: { color: '#60A5FA', fontSize: 12 },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#1C2130',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLetter: {
+    color: GOLD,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  nameContainer: {
+    flex: 1,
+  },
+  customerName: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  orderId: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    marginTop: 2,
+  },
 
-  actions: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingBottom: 12, paddingTop: 4 },
+  /* Badges */
+  badge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  badgeText: { fontSize: 9.5, fontWeight: '800', letterSpacing: 0.8 },
+  badgePending: {
+    backgroundColor: 'rgba(229, 169, 60, 0.12)',
+    borderColor: 'rgba(229, 169, 60, 0.35)',
+  },
+  badgeTextPending: { color: GOLD },
+  badgeAccepted: {
+    backgroundColor: 'rgba(0,102,255,0.15)',
+    borderColor: 'rgba(0,102,255,0.5)',
+  },
+  badgeTextAccepted: { color: '#60A5FA' },
+  badgePickedUp: {
+    backgroundColor: 'rgba(249,115,22,0.15)',
+    borderColor: 'rgba(249,115,22,0.5)',
+  },
+  badgeTextPickedUp: { color: '#FB923C' },
+  badgeDone: {
+    backgroundColor: 'rgba(34,197,94,0.12)',
+    borderColor: 'rgba(34,197,94,0.35)',
+  },
+  badgeTextDone: { color: '#22C55E' },
+
+  /* Address rows */
+  addrRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 10,
+  },
+  iconBox: {
+    marginTop: 2,
+  },
+  addrText: { flex: 1 },
+  addrLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: GOLD,
+    marginBottom: 2,
+  },
+  addrValue: {
+    color: '#F1F5F9',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+
+  /* Earnings & Phone */
+  earningsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  earningsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#151926',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  earningsAmount: {
+    color: GOLD,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  earningsBreak: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11.5,
+    fontWeight: '500',
+  },
+  phone: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12.5,
+    fontWeight: '500',
+  },
+
+  /* Action Buttons */
+  actions: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    paddingTop: 4,
+    alignItems: 'center',
+  },
+  acceptButtonWrapper: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  acceptGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  acceptButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
 
   errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.1)',
+    backgroundColor: 'rgba(239,68,68,0.12)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(239,68,68,0.3)',
     paddingHorizontal: 16,
@@ -297,3 +515,4 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#FCA5A5', fontSize: 11, fontWeight: '600' },
 });
+
