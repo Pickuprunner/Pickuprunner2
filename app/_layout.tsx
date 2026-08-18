@@ -91,11 +91,12 @@ export default function RootLayout() {
             <WebStyleReset />
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
+              <Stack.Screen name="(landing)" />
               <Stack.Screen name="role-select" />
+              <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="(customer)" />
               <Stack.Screen name="order/[id]" />
-              <Stack.Screen name="sign-in" />
               <Stack.Screen name="driver-verification" />
               <Stack.Screen name="background-check" />
               <Stack.Screen name="terms" />

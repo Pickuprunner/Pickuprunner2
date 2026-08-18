@@ -15,15 +15,10 @@ import {
   SafeArea,
   ArrowLeft,
   ShieldCheck,
-  Upload,
   FileText,
   Car,
   CheckCircle,
   AlertCircle,
-  Clock,
-  XCircle,
-  ChevronRight,
-  ArrowRight,
 } from '@blinkdotnew/mobile-ui';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -31,17 +26,8 @@ import { blink } from '@/lib/blink';
 import { useAuth } from '@/hooks/useAuth';
 import { useMyVerification, useSubmitVerification } from '@/lib/verification';
 import { APP_CONFIG } from '@/lib/config';
-import { colors, spacing, borderRadius } from '@/constants/design';
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface DocState {
-  uri: string | null;
-  name: string;
-  uploading: boolean;
-  publicUrl: string | null;
-  progress: number;
-}
+import { spacing, borderRadius } from '@/constants/design';
+import { StatusBanner, DocUploadCard, DocState } from './components';
 
 const EMPTY_DOC: DocState = {
   uri: null,
@@ -51,202 +37,9 @@ const EMPTY_DOC: DocState = {
   progress: 0,
 };
 
-// ── Status Banner ──────────────────────────────────────────────────────────────
-
-function StatusBanner({
-  status,
-  adminNote,
-  onResubmit,
-}: {
-  status: 'pending' | 'approved' | 'rejected';
-  adminNote?: string;
-  onResubmit?: () => void;
-}) {
-  if (status === 'approved') {
-    return (
-      <YStack
-        backgroundColor="$green2"
-        borderRadius="$4"
-        borderWidth={1}
-        borderColor="$green5"
-        padding="$4"
-        gap="$2"
-      >
-        <XStack gap="$3" alignItems="center">
-          <ShieldCheck size={28} color="$green9" />
-          <YStack flex={1}>
-            <SizableText size="$5" fontWeight="800" color="$green10">
-              Verification Approved ✓
-            </SizableText>
-            <SizableText size="$2" color="$green9">
-              Your account is fully verified. You can accept deliveries.
-            </SizableText>
-          </YStack>
-        </XStack>
-      </YStack>
-    );
-  }
-
-  if (status === 'pending') {
-    return (
-      <YStack
-        backgroundColor="$amber2"
-        borderRadius="$4"
-        borderWidth={1}
-        borderColor="$amber5"
-        padding="$4"
-        gap="$2"
-      >
-        <XStack gap="$3" alignItems="center">
-          <Clock size={28} color="$amber9" />
-          <YStack flex={1}>
-            <SizableText size="$5" fontWeight="800" color="$amber10">
-              Under Review
-            </SizableText>
-            <SizableText size="$2" color="$amber9">
-              Your documents are being reviewed by the admin. This usually takes less than 24 hours.
-            </SizableText>
-          </YStack>
-        </XStack>
-      </YStack>
-    );
-  }
-
-  // Rejected
-  return (
-    <YStack
-      backgroundColor="$red2"
-      borderRadius="$4"
-      borderWidth={1}
-      borderColor="$red5"
-      padding="$4"
-      gap="$3"
-    >
-      <XStack gap="$3" alignItems="center">
-        <XCircle size={28} color="$red9" />
-        <YStack flex={1}>
-          <SizableText size="$5" fontWeight="800" color="$red10">
-            Verification Rejected
-          </SizableText>
-          {adminNote ? (
-            <SizableText size="$2" color="$red9">{adminNote}</SizableText>
-          ) : (
-            <SizableText size="$2" color="$red9">
-              Please re-upload clearer documents and resubmit.
-            </SizableText>
-          )}
-        </YStack>
-      </XStack>
-      {onResubmit && (
-        <Pressable
-          onPress={onResubmit}
-          style={({ pressed }) => [styles.resubmitBtn, pressed && { opacity: 0.8 }]}
-        >
-          <SizableText size="$3" fontWeight="700" color="white">
-            Resubmit Documents
-          </SizableText>
-        </Pressable>
-      )}
-    </YStack>
-  );
-}
-
-// ── Doc Upload Card ────────────────────────────────────────────────────────────
-
-function DocUploadCard({
-  label,
-  description,
-  icon,
-  doc,
-  onPick,
-}: {
-  label: string;
-  description: string;
-  icon: React.ReactNode;
-  doc: DocState;
-  onPick: () => void;
-}) {
-  const hasDoc = !!doc.publicUrl;
-
-  return (
-    <Pressable
-      onPress={onPick}
-      disabled={doc.uploading}
-      style={({ pressed }) => [
-        styles.docCard,
-        hasDoc && styles.docCardDone,
-        pressed && !doc.uploading && { opacity: 0.85 },
-      ]}
-    >
-      <XStack gap="$4" alignItems="center">
-        {/* Icon circle */}
-        <YStack
-          width={52}
-          height={52}
-          borderRadius={26}
-          backgroundColor={hasDoc ? 'rgba(22,163,74,0.12)' : 'rgba(204,0,0,0.08)'}
-          alignItems="center"
-          justifyContent="center"
-          borderWidth={1.5}
-          borderColor={hasDoc ? 'rgba(22,163,74,0.35)' : 'rgba(204,0,0,0.25)'}
-        >
-          {doc.uploading ? (
-            <ActivityIndicator size="small" color={APP_CONFIG.PRIMARY_COLOR} />
-          ) : hasDoc ? (
-            <CheckCircle size={26} color="$green9" />
-          ) : (
-            icon
-          )}
-        </YStack>
-
-        {/* Text */}
-        <YStack flex={1} gap="$0">
-          <SizableText size="$4" fontWeight="700" color="$color12">{label}</SizableText>
-          {doc.uploading ? (
-            <SizableText size="$2" color="$amber9">
-              Uploading… {doc.progress > 0 ? `${Math.round(doc.progress)}%` : ''}
-            </SizableText>
-          ) : hasDoc ? (
-            <SizableText size="$2" color="$green9" numberOfLines={1}>
-              ✓ {doc.name || 'Uploaded'}
-            </SizableText>
-          ) : (
-            <SizableText size="$2" color="$color10">{description}</SizableText>
-          )}
-        </YStack>
-
-        {/* Arrow / replace hint */}
-        {!doc.uploading && (
-          <YStack alignItems="center" gap="$0">
-            {hasDoc ? (
-              <SizableText size="$1" color="$color9">Replace</SizableText>
-            ) : (
-              <Upload size={18} color="$color9" />
-            )}
-          </YStack>
-        )}
-      </XStack>
-
-      {/* Progress bar */}
-      {doc.uploading && doc.progress > 0 && (
-        <YStack marginTop="$2" height={3} backgroundColor="$color4" borderRadius={2}>
-          <YStack
-            height={3}
-            borderRadius={2}
-            backgroundColor={APP_CONFIG.PRIMARY_COLOR}
-            width={`${doc.progress}%` as any}
-          />
-        </YStack>
-      )}
-    </Pressable>
-  );
-}
-
-// ── Main Screen ────────────────────────────────────────────────────────────────
-
 export default function DriverVerificationScreen() {
-  const { user, isAuthenticated } = useAuth();
-  const { data: existing, isLoading } = useMyVerification(user?.id);
+  const { user } = useAuth();
+  const { data: existing } = useMyVerification(user?.id);
   const submitVerification = useSubmitVerification();
 
   const [license, setLicense] = useState<DocState>(EMPTY_DOC);
@@ -271,7 +64,6 @@ export default function DriverVerificationScreen() {
       return;
     }
 
-    // On web, use file input element
     if (Platform.OS === 'web') {
       const input = document.createElement('input');
       input.type = 'file';
@@ -297,7 +89,6 @@ export default function DriverVerificationScreen() {
       return;
     }
 
-    // Native: request permission + launch picker
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission required', 'Allow photo library access to upload documents.');
@@ -319,7 +110,6 @@ export default function DriverVerificationScreen() {
     setter((s) => ({ ...s, uri, name: filename, uploading: true, progress: 0 }));
 
     try {
-      // Convert URI to blob on native
       const response = await fetch(uri);
       const blob = await response.blob();
       const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
@@ -371,8 +161,6 @@ export default function DriverVerificationScreen() {
       setSubmitError(err?.message ?? 'Submission failed. Please try again.');
     }
   };
-
-  // ── Render ───────────────────────────────────────────────────────────────────
 
   const canSubmit =
     !!license.publicUrl &&
@@ -442,7 +230,7 @@ export default function DriverVerificationScreen() {
           {/* Status banner for existing submissions */}
           {hasExisting && !showForm && (
             <StatusBanner
-              status={existing.status}
+              status={existing.status as any}
               adminNote={existing.admin_note}
               onResubmit={isRejected ? () => setShowForm(true) : undefined}
             />
@@ -475,8 +263,8 @@ export default function DriverVerificationScreen() {
             </YStack>
           )}
 
-          {/* Upload form — shown for new submissions or resubmissions */}
-          {(showUploadForm) && !isPending && !isVerified && (
+          {/* Upload form */}
+          {showUploadForm && !isPending && !isVerified && (
             <YStack gap="$4">
               <XStack justifyContent="space-between" alignItems="center">
                 <SizableText size="$2" fontWeight="700" color="$color10">UPLOAD DOCUMENTS</SizableText>
@@ -580,9 +368,7 @@ export default function DriverVerificationScreen() {
             </YStack>
           )}
 
-
-
-          {/* Approved state — show what was submitted */}
+          {/* Approved state */}
           {isVerified && existing && (
             <YStack gap="$3">
               <SizableText size="$2" fontWeight="700" color="$color10">SUBMITTED DOCUMENTS</SizableText>
@@ -612,7 +398,7 @@ export default function DriverVerificationScreen() {
             </YStack>
           )}
 
-          {/* Pending — show what was submitted */}
+          {/* Pending state */}
           {isPending && existing && (
             <YStack gap="$3">
               <SizableText size="$2" fontWeight="700" color="$color10">DOCUMENTS SUBMITTED</SizableText>
@@ -653,17 +439,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxxl,
   },
-  docCard: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    padding: spacing.md,
-  },
-  docCardDone: {
-    borderColor: 'rgba(22,163,74,0.4)',
-    backgroundColor: 'rgba(22,163,74,0.04)',
-  },
   submitBtn: {
     height: 56,
     borderRadius: borderRadius.xl,
@@ -673,11 +448,4 @@ const styles = StyleSheet.create({
   },
   submitBtnPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   submitBtnDisabled: { opacity: 0.45 },
-  resubmitBtn: {
-    height: 44,
-    borderRadius: borderRadius.lg,
-    backgroundColor: APP_CONFIG.PRIMARY_COLOR,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });
