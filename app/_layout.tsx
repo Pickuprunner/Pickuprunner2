@@ -2,13 +2,18 @@ import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import { useEffect } from 'react';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BlinkProvider, createTamagui, tamaguiDefaultConfig, Theme, BlinkToastProvider } from '@blinkdotnew/mobile-ui';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { RealtimeProvider } from '@/components/RealtimeProvider';
 // expo-notifications is native-only — importing it on web causes 401 network requests
-// We lazy-import only when needed (inside the useEffect below)
+// In Expo Go SDK 53+, remote notifications were removed on Android, so we skip it in Expo Go
 import { getOrderIdFromNotification, getScreenFromNotification } from '@/lib/notifications';
+
+const isExpoGoAndroid =
+  Platform.OS === 'android' &&
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,9 +51,9 @@ export default function RootLayout() {
 
   // Handle notification taps — navigate directly to the relevant order (native only)
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'web' || isExpoGoAndroid) return;
 
-    // Lazy import to prevent web bundle from loading expo-notifications at startup
+    // Lazy import to prevent web bundle or Expo Go Android from loading expo-notifications
     import('expo-notifications').then((Notifications) => {
       const resolveNavigation = (response: any, delay = 0) => {
         const orderId = getOrderIdFromNotification(response);

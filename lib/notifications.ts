@@ -6,10 +6,15 @@
  * - Web: not supported natively; the caller should fall back to an in-app banner
  */
 import { Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
-// Lazily load expo-notifications only on native to avoid web 401 errors
+const isExpoGoAndroid =
+  Platform.OS === 'android' &&
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+// Lazily load expo-notifications only on native (excluding Expo Go on Android where remote notifications were removed in SDK 53)
 function getNotifications(): typeof import('expo-notifications') | null {
-  if (Platform.OS === 'web') return null;
+  if (Platform.OS === 'web' || isExpoGoAndroid) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require('expo-notifications');
