@@ -126,7 +126,7 @@ export default function NewOrderScreen() {
         end={{ x: 1, y: 1 }}
         style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 }}
       >
-        <XStack space="$3" alignItems="center">
+        <XStack gap="$3" alignItems="center">
           <YStack
             width={44} height={44} borderRadius={22}
             backgroundColor="rgba(0,0,0,0.25)"
@@ -148,7 +148,7 @@ export default function NewOrderScreen() {
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <YStack space="$5">
+          <YStack gap="$5">
 
             {/* Test fill */}
             <XStack justifyContent="flex-end" marginBottom={-8}>
@@ -177,7 +177,7 @@ export default function NewOrderScreen() {
             </XStack>
 
             {/* Customer */}
-            <YStack space="$3">
+            <YStack gap="$3">
               <SizableText size="$3" fontWeight="700" color="$color10">CUSTOMER</SizableText>
 
               <Field label="NAME *" icon={<User size={16} color="$color9" />}>
@@ -202,7 +202,7 @@ export default function NewOrderScreen() {
             </YStack>
 
             {/* Addresses */}
-            <YStack space="$3">
+            <YStack gap="$3">
               <SizableText size="$3" fontWeight="700" color="$color10">ADDRESSES</SizableText>
 
               <Field label="PICKUP ADDRESS" icon={<MapPin size={16} color="$color9" />}
@@ -223,10 +223,10 @@ export default function NewOrderScreen() {
             </YStack>
 
             {/* Items */}
-            <YStack space="$1">
+            <YStack gap="$1">
               <SizableText size="$2" fontWeight="700" color="$color10">ITEMS *</SizableText>
               <XStack backgroundColor="$color3" borderRadius={14} borderWidth={1}
-                borderColor="$color5" paddingHorizontal="$4" paddingVertical="$2" space="$2" alignItems="flex-start">
+                borderColor="$color5" paddingHorizontal="$4" paddingVertical="$2" gap="$2" alignItems="flex-start">
                 <Package size={16} color="$color9" style={{ marginTop: 4 }} />
                 <TextInput value={items} onChangeText={setItems}
                   placeholder="e.g. 2 grocery bags, electronics, clothing..."
@@ -237,7 +237,7 @@ export default function NewOrderScreen() {
             </YStack>
 
             {/* Distance + pricing */}
-            <YStack space="$3">
+            <YStack gap="$3">
               <SizableText size="$3" fontWeight="700" color="$color10">PRICING</SizableText>
 
               <Field label={`DISTANCE (miles) · free up to ${FREE_MILES} mi`} icon={<Navigation size={16} color="$color9" />}>
@@ -251,12 +251,12 @@ export default function NewOrderScreen() {
               </Field>
 
               {/* Tip selector */}
-              <YStack space="$2">
+              <YStack gap="$2">
                 <XStack justifyContent="space-between">
                   <SizableText size="$2" fontWeight="700" color="$color10">DRIVER TIP</SizableText>
                   <SizableText size="$2" color="$green9" fontWeight="700">{fmt(tipCents)}</SizableText>
                 </XStack>
-                <XStack space="$2" flexWrap="wrap">
+                <XStack gap="$2" flexWrap="wrap">
                   {TIP_OPTIONS.map((t) => (
                     <Pressable key={t} onPress={() => setTipCents(t)}
                       style={[styles.tipBtn, tipCents === t && styles.tipBtnActive]}>
@@ -281,7 +281,7 @@ export default function NewOrderScreen() {
               {loading
                 ? <ActivityIndicator color="white" />
                 : (
-                  <XStack space="$2" alignItems="center">
+                  <XStack gap="$2" alignItems="center">
                     <CheckCircle size={20} color="white" />
                     <SizableText size="$5" fontWeight="800" color="white">CREATE ORDER</SizableText>
                   </XStack>
@@ -302,14 +302,14 @@ function Field({ label, icon, children, locked }: {
   locked?: boolean;
 }) {
   return (
-    <YStack space="$1">
+    <YStack gap="$1">
       <SizableText size="$2" fontWeight="700" color="$color10">{label}</SizableText>
       <XStack
         alignItems="center"
         backgroundColor={locked ? 'rgba(204,0,0,0.07)' : '$color3'}
         borderRadius={14} borderWidth={1}
         borderColor={locked ? 'rgba(204,0,0,0.3)' : '$color5'}
-        paddingHorizontal="$4" space="$2"
+        paddingHorizontal="$4" gap="$2"
       >
         {icon}
         {children}

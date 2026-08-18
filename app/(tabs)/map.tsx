@@ -155,16 +155,16 @@ export default function MapScreen() {
         <XStack
           paddingHorizontal="$4"
           paddingVertical="$2"
-          space="$4"
+          gap="$4"
           backgroundColor="$color2"
           borderBottomWidth={1}
           borderBottomColor="$borderColor"
         >
-          <XStack space="$1" alignItems="center">
+          <XStack gap="$1" alignItems="center">
             <View style={[styles.dot, { backgroundColor: '#FFA000' }]} />
             <SizableText size="$2" color="$color11">Pending ({pendingOrders.length})</SizableText>
           </XStack>
-          <XStack space="$1" alignItems="center">
+          <XStack gap="$1" alignItems="center">
             <View style={[styles.dot, { backgroundColor: '#2E7D32' }]} />
             <SizableText size="$2" color="$color11">Delivered ({orders.length - pendingOrders.length})</SizableText>
           </XStack>
@@ -195,7 +195,7 @@ export default function MapScreen() {
             borderColor="$borderColor"
             elevation={4}
           >
-            <YStack space="$3">
+            <YStack gap="$3">
               <XStack justifyContent="space-between" alignItems="center">
                 <YStack>
                   <SizableText size="$5" fontWeight="700" color="$color12">
@@ -215,14 +215,14 @@ export default function MapScreen() {
                 </Button>
               </XStack>
 
-              <XStack space="$2" alignItems="center">
+              <XStack gap="$2" alignItems="center">
                 <MapPin size={14} color="$color9" />
                 <SizableText size="$3" color="$color11" flex={1}>
                   {selectedOrder.deliveryAddress}
                 </SizableText>
               </XStack>
 
-              <XStack space="$2">
+              <XStack gap="$2">
                 <Button
                   flex={1}
                   size="$4"
@@ -251,12 +251,12 @@ export default function MapScreen() {
           </Card>
         ) : (
           /* Scrollable pending stops list */
-          <YStack padding="$3" space="$2">
+          <YStack padding="$3" gap="$2">
             <SizableText size="$3" fontWeight="600" color="$color10" paddingHorizontal="$1">
               PENDING STOPS ({pendingOrders.length})
             </SizableText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <XStack space="$2">
+              <XStack gap="$2">
                 {pendingOrders.map((order) => (
                   <Pressable key={order.id} onPress={() => setSelectedId(order.id)}>
                     <Card
@@ -267,17 +267,17 @@ export default function MapScreen() {
                       borderColor="$amber5"
                       width={180}
                     >
-                      <YStack space="$1">
+                      <YStack gap="$1">
                         <SizableText size="$3" fontWeight="700" color="$color12" numberOfLines={1}>
                           {order.customerName}
                         </SizableText>
-                        <XStack space="$1" alignItems="center">
+                        <XStack gap="$1" alignItems="center">
                           <MapPin size={12} color="$amber9" />
                           <SizableText size="$1" color="$color10" numberOfLines={2} flex={1}>
                             {order.deliveryAddress}
                           </SizableText>
                         </XStack>
-                        <XStack space="$1" alignItems="center">
+                        <XStack gap="$1" alignItems="center">
                           <Package size={12} color="$color9" />
                           <SizableText size="$1" color="$color10" numberOfLines={1} flex={1}>
                             {order.items}

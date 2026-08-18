@@ -102,33 +102,34 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
       padding="$4"
       marginBottom="$3"
     >
-      <YStack space="$3">
+      <YStack gap="$3">
         {/* Header row */}
         <XStack justifyContent="space-between" alignItems="flex-start">
           <YStack flex={1}>
             <SizableText size="$4" fontWeight="700" color="$color12">{check.driver_name}</SizableText>
             <SizableText size="$2" color="$color9">{check.driver_email}</SizableText>
           </YStack>
-          <XStack space="$2" alignItems="center">
+          <XStack gap="$2" alignItems="center">
             <Badge
-              label={check.status.replace('_', ' ').charAt(0).toUpperCase() + check.status.replace('_', ' ').slice(1)}
               variant={STATUS_BADGE[check.status] ?? 'warning'}
-            />
+            >
+              {check.status.replace('_', ' ').charAt(0).toUpperCase() + check.status.replace('_', ' ').slice(1)}
+            </Badge>
             <SizableText size="$1" color="$color9">{relDate(check.submitted_at)}</SizableText>
           </XStack>
         </XStack>
 
         {/* Submitted info */}
-        <XStack space="$4" flexWrap="wrap">
-          <YStack space="$0">
+        <XStack gap="$4" flexWrap="wrap">
+          <YStack gap="$0">
             <SizableText size="$1" color="$color9" fontWeight="600">DOB</SizableText>
             <SizableText size="$2" fontWeight="600" color="$color11">{check.date_of_birth}</SizableText>
           </YStack>
-          <YStack space="$0">
+          <YStack gap="$0">
             <SizableText size="$1" color="$color9" fontWeight="600">SSN LAST 4</SizableText>
             <SizableText size="$2" fontWeight="600" color="$color11">••••{check.ssn_last4}</SizableText>
           </YStack>
-          <YStack space="$0" flex={1}>
+          <YStack gap="$0" flex={1}>
             <SizableText size="$1" color="$color9" fontWeight="600">ADDRESS</SizableText>
             <SizableText size="$2" color="$color11" numberOfLines={1}>
               {check.address}, {check.city}, {check.state} {check.zip}
@@ -138,13 +139,13 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
 
         {/* Existing note / ref */}
         {check.admin_note && !expanded && (
-          <XStack space="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
+          <XStack gap="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
             <AlertCircle size={14} color="$color9" />
             <SizableText size="$2" color="$color10" flex={1}>{check.admin_note}</SizableText>
           </XStack>
         )}
         {check.external_ref && !expanded && (
-          <XStack space="$2" alignItems="center">
+          <XStack gap="$2" alignItems="center">
             <SizableText size="$1" color="$color9" fontWeight="600">REF ID</SizableText>
             <SizableText size="$2" color="$color11">{check.external_ref}</SizableText>
           </XStack>
@@ -161,9 +162,9 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
 
         {/* Action area */}
         {(isPending || expanded) && (
-          <YStack space="$2">
+          <YStack gap="$2">
             {/* External reference field */}
-            <YStack space="$1">
+            <YStack gap="$1">
               <SizableText size="$1" fontWeight="700" color="$color9">
                 SCREENING REFERENCE ID (optional)
               </SizableText>
@@ -174,7 +175,7 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
                 borderColor="$color5"
                 paddingHorizontal="$3"
                 alignItems="center"
-                space="$2"
+                gap="$2"
               >
                 <Search size={14} color="$color9" />
                 <TextInput
@@ -189,7 +190,7 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
             </YStack>
 
             {/* Admin note */}
-            <YStack space="$1">
+            <YStack gap="$1">
               <SizableText size="$1" fontWeight="700" color="$color9">ADMIN NOTE (shown to driver if rejected)</SizableText>
               <XStack
                 backgroundColor="$color3"
@@ -216,7 +217,7 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
             </YStack>
 
             {/* Buttons */}
-            <XStack space="$2">
+            <XStack gap="$2">
               {check.status !== 'in_review' && (
                 <Pressable
                   onPress={() => doReview('in_review')}
@@ -260,8 +261,8 @@ export default function AdminBGCheckPanel() {
   if (actionable.length === 0) return null;
 
   return (
-    <YStack space="$3">
-      <XStack alignItems="center" space="$2">
+    <YStack gap="$3">
+      <XStack alignItems="center" gap="$2">
         <SizableText size="$2" fontWeight="700" color="$red10">
           ADMIN — BACKGROUND CHECKS
         </SizableText>

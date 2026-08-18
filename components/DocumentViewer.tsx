@@ -46,7 +46,7 @@ export function DocThumbnail({
       onPress={onPress}
       style={({ pressed }) => [styles.thumbContainer, pressed && { opacity: 0.8 }]}
     >
-      <YStack space="$1">
+      <YStack gap="$1">
         {/* Image preview */}
         <YStack
           width={140}
@@ -93,7 +93,7 @@ export function DocThumbnail({
               </YStack>
             </>
           ) : (
-            <YStack flex={1} alignItems="center" justifyContent="center" space="$1">
+            <YStack flex={1} alignItems="center" justifyContent="center" gap="$1">
               {icon}
               <SizableText size="$1" color="$color9">Tap to open</SizableText>
             </YStack>
@@ -101,7 +101,7 @@ export function DocThumbnail({
         </YStack>
 
         {/* Label */}
-        <XStack space="$1" alignItems="center" maxWidth={140}>
+        <XStack gap="$1" alignItems="center" maxWidth={140}>
           {icon}
           <SizableText size="$1" fontWeight="600" color="$color11" numberOfLines={1} flex={1}>
             {label}
@@ -188,7 +188,7 @@ export function DocumentLightbox({
           borderRadius={borderRadius.md}
           paddingHorizontal={12}
           paddingVertical={6}
-          space="$2"
+          gap="$2"
           alignItems="center"
         >
           {doc.label.includes('License') || doc.label.includes('license') ? (
@@ -249,7 +249,7 @@ export function DocumentLightbox({
             left={0}
             right={0}
             justifyContent="center"
-            space="$3"
+            gap="$3"
           >
             {documents.map((d, i) => (
               <Pressable
@@ -325,7 +325,7 @@ export function DocumentPreviewRow({
 
   return (
     <>
-      <XStack space="$3" flexWrap="wrap">
+      <XStack gap="$3" flexWrap="wrap">
         {licenseUrl && (
           <DocThumbnail
             label="Driver's License"

@@ -52,7 +52,7 @@ function StatCard({
       borderWidth={1}
       borderColor="$color4"
     >
-      <YStack space="$1" alignItems="center">
+      <YStack gap="$1" alignItems="center">
         {icon}
         <SizableText size="$6" fontWeight="900" color="$color12">{value}</SizableText>
         <SizableText size="$1" color="$color9" textAlign="center" fontWeight="600">{label}</SizableText>
@@ -133,7 +133,7 @@ export default function AdminScreen() {
         }
         contentContainerStyle={{ paddingBottom: 32 }}
       >
-        <YStack padding="$4" space="$4">
+        <YStack padding="$4" gap="$4">
 
           {/* Tab switcher */}
           <BlinkToggleGroup
@@ -148,14 +148,14 @@ export default function AdminScreen() {
 
           {/* ── OVERVIEW TAB ── */}
           {activeTab === 'overview' && (
-            <YStack space="$4">
+            <YStack gap="$4">
 
               {/* Stats row */}
-              <YStack space="$2">
+              <YStack gap="$2">
                 <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
                   DOCUMENT VERIFICATIONS
                 </SizableText>
-                <XStack space="$2">
+                <XStack gap="$2">
                   <StatCard label="PENDING" value={pendingDocs} color={YELLOW}
                     icon={<Clock size={18} color="$amber9" />} />
                   <StatCard label="APPROVED" value={approvedDocs} color="#16a34a"
@@ -165,11 +165,11 @@ export default function AdminScreen() {
                 </XStack>
               </YStack>
 
-              <YStack space="$2">
+              <YStack gap="$2">
                 <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
                   BACKGROUND CHECKS
                 </SizableText>
-                <XStack space="$2">
+                <XStack gap="$2">
                   <StatCard label="PENDING" value={pendingBG} color={YELLOW}
                     icon={<Clock size={18} color="$amber9" />} />
                   <StatCard label="APPROVED" value={approvedBG} color="#16a34a"
@@ -180,14 +180,14 @@ export default function AdminScreen() {
               </YStack>
 
               {/* Driver roster */}
-              <YStack space="$2">
+              <YStack gap="$2">
                 <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
                   ALL DRIVERS ({drivers.length})
                 </SizableText>
 
                 {drivers.length === 0 && (
                   <Card padding="$5" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-                    <YStack alignItems="center" space="$2">
+                    <YStack alignItems="center" gap="$2">
                       <Users size={36} color="$color8" />
                       <SizableText size="$3" color="$color10" textAlign="center">
                         No drivers have submitted documents yet.
@@ -225,13 +225,13 @@ export default function AdminScreen() {
                             <SizableText size="$2" color="$color9">{d.email}</SizableText>
                           ) : null}
                         </YStack>
-                        <Badge label={statusLabel} variant={statusVariant} />
+                        <Badge variant={statusVariant}>{statusLabel}</Badge>
                       </XStack>
 
-                      <XStack space="$3" flexWrap="wrap">
+                      <XStack gap="$3" flexWrap="wrap">
                         {/* Doc status chip */}
                         <XStack
-                          space="$1" alignItems="center"
+                          gap="$1" alignItems="center"
                           paddingHorizontal={8} paddingVertical={3}
                           borderRadius={6}
                           backgroundColor={
@@ -270,7 +270,7 @@ export default function AdminScreen() {
 
                         {/* BG status chip */}
                         <XStack
-                          space="$1" alignItems="center"
+                          gap="$1" alignItems="center"
                           paddingHorizontal={8} paddingVertical={3}
                           borderRadius={6}
                           backgroundColor={
@@ -316,10 +316,10 @@ export default function AdminScreen() {
 
           {/* ── DOCS TAB ── */}
           {activeTab === 'docs' && (
-            <YStack space="$3">
+            <YStack gap="$3">
               {verifications.length === 0 ? (
                 <Card padding="$5" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-                  <YStack alignItems="center" space="$2">
+                  <YStack alignItems="center" gap="$2">
                     <FileText size={36} color="$color8" />
                     <SizableText size="$3" color="$color10" textAlign="center">
                       No document submissions yet.
@@ -334,10 +334,10 @@ export default function AdminScreen() {
 
           {/* ── BG CHECK TAB ── */}
           {activeTab === 'bgcheck' && (
-            <YStack space="$3">
+            <YStack gap="$3">
               {bgChecks.length === 0 ? (
                 <Card padding="$5" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-                  <YStack alignItems="center" space="$2">
+                  <YStack alignItems="center" gap="$2">
                     <Shield size={36} color="$color8" />
                     <SizableText size="$3" color="$color10" textAlign="center">
                       No background check submissions yet.

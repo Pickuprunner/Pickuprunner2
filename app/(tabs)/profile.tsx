@@ -145,7 +145,7 @@ function DocRow({
         pressed && { opacity: 0.82, transform: [{ scale: 0.988 }] },
       ]}
     >
-      <XStack space="$3" alignItems="center" padding="$4">
+      <XStack gap="$3" alignItems="center" padding="$4">
         {/* Status icon circle */}
         <YStack
           width={44} height={44} borderRadius={22}
@@ -158,7 +158,7 @@ function DocRow({
 
         {/* Label + pill + subtitle */}
         <YStack flex={1}>
-          <XStack alignItems="center" space="$2" flexWrap="wrap" marginBottom={2}>
+          <XStack alignItems="center" gap="$2" flexWrap="wrap" marginBottom={2}>
             <SizableText size="$3" fontWeight="700" color="$color12">{label}</SizableText>
             <StatusPill status={status} />
           </XStack>
@@ -194,7 +194,7 @@ function AccreditationSection({
   const overallLabel = allApproved ? '✓  FULLY CLEARED' : anyRejected ? '⚠  ACTION NEEDED' : '●  IN PROGRESS';
 
   return (
-    <YStack space="$3">
+    <YStack gap="$3">
       {/* Header */}
       <XStack alignItems="center" justifyContent="space-between">
         <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
@@ -271,7 +271,7 @@ function AccreditationSection({
         <XStack
           backgroundColor="rgba(220,38,38,0.06)"
           borderRadius={12} borderWidth={1} borderColor="rgba(220,38,38,0.2)"
-          padding="$3" space="$2" alignItems="flex-start"
+          padding="$3" gap="$2" alignItems="flex-start"
         >
           <AlertTriangle size={14} color="$red9" />
           <SizableText size="$2" color="$red10" flex={1} lineHeight={20}>
@@ -487,10 +487,10 @@ export default function ProfileScreen() {
     <SafeArea>
       <AppHeader title="Profile" />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <YStack padding="$4" space="$6">
+        <YStack padding="$4" gap="$6">
 
           {/* ── Avatar + Name ── */}
-          <YStack alignItems="center" space="$3">
+          <YStack alignItems="center" gap="$3">
             {/* Hidden web file input */}
             {Platform.OS === 'web' && (
               <input
@@ -546,7 +546,7 @@ export default function ProfileScreen() {
             </YStack>
 
             {editing ? (
-              <YStack space="$2" width="100%" alignItems="center">
+              <YStack gap="$2" width="100%" alignItems="center">
                 <TextInput
                   value={editValue}
                   onChangeText={setEditValue}
@@ -560,7 +560,7 @@ export default function ProfileScreen() {
                     Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {},
                   ]}
                 />
-                <XStack space="$2">
+                <XStack gap="$2">
                   <Pressable onPress={cancelEdit} style={styles.editActionBtn}>
                     <X size={16} color="$color10" />
                     <SizableText size="$3" color="$color10">Cancel</SizableText>
@@ -572,8 +572,8 @@ export default function ProfileScreen() {
                 </XStack>
               </YStack>
             ) : (
-              <YStack alignItems="center" space="$1">
-                <XStack space="$2" alignItems="center">
+              <YStack alignItems="center" gap="$1">
+                <XStack gap="$2" alignItems="center">
                   <SizableText size="$6" fontWeight="700" color="$color12">
                     {displayName}
                   </SizableText>
@@ -599,9 +599,9 @@ export default function ProfileScreen() {
             <Pressable onPress={() => router.push('/sign-in')}>
               <YStack
                 backgroundColor="$green2" borderRadius="$4" padding="$4"
-                borderWidth={1} borderColor="$green5" space="$3"
+                borderWidth={1} borderColor="$green5" gap="$3"
               >
-                <XStack space="$3" alignItems="flex-start">
+                <XStack gap="$3" alignItems="flex-start">
                   <YStack
                     width={40} height={40} borderRadius={20}
                     backgroundColor="$green4" alignItems="center"
@@ -609,20 +609,20 @@ export default function ProfileScreen() {
                   >
                     <LogIn size={20} color="$green9" />
                   </YStack>
-                  <YStack flex={1} space="$1">
+                  <YStack flex={1} gap="$1">
                     <SizableText size="$4" fontWeight="800" color="$green10">
                       Sign in to unlock more features
                     </SizableText>
-                    <YStack space="$1" marginTop="$1">
-                      <XStack space="$2" alignItems="center">
+                    <YStack gap="$1" marginTop="$1">
+                      <XStack gap="$2" alignItems="center">
                         <CheckCircle size={13} color="$green8" />
                         <SizableText size="$2" color="$green9">Full chat history (last 60 messages)</SizableText>
                       </XStack>
-                      <XStack space="$2" alignItems="center">
+                      <XStack gap="$2" alignItems="center">
                         <CheckCircle size={13} color="$green8" />
                         <SizableText size="$2" color="$green9">Delivery notification emails to customers</SizableText>
                       </XStack>
-                      <XStack space="$2" alignItems="center">
+                      <XStack gap="$2" alignItems="center">
                         <CheckCircle size={13} color="$green8" />
                         <SizableText size="$2" color="$green9">Your account synced across devices</SizableText>
                       </XStack>
@@ -680,7 +680,7 @@ export default function ProfileScreen() {
                   alignItems="center"
                   justifyContent="space-between"
                 >
-                  <XStack space="$3" alignItems="center" flex={1}>
+                  <XStack gap="$3" alignItems="center" flex={1}>
                     <YStack
                       width={40} height={40} borderRadius={20}
                       backgroundColor={isConnected ? 'rgba(21,128,61,0.15)' : 'rgba(99,102,241,0.15)'}
@@ -721,7 +721,7 @@ export default function ProfileScreen() {
               borderWidth={1} borderColor="rgba(204,0,0,0.25)"
               padding="$4" alignItems="center" justifyContent="space-between"
             >
-              <XStack space="$3" alignItems="center">
+              <XStack gap="$3" alignItems="center">
                 <YStack
                   width={40} height={40} borderRadius={20}
                   backgroundColor="rgba(204,0,0,0.15)"

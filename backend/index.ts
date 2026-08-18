@@ -204,7 +204,7 @@ app.patch("/orders/:id", async (c) => {
 const _stripeCache: Record<string, Stripe> = {};
 const getStripe = (secretKey: string): Stripe => {
   if (!_stripeCache[secretKey]) {
-    _stripeCache[secretKey] = new Stripe(secretKey, { apiVersion: "2024-06-20" });
+    _stripeCache[secretKey] = new Stripe(secretKey, { apiVersion: "2024-06-20" as any });
   }
   return _stripeCache[secretKey];
 };
@@ -437,6 +437,9 @@ app.post("/webhook", async (c) => {
   const env = c.env as Record<string, string>;
 
   const signature = c.req.header("stripe-signature");
+  if (!signature) {
+    return c.json({ error: "Missing stripe-signature header" }, 400);
+  }
   const rawBody = await c.req.text();
 
   // Try both live and test webhook secrets
@@ -661,7 +664,7 @@ app.post("/connect/onboard", async (c) => {
   const stripe = getStripe(resolveStripeKey(env, false));
   const db = getBlink(env);
 
-  let body: { driverUserId: string; driverEmail?: string; returnUrl: string; refreshUrl: string };
+  let body: { driverUserId?: string; stripeAccountId?: string; driverEmail?: string; returnUrl: string; refreshUrl: string };
   try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON body" }, 400); }
 
   const { driverUserId, stripeAccountId: directAccountId, driverEmail, returnUrl, refreshUrl } = body;

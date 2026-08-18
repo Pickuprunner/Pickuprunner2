@@ -58,7 +58,7 @@ function InfoPill({
   if (!value) return null;
   return (
     <XStack
-      space="$1"
+      gap="$1"
       alignItems="center"
       backgroundColor="$color3"
       borderRadius={8}
@@ -110,18 +110,19 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
       backgroundColor="$color2" borderRadius="$4" borderWidth={1} padding="$4" marginBottom="$3"
       borderColor={v.status === 'approved' ? 'rgba(22,163,74,0.3)' : v.status === 'rejected' ? 'rgba(220,38,38,0.3)' : '$borderColor'}
     >
-      <YStack space="$3">
+      <YStack gap="$3">
         {/* Driver info header */}
         <XStack justifyContent="space-between" alignItems="flex-start">
           <YStack flex={1} marginRight="$2">
             <SizableText size="$4" fontWeight="700" color="$color12">{v.driver_name}</SizableText>
             <SizableText size="$2" color="$color9">{v.driver_email}</SizableText>
           </YStack>
-          <XStack space="$2" alignItems="center">
+          <XStack gap="$2" alignItems="center">
             <Badge
-              label={v.status.charAt(0).toUpperCase() + v.status.slice(1)}
               variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'error' : 'warning'}
-            />
+            >
+              {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
+            </Badge>
             <SizableText size="$1" color="$color9">{relDate(v.submitted_at)}</SizableText>
           </XStack>
         </XStack>
@@ -129,7 +130,7 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
         {/* Driver profile details (collapsible) */}
         {profile && (
           <Pressable onPress={() => setShowProfile((s) => !s)} hitSlop={6}>
-            <XStack space="$1" alignItems="center">
+            <XStack gap="$1" alignItems="center">
               <User size={12} color="$color9" />
               <SizableText size="$1" color="$blue9" fontWeight="600">
                 {showProfile ? 'Hide profile' : 'View profile'}
@@ -138,7 +139,7 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
           </Pressable>
         )}
         {profile && showProfile && (
-          <XStack space="$2" flexWrap="wrap">
+          <XStack gap="$2" flexWrap="wrap">
             <InfoPill
               icon={<Phone size={10} color="$color9" />}
               label="Phone"
@@ -165,7 +166,7 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
         )}
 
         {/* Document image previews */}
-        <YStack space="$1">
+        <YStack gap="$1">
           <SizableText size="$1" fontWeight="700" color="$color9" letterSpacing={0.3}>
             UPLOADED DOCUMENTS
           </SizableText>
@@ -179,7 +180,7 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
 
         {/* Admin note */}
         {v.admin_note && (
-          <XStack space="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
+          <XStack gap="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
             <AlertCircle size={14} color="$color9" />
             <SizableText size="$2" color="$color10" flex={1}>{v.admin_note}</SizableText>
           </XStack>
@@ -187,7 +188,7 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
 
         {/* Pending actions */}
         {isPending && (
-          <YStack space="$2">
+          <YStack gap="$2">
             {showReject && (
               <XStack backgroundColor="$color3" borderRadius={12} borderWidth={1} borderColor="$color5" paddingHorizontal="$3" alignItems="center">
                 <TextInput value={rejNote} onChangeText={setRejNote}
@@ -195,7 +196,7 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
                   style={[cardStyles.input, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}]} />
               </XStack>
             )}
-            <XStack space="$2">
+            <XStack gap="$2">
               {showReject ? (
                 <>
                   <Pressable onPress={() => setShowReject(false)}
@@ -205,7 +206,7 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
                   <Pressable onPress={() => doReview('rejected', rejNote.trim() || undefined)} disabled={busy}
                     style={({ pressed }) => [cardStyles.btn, cardStyles.btnReject, pressed && { opacity: 0.7 }]}>
                     {busy ? <ActivityIndicator size="small" color="white" /> : (
-                      <XStack space="$1" alignItems="center">
+                      <XStack gap="$1" alignItems="center">
                         <XCircle size={14} color="white" />
                         <SizableText size="$2" fontWeight="700" color="white">Confirm Reject</SizableText>
                       </XStack>
@@ -216,7 +217,7 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
                 <>
                   <Pressable onPress={() => setShowReject(true)}
                     style={({ pressed }) => [cardStyles.btn, cardStyles.btnRejectOutline, pressed && { opacity: 0.7 }]}>
-                    <XStack space="$1" alignItems="center">
+                    <XStack gap="$1" alignItems="center">
                       <XCircle size={14} color="$red9" />
                       <SizableText size="$2" fontWeight="700" color="$red9">Reject</SizableText>
                     </XStack>
@@ -224,7 +225,7 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
                   <Pressable onPress={() => doReview('approved')} disabled={busy}
                     style={({ pressed }) => [cardStyles.btn, cardStyles.btnApprove, pressed && { opacity: 0.7 }]}>
                     {busy ? <ActivityIndicator size="small" color="white" /> : (
-                      <XStack space="$1" alignItems="center">
+                      <XStack gap="$1" alignItems="center">
                         <CheckCircle size={14} color="white" />
                         <SizableText size="$2" fontWeight="700" color="white">Approve</SizableText>
                       </XStack>

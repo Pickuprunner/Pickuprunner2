@@ -158,9 +158,9 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
             borderColor="rgba(0,102,255,0.3)"
             padding="$4"
             marginBottom="$4"
-            space="$2"
+            gap="$2"
           >
-            <XStack alignItems="center" space="$3">
+            <XStack alignItems="center" gap="$3">
               <YStack
                 width={44} height={44} borderRadius={22}
                 backgroundColor="rgba(0,102,255,0.18)"
@@ -176,17 +176,17 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
                 <SizableText size="$3" color="#374151">{APP_CONFIG.STORE_TYPE}</SizableText>
               </YStack>
             </XStack>
-            <XStack space="$2" alignItems="center" marginTop="$1">
+            <XStack gap="$2" alignItems="center" marginTop="$1">
               <MapPin size={15} color="#6B7280" />
               <SizableText size="$3" color="#374151" flex={1}>{APP_CONFIG.STORE_ADDRESS}</SizableText>
             </XStack>
             {APP_CONFIG.STORE_PHONE ? (
-              <XStack space="$2" alignItems="center">
+              <XStack gap="$2" alignItems="center">
                 <Phone size={15} color="#6B7280" />
                 <SizableText size="$3" color="#374151">{APP_CONFIG.STORE_PHONE}</SizableText>
               </XStack>
             ) : null}
-            <XStack space="$2" alignItems="center">
+            <XStack gap="$2" alignItems="center">
               <Navigation size={15} color="#6B7280" />
               <SizableText size="$3" color="#374151">{APP_CONFIG.STORE_HOURS}</SizableText>
             </XStack>
@@ -194,7 +194,7 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
         )}
 
         {/* Header */}
-        <XStack alignItems="center" space="$3" marginBottom="$6">
+        <XStack alignItems="center" gap="$3" marginBottom="$6">
           <YStack width={48} height={48} borderRadius={24} backgroundColor="#DBEAFE" alignItems="center" justifyContent="center">
             <ShoppingBag size={26} color="#2563EB" />
           </YStack>
@@ -237,13 +237,13 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
         </XStack>
 
         {/* Standard fields */}
-        <YStack space="$4">
+        <YStack gap="$4">
           {fields.map(({ label, key, placeholder, icon, multiline, keyboardType, autoCapitalize }) => {
             // Lock pickup address field for store builds
             const isLocked = key === 'address' && APP_CONFIG.LOCK_PICKUP_ADDRESS && IS_STORE_BUILD;
             return (
-            <YStack key={key} space="$1">
-              <XStack alignItems="center" space="$2">
+            <YStack key={key} gap="$1">
+              <XStack alignItems="center" gap="$2">
                 <SizableText size="$3" fontWeight="700" color="#374151">{label}</SizableText>
                 {isLocked && (
                   <SizableText size="$2" fontWeight="700"
@@ -264,7 +264,7 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
                 borderColor={isLocked ? 'rgba(0,102,255,0.3)' : '#E5E7EB'}
                 paddingHorizontal="$4"
                 paddingVertical={multiline ? '$3' : '$0'}
-                space="$2"
+                gap="$2"
               >
                 <YStack marginTop={multiline ? 2 : 0}>{icon}</YStack>
                 <TextInput
@@ -289,7 +289,7 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
           );})}
 
           {/* Auto-calculated distance display */}
-          <YStack space="$1">
+          <YStack gap="$1">
             <SizableText size="$3" fontWeight="700" color="#374151">ESTIMATED DISTANCE</SizableText>
             {calculating ? (
               <XStack
@@ -300,7 +300,7 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
                 borderColor="#93C5FD"
                 paddingHorizontal="$4"
                 height={52}
-                space="$2"
+                gap="$2"
               >
                 <ActivityIndicator size="small" color="#2563EB" />
                 <SizableText size="$4" color="#2563EB">Calculating distance…</SizableText>
@@ -314,7 +314,7 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
                 borderColor="#86EFAC"
                 paddingHorizontal="$4"
                 height={52}
-                space="$2"
+                gap="$2"
               >
                 <Navigation size={20} color="#16A34A" />
                 <SizableText size="$5" fontWeight="800" color="#111827">{miles.toFixed(1)} miles</SizableText>
@@ -332,7 +332,7 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
                 borderColor="#E5E7EB"
                 paddingHorizontal="$4"
                 height={52}
-                space="$2"
+                gap="$2"
               >
                 <Navigation size={20} color="#9CA3AF" />
                 <SizableText size="$4" color="#9CA3AF">
@@ -349,9 +349,9 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
         </YStack>
 
         {/* Delivery preference toggle */}
-        <YStack marginBottom="$5" space="$2" marginTop="$5">
+        <YStack marginBottom="$5" gap="$2" marginTop="$5">
           <SizableText size="$3" fontWeight="700" color="#374151" letterSpacing={1}>DELIVERY PREFERENCE</SizableText>
-          <XStack space="$3">
+          <XStack gap="$3">
             <Pressable
               onPress={() => setDeliveryType('door')}
               style={({ pressed }: { pressed: boolean }) => ({
@@ -393,7 +393,7 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
           onPress={onNext}
           style={({ pressed }) => [styles.btn, { marginTop: spacing.lg }, pressed && styles.btnPressed]}
         >
-          <XStack alignItems="center" space="$2">
+          <XStack alignItems="center" gap="$2">
             <SizableText size="$6" fontWeight="800" color="white">Next: Review Order</SizableText>
             <ChevronRight size={22} color="white" />
           </XStack>
@@ -430,7 +430,7 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
   return (
     <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <XStack alignItems="center" space="$3" marginBottom="$6">
+      <XStack alignItems="center" gap="$3" marginBottom="$6">
         <YStack width={48} height={48} borderRadius={24} backgroundColor="#BBF7D0" alignItems="center" justifyContent="center">
           <CreditCard size={26} color="#16A34A" />
         </YStack>
@@ -446,9 +446,9 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
       </XStack>
 
       {/* Order summary card */}
-      <YStack backgroundColor="#F9FAFB" borderRadius={16} borderWidth={1} borderColor="#E5E7EB" padding="$4" space="$3" marginBottom="$5">
+      <YStack backgroundColor="#F9FAFB" borderRadius={16} borderWidth={1} borderColor="#E5E7EB" padding="$4" gap="$3" marginBottom="$5">
         <SizableText size="$4" fontWeight="700" color="#374151">ORDER SUMMARY</SizableText>
-        <YStack space="$2">
+        <YStack gap="$2">
           <XStack justifyContent="space-between">
             <SizableText size="$4" color="#1F2937">Customer</SizableText>
             <SizableText size="$4" color="#111827" fontWeight="600">{form.name}</SizableText>
@@ -479,7 +479,7 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
           </XStack>
           <XStack justifyContent="space-between" alignItems="center">
             <SizableText size="$4" color="#1F2937">Delivery</SizableText>
-            <XStack space="$1" alignItems="center">
+            <XStack gap="$1" alignItems="center">
               <SizableText size="$4">{deliveryType === 'meet' ? '🤝' : '🚪'}</SizableText>
               <SizableText size="$4" color="#111827" fontWeight="600">{deliveryType === 'meet' ? 'Meet at Door' : 'Leave at Door'}</SizableText>
             </XStack>
@@ -488,7 +488,7 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
       </YStack>
 
       {/* Pricing */}
-      <YStack backgroundColor="#F9FAFB" borderRadius={16} borderWidth={1} borderColor="#E5E7EB" padding="$4" space="$4" marginBottom="$5">
+      <YStack backgroundColor="#F9FAFB" borderRadius={16} borderWidth={1} borderColor="#E5E7EB" padding="$4" gap="$4" marginBottom="$5">
         <SizableText size="$4" fontWeight="700" color="#374151">PRICING</SizableText>
 
         {/* Delivery fee */}
@@ -520,7 +520,7 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
         <YStack height={1} backgroundColor="#E5E7EB" />
 
         {/* Tip for driver */}
-        <YStack space="$3">
+        <YStack gap="$3">
           <XStack justifyContent="space-between" alignItems="center">
             <YStack>
               <SizableText size="$5" color="#111827" fontWeight="600">Tip for Driver</SizableText>
@@ -579,7 +579,7 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
           {showCustomTip && (
             <XStack
               alignItems="center"
-              space="$2"
+              gap="$2"
               marginTop="$2"
               backgroundColor="#F3F4F6"
               borderRadius={10}
@@ -649,24 +649,24 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
         borderWidth={1}
         borderColor="#E5E7EB"
         padding="$4"
-        space="$2"
+        gap="$2"
         marginBottom="$4"
       >
         <SizableText size="$4" fontWeight="700" color="#374151">WHAT TO EXPECT</SizableText>
-        <XStack space="$2" alignItems="flex-start">
+        <XStack gap="$2" alignItems="flex-start">
           <SizableText size="$4" color="#6B7280">1.</SizableText>
           <SizableText size="$4" color="#1F2937" flex={1}>A driver picks up your order from the store</SizableText>
         </XStack>
-        <XStack space="$2" alignItems="flex-start">
+        <XStack gap="$2" alignItems="flex-start">
           <SizableText size="$4" color="#6B7280">2.</SizableText>
           <SizableText size="$4" color="#1F2937" flex={1}>They deliver to your address — usually within the hour</SizableText>
         </XStack>
-        <XStack space="$2" alignItems="flex-start">
+        <XStack gap="$2" alignItems="flex-start">
           <SizableText size="$4" color="#6B7280">3.</SizableText>
           <SizableText size="$4" color="#1F2937" flex={1}>You'll receive a payment link via email to pay securely</SizableText>
         </XStack>
         {APP_CONFIG.STORE_EMAIL ? (
-          <XStack space="$2" alignItems="flex-start">
+          <XStack gap="$2" alignItems="flex-start">
             <SizableText size="$4" color="#6B7280">?</SizableText>
             <SizableText
               size="$4" color="#1D4ED8" flex={1}
@@ -685,7 +685,7 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
         borderWidth={1}
         borderColor="#86EFAC"
         padding="$3"
-        space="$2"
+        gap="$2"
         alignItems="center"
         marginBottom="$3"
       >
@@ -702,7 +702,7 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
         borderWidth={3}
         borderColor={agreedToTerms ? '#22C55E' : '#9CA3AF'}
         padding="$5"
-        space="$3"
+        gap="$3"
         marginBottom="$2"
         shadowColor="#000"
         shadowOpacity={0.3}
@@ -752,7 +752,7 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
       )}
 
       {/* Actions */}
-      <YStack space="$3">
+      <YStack gap="$3">
         <Pressable
           onPress={agreedToTerms ? onSubmit : undefined}
           disabled={loading || !agreedToTerms}
@@ -763,12 +763,12 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
           ]}
         >
           {loading ? (
-            <XStack space="$2" alignItems="center">
+            <XStack gap="$2" alignItems="center">
               <ActivityIndicator color="white" size="small" />
               <SizableText size="$5" fontWeight="700" color="white">Placing order…</SizableText>
             </XStack>
           ) : (
-            <XStack alignItems="center" space="$2">
+            <XStack alignItems="center" gap="$2">
               <Truck size={22} color="white" />
               <SizableText size="$6" fontWeight="800" color="white">
                 Place Order — {fmt(totalCents)} estimated
@@ -778,7 +778,7 @@ function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, 
         </Pressable>
 
         <Pressable onPress={onBack} style={({ pressed }) => [styles.backBtn, pressed && styles.btnPressed]}>
-          <XStack alignItems="center" justifyContent="center" space="$2">
+          <XStack alignItems="center" justifyContent="center" gap="$2">
             <ChevronLeft size={20} color="#374151" />
             <SizableText size="$4" color="#374151">Edit Details</SizableText>
           </XStack>
@@ -798,12 +798,12 @@ interface SuccessProps {
 
 function SuccessScreen({ orderId, totalCents, onReset }: SuccessProps) {
   return (
-    <SafeArea backgroundColor="#FFFFFF">
-      <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" space="$5">
+    <SafeArea>
+      <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" gap="$5">
         <YStack width={88} height={88} borderRadius={44} backgroundColor="#DBEAFE" alignItems="center" justifyContent="center">
           <Truck size={50} color="#2563EB" />
         </YStack>
-        <YStack alignItems="center" space="$2">
+        <YStack alignItems="center" gap="$2">
           <SizableText size="$8" fontWeight="800" color="#111827" textAlign="center">Order Placed!</SizableText>
           <SizableText size="$4" color="#374151" textAlign="center">
             A driver will accept your order shortly. You'll receive a payment link when your delivery is picked up.
@@ -967,7 +967,7 @@ export default function RequestPickupScreen() {
   }
 
   return (
-    <SafeArea backgroundColor="#FFFFFF">
+    <SafeArea>
       {step === 1 ? (
         <StepOne
           form={form}

@@ -77,22 +77,23 @@ export default function BGCard({ check }: { check: BackgroundCheck }) {
       backgroundColor="$color2" borderRadius="$4" borderWidth={1} padding="$4" marginBottom="$3"
       borderColor={check.status === 'approved' ? 'rgba(22,163,74,0.3)' : check.status === 'rejected' ? 'rgba(220,38,38,0.3)' : '$borderColor'}
     >
-      <YStack space="$3">
+      <YStack gap="$3">
         <XStack justifyContent="space-between" alignItems="flex-start">
           <YStack flex={1} marginRight="$2">
             <SizableText size="$4" fontWeight="700" color="$color12">{check.driver_name}</SizableText>
             <SizableText size="$2" color="$color9">{check.driver_email}</SizableText>
           </YStack>
-          <XStack space="$2" alignItems="center">
+          <XStack gap="$2" alignItems="center">
             <Badge
-              label={check.status.replace('_', ' ').charAt(0).toUpperCase() + check.status.replace('_', ' ').slice(1)}
               variant={STATUS_BADGE[check.status] ?? 'warning'}
-            />
+            >
+              {check.status.replace('_', ' ').charAt(0).toUpperCase() + check.status.replace('_', ' ').slice(1)}
+            </Badge>
             <SizableText size="$1" color="$color9">{relDate(check.submitted_at)}</SizableText>
           </XStack>
         </XStack>
 
-        <XStack space="$4" flexWrap="wrap">
+        <XStack gap="$4" flexWrap="wrap">
           <YStack>
             <SizableText size="$1" color="$color9" fontWeight="600">DOB</SizableText>
             <SizableText size="$2" fontWeight="600" color="$color11">{check.date_of_birth}</SizableText>
@@ -110,13 +111,13 @@ export default function BGCard({ check }: { check: BackgroundCheck }) {
         </XStack>
 
         {check.admin_note && !expanded && (
-          <XStack space="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
+          <XStack gap="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
             <AlertCircle size={14} color="$color9" />
             <SizableText size="$2" color="$color10" flex={1}>{check.admin_note}</SizableText>
           </XStack>
         )}
         {check.external_ref && !expanded && (
-          <XStack space="$2" alignItems="center">
+          <XStack gap="$2" alignItems="center">
             <SizableText size="$1" color="$color9" fontWeight="600">REF ID</SizableText>
             <SizableText size="$2" color="$color11">{check.external_ref}</SizableText>
           </XStack>
@@ -131,11 +132,11 @@ export default function BGCard({ check }: { check: BackgroundCheck }) {
         )}
 
         {(isPending || expanded) && (
-          <YStack space="$2">
-            <YStack space="$1">
+          <YStack gap="$2">
+            <YStack gap="$1">
               <SizableText size="$1" fontWeight="700" color="$color9">SCREENING REFERENCE ID (optional)</SizableText>
               <XStack backgroundColor="$color3" borderRadius={12} borderWidth={1} borderColor="$color5"
-                paddingHorizontal="$3" alignItems="center" space="$2">
+                paddingHorizontal="$3" alignItems="center" gap="$2">
                 <Search size={14} color="$color9" />
                 <TextInput value={ref} onChangeText={setRef}
                   placeholder="e.g. CHKR-12345 or Sterling case ID" placeholderTextColor={colors.textTertiary}
@@ -143,7 +144,7 @@ export default function BGCard({ check }: { check: BackgroundCheck }) {
                   style={[styles.input, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}]} />
               </XStack>
             </YStack>
-            <YStack space="$1">
+            <YStack gap="$1">
               <SizableText size="$1" fontWeight="700" color="$color9">ADMIN NOTE (shown to driver if rejected)</SizableText>
               <XStack backgroundColor="$color3" borderRadius={12} borderWidth={1} borderColor="$color5"
                 paddingHorizontal="$3" paddingVertical="$2">
@@ -153,7 +154,7 @@ export default function BGCard({ check }: { check: BackgroundCheck }) {
                   style={[styles.input, styles.inputMulti, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}]} />
               </XStack>
             </YStack>
-            <XStack space="$2">
+            <XStack gap="$2">
               {check.status !== 'in_review' && (
                 <Pressable onPress={() => doReview('in_review')} disabled={busy}
                   style={({ pressed }) => [styles.btn, styles.btnReview, pressed && { opacity: 0.7 }]}>

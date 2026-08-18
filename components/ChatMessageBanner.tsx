@@ -104,7 +104,7 @@ export default function ChatMessageBanner({ message, onDismiss }: Props) {
           borderRadius={16}
           padding="$4"
           alignItems="center"
-          space="$3"
+          gap="$3"
         >
           {/* Icon */}
           <YStack
@@ -120,7 +120,7 @@ export default function ChatMessageBanner({ message, onDismiss }: Props) {
           </YStack>
 
           {/* Text */}
-          <YStack flex={1} space="$0.5">
+          <YStack flex={1} gap="$0.5">
             <SizableText size="$3" fontWeight="800" color="#DBEAFE">
               👤 {message.senderName}
             </SizableText>

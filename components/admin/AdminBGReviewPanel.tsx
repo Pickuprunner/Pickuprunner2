@@ -9,7 +9,7 @@ export default function AdminBGReviewPanel({ bgChecks }: { bgChecks: BackgroundC
   const rest = bgChecks.filter((c) => c.status !== 'pending' && c.status !== 'in_review');
 
   return (
-    <YStack space="$2">
+    <YStack gap="$2">
       {actionable.length > 0 && (
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionHeaderText}>NEEDS REVIEW ({actionable.length})</Text>

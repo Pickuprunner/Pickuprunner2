@@ -95,7 +95,7 @@ function MessageBubble({
 
 function DateSeparator({ ts }: { ts: number }) {
   return (
-    <XStack alignItems="center" space="$2" paddingHorizontal="$4" marginVertical="$3">
+    <XStack alignItems="center" gap="$2" paddingHorizontal="$4" marginVertical="$3">
       <YStack flex={1} height={1} backgroundColor="$color4" />
       <SizableText size="$1" color="$color9" fontWeight="600">{formatDate(ts)}</SizableText>
       <YStack flex={1} height={1} backgroundColor="$color4" />
@@ -108,11 +108,11 @@ function DateSeparator({ ts }: { ts: number }) {
 function NameSetupPrompt({ onSet }: { onSet: (name: string) => void }) {
   const [value, setValue] = useState('');
   return (
-    <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" space="$4">
+    <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" gap="$4">
       <YStack width={72} height={72} borderRadius={36} backgroundColor="$color3" alignItems="center" justifyContent="center">
         <MessageCircle size={36} color="$color9" />
       </YStack>
-      <YStack alignItems="center" space="$1">
+      <YStack alignItems="center" gap="$1">
         <SizableText size="$6" fontWeight="800" color="$color12">Set Your Name</SizableText>
         <SizableText size="$3" color="$color10" textAlign="center">
           Customers will see this name when you message them.
@@ -191,11 +191,11 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
   }, [messages]);
 
   return (
-    <SafeArea flex={1}>
+    <SafeArea>
       {/* Header */}
       <XStack
         paddingHorizontal="$4" paddingTop="$3" paddingBottom="$3"
-        alignItems="center" space="$3"
+        alignItems="center" gap="$3"
         borderBottomWidth={1} borderBottomColor="$color4"
       >
         <Pressable onPress={onBack} hitSlop={8}>
@@ -209,7 +209,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
             Order #{shortId} · {order.deliveryAddress?.slice(0, 30) || 'No address'}
           </SizableText>
         </YStack>
-        <XStack space="$1" alignItems="center" paddingHorizontal="$2" paddingVertical="$1" borderRadius="$full"
+        <XStack gap="$1" alignItems="center" paddingHorizontal="$2" paddingVertical="$1" borderRadius="$full"
           backgroundColor={isConnected ? '$green3' : '$color3'} borderWidth={1}
           borderColor={isConnected ? '$green6' : '$color6'}
         >
@@ -225,7 +225,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
       {/* Messages */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {messages.length === 0 ? (
-          <YStack flex={1} alignItems="center" justifyContent="center" space="$3" padding="$6">
+          <YStack flex={1} alignItems="center" justifyContent="center" gap="$3" padding="$6">
             <YStack width={56} height={56} borderRadius={28} backgroundColor="$color3" alignItems="center" justifyContent="center">
               <MessageCircle size={28} color="$color8" />
             </YStack>
@@ -251,7 +251,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
         )}
 
         {/* Input bar */}
-        <XStack paddingHorizontal="$3" paddingVertical="$3" space="$2" alignItems="flex-end"
+        <XStack paddingHorizontal="$3" paddingVertical="$3" gap="$2" alignItems="flex-end"
           borderTopWidth={1} borderTopColor="$color4" backgroundColor="$background"
         >
           <YStack flex={1} backgroundColor="$color3" borderRadius={22} paddingHorizontal="$4" paddingVertical="$2" minHeight={44} justifyContent="center">
@@ -356,11 +356,11 @@ export default function ChatScreen() {
           <Spinner size="large" color="$color9" />
         </YStack>
       ) : activeOrders.length === 0 ? (
-        <YStack flex={1} alignItems="center" justifyContent="center" space="$3" padding="$6">
+        <YStack flex={1} alignItems="center" justifyContent="center" gap="$3" padding="$6">
           <YStack width={64} height={64} borderRadius={32} backgroundColor="$color3" alignItems="center" justifyContent="center">
             <MessageCircle size={32} color="$color8" />
           </YStack>
-          <YStack alignItems="center" space="$1">
+          <YStack alignItems="center" gap="$1">
             <SizableText size="$5" fontWeight="700" color="$color12">No Active Deliveries</SizableText>
             <SizableText size="$3" color="$color10" textAlign="center">
               Accept an order to start messaging your customer.
@@ -387,7 +387,7 @@ export default function ChatScreen() {
                 onPress={() => setActiveChatOrder(item)}
                 style={({ pressed }) => [styles.orderCard, pressed && styles.orderCardPressed]}
               >
-                <XStack alignItems="center" space="$3">
+                <XStack alignItems="center" gap="$3">
                   <YStack
                     width={44} height={44} borderRadius={22}
                     backgroundColor={item.status === 'accepted' ? 'rgba(0,102,255,0.15)' : 'rgba(249,115,22,0.15)'}
@@ -405,7 +405,7 @@ export default function ChatScreen() {
                     <SizableText size="$2" color="$color10" numberOfLines={1}>
                       {item.deliveryAddress || 'No address'}
                     </SizableText>
-                    <XStack space="$2" alignItems="center" marginTop="$1">
+                    <XStack gap="$2" alignItems="center" marginTop="$1">
                       <YStack
                         paddingHorizontal="$2" paddingVertical="$0.5"
                         borderRadius="$full"

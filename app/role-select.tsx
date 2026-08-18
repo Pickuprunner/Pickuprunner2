@@ -52,7 +52,7 @@ export default function RoleSelectScreen() {
         >
           {/* Glow orb */}
           <View style={styles.glowOrb} />
-          <YStack alignItems="center" space="$3" paddingHorizontal="$6">
+          <YStack alignItems="center" gap="$3" paddingHorizontal="$6">
             <YStack
               width={80}
               height={80}
@@ -66,7 +66,7 @@ export default function RoleSelectScreen() {
             >
               <Zap size={42} color={YELLOW} />
             </YStack>
-            <YStack alignItems="center" space="$2">
+            <YStack alignItems="center" gap="$2">
               <SizableText size="$9" fontWeight="900" color="white" textAlign="center" letterSpacing={-1}>
                 {APP_CONFIG.APP_NAME}
               </SizableText>
@@ -78,7 +78,7 @@ export default function RoleSelectScreen() {
         </LinearGradient>
 
         {/* Cards section */}
-        <YStack flex={1} paddingHorizontal="$5" paddingTop="$8" space="$4" justifyContent="center">
+        <YStack flex={1} paddingHorizontal="$5" paddingTop="$8" gap="$4" justifyContent="center">
           <SizableText
             size="$2"
             fontWeight="700"
@@ -100,12 +100,12 @@ export default function RoleSelectScreen() {
               selecting === 'customer' && styles.customerCardActive,
             ]}
           >
-            <XStack alignItems="center" space="$4">
+            <XStack alignItems="center" gap="$4">
               <View style={[styles.iconCircle, styles.customerIconCircle]}>
                 <ShoppingBag size={26} color={YELLOW} />
               </View>
-              <YStack flex={1} space="$1">
-                <XStack alignItems="center" space="$2">
+              <YStack flex={1} gap="$1">
+                <XStack alignItems="center" gap="$2">
                   <SizableText size="$5" fontWeight="800" color="white">
                     I'm a Customer
                   </SizableText>
@@ -132,12 +132,12 @@ export default function RoleSelectScreen() {
               selecting === 'driver' && styles.driverCardActive,
             ]}
           >
-            <XStack alignItems="center" space="$4">
+            <XStack alignItems="center" gap="$4">
               <View style={[styles.iconCircle, styles.driverIconCircle]}>
                 <Truck size={26} color={BLUE} />
               </View>
-              <YStack flex={1} space="$1">
-                <XStack alignItems="center" space="$2">
+              <YStack flex={1} gap="$1">
+                <XStack alignItems="center" gap="$2">
                   <SizableText size="$5" fontWeight="800" color="white">
                     I'm a Driver
                   </SizableText>
@@ -186,7 +186,7 @@ export default function RoleSelectScreen() {
             <SizableText size="$2" fontWeight="700" color="$blue9">⚡ Enter as test driver</SizableText>
           </Pressable>
 
-          <XStack justifyContent="center" space="$2" marginTop="$4">
+          <XStack justifyContent="center" gap="$2" marginTop="$4">
             <SizableText
               size="$1"
               color="rgba(255,255,255,0.35)"

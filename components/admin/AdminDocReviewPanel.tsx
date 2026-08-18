@@ -9,7 +9,7 @@ export default function AdminDocReviewPanel({ verifications }: { verifications: 
   const rest = verifications.filter((v) => v.status !== 'pending');
 
   return (
-    <YStack space="$2">
+    <YStack gap="$2">
       {pending.length > 0 && (
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionHeaderText}>NEEDS REVIEW ({pending.length})</Text>

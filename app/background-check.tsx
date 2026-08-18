@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import {
   YStack,
   XStack,
@@ -16,7 +17,6 @@ import {
   ArrowLeft,
   Shield,
   CheckSquare,
-  Square,
   CheckCircle,
   Clock,
   XCircle,
@@ -65,7 +65,7 @@ function Field({
   autoCapitalize?: any;
 }) {
   return (
-    <YStack space="$1">
+    <YStack gap="$1">
       <SizableText size="$2" fontWeight="700" color="$color10">{label}</SizableText>
       <XStack
         backgroundColor="$color3"
@@ -74,7 +74,7 @@ function Field({
         borderColor={error ? '$red7' : '$color5'}
         paddingHorizontal="$3"
         alignItems="center"
-        space="$2"
+        gap="$2"
       >
         {icon}
         <TextInput
@@ -145,17 +145,17 @@ function StatusBanner({
       borderWidth={1}
       borderColor={cfg.border}
       padding="$4"
-      space="$3"
+      gap="$3"
     >
-      <XStack space="$3" alignItems="flex-start">
+      <XStack gap="$3" alignItems="flex-start">
         {cfg.icon}
-        <YStack flex={1} space="$1">
+        <YStack flex={1} gap="$1">
           <SizableText size="$5" fontWeight="800" color="$color12">{cfg.title}</SizableText>
           <SizableText size="$2" color="$color10" lineHeight={20}>{cfg.body}</SizableText>
         </YStack>
       </XStack>
       {externalRef && (
-        <XStack space="$2" alignItems="center">
+        <XStack gap="$2" alignItems="center">
           <SizableText size="$1" color="$color9" fontWeight="600">REFERENCE ID</SizableText>
           <SizableText size="$2" fontWeight="700" color="$color11">{externalRef}</SizableText>
         </XStack>
@@ -247,7 +247,7 @@ export default function BackgroundCheckScreen() {
         paddingHorizontal="$4"
         paddingVertical="$3"
         alignItems="center"
-        space="$3"
+        gap="$3"
         borderBottomWidth={1}
         borderBottomColor="$borderColor"
       >
@@ -257,7 +257,7 @@ export default function BackgroundCheckScreen() {
         >
           <ArrowLeft size={22} color="$color10" />
         </Pressable>
-        <XStack flex={1} space="$2" alignItems="center">
+        <XStack flex={1} gap="$2" alignItems="center">
           <Shield size={18} color={APP_CONFIG.PRIMARY_COLOR} />
           <SizableText size="$5" fontWeight="800" color="$color12">Background Check</SizableText>
         </XStack>
@@ -285,10 +285,10 @@ export default function BackgroundCheckScreen() {
       </XStack>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <YStack space="$5">
+        <YStack gap="$5">
 
           {/* Intro */}
-          <YStack space="$2">
+          <YStack gap="$2">
             <SizableText size="$6" fontWeight="800" color="$color12">
               Driver Background Check
             </SizableText>
@@ -315,7 +315,7 @@ export default function BackgroundCheckScreen() {
               borderWidth={1}
               borderColor="$borderColor"
               padding="$4"
-              space="$3"
+              gap="$3"
             >
               <SizableText size="$2" fontWeight="700" color="$color10">WHAT IS CHECKED</SizableText>
               {[
@@ -325,7 +325,7 @@ export default function BackgroundCheckScreen() {
                 'Motor vehicle record (MVR)',
                 'Identity verification',
               ].map((item, i) => (
-                <XStack key={i} space="$3" alignItems="center">
+                <XStack key={i} gap="$3" alignItems="center">
                   <CheckCircle size={15} color="$color8" />
                   <SizableText size="$3" color="$color11">{item}</SizableText>
                 </XStack>
@@ -336,7 +336,7 @@ export default function BackgroundCheckScreen() {
                 backgroundColor="$color3"
                 borderRadius="$3"
                 padding="$3"
-                space="$1"
+                gap="$1"
                 borderWidth={1}
                 borderColor="$color5"
               >
@@ -350,7 +350,7 @@ export default function BackgroundCheckScreen() {
 
           {/* Authorization form */}
           {showUploadForm && !isPending && !isApproved && (
-            <YStack space="$4">
+            <YStack gap="$4">
               <XStack justifyContent="space-between" alignItems="center">
                 <SizableText size="$2" fontWeight="700" color="$color10">AUTHORIZATION FORM</SizableText>
                 <Pressable
@@ -412,7 +412,7 @@ export default function BackgroundCheckScreen() {
                 error={errors.address}
               />
 
-              <XStack space="$3">
+              <XStack gap="$3">
                 <YStack flex={2}>
                   <Field
                     label="CITY"
@@ -455,11 +455,11 @@ export default function BackgroundCheckScreen() {
                 backgroundColor="$color3"
                 borderRadius="$3"
                 padding="$3"
-                space="$1"
+                gap="$1"
                 borderWidth={1}
                 borderColor="$color5"
               >
-                <XStack space="$2" alignItems="flex-start">
+                <XStack gap="$2" alignItems="flex-start">
                   <Lock size={14} color="$color9" />
                   <SizableText size="$2" color="$color9" flex={1} lineHeight={18}>
                     Your personal information is encrypted and used solely to run your background check. It is never shared with third parties beyond the authorized screening provider.
@@ -473,8 +473,8 @@ export default function BackgroundCheckScreen() {
                 style={styles.consentRow}
               >
                 {agreed
-                  ? <CheckSquare size={22} color="$green9" />
-                  : <Square size={22} color="$color9" />}
+                  ? <Ionicons name="checkbox" size={22} color={colors.primary} />
+                  : <Ionicons name="square-outline" size={22} color={colors.textSecondary} />}
                 <SizableText size="$2" color="$color10" flex={1} lineHeight={20}>
                   I authorize {APP_CONFIG.STORE_NAME} and its designated screening provider to obtain a consumer report and/or investigative consumer report for employment purposes. I understand this report may include information on my criminal history, driving record, and identity. I acknowledge my FCRA rights described above.
                 </SizableText>
@@ -486,7 +486,7 @@ export default function BackgroundCheckScreen() {
                   backgroundColor="$red2"
                   borderRadius="$3"
                   padding="$3"
-                  space="$2"
+                  gap="$2"
                   alignItems="center"
                   borderWidth={1}
                   borderColor="$red5"
@@ -507,12 +507,12 @@ export default function BackgroundCheckScreen() {
                 ]}
               >
                 {submit.isPending ? (
-                  <XStack space="$2" alignItems="center">
+                  <XStack gap="$2" alignItems="center">
                     <ActivityIndicator color="white" size="small" />
                     <SizableText size="$4" fontWeight="700" color="white">Submitting…</SizableText>
                   </XStack>
                 ) : (
-                  <XStack space="$2" alignItems="center">
+                  <XStack gap="$2" alignItems="center">
                     <Shield size={20} color="white" />
                     <SizableText size="$4" fontWeight="800" color="white">
                       Submit Authorization
@@ -531,20 +531,20 @@ export default function BackgroundCheckScreen() {
               borderWidth={1}
               borderColor="$borderColor"
               padding="$4"
-              space="$3"
+              gap="$3"
             >
               <SizableText size="$2" fontWeight="700" color="$color10">SUBMITTED INFORMATION</SizableText>
-              <XStack space="$3">
-                <YStack flex={1} space="$1">
+              <XStack gap="$3">
+                <YStack flex={1} gap="$1">
                   <SizableText size="$1" color="$color9">DOB</SizableText>
                   <SizableText size="$3" color="$color12">{existing.date_of_birth}</SizableText>
                 </YStack>
-                <YStack flex={1} space="$1">
+                <YStack flex={1} gap="$1">
                   <SizableText size="$1" color="$color9">SSN LAST 4</SizableText>
                   <SizableText size="$3" color="$color12">••••{existing.ssn_last4}</SizableText>
                 </YStack>
               </XStack>
-              <YStack space="$1">
+              <YStack gap="$1">
                 <SizableText size="$1" color="$color9">ADDRESS</SizableText>
                 <SizableText size="$3" color="$color12">
                   {existing.address}, {existing.city}, {existing.state} {existing.zip}

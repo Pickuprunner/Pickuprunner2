@@ -89,7 +89,7 @@ function CustomerOrderChat({ orderId, customerName }: { orderId: string; custome
   return (
     <Card borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4" overflow="hidden">
       {/* Header */}
-      <XStack paddingHorizontal="$4" paddingTop="$3" paddingBottom="$2" alignItems="center" space="$2">
+      <XStack paddingHorizontal="$4" paddingTop="$3" paddingBottom="$2" alignItems="center" gap="$2">
         <MessageCircle size={16} color="$color9" />
         <SizableText size="$3" fontWeight="700" color="$color10">MESSAGE YOUR DRIVER</SizableText>
         <YStack flex={1} />
@@ -127,7 +127,7 @@ function CustomerOrderChat({ orderId, customerName }: { orderId: string; custome
       )}
 
       {/* Input */}
-      <XStack paddingHorizontal="$3" paddingBottom="$3" space="$2" alignItems="center">
+      <XStack paddingHorizontal="$3" paddingBottom="$3" gap="$2" alignItems="center">
         <YStack flex={1} backgroundColor="$color4" borderRadius={20} paddingHorizontal="$3" paddingVertical="$1.5">
           <TextInput
             value={inputText}
@@ -252,7 +252,7 @@ export default function TrackOrderScreen() {
   if (loading) {
     return (
       <SafeArea>
-        <YStack flex={1} alignItems="center" justifyContent="center" space="$3">
+        <YStack flex={1} alignItems="center" justifyContent="center" gap="$3">
           <Spinner size="large" color="$color9" />
           <SizableText color="$color10">Loading order…</SizableText>
         </YStack>
@@ -263,7 +263,7 @@ export default function TrackOrderScreen() {
   if (!order) {
     return (
       <SafeArea>
-        <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" space="$4">
+        <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" gap="$4">
           <SizableText size="$5" fontWeight="700" color="$color12">Order not found</SizableText>
           <Pressable onPress={() => router.replace('/(customer)')} style={styles.btn}>
             <SizableText size="$4" fontWeight="700" color="white">Go Home</SizableText>
@@ -278,7 +278,7 @@ export default function TrackOrderScreen() {
       {/* Header */}
       <XStack
         paddingHorizontal="$4" paddingTop="$3" paddingBottom="$2"
-        alignItems="center" space="$3"
+        alignItems="center" gap="$3"
         borderBottomWidth={1} borderBottomColor="$color4"
       >
         <Pressable onPress={() => router.replace('/(customer)/my-orders')} hitSlop={8}>
@@ -292,7 +292,7 @@ export default function TrackOrderScreen() {
         </YStack>
         {/* Live indicator */}
         <XStack
-          space="$1" alignItems="center"
+          gap="$1" alignItems="center"
           paddingHorizontal="$2" paddingVertical="$1"
           borderRadius="$full"
           backgroundColor={isConnected ? '$green3' : '$color3'}
@@ -319,7 +319,7 @@ export default function TrackOrderScreen() {
           />
         }
       >
-        <YStack padding="$4" space="$4" paddingBottom="$10">
+        <YStack padding="$4" gap="$4" paddingBottom="$10">
 
           {/* ── Status hero ── */}
           <Animated.View entering={FadeInDown.springify()}>
@@ -327,7 +327,7 @@ export default function TrackOrderScreen() {
               <YStack
                 backgroundColor="rgba(22,163,74,0.10)"
                 borderRadius={20} borderWidth={1.5} borderColor="rgba(22,163,74,0.35)"
-                padding="$6" alignItems="center" space="$3"
+                padding="$6" alignItems="center" gap="$3"
               >
                 <YStack
                   width={80} height={80} borderRadius={40}
@@ -336,7 +336,7 @@ export default function TrackOrderScreen() {
                 >
                   <CheckCircle size={44} color="$green9" />
                 </YStack>
-                <YStack alignItems="center" space="$1">
+                <YStack alignItems="center" gap="$1">
                   <SizableText size="$7" fontWeight="900" color="$green10">
                     {justDelivered ? '🎉 Delivered!' : 'Delivered'}
                   </SizableText>
@@ -361,7 +361,7 @@ export default function TrackOrderScreen() {
                       paddingVertical="$2"
                       backgroundColor="rgba(22,163,74,0.12)"
                       alignItems="center"
-                      space="$2"
+                      gap="$2"
                     >
                       <SizableText size="$3" fontWeight="700" color="$green10">
                         📸 Delivery photo
@@ -400,7 +400,7 @@ export default function TrackOrderScreen() {
               <YStack
                 backgroundColor="rgba(217,119,6,0.08)"
                 borderRadius={20} borderWidth={1.5} borderColor="rgba(217,119,6,0.3)"
-                padding="$5" alignItems="center" space="$3"
+                padding="$5" alignItems="center" gap="$3"
               >
                 {/* Animated pulse ring */}
                 <YStack position="relative" alignItems="center" justifyContent="center">
@@ -412,7 +412,7 @@ export default function TrackOrderScreen() {
                     <Clock size={40} color="$amber9" />
                   </YStack>
                 </YStack>
-                <YStack alignItems="center" space="$1">
+                <YStack alignItems="center" gap="$1">
                   <SizableText size="$6" fontWeight="900" color="$amber10">On the Way</SizableText>
                   <SizableText size="$3" color="$amber9" textAlign="center">
                     Your driver is heading to you
@@ -425,12 +425,12 @@ export default function TrackOrderScreen() {
           {/* ── Progress steps ── */}
           <Animated.View entering={FadeInDown.delay(80).springify()}>
             <Card padding="$4" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-              <YStack space="$3">
+              <YStack gap="$3">
                 <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
                   ORDER STATUS
                 </SizableText>
                 {/* Step 1 */}
-                <XStack space="$3" alignItems="center">
+                <XStack gap="$3" alignItems="center">
                   <YStack
                     width={32} height={32} borderRadius={16}
                     backgroundColor="$green3"
@@ -448,7 +448,7 @@ export default function TrackOrderScreen() {
                 <YStack marginLeft={15} width={2} height={16} backgroundColor={hasDriver ? '$green6' : '$color5'} />
 
                 {/* Step 2 */}
-                <XStack space="$3" alignItems="center">
+                <XStack gap="$3" alignItems="center">
                   <YStack
                     width={32} height={32} borderRadius={16}
                     backgroundColor={hasDriver ? '$green3' : '$color4'}
@@ -473,7 +473,7 @@ export default function TrackOrderScreen() {
                 <YStack marginLeft={15} width={2} height={16} backgroundColor={isDelivered ? '$green6' : '$color5'} />
 
                 {/* Step 3 */}
-                <XStack space="$3" alignItems="center">
+                <XStack gap="$3" alignItems="center">
                   <YStack
                     width={32} height={32} borderRadius={16}
                     backgroundColor={isDelivered ? '$green3' : '$color4'}
@@ -501,18 +501,18 @@ export default function TrackOrderScreen() {
           {hasDriver && (
             <Animated.View entering={FadeInDown.delay(160).springify()}>
               <Card padding="$4" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-                <YStack space="$3">
+                <YStack gap="$3">
                   <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
                     YOUR DRIVER
                   </SizableText>
-                  <XStack space="$3" alignItems="center">
+                  <XStack gap="$3" alignItems="center">
                     <Avatar size="$5" borderRadius="$full" backgroundColor="rgba(22,163,74,0.15)">
                       {order.driverPhotoUrl
                         ? <Avatar.Image source={{ uri: order.driverPhotoUrl }} />
                         : <User size={26} color="$green9" />
                       }
                     </Avatar>
-                    <YStack flex={1} space="$0.5">
+                    <YStack flex={1} gap="$0.5">
                       <SizableText size="$4" fontWeight="700" color="$color12">
                         {order.driverName || 'Your Driver'}
                       </SizableText>
@@ -534,24 +534,24 @@ export default function TrackOrderScreen() {
           {/* ── Order details ── */}
           <Animated.View entering={FadeInDown.delay(240).springify()}>
             <Card padding="$4" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-              <YStack space="$3">
+              <YStack gap="$3">
                 <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
                   ORDER DETAILS
                 </SizableText>
-                <XStack space="$3" alignItems="flex-start">
+                <XStack gap="$3" alignItems="flex-start">
                   <YStack width={32} height={32} borderRadius={16} backgroundColor="$color4" alignItems="center" justifyContent="center" flexShrink={0}>
                     <MapPin size={16} color="$color9" />
                   </YStack>
-                  <YStack flex={1} space="$0.5">
+                  <YStack flex={1} gap="$0.5">
                     <SizableText size="$2" color="$color9" fontWeight="600">DELIVERY ADDRESS</SizableText>
                     <SizableText size="$3" color="$color12">{order.delivery_address}</SizableText>
                   </YStack>
                 </XStack>
-                <XStack space="$3" alignItems="flex-start">
+                <XStack gap="$3" alignItems="flex-start">
                   <YStack width={32} height={32} borderRadius={16} backgroundColor="$color4" alignItems="center" justifyContent="center" flexShrink={0}>
                     <Package size={16} color="$color9" />
                   </YStack>
-                  <YStack flex={1} space="$0.5">
+                  <YStack flex={1} gap="$0.5">
                     <SizableText size="$2" color="$color9" fontWeight="600">PICKUP INFO</SizableText>
                     <SizableText size="$3" color="$color12">{order.items}</SizableText>
                   </YStack>
@@ -562,7 +562,7 @@ export default function TrackOrderScreen() {
 
           {/* ── Actions ── */}
           <Animated.View entering={FadeInDown.delay(320).springify()}>
-            <YStack space="$3">
+            <YStack gap="$3">
 
               {/* Message Driver — only when driver is assigned and order is active */}
               {hasDriver && !isDelivered && (
@@ -577,12 +577,12 @@ export default function TrackOrderScreen() {
                   borderColor="rgba(0,102,255,0.3)"
                   backgroundColor="rgba(0,102,255,0.06)"
                   padding="$3"
-                  space="$2"
+                  gap="$2"
                 >
                   <SizableText size="$1" fontWeight="700" color="$blue9" letterSpacing={0.5}>
                     ⚡ TEST CONTROLS — delivery requires a driver photo
                   </SizableText>
-                  <XStack space="$2">
+                  <XStack gap="$2">
                     <Pressable
                       onPress={handleAssignTestDriver}
                       disabled={testBusy || !!order?.driverName}

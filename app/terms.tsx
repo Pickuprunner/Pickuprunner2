@@ -18,7 +18,7 @@ const APP = APP_CONFIG.APP_NAME;
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <YStack space="$2" marginBottom="$5">
+    <YStack gap="$2" marginBottom="$5">
       <SizableText size="$4" fontWeight="800" color="$color12">{title}</SizableText>
       {children}
     </YStack>
@@ -33,7 +33,7 @@ function Body({ children }: { children: string }) {
 
 function Bullet({ children }: { children: string }) {
   return (
-    <XStack space="$2" alignItems="flex-start">
+    <XStack gap="$2" alignItems="flex-start">
       <SizableText size="$3" color="$color9">•</SizableText>
       <SizableText size="$3" color="$color11" flex={1} lineHeight={22}>{children}</SizableText>
     </XStack>
@@ -48,21 +48,21 @@ export default function TermsScreen() {
         paddingHorizontal="$4"
         paddingVertical="$3"
         alignItems="center"
-        space="$3"
+        gap="$3"
         borderBottomWidth={1}
         borderBottomColor="$borderColor"
       >
         <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/role-select')} hitSlop={12}>
           <ArrowLeft size={22} color="$color10" />
         </Pressable>
-        <XStack flex={1} space="$2" alignItems="center">
+        <XStack flex={1} gap="$2" alignItems="center">
           <FileText size={18} color="$color9" />
           <SizableText size="$5" fontWeight="800" color="$color12">Terms of Use</SizableText>
         </XStack>
       </XStack>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <YStack space="$2" marginBottom="$6">
+        <YStack gap="$2" marginBottom="$6">
           <SizableText size="$2" color="$color9">Effective: {EFFECTIVE_DATE}</SizableText>
           <SizableText size="$3" color="$color10" lineHeight={22}>
             These Terms of Use ("Terms") govern your use of {APP} (the "App"), operated by Pickup Runner ("we," "us," or "our"). By using the App — whether as a customer placing an order or a driver accepting and delivering orders — you agree to these Terms. If you do not agree, do not use the App.
@@ -82,7 +82,7 @@ export default function TermsScreen() {
         {/* ── Section 2 ── */}
         <Section title="2. Customer Terms">
           <Body>By placing an order through the App, you agree to the following:</Body>
-          <YStack space="$2" paddingLeft="$2">
+          <YStack gap="$2" paddingLeft="$2">
             <Bullet>You are ordering a delivery service through Pickup Runner in your service area. Pickup Runner is a delivery service only and is not affiliated with, endorsed by, or responsible for any store, restaurant, or business from which items are picked up.</Bullet>
             <Bullet>Pickup Runner does not sell, manufacture, or guarantee any products. Product availability, pricing, quality, and substitutions are determined solely by the store or business fulfilling your order.</Bullet>
             <Bullet>A delivery fee and applicable mileage surcharge will be charged at checkout. These fees are non-refundable once a driver has accepted your order.</Bullet>
@@ -97,7 +97,7 @@ export default function TermsScreen() {
         {/* ── Section 3 ── */}
         <Section title="3. Driver Terms">
           <Body>By creating a driver account and accepting deliveries through the App, you agree to the following:</Body>
-          <YStack space="$2" paddingLeft="$2">
+          <YStack gap="$2" paddingLeft="$2">
             <Bullet>You are an independent contractor, not an employee of Pickup Runner or the App operator. You are solely responsible for your taxes, insurance, vehicle maintenance, and compliance with applicable law.</Bullet>
             <Bullet>You must handle all items with care and deliver them to the correct address in the condition received. You are liable for items damaged due to your negligence.</Bullet>
             <Bullet>You must not open, tamper with, or consume any part of a customer's order.</Bullet>
@@ -111,7 +111,7 @@ export default function TermsScreen() {
         {/* ── Section 4 ── */}
         <Section title="4. Prohibited Conduct">
           <Body>You agree not to:</Body>
-          <YStack space="$2" paddingLeft="$2">
+          <YStack gap="$2" paddingLeft="$2">
             <Bullet>Use the App for any unlawful purpose or in violation of any applicable law or regulation.</Bullet>
             <Bullet>Submit false, misleading, or fraudulent orders or payout requests.</Bullet>
             <Bullet>Attempt to circumvent the App's payment or authentication systems.</Bullet>
@@ -173,7 +173,7 @@ export default function TermsScreen() {
             backgroundColor="$color3"
             borderRadius={12}
             padding="$4"
-            space="$1"
+            gap="$1"
             borderWidth={1}
             borderColor="$borderColor"
           >

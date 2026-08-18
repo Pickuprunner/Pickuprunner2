@@ -43,7 +43,7 @@ function DocLink({ label, url, icon }: { label: string; url?: string; icon: Reac
       onPress={() => url && Linking.openURL(url)}
       style={({ pressed }) => [styles.docLink, pressed && { opacity: 0.7 }]}
     >
-      <XStack space="$2" alignItems="center">
+      <XStack gap="$2" alignItems="center">
         {icon}
         <SizableText size="$2" fontWeight="600" color="$blue9">{label}</SizableText>
         <ExternalLink size={12} color="$blue9" />
@@ -85,7 +85,7 @@ function VerificationCard({ v }: { v: DriverVerification }) {
     setResolving(true);
     try {
       await review.mutateAsync({ id: v.id, status: action, adminNote: note });
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       setShowRejectInput(false);
       setRejNote('');
     } finally {
@@ -100,30 +100,31 @@ function VerificationCard({ v }: { v: DriverVerification }) {
       borderWidth={1}
       borderColor={
         v.status === 'approved' ? 'rgba(22,163,74,0.3)' :
-        v.status === 'rejected' ? 'rgba(220,38,38,0.3)' :
-        '$borderColor'
+          v.status === 'rejected' ? 'rgba(220,38,38,0.3)' :
+            '$borderColor'
       }
       padding="$4"
       marginBottom="$3"
     >
-      <YStack space="$3">
+      <YStack gap="$3">
         {/* Driver info row */}
         <XStack justifyContent="space-between" alignItems="flex-start">
           <YStack>
             <SizableText size="$4" fontWeight="700" color="$color12">{v.driver_name}</SizableText>
             <SizableText size="$2" color="$color9">{v.driver_email}</SizableText>
           </YStack>
-          <XStack space="$2" alignItems="center">
+          <XStack gap="$2" alignItems="center">
             <Badge
-              label={v.status.charAt(0).toUpperCase() + v.status.slice(1)}
               variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'error' : 'warning'}
-            />
+            >
+              {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
+            </Badge>
             <SizableText size="$1" color="$color9">{relDate(v.submitted_at)}</SizableText>
           </XStack>
         </XStack>
 
         {/* Document links */}
-        <XStack space="$3" flexWrap="wrap">
+        <XStack gap="$3" flexWrap="wrap">
           <DocLink
             label={v.license_filename || "Driver's License"}
             url={v.license_url}
@@ -138,7 +139,7 @@ function VerificationCard({ v }: { v: DriverVerification }) {
 
         {/* Admin note (if any) */}
         {v.admin_note && !isPending && (
-          <XStack space="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
+          <XStack gap="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
             <AlertCircle size={14} color="$color9" />
             <SizableText size="$2" color="$color10" flex={1}>{v.admin_note}</SizableText>
           </XStack>
@@ -146,7 +147,7 @@ function VerificationCard({ v }: { v: DriverVerification }) {
 
         {/* Action buttons — only for pending */}
         {isPending && (
-          <YStack space="$2">
+          <YStack gap="$2">
             {showRejectInput && (
               <XStack
                 backgroundColor="$color3"
@@ -165,7 +166,7 @@ function VerificationCard({ v }: { v: DriverVerification }) {
                 />
               </XStack>
             )}
-            <XStack space="$2">
+            <XStack gap="$2">
               {showRejectInput ? (
                 <>
                   <Pressable
@@ -180,7 +181,7 @@ function VerificationCard({ v }: { v: DriverVerification }) {
                     style={({ pressed }) => [styles.actionBtn, styles.actionBtnReject, pressed && { opacity: 0.7 }]}
                   >
                     {resolving ? <ActivityIndicator size="small" color="white" /> : (
-                      <XStack space="$1" alignItems="center">
+                      <XStack gap="$1" alignItems="center">
                         <XCircle size={14} color="white" />
                         <SizableText size="$2" fontWeight="700" color="white">Confirm Reject</SizableText>
                       </XStack>
@@ -193,7 +194,7 @@ function VerificationCard({ v }: { v: DriverVerification }) {
                     onPress={() => setShowRejectInput(true)}
                     style={({ pressed }) => [styles.actionBtn, styles.actionBtnRejectOutline, pressed && { opacity: 0.7 }]}
                   >
-                    <XStack space="$1" alignItems="center">
+                    <XStack gap="$1" alignItems="center">
                       <XCircle size={14} color="$red9" />
                       <SizableText size="$2" fontWeight="700" color="$red9">Reject</SizableText>
                     </XStack>
@@ -204,7 +205,7 @@ function VerificationCard({ v }: { v: DriverVerification }) {
                     style={({ pressed }) => [styles.actionBtn, styles.actionBtnApprove, pressed && { opacity: 0.7 }]}
                   >
                     {resolving ? <ActivityIndicator size="small" color="white" /> : (
-                      <XStack space="$1" alignItems="center">
+                      <XStack gap="$1" alignItems="center">
                         <CheckCircle size={14} color="white" />
                         <SizableText size="$2" fontWeight="700" color="white">Approve</SizableText>
                       </XStack>
@@ -227,8 +228,8 @@ export default function AdminVerificationPanel() {
   if (pending.length === 0) return null;
 
   return (
-    <YStack space="$3">
-      <XStack alignItems="center" space="$2">
+    <YStack gap="$3">
+      <XStack alignItems="center" gap="$2">
         <SizableText size="$2" fontWeight="700" color="$red10">
           ADMIN — DRIVER VERIFICATIONS
         </SizableText>

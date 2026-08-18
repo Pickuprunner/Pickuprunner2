@@ -189,7 +189,7 @@ export default function OrdersScreen() {
   return (
     // Use a plain View so the absolutely-positioned modal overlay can escape SafeArea clipping
     <View style={styles.root}>
-      <SafeArea backgroundColor={BG} flex={1}>
+      <SafeArea>
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}

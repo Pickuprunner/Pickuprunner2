@@ -70,9 +70,9 @@ function StatusBanner({
         borderWidth={1}
         borderColor="$green5"
         padding="$4"
-        space="$2"
+        gap="$2"
       >
-        <XStack space="$3" alignItems="center">
+        <XStack gap="$3" alignItems="center">
           <ShieldCheck size={28} color="$green9" />
           <YStack flex={1}>
             <SizableText size="$5" fontWeight="800" color="$green10">
@@ -95,9 +95,9 @@ function StatusBanner({
         borderWidth={1}
         borderColor="$amber5"
         padding="$4"
-        space="$2"
+        gap="$2"
       >
-        <XStack space="$3" alignItems="center">
+        <XStack gap="$3" alignItems="center">
           <Clock size={28} color="$amber9" />
           <YStack flex={1}>
             <SizableText size="$5" fontWeight="800" color="$amber10">
@@ -120,9 +120,9 @@ function StatusBanner({
       borderWidth={1}
       borderColor="$red5"
       padding="$4"
-      space="$3"
+      gap="$3"
     >
-      <XStack space="$3" alignItems="center">
+      <XStack gap="$3" alignItems="center">
         <XCircle size={28} color="$red9" />
         <YStack flex={1}>
           <SizableText size="$5" fontWeight="800" color="$red10">
@@ -178,7 +178,7 @@ function DocUploadCard({
         pressed && !doc.uploading && { opacity: 0.85 },
       ]}
     >
-      <XStack space="$4" alignItems="center">
+      <XStack gap="$4" alignItems="center">
         {/* Icon circle */}
         <YStack
           width={52}
@@ -200,7 +200,7 @@ function DocUploadCard({
         </YStack>
 
         {/* Text */}
-        <YStack flex={1} space="$0">
+        <YStack flex={1} gap="$0">
           <SizableText size="$4" fontWeight="700" color="$color12">{label}</SizableText>
           {doc.uploading ? (
             <SizableText size="$2" color="$amber9">
@@ -217,7 +217,7 @@ function DocUploadCard({
 
         {/* Arrow / replace hint */}
         {!doc.uploading && (
-          <YStack alignItems="center" space="$0">
+          <YStack alignItems="center" gap="$0">
             {hasDoc ? (
               <SizableText size="$1" color="$color9">Replace</SizableText>
             ) : (
@@ -387,7 +387,7 @@ export default function DriverVerificationScreen() {
         paddingHorizontal="$4"
         paddingVertical="$3"
         alignItems="center"
-        space="$3"
+        gap="$3"
         borderBottomWidth={1}
         borderBottomColor="$borderColor"
       >
@@ -397,7 +397,7 @@ export default function DriverVerificationScreen() {
         >
           <ArrowLeft size={22} color="$color10" />
         </Pressable>
-        <XStack flex={1} space="$2" alignItems="center">
+        <XStack flex={1} gap="$2" alignItems="center">
           <ShieldCheck size={18} color={APP_CONFIG.PRIMARY_COLOR} />
           <SizableText size="$5" fontWeight="800" color="$color12">
             Driver Verification
@@ -427,10 +427,10 @@ export default function DriverVerificationScreen() {
       </XStack>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <YStack space="$5">
+        <YStack gap="$5">
 
           {/* Intro */}
-          <YStack space="$2">
+          <YStack gap="$2">
             <SizableText size="$6" fontWeight="800" color="$color12">
               Verify Your Identity
             </SizableText>
@@ -456,7 +456,7 @@ export default function DriverVerificationScreen() {
               borderWidth={1}
               borderColor="$borderColor"
               padding="$4"
-              space="$3"
+              gap="$3"
             >
               <SizableText size="$2" fontWeight="700" color="$color10">
                 WHAT WE VERIFY
@@ -467,7 +467,7 @@ export default function DriverVerificationScreen() {
                 { icon: <ShieldCheck size={16} color="$color9" />, text: 'Identity matching your account name' },
                 { icon: <CheckCircle size={16} color="$color9" />, text: 'Arizona state driving eligibility' },
               ].map((item, i) => (
-                <XStack key={i} space="$3" alignItems="center">
+                <XStack key={i} gap="$3" alignItems="center">
                   {item.icon}
                   <SizableText size="$3" color="$color11">{item.text}</SizableText>
                 </XStack>
@@ -477,7 +477,7 @@ export default function DriverVerificationScreen() {
 
           {/* Upload form — shown for new submissions or resubmissions */}
           {(showUploadForm) && !isPending && !isVerified && (
-            <YStack space="$4">
+            <YStack gap="$4">
               <XStack justifyContent="space-between" alignItems="center">
                 <SizableText size="$2" fontWeight="700" color="$color10">UPLOAD DOCUMENTS</SizableText>
                 <Pressable
@@ -519,7 +519,7 @@ export default function DriverVerificationScreen() {
                 backgroundColor="$blue2"
                 borderRadius="$3"
                 padding="$3"
-                space="$2"
+                gap="$2"
                 borderWidth={1}
                 borderColor="$blue4"
               >
@@ -530,7 +530,7 @@ export default function DriverVerificationScreen() {
                   'Accepted formats: JPG, PNG, HEIC, PDF',
                   'Max file size: 10 MB',
                 ].map((tip, i) => (
-                  <XStack key={i} space="$2" alignItems="flex-start">
+                  <XStack key={i} gap="$2" alignItems="flex-start">
                     <SizableText size="$2" color="$blue9">•</SizableText>
                     <SizableText size="$2" color="$blue9" flex={1}>{tip}</SizableText>
                   </XStack>
@@ -543,7 +543,7 @@ export default function DriverVerificationScreen() {
                   backgroundColor="$red2"
                   borderRadius="$3"
                   padding="$3"
-                  space="$2"
+                  gap="$2"
                   alignItems="center"
                   borderWidth={1}
                   borderColor="$red5"
@@ -564,12 +564,12 @@ export default function DriverVerificationScreen() {
                 ]}
               >
                 {submitVerification.isPending ? (
-                  <XStack space="$2" alignItems="center">
+                  <XStack gap="$2" alignItems="center">
                     <ActivityIndicator color="white" size="small" />
                     <SizableText size="$4" fontWeight="700" color="white">Submitting…</SizableText>
                   </XStack>
                 ) : (
-                  <XStack space="$2" alignItems="center">
+                  <XStack gap="$2" alignItems="center">
                     <ShieldCheck size={20} color="white" />
                     <SizableText size="$4" fontWeight="800" color="white">
                       Submit for Review
@@ -584,7 +584,7 @@ export default function DriverVerificationScreen() {
 
           {/* Approved state — show what was submitted */}
           {isVerified && existing && (
-            <YStack space="$3">
+            <YStack gap="$3">
               <SizableText size="$2" fontWeight="700" color="$color10">SUBMITTED DOCUMENTS</SizableText>
               <YStack
                 backgroundColor="$color2"
@@ -592,17 +592,17 @@ export default function DriverVerificationScreen() {
                 borderWidth={1}
                 borderColor="$borderColor"
                 padding="$4"
-                space="$3"
+                gap="$3"
               >
-                <XStack space="$3" alignItems="center" justifyContent="space-between">
-                  <XStack space="$2" alignItems="center">
+                <XStack gap="$3" alignItems="center" justifyContent="space-between">
+                  <XStack gap="$2" alignItems="center">
                     <Car size={18} color="$green9" />
                     <SizableText size="$3" color="$color12" fontWeight="600">Driver's License</SizableText>
                   </XStack>
                   <SizableText size="$2" color="$green9">✓ Verified</SizableText>
                 </XStack>
-                <XStack space="$3" alignItems="center" justifyContent="space-between">
-                  <XStack space="$2" alignItems="center">
+                <XStack gap="$3" alignItems="center" justifyContent="space-between">
+                  <XStack gap="$2" alignItems="center">
                     <FileText size={18} color="$green9" />
                     <SizableText size="$3" color="$color12" fontWeight="600">Proof of Insurance</SizableText>
                   </XStack>
@@ -614,7 +614,7 @@ export default function DriverVerificationScreen() {
 
           {/* Pending — show what was submitted */}
           {isPending && existing && (
-            <YStack space="$3">
+            <YStack gap="$3">
               <SizableText size="$2" fontWeight="700" color="$color10">DOCUMENTS SUBMITTED</SizableText>
               <YStack
                 backgroundColor="$color2"
@@ -622,15 +622,15 @@ export default function DriverVerificationScreen() {
                 borderWidth={1}
                 borderColor="$borderColor"
                 padding="$4"
-                space="$3"
+                gap="$3"
               >
-                <XStack space="$2" alignItems="center">
+                <XStack gap="$2" alignItems="center">
                   <Car size={16} color="$color9" />
                   <SizableText size="$3" color="$color10">
                     License: {existing.license_filename || 'uploaded'}
                   </SizableText>
                 </XStack>
-                <XStack space="$2" alignItems="center">
+                <XStack gap="$2" alignItems="center">
                   <FileText size={16} color="$color9" />
                   <SizableText size="$3" color="$color10">
                     Insurance: {existing.insurance_filename || 'uploaded'}

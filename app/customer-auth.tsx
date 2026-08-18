@@ -71,7 +71,7 @@ export default function CustomerAuthScreen() {
         await blink.auth.signUp({
           email: emailTrimmed,
           password,
-          displayName: nameTrimmed,
+          metadata: { displayName: nameTrimmed },
         });
         // Save display name locally
         await AsyncStorage.setItem(NAME_KEY, nameTrimmed).catch(() => {});
@@ -141,7 +141,7 @@ export default function CustomerAuthScreen() {
           </Pressable>
 
           {/* Icon + heading */}
-          <YStack alignItems="center" space="$3" marginBottom="$8">
+          <YStack alignItems="center" gap="$3" marginBottom="$8">
             <YStack
               width={72} height={72} borderRadius={36}
               backgroundColor="rgba(245,196,0,0.12)"
@@ -150,7 +150,7 @@ export default function CustomerAuthScreen() {
             >
               <ShoppingBag size={36} color={APP_CONFIG.SECONDARY_COLOR} />
             </YStack>
-            <YStack alignItems="center" space="$1">
+            <YStack alignItems="center" gap="$1">
               <SizableText size="$8" fontWeight="800" color="$color12">
                 {isSignUp ? 'Create Account' : 'Welcome Back'}
               </SizableText>
@@ -163,16 +163,16 @@ export default function CustomerAuthScreen() {
           </YStack>
 
           {/* Form */}
-          <YStack space="$4" width="100%">
+          <YStack gap="$4" width="100%">
             {/* Name (sign-up only) */}
             {isSignUp && (
-              <YStack space="$1">
+              <YStack gap="$1">
                 <SizableText size="$2" fontWeight="700" color="$color10">YOUR NAME</SizableText>
                 <XStack
                   alignItems="center" backgroundColor="$color3"
                   borderRadius={14} borderWidth={1}
                   borderColor={error && !name.trim() ? '$red8' : '$color5'}
-                  paddingHorizontal="$4" space="$2"
+                  paddingHorizontal="$4" gap="$2"
                 >
                   <User size={18} color="$color9" />
                   <TextInput
@@ -189,12 +189,12 @@ export default function CustomerAuthScreen() {
             )}
 
             {/* Email */}
-            <YStack space="$1">
+            <YStack gap="$1">
               <SizableText size="$2" fontWeight="700" color="$color10">EMAIL</SizableText>
               <XStack
                 alignItems="center" backgroundColor="$color3"
                 borderRadius={14} borderWidth={1} borderColor="$color5"
-                paddingHorizontal="$4" space="$2"
+                paddingHorizontal="$4" gap="$2"
               >
                 <Mail size={18} color="$color9" />
                 <TextInput
@@ -212,12 +212,12 @@ export default function CustomerAuthScreen() {
             </YStack>
 
             {/* Password */}
-            <YStack space="$1">
+            <YStack gap="$1">
               <SizableText size="$2" fontWeight="700" color="$color10">PASSWORD</SizableText>
               <XStack
                 alignItems="center" backgroundColor="$color3"
                 borderRadius={14} borderWidth={1} borderColor="$color5"
-                paddingHorizontal="$4" space="$2"
+                paddingHorizontal="$4" gap="$2"
               >
                 <Lock size={18} color="$color9" />
                 <TextInput
@@ -246,8 +246,8 @@ export default function CustomerAuthScreen() {
 
             {/* Terms — sign-up only */}
             {isSignUp && (
-              <YStack space="$2">
-                <XStack space="$3">
+              <YStack gap="$2">
+                <XStack gap="$3">
                   <Pressable onPress={() => router.push('/terms')} style={({ pressed }) => [styles.linkBtn, pressed && { opacity: 0.6 }]}>
                     <SizableText size="$2" fontWeight="700" color="$yellow10" textDecorationLine="underline">Terms of Use</SizableText>
                   </Pressable>
@@ -291,7 +291,7 @@ export default function CustomerAuthScreen() {
             </Pressable>
 
             {/* Mode switch */}
-            <XStack justifyContent="center" space="$1" marginTop="$2">
+            <XStack justifyContent="center" gap="$1" marginTop="$2">
               <SizableText size="$3" color="$color10">
                 {isSignUp ? 'Already have an account?' : "Don't have an account?"}
               </SizableText>

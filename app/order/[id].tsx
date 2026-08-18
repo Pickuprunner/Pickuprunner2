@@ -201,7 +201,7 @@ export default function OrderDetailScreen() {
 
   if (!order && !loading) {
     return (
-      <SafeArea backgroundColor={BG} flex={1}>
+      <SafeArea>
         <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" gap="$4">
           <AlertCircle size={48} color="#EF4444" />
           <SizableText size="$5" fontWeight="700" color="white" textAlign="center">Order not found</SizableText>
@@ -392,7 +392,7 @@ export default function OrderDetailScreen() {
   const displayStatus = order ? { ...order, status: status as Order['status'] } : order;
 
   return (
-    <SafeArea backgroundColor={BG} flex={1}>
+    <SafeArea>
 
       {/* ── Header ── */}
       <XStack

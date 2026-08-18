@@ -146,10 +146,10 @@ function OrderCard({
         borderColor={isNewlyDelivered ? '$green6' : isPending ? '$amber4' : '$color4'}
         elevation={2}
       >
-        <YStack space="$3">
+        <YStack gap="$3">
           {/* Status + time */}
           <XStack justifyContent="space-between" alignItems="center">
-            <XStack space="$2" alignItems="center">
+            <XStack gap="$2" alignItems="center">
               {isPending
                 ? <Clock size={14} color="$amber9" />
                 : <CheckCircle size={14} color="$green9" />}
@@ -164,27 +164,27 @@ function OrderCard({
           </XStack>
 
           {/* Order ID + name */}
-          <YStack space="$1">
+          <YStack gap="$1">
             <SizableText size="$5" fontWeight="700" color="$color12">{item.customer_name}</SizableText>
             <SizableText size="$2" color="$color9">Order #{item?.id ? item.id.slice(-6).toUpperCase() : '------'}</SizableText>
           </YStack>
 
           {/* Address + items */}
-          <YStack space="$2">
-            <XStack space="$2" alignItems="flex-start">
+          <YStack gap="$2">
+            <XStack gap="$2" alignItems="flex-start">
               <MapPin size={13} color="$color9" style={{ marginTop: 2 }} />
               <SizableText size="$3" color="$color11" flex={1} numberOfLines={2}>
                 {item.delivery_address}
               </SizableText>
             </XStack>
-            <XStack space="$2" alignItems="flex-start">
+            <XStack gap="$2" alignItems="flex-start">
               <Package size={13} color="$color9" style={{ marginTop: 2 }} />
               <SizableText size="$3" color="$color11" flex={1} numberOfLines={2}>
                 {item.items}
               </SizableText>
             </XStack>
             {miles > 0 && (
-              <XStack space="$2" alignItems="center">
+              <XStack gap="$2" alignItems="center">
                 <Navigation size={13} color="$color9" />
                 <SizableText size="$3" color="$color11">
                   {miles.toFixed(1)} mi
@@ -204,7 +204,7 @@ function OrderCard({
               padding="$2"
               paddingHorizontal="$3"
             >
-              <XStack space="$2" alignItems="center">
+              <XStack gap="$2" alignItems="center">
                 <DollarSign size={13} color={item.payment_status === 'paid' ? '$green9' : '$amber9'} />
                 <SizableText
                   size="$2"
@@ -214,7 +214,7 @@ function OrderCard({
                   {item.payment_status === 'paid' ? '✓ Paid' : 'Pay on Pickup'}
                 </SizableText>
               </XStack>
-              <XStack space="$2" alignItems="center">
+              <XStack gap="$2" alignItems="center">
                 <SizableText size="$3" fontWeight="800" color={item.payment_status === 'paid' ? '$green10' : '$amber10'}>
                   {fmt(total)}
                 </SizableText>
@@ -231,7 +231,7 @@ function OrderCard({
               backgroundColor="$color3"
               borderRadius={10}
               padding="$3"
-              space="$2"
+              gap="$2"
               borderWidth={1}
               borderColor="$color5"
             >
@@ -268,7 +268,7 @@ function OrderCard({
               borderWidth={1}
               borderColor="rgba(22,163,74,0.25)"
               padding="$3"
-              space="$3"
+              gap="$3"
               alignItems="center"
             >
               <Avatar size="$3" borderRadius="$full" backgroundColor="rgba(22,163,74,0.18)">
@@ -293,13 +293,13 @@ function OrderCard({
 
           {/* Action buttons for pending orders */}
           {isPending && (
-            <XStack space="$2">
+            <XStack gap="$2">
               {/* Call store for questions */}
               <Pressable
                 onPress={() => Linking.openURL(`mailto:${APP_CONFIG.STORE_EMAIL}`)}
                 style={({ pressed }) => [styles.callBtn, pressed && styles.cancelBtnPressed]}
               >
-                <XStack space="$1" alignItems="center" justifyContent="center">
+                <XStack gap="$1" alignItems="center" justifyContent="center">
                   <Mail size={13} color="$color10" />
                   <SizableText size="$2" fontWeight="600" color="$color10">Email Us</SizableText>
                 </XStack>
@@ -310,7 +310,7 @@ function OrderCard({
                 onPress={() => onCancel(item.id)}
                 style={({ pressed }) => [styles.cancelBtn, pressed && styles.cancelBtnPressed]}
               >
-                <XStack space="$1" alignItems="center" justifyContent="center">
+                <XStack gap="$1" alignItems="center" justifyContent="center">
                   <Trash2 size={13} color="$red9" />
                   <SizableText size="$2" fontWeight="600" color="$red9">Cancel</SizableText>
                 </XStack>
@@ -458,7 +458,7 @@ export default function MyOrdersScreen() {
       >
         <SizableText size="$6" fontWeight="800" color="$color12">My Orders</SizableText>
         <XStack
-          space="$1"
+          gap="$1"
           alignItems="center"
           paddingHorizontal="$3"
           paddingVertical="$1"

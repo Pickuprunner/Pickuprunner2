@@ -246,7 +246,7 @@ export default function ActiveOrdersScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
-      <SafeArea backgroundColor={BG} flex={1}>
+      <SafeArea>
 
         {/* ── Header ── */}
         <View style={styles.header}>

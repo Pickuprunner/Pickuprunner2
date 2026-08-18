@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Modal, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import {
   YStack,
   XStack,
@@ -14,7 +15,6 @@ import {
   ShieldCheck,
   ShieldAlert,
   Camera,
-  ImageIcon,
   X,
   AlertTriangle,
   CheckCircle,
@@ -139,20 +139,20 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
           </Pressable>
         </XStack>
 
-        <YStack flex={1} padding="$4" space="$4">
+        <YStack flex={1} padding="$4" gap="$4">
 
           {/* ── IDLE: choose method ── */}
           {phase === 'idle' && (
-            <YStack flex={1} space="$5">
+            <YStack flex={1} gap="$5">
               <YStack
                 backgroundColor="$amber2"
                 borderRadius="$4"
                 borderWidth={1}
                 borderColor="$amber5"
                 padding="$4"
-                space="$2"
+                gap="$2"
               >
-                <XStack space="$2" alignItems="center">
+                <XStack gap="$2" alignItems="center">
                   <AlertTriangle size={18} color="$amber9" />
                   <SizableText size="$3" fontWeight="700" color="$amber10">
                     ID Scan Required
@@ -164,7 +164,7 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                 </SizableText>
               </YStack>
 
-              <YStack space="$3" flex={1} justifyContent="center">
+              <YStack gap="$3" flex={1} justifyContent="center">
                 {/* Camera button — native only */}
                 {Platform.OS !== 'web' && (
                   <Pressable
@@ -177,7 +177,7 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                     >
                       <Camera size={28} color="$blue9" />
                     </YStack>
-                    <YStack flex={1} space="$0.5">
+                    <YStack flex={1} gap="$0.5">
                       <SizableText size="$4" fontWeight="700" color="$color12">
                         Take Photo
                       </SizableText>
@@ -197,9 +197,9 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                     width={56} height={56} borderRadius={28}
                     backgroundColor="$color3" alignItems="center" justifyContent="center"
                   >
-                    <ImageIcon size={28} color="$color9" />
+                    <Ionicons name="images-outline" size={28} color={colors.textSecondary} />
                   </YStack>
-                  <YStack flex={1} space="$0.5">
+                  <YStack flex={1} gap="$0.5">
                     <SizableText size="$4" fontWeight="700" color="$color12">
                       {Platform.OS === 'web' ? 'Upload ID Photo' : 'Choose from Library'}
                     </SizableText>
@@ -221,9 +221,9 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
 
           {/* ── UPLOADING / SCANNING ── */}
           {(phase === 'uploading' || phase === 'scanning') && (
-            <YStack flex={1} alignItems="center" justifyContent="center" space="$4">
+            <YStack flex={1} alignItems="center" justifyContent="center" gap="$4">
               <ActivityIndicator size="large" color={colors.primary} />
-              <YStack alignItems="center" space="$1">
+              <YStack alignItems="center" gap="$1">
                 <SizableText size="$4" fontWeight="700" color="$color12">
                   {phase === 'uploading' ? 'Uploading photo…' : 'Scanning ID…'}
                 </SizableText>
@@ -238,7 +238,7 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
 
           {/* ── RESULT ── */}
           {phase === 'result' && result?.success && (
-            <YStack flex={1} space="$4">
+            <YStack flex={1} gap="$4">
               {/* Big pass / fail banner */}
               <YStack
                 borderRadius="$5"
@@ -247,7 +247,7 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                 backgroundColor={passed ? '$green2' : '$red2'}
                 padding="$5"
                 alignItems="center"
-                space="$3"
+                gap="$3"
               >
                 {passed
                   ? <ShieldCheck size={56} color="$green9" />
@@ -272,14 +272,14 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                 borderWidth={1}
                 borderColor="$color4"
                 padding="$4"
-                space="$3"
+                gap="$3"
               >
                 <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
                   ID DETAILS
                 </SizableText>
 
                 {(result.firstName || result.lastName) && (
-                  <XStack space="$3" alignItems="center">
+                  <XStack gap="$3" alignItems="center">
                     <User size={16} color="$color9" />
                     <SizableText size="$3" color="$color12" flex={1}>
                       {[result.firstName, result.lastName].filter(Boolean).join(' ')}
@@ -287,7 +287,7 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                   </XStack>
                 )}
 
-                <XStack space="$3" alignItems="center">
+                <XStack gap="$3" alignItems="center">
                   <Calendar size={16} color="$color9" />
                   <SizableText size="$3" color="$color12" flex={1}>
                     DOB: {result.dob} · Age {result.age}
@@ -295,7 +295,7 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                 </XStack>
 
                 {result.expirationDate && (
-                  <XStack space="$3" alignItems="center">
+                  <XStack gap="$3" alignItems="center">
                     <Clock size={16} color={result.isExpired ? '$red9' : '$color9'} />
                     <SizableText size="$3" color={result.isExpired ? '$red10' : '$color12'} flex={1}>
                       Expires: {result.expirationDate}
@@ -305,7 +305,7 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                 )}
 
                 {result.state && (
-                  <XStack space="$3" alignItems="center">
+                  <XStack gap="$3" alignItems="center">
                     <MapPin size={16} color="$color9" />
                     <SizableText size="$3" color="$color12" flex={1}>
                       State: {result.state}
@@ -315,7 +315,7 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
               </YStack>
 
               {/* Actions */}
-              <YStack space="$2" marginTop="auto">
+              <YStack gap="$2" marginTop="auto">
                 {!passed && (
                   <Button
                     variant="outlined"
@@ -343,20 +343,20 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
 
           {/* ── ERROR ── */}
           {phase === 'error' && (
-            <YStack flex={1} alignItems="center" justifyContent="center" space="$4">
+            <YStack flex={1} alignItems="center" justifyContent="center" gap="$4">
               <YStack
                 width={72} height={72} borderRadius={36}
                 backgroundColor="$amber3" alignItems="center" justifyContent="center"
               >
                 <AlertTriangle size={36} color="$amber9" />
               </YStack>
-              <YStack alignItems="center" space="$1">
+              <YStack alignItems="center" gap="$1">
                 <SizableText size="$5" fontWeight="700" color="$color12">Scan Failed</SizableText>
                 <SizableText size="$3" color="$color9" textAlign="center" lineHeight={22}>
                   {result?.errorMessage ?? 'Something went wrong. Please try again.'}
                 </SizableText>
               </YStack>
-              <YStack space="$2" width="100%">
+              <YStack gap="$2" width="100%">
                 <Button
                   theme="active"
                   size="$4"

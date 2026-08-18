@@ -65,13 +65,13 @@ export default function DeleteAccountScreen() {
         // Delete user data from all tables (best-effort, in parallel)
         const cleanupOps = [
           blink.db.driverVerifications.list({ where: { user_id: userId } })
-            .then((rows) => Promise.all(rows.map((r: any) => blink.db.driverVerifications.delete(r.id)))),
+            .then((rows: any[]) => Promise.all(rows.map((r: any) => blink.db.driverVerifications.delete(r.id)))),
           blink.db.backgroundChecks.list({ where: { user_id: userId } })
-            .then((rows) => Promise.all(rows.map((r: any) => blink.db.backgroundChecks.delete(r.id)))),
+            .then((rows: any[]) => Promise.all(rows.map((r: any) => blink.db.backgroundChecks.delete(r.id)))),
           blink.db.payoutRequests.list({ where: { driver_user_id: userId } })
-            .then((rows) => Promise.all(rows.map((r: any) => blink.db.payoutRequests.delete(r.id)))),
+            .then((rows: any[]) => Promise.all(rows.map((r: any) => blink.db.payoutRequests.delete(r.id)))),
           blink.db.orders.list({ where: { driver_user_id: userId } })
-            .then((rows) => Promise.all(rows.map((r: any) => blink.db.orders.update(r.id, { driver_user_id: null, driver_name: null, driver_photo_url: null })))),
+            .then((rows: any[]) => Promise.all(rows.map((r: any) => blink.db.orders.update(r.id, { driver_user_id: null, driver_name: null, driver_photo_url: null })))),
         ];
 
         await Promise.allSettled(cleanupOps);
@@ -96,7 +96,7 @@ export default function DeleteAccountScreen() {
   };
 
   return (
-    <SafeArea edges={['top', 'bottom']} backgroundColor={colors.background} flex={1}>
+    <SafeArea edges={['top', 'bottom']}>
       {/* Header */}
       <XStack
         alignItems="center"
@@ -104,7 +104,7 @@ export default function DeleteAccountScreen() {
         paddingVertical="$3"
         borderBottomWidth={1}
         borderBottomColor={colors.border}
-        space="$3"
+        gap="$3"
       >
         {step !== 'deleting' && step !== 'done' && (
           <Pressable
@@ -153,8 +153,8 @@ function ReviewStep({ onNext }: { onNext: () => void }) {
   ];
 
   return (
-    <YStack space="$6">
-      <YStack alignItems="center" space="$4" marginTop="$4">
+    <YStack gap="$6">
+      <YStack alignItems="center" gap="$4" marginTop="$4">
         <YStack
           width={80} height={80} borderRadius={40}
           backgroundColor="rgba(220,38,38,0.1)"
@@ -163,7 +163,7 @@ function ReviewStep({ onNext }: { onNext: () => void }) {
         >
           <AlertTriangle size={36} color="$red9" />
         </YStack>
-        <YStack alignItems="center" space="$2">
+        <YStack alignItems="center" gap="$2">
           <SizableText size="$7" fontWeight="800" color="$color12">
             Request Account Deletion
           </SizableText>
@@ -182,7 +182,7 @@ function ReviewStep({ onNext }: { onNext: () => void }) {
       >
         {items.map((item, i) => (
           <React.Fragment key={item.label}>
-            <XStack alignItems="center" space="$3" padding="$4">
+            <XStack alignItems="center" gap="$3" padding="$4">
               <YStack
                 width={40} height={40} borderRadius={20}
                 backgroundColor="rgba(220,38,38,0.08)"
@@ -204,9 +204,9 @@ function ReviewStep({ onNext }: { onNext: () => void }) {
       <YStack
         backgroundColor="rgba(59,130,246,0.06)"
         borderRadius={12} borderWidth={1} borderColor="rgba(59,130,246,0.2)"
-        padding="$4" space="$2"
+        padding="$4" gap="$2"
       >
-        <XStack alignItems="center" space="$2">
+        <XStack alignItems="center" gap="$2">
           <Mail size={16} color="$blue9" />
           <SizableText size="$3" fontWeight="700" color="$blue9">
             Need help instead?
@@ -259,8 +259,8 @@ function ConfirmStep({
   onBack: () => void;
 }) {
   return (
-    <YStack space="$5" marginTop="$4">
-      <YStack alignItems="center" space="$3">
+    <YStack gap="$5" marginTop="$4">
+      <YStack alignItems="center" gap="$3">
         <YStack
           width={64} height={64} borderRadius={32}
           backgroundColor="rgba(220,38,38,0.12)"
@@ -277,7 +277,7 @@ function ConfirmStep({
         </SizableText>
       </YStack>
 
-      <YStack space="$2">
+      <YStack gap="$2">
         <SizableText size="$2" fontWeight="700" color="$color10" paddingLeft="$1">
           TYPE DELETE TO CONFIRM
         </SizableText>
@@ -338,7 +338,7 @@ function ConfirmStep({
 
 function DeletingStep() {
   return (
-    <YStack flex={1} alignItems="center" justifyContent="center" space="$5" marginTop="$8">
+    <YStack flex={1} alignItems="center" justifyContent="center" gap="$5" marginTop="$8">
       <YStack
         width={80} height={80} borderRadius={40}
         backgroundColor="rgba(220,38,38,0.08)"
@@ -346,7 +346,7 @@ function DeletingStep() {
       >
         <Spinner size="large" color="$red9" />
       </YStack>
-      <YStack alignItems="center" space="$2">
+      <YStack alignItems="center" gap="$2">
         <SizableText size="$5" fontWeight="700" color="$color12">
           Deleting your account...
         </SizableText>
@@ -362,16 +362,16 @@ function DeletingStep() {
 
 function DoneStep() {
   return (
-    <YStack alignItems="center" space="$5" marginTop="$8">
+    <YStack alignItems="center" gap="$5" marginTop="$8">
       <YStack
         width={80} height={80} borderRadius={40}
-        backgroundColor="rgba(22,163,74,0.1)"
+        backgroundColor="rgba(220,38,38,0.1)"
         alignItems="center" justifyContent="center"
         borderWidth={2} borderColor="rgba(22,163,74,0.25)"
       >
         <CheckCircle size={36} color="$green9" />
       </YStack>
-      <YStack alignItems="center" space="$2">
+      <YStack alignItems="center" gap="$2">
         <SizableText size="$6" fontWeight="800" color="$color12">
           Account Deleted
         </SizableText>
@@ -383,7 +383,7 @@ function DoneStep() {
       <YStack
         backgroundColor="rgba(59,130,246,0.06)"
         borderRadius={12} borderWidth={1} borderColor="rgba(59,130,246,0.2)"
-        padding="$4" space="$2" width="100%"
+        padding="$4" gap="$2" width="100%"
       >
         <SizableText size="$2" color="$color10" lineHeight={20}>
           If you change your mind, you can create a new account at any time. If you have questions, contact{' '}

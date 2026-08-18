@@ -109,7 +109,7 @@ export default function NewOrderBanner({ alert, onDismiss }: Props) {
           borderRadius={16}
           padding="$4"
           alignItems="center"
-          space="$3"
+          gap="$3"
         >
           {/* Icon */}
           <YStack
@@ -125,7 +125,7 @@ export default function NewOrderBanner({ alert, onDismiss }: Props) {
           </YStack>
 
           {/* Text */}
-          <YStack flex={1} space="$0.5">
+          <YStack flex={1} gap="$0.5">
             <SizableText size="$4" fontWeight="800" color="#D8F3DC">
               New Order #{shortId}
             </SizableText>

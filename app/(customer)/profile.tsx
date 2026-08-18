@@ -128,10 +128,10 @@ export default function CustomerProfileScreen() {
     <SafeArea>
       <AppHeader title="My Profile" />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <YStack padding="$4" space="$6">
+        <YStack padding="$4" gap="$6">
 
           {/* Avatar + name */}
-          <YStack alignItems="center" space="$3">
+          <YStack alignItems="center" gap="$3">
             <Avatar size="$8" borderRadius="$full" backgroundColor="$color4">
               <SizableText size="$7" fontWeight="800" color="$color12">
                 {initials(displayName)}
@@ -139,7 +139,7 @@ export default function CustomerProfileScreen() {
             </Avatar>
 
             {editing ? (
-              <YStack space="$2" width="100%" alignItems="center">
+              <YStack gap="$2" width="100%" alignItems="center">
                 <TextInput
                   value={editValue}
                   onChangeText={setEditValue}
@@ -153,7 +153,7 @@ export default function CustomerProfileScreen() {
                     Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {},
                   ]}
                 />
-                <XStack space="$2">
+                <XStack gap="$2">
                   <Pressable onPress={() => setEditing(false)} style={styles.editBtn}>
                     <X size={16} color="$color10" />
                     <SizableText size="$3" color="$color10"> Cancel</SizableText>
@@ -165,8 +165,8 @@ export default function CustomerProfileScreen() {
                 </XStack>
               </YStack>
             ) : (
-              <YStack alignItems="center" space="$1">
-                <XStack space="$2" alignItems="center">
+              <YStack alignItems="center" gap="$1">
+                <XStack gap="$2" alignItems="center">
                   <SizableText size="$6" fontWeight="700" color="$color12">{displayName}</SizableText>
                   <Pressable onPress={() => { setEditValue(displayName); setEditing(true); }} hitSlop={8}>
                     <Edit3 size={16} color="$color9" />
@@ -178,11 +178,11 @@ export default function CustomerProfileScreen() {
           </YStack>
 
           {/* Order stats */}
-          <XStack space="$3">
+          <XStack gap="$3">
             <YStack
               flex={1} padding="$4" borderRadius="$4"
               backgroundColor="$amber2" borderWidth={1} borderColor="$amber4"
-              alignItems="center" space="$1"
+              alignItems="center" gap="$1"
             >
               <Clock size={18} color="$amber9" />
               <SizableText size="$6" fontWeight="800" color="$amber9">{orderStats.pending}</SizableText>
@@ -191,7 +191,7 @@ export default function CustomerProfileScreen() {
             <YStack
               flex={1} padding="$4" borderRadius="$4"
               backgroundColor="$green2" borderWidth={1} borderColor="$green4"
-              alignItems="center" space="$1"
+              alignItems="center" gap="$1"
             >
               <CheckCircle size={18} color="$green9" />
               <SizableText size="$6" fontWeight="800" color="$green9">{orderStats.delivered}</SizableText>
@@ -200,19 +200,19 @@ export default function CustomerProfileScreen() {
           </XStack>
 
           {/* Account — sign in/out */}
-          <YStack space="$3">
+          <YStack gap="$3">
             <SizableText size="$2" fontWeight="700" color="$color10" paddingLeft="$1">ACCOUNT</SizableText>
             {isAuthenticated ? (
               <>
                 <YStack
                   backgroundColor="$green2" borderRadius="$4" padding="$4"
-                  borderWidth={1} borderColor="$green5" space="$1"
+                  borderWidth={1} borderColor="$green5" gap="$1"
                 >
                   <SizableText size="$3" fontWeight="700" color="$green10">Signed in</SizableText>
                   <SizableText size="$2" color="$green9">{user?.email}</SizableText>
                 </YStack>
                 <Pressable onPress={handleSignOut} style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}>
-                  <XStack alignItems="center" space="$3">
+                  <XStack alignItems="center" gap="$3">
                     <YStack width={44} height={44} borderRadius={22} backgroundColor="$red3" alignItems="center" justifyContent="center">
                       <LogOut size={22} color="$red9" />
                     </YStack>
@@ -225,7 +225,7 @@ export default function CustomerProfileScreen() {
               </>
             ) : (
               <Pressable onPress={() => router.push('/customer-auth')} style={({ pressed }) => [styles.signInCard, pressed && styles.actionCardPressed]}>
-                <XStack alignItems="center" space="$3">
+                <XStack alignItems="center" gap="$3">
                   <YStack width={44} height={44} borderRadius={22} backgroundColor="rgba(245,196,0,0.15)" alignItems="center" justifyContent="center" borderWidth={1} borderColor="rgba(245,196,0,0.35)">
                     <LogIn size={22} color="$yellow9" />
                   </YStack>
@@ -239,10 +239,10 @@ export default function CustomerProfileScreen() {
           </YStack>
 
           {/* Support */}
-          <YStack space="$3">
+          <YStack gap="$3">
             <SizableText size="$2" fontWeight="700" color="$color10" paddingLeft="$1">SUPPORT</SizableText>
             <Pressable onPress={emailSupport} style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}>
-              <XStack alignItems="center" space="$3">
+              <XStack alignItems="center" gap="$3">
                 <YStack width={44} height={44} borderRadius={22} backgroundColor="$color4" alignItems="center" justifyContent="center">
                   <Mail size={22} color="$color10" />
                 </YStack>
@@ -255,11 +255,11 @@ export default function CustomerProfileScreen() {
           </YStack>
 
           {/* Switch / role */}
-          <YStack space="$3">
+          <YStack gap="$3">
             <SizableText size="$2" fontWeight="700" color="$color10" paddingLeft="$1">SWITCH MODE</SizableText>
 
             <Pressable onPress={switchToDriver} style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}>
-              <XStack alignItems="center" space="$3">
+              <XStack alignItems="center" gap="$3">
                 <YStack width={44} height={44} borderRadius={22} backgroundColor="$color4" alignItems="center" justifyContent="center">
                   <Truck size={22} color="$color10" />
                 </YStack>
@@ -272,7 +272,7 @@ export default function CustomerProfileScreen() {
             </Pressable>
 
             <Pressable onPress={chooseRole} style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}>
-              <XStack alignItems="center" space="$3">
+              <XStack alignItems="center" gap="$3">
                 <YStack width={44} height={44} borderRadius={22} backgroundColor="$color4" alignItems="center" justifyContent="center">
                   <RefreshCw size={22} color="$color10" />
                 </YStack>
@@ -285,10 +285,10 @@ export default function CustomerProfileScreen() {
           </YStack>
 
           {/* Delete Account */}
-          <YStack space="$3">
+          <YStack gap="$3">
             <SizableText size="$2" fontWeight="700" color="$color10" paddingLeft="$1">DANGER ZONE</SizableText>
             <Pressable onPress={() => router.push('/delete-account')} style={({ pressed }) => [styles.deleteCard, pressed && styles.actionCardPressed]}>
-              <XStack alignItems="center" space="$3">
+              <XStack alignItems="center" gap="$3">
                 <YStack width={44} height={44} borderRadius={22} backgroundColor="rgba(220,38,38,0.1)" alignItems="center" justifyContent="center">
                   <Trash2 size={22} color="$red9" />
                 </YStack>

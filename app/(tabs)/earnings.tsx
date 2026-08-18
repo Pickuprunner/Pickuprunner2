@@ -52,7 +52,18 @@ interface PayoutRequest {
   order_scope: string;
   requested_at: string;
   resolved_at?: string;
+  payment_method?: string;
+  payment_handle?: string;
 }
+
+const METHOD_LABELS: Record<string, string> = {
+  stripe: 'Stripe Direct',
+  bank: 'Bank Transfer',
+  venmo: 'Venmo',
+  cashapp: 'Cash App',
+  zelle: 'Zelle',
+  paypal: 'PayPal',
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -108,20 +119,21 @@ function PayoutCard({ payout }: { payout: PayoutRequest }) {
       padding="$4"
       marginBottom="$3"
     >
-      <YStack space="$3">
+      <YStack gap="$3">
         <XStack justifyContent="space-between" alignItems="center">
-          <XStack space="$2" alignItems="center">
+          <XStack gap="$2" alignItems="center">
             <SizableText size="$5" fontWeight="800" color="$color12">{fmt(payout.amount_cents)}</SizableText>
             <Badge
-              label={statusLabel}
               variant={payout.status === 'paid' ? 'success' : payout.status === 'rejected' ? 'error' : payout.status === 'approved' ? 'info' : 'warning'}
-            />
+            >
+              {statusLabel}
+            </Badge>
           </XStack>
           <SizableText size="$1" color="$color9">{relativeDate(payout.requested_at)}</SizableText>
         </XStack>
 
-        <XStack space="$4">
-          <YStack space="$0">
+        <XStack gap="$4">
+          <YStack gap="$0">
             <SizableText size="$1" color="$color9" fontWeight="600">DELIVERIES</SizableText>
             <SizableText size="$2" color="$color11">{payout.deliveries_count}</SizableText>
           </YStack>
@@ -132,7 +144,7 @@ function PayoutCard({ payout }: { payout: PayoutRequest }) {
             backgroundColor="$color3"
             borderRadius="$3"
             padding="$3"
-            space="$2"
+            gap="$2"
             alignItems="flex-start"
           >
             <AlertCircle size={14} color="$color9" />
@@ -141,7 +153,7 @@ function PayoutCard({ payout }: { payout: PayoutRequest }) {
         )}
 
         {payout.status === 'paid' && payout.resolved_at && (
-          <XStack space="$1" alignItems="center">
+          <XStack gap="$1" alignItems="center">
             <CheckCircle size={13} color="$green9" />
             <SizableText size="$1" color="$green9">Paid {relativeDate(payout.resolved_at)}</SizableText>
           </XStack>
@@ -193,10 +205,11 @@ function AdminPayoutPanel() {
   };
 
   const confirmAction = (req: PayoutRequest, action: 'paid' | 'rejected') => {
+    const methodStr = (req.payment_method && METHOD_LABELS[req.payment_method]) || req.payment_method || 'Direct Transfer';
     const label = action === 'paid' ? 'Mark as Paid' : 'Reject';
     const msg =
       action === 'paid'
-        ? `Confirm you sent ${fmt(req.amount_cents)} to ${req.driver_name} via ${METHOD_LABELS[req.payment_method]}${req.payment_handle ? ` (${req.payment_handle})` : ''}?`
+        ? `Confirm you sent ${fmt(req.amount_cents)} to ${req.driver_name} via ${methodStr}${req.payment_handle ? ` (${req.payment_handle})` : ''}?`
         : `Reject payout request from ${req.driver_name}?`;
 
     if (Platform.OS === 'web') {
@@ -212,8 +225,8 @@ function AdminPayoutPanel() {
   if (pending.length === 0) return null;
 
   return (
-    <YStack space="$3">
-      <XStack alignItems="center" space="$2">
+    <YStack gap="$3">
+      <XStack alignItems="center" gap="$2">
         <SizableText size="$2" fontWeight="700" color="$red10">ADMIN — PAYOUT REQUESTS</SizableText>
         <YStack
           backgroundColor="$red9"
@@ -235,7 +248,7 @@ function AdminPayoutPanel() {
           borderWidth={1}
           borderColor="$borderColor"
           padding="$4"
-          space="$3"
+          gap="$3"
         >
           <XStack justifyContent="space-between" alignItems="flex-start">
             <YStack>
@@ -245,10 +258,10 @@ function AdminPayoutPanel() {
             <SizableText size="$5" fontWeight="900" color={APP_CONFIG.PRIMARY_COLOR}>{fmt(req.amount_cents)}</SizableText>
           </XStack>
 
-          <XStack space="$4">
+          <XStack gap="$4">
             <YStack>
               <SizableText size="$1" color="$color9" fontWeight="600">METHOD</SizableText>
-              <SizableText size="$2" fontWeight="600" color="$color11">{METHOD_LABELS[req.payment_method]}</SizableText>
+              <SizableText size="$2" fontWeight="600" color="$color11">{(req.payment_method && METHOD_LABELS[req.payment_method]) || req.payment_method || 'Direct'}</SizableText>
             </YStack>
             {req.payment_handle && (
               <YStack>
@@ -266,7 +279,7 @@ function AdminPayoutPanel() {
             <SizableText size="$2" color="$color10" fontStyle="italic">"{req.notes}"</SizableText>
           )}
 
-          <XStack space="$2">
+          <XStack gap="$2">
             <Pressable
               onPress={() => confirmAction(req, 'rejected')}
               disabled={resolving === req.id}
@@ -386,15 +399,15 @@ export default function EarningsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <YStack padding="$4" space="$5">
+        <YStack padding="$4" gap="$5">
 
           {/* ── Earnings Summary ── */}
-          <YStack space="$3">
+          <YStack gap="$3">
             <SizableText size="$2" fontWeight="700" color="$color10">YOUR EARNINGS</SizableText>
 
             {/* Total card — shows all delivered earnings */}
             <YStack
-              padding="$4" borderRadius="$4" alignItems="center" space="$1"
+              padding="$4" borderRadius="$4" alignItems="center" gap="$1"
               backgroundColor="rgba(204,0,0,0.08)" borderWidth={1} borderColor="rgba(204,0,0,0.25)"
             >
               <SizableText size="$7" fontWeight="900" color={APP_CONFIG.PRIMARY_COLOR}>
@@ -407,16 +420,16 @@ export default function EarningsScreen() {
 
             {/* Payment status breakdown — when some are paid and some pending */}
             {deliveredOrders.length > 0 && paidOrders.length > 0 && paidOrders.length < deliveredOrders.length && (
-              <XStack space="$3">
+              <XStack gap="$3">
                 <YStack
-                  flex={1} padding="$3" borderRadius="$4" alignItems="center" space="$0"
+                  flex={1} padding="$3" borderRadius="$4" alignItems="center" gap="$0"
                   backgroundColor="$green2" borderWidth={1} borderColor="$green4"
                 >
                   <SizableText size="$4" fontWeight="800" color="$green9">{fmt(totalEarnedCents - pendingPaymentCents)}</SizableText>
                   <SizableText size="$1" fontWeight="700" color="$green10">PAID</SizableText>
                 </YStack>
                 <YStack
-                  flex={1} padding="$3" borderRadius="$4" alignItems="center" space="$0"
+                  flex={1} padding="$3" borderRadius="$4" alignItems="center" gap="$0"
                   backgroundColor="$amber2" borderWidth={1} borderColor="$amber4"
                 >
                   <SizableText size="$4" fontWeight="800" color="$amber10">{fmt(pendingPaymentCents)}</SizableText>
@@ -426,16 +439,16 @@ export default function EarningsScreen() {
             )}
 
             {/* Breakdown — mileage + tips only (base fee is app owner revenue) */}
-            <XStack space="$3">
+            <XStack gap="$3">
               <YStack
-                flex={1} padding="$3" borderRadius="$4" alignItems="center" space="$1"
+                flex={1} padding="$3" borderRadius="$4" alignItems="center" gap="$1"
                 backgroundColor="$amber2" borderWidth={1} borderColor="$amber4"
               >
                 <SizableText size="$5" fontWeight="800" color="$amber10">{fmt(totalMileageCents)}</SizableText>
                 <SizableText size="$1" fontWeight="700" color="$amber9">MILEAGE</SizableText>
               </YStack>
               <YStack
-                flex={1} padding="$3" borderRadius="$4" alignItems="center" space="$1"
+                flex={1} padding="$3" borderRadius="$4" alignItems="center" gap="$1"
                 backgroundColor="$green2" borderWidth={1} borderColor="$green4"
               >
                 <SizableText size="$5" fontWeight="800" color="$green9">{fmt(totalTipCents)}</SizableText>
@@ -446,7 +459,7 @@ export default function EarningsScreen() {
             {/* Available balance */}
             <YStack
               backgroundColor="$color2" borderRadius="$4" borderWidth={1} borderColor="$borderColor"
-              padding="$4" space="$3"
+              padding="$4" gap="$3"
             >
               <XStack justifyContent="space-between" alignItems="center">
                 <YStack>
@@ -485,7 +498,7 @@ export default function EarningsScreen() {
                   {payingOut ? (
                     <ActivityIndicator color="white" />
                   ) : (
-                    <XStack space="$2" alignItems="center" justifyContent="center">
+                    <XStack gap="$2" alignItems="center" justifyContent="center">
                       <DollarSign size={18} color="white" />
                       <SizableText size="$4" fontWeight="800" color="white">
                         Cash Out via Stripe — {fmt(availableCents)}
@@ -516,14 +529,14 @@ export default function EarningsScreen() {
 
           {/* ── Payout History ── */}
           {payouts.length > 0 && (
-            <YStack space="$3">
+            <YStack gap="$3">
               <SizableText size="$2" fontWeight="700" color="$color10">PAYOUT HISTORY</SizableText>
               {payouts.map((p) => <PayoutCard key={p.id} payout={p} />)}
             </YStack>
           )}
 
           {payouts.length === 0 && !ordersLoading && (
-            <YStack alignItems="center" padding="$6" space="$3">
+            <YStack alignItems="center" padding="$6" gap="$3">
               <TrendingUp size={48} color="$color7" />
               <SizableText size="$4" fontWeight="700" color="$color10" textAlign="center">No payouts yet</SizableText>
               <SizableText size="$2" color="$color9" textAlign="center">

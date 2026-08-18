@@ -67,7 +67,7 @@ export default function SignInScreen() {
         await blink.auth.signUp({
           email: emailTrimmed,
           password,
-          displayName: nameTrimmed,
+          metadata: { displayName: nameTrimmed },
         });
         // Also save as chat display name
         await saveDisplayName(nameTrimmed).catch(() => {});
@@ -147,7 +147,7 @@ export default function SignInScreen() {
           </Pressable>
 
           {/* Icon + heading */}
-          <YStack alignItems="center" space="$3" marginBottom="$8">
+          <YStack alignItems="center" gap="$3" marginBottom="$8">
             <YStack
               width={72}
               height={72}
@@ -158,7 +158,7 @@ export default function SignInScreen() {
             >
               <Truck size={36} color="$green9" />
             </YStack>
-            <YStack alignItems="center" space="$1">
+            <YStack alignItems="center" gap="$1">
               <SizableText size="$8" fontWeight="800" color="$color12">
                 {isSignUp ? 'Create Account' : 'Welcome Back'}
               </SizableText>
@@ -171,10 +171,10 @@ export default function SignInScreen() {
           </YStack>
 
           {/* Form */}
-          <YStack space="$4" width="100%">
+          <YStack gap="$4" width="100%">
             {/* Name (sign-up only) */}
             {isSignUp && (
-              <YStack space="$1">
+              <YStack gap="$1">
                 <SizableText size="$2" fontWeight="700" color="$color10">
                   YOUR NAME
                 </SizableText>
@@ -185,7 +185,7 @@ export default function SignInScreen() {
                   borderWidth={1}
                   borderColor={error && !name.trim() ? '$red8' : '$color5'}
                   paddingHorizontal="$4"
-                  space="$2"
+                  gap="$2"
                 >
                   <SizableText size="$3" color="$color9">👤</SizableText>
                   <TextInput
@@ -205,7 +205,7 @@ export default function SignInScreen() {
             )}
 
             {/* Email */}
-            <YStack space="$1">
+            <YStack gap="$1">
               <SizableText size="$2" fontWeight="700" color="$color10">
                 EMAIL
               </SizableText>
@@ -216,7 +216,7 @@ export default function SignInScreen() {
                 borderWidth={1}
                 borderColor="$color5"
                 paddingHorizontal="$4"
-                space="$2"
+                gap="$2"
               >
                 <Mail size={18} color="$color9" />
                 <TextInput
@@ -237,7 +237,7 @@ export default function SignInScreen() {
             </YStack>
 
             {/* Password */}
-            <YStack space="$1">
+            <YStack gap="$1">
               <SizableText size="$2" fontWeight="700" color="$color10">
                 PASSWORD
               </SizableText>
@@ -248,7 +248,7 @@ export default function SignInScreen() {
                 borderWidth={1}
                 borderColor="$color5"
                 paddingHorizontal="$4"
-                space="$2"
+                gap="$2"
               >
                 <Lock size={18} color="$color9" />
                 <TextInput
@@ -292,9 +292,9 @@ export default function SignInScreen() {
 
             {/* Terms links + checkbox — sign-up only */}
             {isSignUp && (
-              <YStack space="$2">
+              <YStack gap="$2">
                 {/* Read links first */}
-                <XStack space="$3">
+                <XStack gap="$3">
                   <Pressable
                     onPress={() => router.push('/terms')}
                     style={({ pressed }) => [styles.linkBtn, pressed && { opacity: 0.6 }]}
@@ -357,7 +357,7 @@ export default function SignInScreen() {
             </Pressable>
 
             {/* Mode switch */}
-            <XStack justifyContent="center" space="$1" marginTop="$2">
+            <XStack justifyContent="center" gap="$1" marginTop="$2">
               <SizableText size="$3" color="$color10">
                 {isSignUp ? 'Already have an account?' : "Don't have an account?"}
               </SizableText>
