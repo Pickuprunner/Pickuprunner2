@@ -24,7 +24,8 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { blink } from '@/lib/blink';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
-import { AuthInput, AuthHero, TermsAgreement } from '@/components/auth';
+import { AuthHero, TermsAgreement } from '@/components/auth';
+import CustomInput from '@/components/core/CustomInput';
 
 const SESSION_KEY = 'customer_session_id';
 const NAME_KEY = 'customer_display_name';
@@ -174,20 +175,20 @@ export default function CustomerAuthScreen() {
           <View style={styles.formSection}>
             {/* Name (sign-up only) */}
             {isSignUp && (
-              <AuthInput
+              <CustomInput
                 label="YOUR NAME"
                 value={name}
                 onChangeText={setName}
                 placeholder="e.g. Alex Rivera"
                 autoCapitalize="words"
                 returnKeyType="next"
-                icon={<User size={18} color={colors.outline} />}
+                leftIcon={<User size={18} color={colors.outline} />}
                 error={!!error && !name.trim()}
               />
             )}
 
             {/* Email */}
-            <AuthInput
+            <CustomInput
               label="EMAIL"
               value={email}
               onChangeText={setEmail}
@@ -196,22 +197,20 @@ export default function CustomerAuthScreen() {
               keyboardType="email-address"
               autoComplete="email"
               returnKeyType="next"
-              icon={<Mail size={18} color={colors.outline} />}
+              leftIcon={<Mail size={18} color={colors.outline} />}
             />
 
             {/* Password */}
-            <AuthInput
+            <CustomInput
               label="PASSWORD"
               value={password}
               onChangeText={setPassword}
               placeholder={isSignUp ? 'At least 8 characters' : '••••••••'}
               isPassword
-              showPassword={showPassword}
-              onTogglePassword={() => setShowPassword((v) => !v)}
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
               returnKeyType="done"
               onSubmitEditing={handleSubmit}
-              icon={<Lock size={18} color={colors.outline} />}
+              leftIcon={<Lock size={18} color={colors.outline} />}
             />
 
             {/* Error */}
