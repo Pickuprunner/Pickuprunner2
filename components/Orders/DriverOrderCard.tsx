@@ -18,7 +18,7 @@ import { CustomCard, useToast } from '@/components/core';
 
 function haptic() {
   if (Platform.OS !== 'web') {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
   }
 }
 
@@ -242,8 +242,8 @@ export function DriverOrderCard({
               {updateStatus.isPending
                 ? 'Accepting…'
                 : driverAtCapacity
-                ? 'Queue Full'
-                : 'Accept'}
+                  ? 'Queue Full'
+                  : 'Accept'}
             </Text>
           </TouchableOpacity>
         )}

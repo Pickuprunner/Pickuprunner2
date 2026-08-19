@@ -10,8 +10,6 @@ const INACTIVE = '#C2C6D8';
 const TAB_BG = '#0F131C';
 const TAB_BORDER = 'rgba(255, 255, 255, 0.05)';
 
-/* ─── Material-styled Tab Icons (using library) ─── */
-
 function InventoryTabIcon({ color, size }: { color: string; size: number }) {
   const { data: orders = [] } = useOrders();
   const driverId = useDriverId();
@@ -58,7 +56,6 @@ export default function TabLayout() {
         },
       }}
     >
-      {/* 1. Orders Tab (Home) */}
       <Tabs.Screen
         name="index"
         options={{
@@ -69,7 +66,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 2. My Orders Tab (Queue / Inventory) */}
       <Tabs.Screen
         name="my-orders"
         options={{
@@ -80,7 +76,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 3. New Order Tab */}
       <Tabs.Screen
         name="new-order"
         options={{
@@ -91,7 +86,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 4. Chat Tab */}
       <Tabs.Screen
         name="chat"
         options={{
@@ -102,7 +96,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* 5. Map Tab */}
       <Tabs.Screen
         name="map"
         options={{
@@ -113,7 +106,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Hidden Utility Routes */}
       <Tabs.Screen
         name="earnings"
         options={{
@@ -130,6 +122,13 @@ export default function TabLayout() {
 
       <Tabs.Screen
         name="profile"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="orders"
         options={{
           href: null,
         }}

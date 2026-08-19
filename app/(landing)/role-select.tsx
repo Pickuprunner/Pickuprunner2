@@ -23,7 +23,7 @@ export default function RoleSelectScreen() {
     if (selecting) return;
     setSelecting(role);
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
     }
     await saveRole(role);
     setSelecting(null);
@@ -37,8 +37,6 @@ export default function RoleSelectScreen() {
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
-      {/* Hero Glow Background */}
       <LinearGradient
         colors={gradients.heroGlow}
         locations={gradients.heroGlowLocations}
@@ -60,9 +58,7 @@ export default function RoleSelectScreen() {
         bounces={false}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section */}
         <View style={styles.heroSection}>
-          {/* Logo Icon */}
           <View style={styles.logoContainer}>
             <Zap size={56} color={colors.secondaryContainer} />
           </View>
@@ -70,11 +66,9 @@ export default function RoleSelectScreen() {
           <Text style={styles.tagline}>{APP_CONFIG.TAGLINE}</Text>
         </View>
 
-        {/* Role Selection Section */}
         <View style={styles.rolesSection}>
           <Text style={styles.sectionHeader}>HOW ARE YOU USING THE APP?</Text>
 
-          {/* Customer Card */}
           <Pressable
             onPress={() => handleSelect('customer')}
             disabled={!!selecting}
@@ -98,8 +92,6 @@ export default function RoleSelectScreen() {
             </View>
             <ChevronRight size={20} color={colors.outline} />
           </Pressable>
-
-          {/* Driver Card */}
           <Pressable
             onPress={() => handleSelect('driver')}
             disabled={!!selecting}
@@ -126,15 +118,12 @@ export default function RoleSelectScreen() {
 
           <Text style={styles.switchRolesHint}>Switch roles anytime from Profile</Text>
         </View>
-
-        {/* Footer Actions */}
         <View style={styles.footerSection}>
-          {/* Test mode shortcut (commented out)
           <Pressable
             onPress={async () => {
               if (selecting) return;
               setSelecting('driver');
-              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
               await AsyncStorage.setItem('app_role', 'driver');
               await AsyncStorage.setItem('driver_test_mode', 'true');
               router.replace('/(tabs)');
@@ -148,9 +137,6 @@ export default function RoleSelectScreen() {
             <Zap size={14} color={colors.secondaryContainer} />
             <Text style={styles.testDriverButtonText}>Enter as test driver</Text>
           </Pressable>
-          */}
-
-          {/* Privacy & Terms Links */}
           <View style={styles.linksRow}>
             <Text
               style={styles.linkText}

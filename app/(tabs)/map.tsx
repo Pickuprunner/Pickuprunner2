@@ -1,371 +1,115 @@
-import React, { useState, useRef } from 'react';
-import { Platform, StyleSheet, View, Pressable, Linking, ScrollView } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { Platform, StyleSheet, View, StatusBar } from 'react-native';
 import { router } from 'expo-router';
-import {
-  YStack,
-  XStack,
-  SizableText,
-  Card,
-  Button,
-  Badge,
-  AppHeader,
-  SafeArea,
-  MapPin,
-  Navigation,
-  Package,
-  CheckCircle,
-} from '@blinkdotnew/mobile-ui';
-import { useOrders, Order } from '@/lib/orders';
+
+import { useOrders, Order, useUpdateOrderStatus } from '@/lib/orders';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { setSelectedOrder } from '@/lib/selectedOrder';
+import { useDriverQueue } from '@/lib/driverQueue';
+import { useDriverId } from '@/hooks/useDriverId';
+import { useAuth } from '@/hooks/useAuth';
 
-import { APP_CONFIG } from '@/lib/config';
-
-// Store location — used as map center and fallback for orders without geocoded coords
-// Default map center — Sahuarita AZ
-const CENTER = { lat: 31.9572, lng: -110.9553 };
-
-// Scatter unresolved orders around the store with small random offsets
-function getCoords(order: Order) {
-  // Use a stable hash of the order id so coords don't jump on re-render
-  let hash = 0;
-  for (let i = 0; i < order.id.length; i++) hash = (hash * 31 + order.id.charCodeAt(i)) | 0;
-  const lat = CENTER.lat + ((hash % 1000) / 10000) * 0.08;
-  const lng = CENTER.lng + (((hash >> 4) % 1000) / 10000) * 0.08;
-  return { lat, lng };
-}
-
-function openMapsNavigation(address: string) {
-  const encoded = encodeURIComponent(address);
-  if (Platform.OS === 'ios') {
-    Linking.openURL(`maps://maps.apple.com/?daddr=${encoded}`);
-  } else if (Platform.OS === 'android') {
-    Linking.openURL(`google.navigation:q=${encoded}`);
-  } else {
-    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`);
-  }
-}
-
-// --- Web Map (iframe embed via OpenStreetMap) ---
-function WebMap({ orders }: { orders: Order[] }) {
-  const pending = orders.filter((o) => o.status === 'pending');
-  const lats = pending.map((o) => getCoords(o).lat);
-  const lngs = pending.map((o) => getCoords(o).lng);
-  const centerLat = lats.length ? lats.reduce((a, b) => a + b, 0) / lats.length : CENTER.lat;
-  const centerLng = lngs.length ? lngs.reduce((a, b) => a + b, 0) / lngs.length : CENTER.lng;
-
-  // Build OpenStreetMap URL with markers
-  const markerParams = pending
-    .map((o) => {
-      const c = getCoords(o);
-      return `marker=${c.lat},${c.lng}`;
-    })
-    .join('&');
-
-  // Wider bbox for Sahuarita area
-  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${centerLng - 0.12},${centerLat - 0.09},${centerLng + 0.12},${centerLat + 0.09}&layer=mapnik&${markerParams}`;
-
-  return (
-    <iframe
-      src={src}
-      style={{ width: '100%', height: '100%', border: 'none' }}
-      loading="lazy"
-    />
-  );
-}
-
-// --- Native Map Fallback (when native maps TurboModule is unavailable) ---
-function NativeFallbackMap({ orders, selectedId, onSelect }: {
-  orders: Order[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  const pending = orders.filter((o) => o.status === 'pending');
-  return (
-    <YStack flex={1} padding="$4" gap="$3" justifyContent="center" alignItems="center" backgroundColor="$color2">
-      <YStack
-        width={64}
-        height={64}
-        borderRadius={32}
-        backgroundColor="rgba(245,196,0,0.12)"
-        borderWidth={1.5}
-        borderColor="rgba(245,196,0,0.3)"
-        alignItems="center"
-        justifyContent="center"
-      >
-        <MapPin size={32} color="#FFA000" />
-      </YStack>
-      <SizableText size="$5" fontWeight="800" textAlign="center" color="$color12">
-        Sahuarita Delivery Routes
-      </SizableText>
-      <SizableText size="$2" color="$color10" textAlign="center" paddingHorizontal="$4">
-        {pending.length} pending deliveries active. Tap any stop below to navigate directly in Apple Maps or Google Maps.
-      </SizableText>
-      <Button
-        size="$3"
-        variant="outlined"
-        borderRadius="$full"
-        icon={<Navigation size={14} />}
-        onPress={() => openMapsNavigation(APP_CONFIG.STORE_ADDRESS)}
-      >
-        Directions to Store Hub
-      </Button>
-    </YStack>
-  );
-}
-
-// --- Native Map ---
-function NativeMap({ orders, selectedId, onSelect }: {
-  orders: Order[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  let MapView: any = null;
-  let Marker: any = null;
-  let Callout: any = null;
-
-  try {
-    const Maps = require('react-native-maps');
-    MapView = Maps.default || Maps;
-    Marker = Maps.Marker;
-    Callout = Maps.Callout;
-  } catch (err) {
-    console.warn('[map] react-native-maps not available, using fallback:', err);
-  }
-
-  if (!MapView || !Marker) {
-    return <NativeFallbackMap orders={orders} selectedId={selectedId} onSelect={onSelect} />;
-  }
-
-  const pending = orders.filter((o) => o.status === 'pending');
-  const delivered = orders.filter((o) => o.status === 'delivered');
-
-  return (
-    <MapView
-      style={StyleSheet.absoluteFill}
-      initialRegion={{
-        latitude: CENTER.lat,
-        longitude: CENTER.lng,
-        latitudeDelta: 0.15,
-        longitudeDelta: 0.15,
-      }}
-      showsUserLocation
-      showsMyLocationButton
-    >
-      {pending.map((order) => {
-        const { lat, lng } = getCoords(order);
-        return (
-          <Marker
-            key={order.id}
-            coordinate={{ latitude: lat, longitude: lng }}
-            pinColor="#FFA000"
-            onPress={() => onSelect(order.id)}
-          >
-            {Callout ? (
-              <Callout>
-                <View style={{ width: 160, padding: 8 }}>
-                  <SizableText size="$3" fontWeight="700">{order.customerName}</SizableText>
-                  <SizableText size="$2" color="$color10">{order.deliveryAddress}</SizableText>
-                </View>
-              </Callout>
-            ) : null}
-          </Marker>
-        );
-      })}
-
-      {delivered.map((order) => {
-        const { lat, lng } = getCoords(order);
-        return (
-          <Marker
-            key={order.id}
-            coordinate={{ latitude: lat, longitude: lng }}
-            pinColor="#2E7D32"
-          />
-        );
-      })}
-    </MapView>
-  );
-}
+import {
+  WebMap,
+  NativeMap,
+  MapSelectedCard,
+  MapStopsCarousel,
+  haptic,
+  BG,
+} from '@/components/map';
 
 export default function MapScreen() {
-  const { data: orders = [], isLoading } = useOrders();
-  useOrdersRealtime(); // keep map in sync with realtime events
+  const { data: orders = [] } = useOrders();
+  const { isConnected } = useOrdersRealtime();
+  const updateStatus = useUpdateOrderStatus();
+  const driverId = useDriverId();
+  const { user } = useAuth();
+  const { isMyOrder } = useDriverQueue(orders, driverId);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const selectedOrder = orders.find((o) => o.id === selectedId);
-  const pendingOrders = orders.filter((o) => o.status === 'pending');
+  const pendingOrders = useMemo(() => orders.filter((o) => o.status === 'pending'), [orders]);
+  const activeOrders = useMemo(
+    () => orders.filter((o) => isMyOrder(o.id) && (o.status === 'accepted' || o.status === 'picked_up')),
+    [orders, isMyOrder]
+  );
+
+  const selectedOrder = useMemo(
+    () => orders.find((o) => o.id === selectedId),
+    [orders, selectedId]
+  );
 
   const handleOpenOrder = (order: Order) => {
+    haptic('medium');
     setSelectedOrder(order);
-    setSelectedId(null);
     router.push(`/order/${order.id}`);
   };
 
+  const handleAcceptOrder = async (order: Order) => {
+    if (!order.id) return;
+    haptic('heavy');
+    try {
+      await updateStatus.mutateAsync({
+        id: order.id,
+        status: 'accepted',
+        driverUserId: driverId,
+        driverName: user?.displayName ?? user?.email ?? 'Driver',
+      });
+      setSelectedOrder({ ...order, status: 'accepted', driverUserId: driverId });
+      router.push(`/order/${order.id}`);
+    } catch (err: any) {
+      console.error('[MapScreen] Failed to accept order:', err);
+    }
+  };
+
   return (
-    <SafeArea>
-      <AppHeader title="Delivery Map" />
-
-      <YStack flex={1}>
-        {/* Legend row */}
-        <XStack
-          paddingHorizontal="$4"
-          paddingVertical="$2"
-          gap="$4"
-          backgroundColor="$color2"
-          borderBottomWidth={1}
-          borderBottomColor="$borderColor"
-        >
-          <XStack gap="$1" alignItems="center">
-            <View style={[styles.dot, { backgroundColor: '#FFA000' }]} />
-            <SizableText size="$2" color="$color11">Pending ({pendingOrders.length})</SizableText>
-          </XStack>
-          <XStack gap="$1" alignItems="center">
-            <View style={[styles.dot, { backgroundColor: '#2E7D32' }]} />
-            <SizableText size="$2" color="$color11">Delivered ({orders.length - pendingOrders.length})</SizableText>
-          </XStack>
-        </XStack>
-
-        {/* Map area */}
-        <View style={styles.mapContainer}>
-          {Platform.OS === 'web' ? (
-            <WebMap orders={orders} />
-          ) : (
-            <NativeMap
-              orders={orders}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-            />
-          )}
-        </View>
-
-        {/* Order list / selected order panel */}
-        {selectedOrder ? (
-          /* Selected order detail card */
-          <Card
-            margin="$3"
-            padding="$4"
-            borderRadius="$4"
-            backgroundColor="$color2"
-            borderWidth={1}
-            borderColor="$borderColor"
-            elevation={4}
-          >
-            <YStack gap="$3">
-              <XStack justifyContent="space-between" alignItems="center">
-                <YStack>
-                  <SizableText size="$5" fontWeight="700" color="$color12">
-                    {selectedOrder.customerName}
-                  </SizableText>
-                  <SizableText size="$2" color="$color10">
-                    Order #{selectedOrder?.id ? selectedOrder.id.slice(-6).toUpperCase() : '------'}
-                  </SizableText>
-                </YStack>
-                <Button
-                  size="$2"
-                  variant="outlined"
-                  borderRadius="$full"
-                  onPress={() => setSelectedId(null)}
-                >
-                  ✕
-                </Button>
-              </XStack>
-
-              <XStack gap="$2" alignItems="center">
-                <MapPin size={14} color="$color9" />
-                <SizableText size="$3" color="$color11" flex={1}>
-                  {selectedOrder.deliveryAddress}
-                </SizableText>
-              </XStack>
-
-              <XStack gap="$2">
-                <Button
-                  flex={1}
-                  size="$4"
-                  variant="outlined"
-                  borderRadius="$4"
-                  icon={<Navigation size={16} />}
-                  onPress={() => openMapsNavigation(selectedOrder.deliveryAddress)}
-                >
-                  Navigate
-                </Button>
-                {selectedOrder.status === 'pending' && (
-                  <Button
-                    flex={2}
-                    theme="active"
-                    size="$4"
-                    borderRadius="$4"
-                    iconAfter={<CheckCircle size={16} />}
-                    onPress={() => handleOpenOrder(selectedOrder)}
-                    fontWeight="700"
-                  >
-                    OPEN ORDER
-                  </Button>
-                )}
-              </XStack>
-            </YStack>
-          </Card>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <View style={styles.mapWrapper}>
+        {Platform.OS === 'web' ? (
+          <WebMap orders={orders} selectedId={selectedId} onSelect={setSelectedId} />
         ) : (
-          /* Scrollable pending stops list */
-          <YStack padding="$3" gap="$2">
-            <SizableText size="$3" fontWeight="600" color="$color10" paddingHorizontal="$1">
-              PENDING STOPS ({pendingOrders.length})
-            </SizableText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <XStack gap="$2">
-                {pendingOrders.map((order) => (
-                  <Pressable key={order.id} onPress={() => setSelectedId(order.id)}>
-                    <Card
-                      padding="$3"
-                      borderRadius="$4"
-                      backgroundColor="$color2"
-                      borderWidth={1}
-                      borderColor="$amber5"
-                      width={180}
-                    >
-                      <YStack gap="$1">
-                        <SizableText size="$3" fontWeight="700" color="$color12" numberOfLines={1}>
-                          {order.customerName}
-                        </SizableText>
-                        <XStack gap="$1" alignItems="center">
-                          <MapPin size={12} color="$amber9" />
-                          <SizableText size="$1" color="$color10" numberOfLines={2} flex={1}>
-                            {order.deliveryAddress}
-                          </SizableText>
-                        </XStack>
-                        <XStack gap="$1" alignItems="center">
-                          <Package size={12} color="$color9" />
-                          <SizableText size="$1" color="$color10" numberOfLines={1} flex={1}>
-                            {order.items}
-                          </SizableText>
-                        </XStack>
-                      </YStack>
-                    </Card>
-                  </Pressable>
-                ))}
-                {pendingOrders.length === 0 && (
-                  <YStack padding="$4" alignItems="center">
-                    <SizableText size="$3" color="$green9" fontWeight="600">
-                      All deliveries complete!
-                    </SizableText>
-                  </YStack>
-                )}
-              </XStack>
-            </ScrollView>
-          </YStack>
+          <NativeMap orders={orders} selectedId={selectedId} onSelect={setSelectedId} />
         )}
-      </YStack>
-    </SafeArea>
+      </View>
+      <View style={styles.bottomSection}>
+        {selectedOrder ? (
+          <MapSelectedCard
+            selectedOrder={selectedOrder}
+            onClose={() => setSelectedId(null)}
+            onAccept={handleAcceptOrder}
+            onOpenOrder={handleOpenOrder}
+          />
+        ) : (
+          <MapStopsCarousel
+            pendingOrders={pendingOrders}
+            activeOrders={activeOrders}
+            selectedId={selectedId}
+            isConnected={isConnected}
+            onSelectId={setSelectedId}
+          />
+        )}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  mapContainer: {
+  container: {
     flex: 1,
-    minHeight: 260,
+    backgroundColor: BG,
+    position: 'relative',
   },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  mapWrapper: {
+    flex: 1,
+    minHeight: 240,
+    position: 'relative',
+  },
+  bottomSection: {
+    backgroundColor: BG,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
   },
 });
