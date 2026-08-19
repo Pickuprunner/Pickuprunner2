@@ -223,11 +223,21 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
               backgroundColor: getBgColor(),
             },
             getDynamicWrapperStyle(),
+            restProps.multiline && styles.multilineWrapper,
             disabled && styles.disabledWrapper,
             wrapperStyle,
           ]}
         >
-          {leftIcon && <View style={styles.leftIconContainer}>{leftIcon}</View>}
+          {leftIcon && (
+            <View
+              style={[
+                styles.leftIconContainer,
+                restProps.multiline && styles.multilineLeftIcon,
+              ]}
+            >
+              {leftIcon}
+            </View>
+          )}
 
           <TextInput
             ref={ref}
@@ -240,6 +250,7 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
             onBlur={handleBlur}
             style={[
               styles.input,
+              restProps.multiline && styles.multilineInput,
               Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null,
               disabled && styles.disabledInput,
               inputStyle,
@@ -331,13 +342,18 @@ const styles = StyleSheet.create({
   wrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 52,
+    minHeight: 52,
     borderWidth: 1.5,
     paddingHorizontal: 16,
   },
+  multilineWrapper: {
+    alignItems: 'flex-start',
+    paddingVertical: 12,
+    minHeight: 80,
+  },
   input: {
     flex: 1,
-    height: 52,
+    minHeight: 48,
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '400',
@@ -350,10 +366,18 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  multilineInput: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+    paddingTop: 0,
+  },
   leftIconContainer: {
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  multilineLeftIcon: {
+    marginTop: 2,
   },
   rightContainer: {
     flexDirection: 'row',

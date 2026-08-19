@@ -27,12 +27,11 @@ import { useOrders, useUpdateOrderStatus, type Order } from '@/lib/orders';
 import { getSelectedOrder } from '@/lib/selectedOrder';
 import { blink } from '@/lib/blink';
 import { calcDriverEarnings, APP_CONFIG } from '@/lib/config';
-import { toast } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue, MAX_QUEUE } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
-import { CustomCard, CustomLoading } from '@/components/core';
+import { CustomCard, CustomLoading, SwipeSlider, useToast } from '@/components/core';
 
 const BLUE = '#0066FF';
 const GOLD = '#FFE399';
@@ -211,6 +210,7 @@ function AddressCard({
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function OrderDetailScreen() {
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
   const updateStatus = useUpdateOrderStatus();
   const { user } = useAuth();
@@ -376,12 +376,12 @@ export default function OrderDetailScreen() {
       if (!publicUrl) throw new Error('Upload OK but no publicUrl in response');
 
       setPhotoUrl(publicUrl);
-      toast('Photo uploaded', { variant: 'success' });
+      showToast('Photo uploaded', { type: 'success' });
     } catch (e: any) {
       console.error('[uploadPhoto] Error:', e?.message || e);
-      toast('Upload failed', {
-        message: `${e?.message || 'unknown error'}. Please retry.`,
-        variant: 'error',
+      showToast('Upload failed', {
+        description: `${e?.message || 'unknown error'}. Please retry.`,
+        type: 'error',
       });
     } finally {
       setUploadingPhoto(false);
@@ -409,12 +409,12 @@ export default function OrderDetailScreen() {
         driverName: user?.displayName ?? user?.email ?? driverId?.slice(0, 8),
       });
       setStatus('accepted');
-      toast('Order Accepted!', {
-        message: 'Head to pickup address.',
-        variant: 'success',
+      showToast('Order Accepted!', {
+        description: 'Head to pickup address.',
+        type: 'success',
       });
     } catch (e: any) {
-      toast('Error', { message: e?.message || 'Could not accept order', variant: 'error' });
+      showToast('Error', { description: e?.message || 'Could not accept order', type: 'error' });
     } finally {
       setAccepting(false);
     }
@@ -448,12 +448,12 @@ export default function OrderDetailScreen() {
         }),
       }).catch(() => {});
 
-      toast('Order Picked Up', {
-        message: 'Head to delivery address to complete.',
-        variant: 'success',
+      showToast('Order Picked Up', {
+        description: 'Head to delivery address to complete.',
+        type: 'success',
       });
     } catch {
-      toast('Error', { message: 'Could not update status', variant: 'error' });
+      showToast('Error', { description: 'Could not update status', type: 'error' });
     } finally {
       setPickingUp(false);
     }
@@ -481,12 +481,12 @@ export default function OrderDetailScreen() {
       const message = notification?.sent
         ? `Customer notified with delivery photo. You earned ${earnings?.totalDisplay ?? ''}.`
         : `Delivered and earned ${earnings?.totalDisplay ?? ''}.`;
-      toast(notification?.sent ? 'Delivered! 🎉' : 'Delivered', {
-        message,
-        variant: notification?.sent ? 'success' : 'warning',
+      showToast(notification?.sent ? 'Delivered! 🎉' : 'Delivered', {
+        description: message,
+        type: notification?.sent ? 'success' : 'warning',
       });
     } catch (e: any) {
-      toast('Error', { message: e?.message || 'Could not mark delivered', variant: 'error' });
+      showToast('Error', { description: e?.message || 'Could not mark delivered', type: 'error' });
     } finally {
       setDelivering(false);
     }
@@ -621,6 +621,15 @@ export default function OrderDetailScreen() {
               <Text style={styles.stepInstruction}>
                 Review the pickup and delivery addresses above, then accept this order to begin.
               </Text>
+              {/* <SwipeSlider
+                title="Slide to Accept"
+                completedTitle="Order Accepted"
+                onSwipeComplete={doAccept}
+                loading={accepting}
+                disabled={accepting || atCapacity}
+                variant="primary"
+                style={{ marginTop: 8 }}
+              /> */}
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={styles.primaryActionButton}
@@ -653,6 +662,17 @@ export default function OrderDetailScreen() {
                 <MaterialIcons name="near-me" size={20} color="#DFE2EF" />
                 <Text style={styles.secondaryActionText}>Navigate to Pickup</Text>
               </TouchableOpacity>
+
+              {/* <SwipeSlider
+                title="Slide to Confirm Pickup"
+                completedTitle="Pickup Confirmed"
+                onSwipeComplete={doPickUp}
+                loading={pickingUp}
+                disabled={pickingUp}
+                variant="primary"
+                icon="inventory"
+                style={{ marginTop: 12 }}
+              /> */}
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={[styles.primaryActionButton, { marginTop: 12 }]}
@@ -744,6 +764,16 @@ export default function OrderDetailScreen() {
               </CustomCard>
 
               {/* Complete Delivery Action */}
+              {/* <SwipeSlider
+                title="Slide to Complete Delivery"
+                completedTitle="Delivery Completed"
+                onSwipeComplete={doDeliver}
+                loading={delivering}
+                disabled={delivering || uploadingPhoto || !photoUrl}
+                variant="primary"
+                completedIcon="check-circle"
+                style={{ marginTop: 16 }}
+              /> */}
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={[

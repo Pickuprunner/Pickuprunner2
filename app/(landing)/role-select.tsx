@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Platform, View, StatusBar, ScrollView, Text } from 'react-native';
+import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -60,7 +61,12 @@ export default function RoleSelectScreen() {
       >
         <View style={styles.heroSection}>
           <View style={styles.logoContainer}>
-            <Zap size={56} color={colors.secondaryContainer} />
+            <Image
+              source={require('@/assets/images/icon.png')}
+              style={styles.logoImage}
+              contentFit="cover"
+              transition={200}
+            />
           </View>
           <Text style={styles.brandTitle}>{APP_CONFIG.APP_NAME}</Text>
           <Text style={styles.tagline}>{APP_CONFIG.TAGLINE}</Text>
@@ -182,20 +188,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   logoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 2.5,
-    borderColor: colors.secondaryContainer,
-    backgroundColor: colors.surface,
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
-    shadowColor: shadows.goldGlow.shadowColor,
-    shadowOffset: shadows.goldGlow.shadowOffset,
-    shadowOpacity: 0.45,
-    shadowRadius: 28,
-    elevation: 16,
+    marginBottom: 16,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 14,
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 54,
   },
   brandTitle: {
     fontSize: 28,

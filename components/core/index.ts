@@ -29,3 +29,7 @@ export {
   type ToastType,
   type ToastOptions,
 } from './CustomToast';
+export {
+  SwipeSlider,
+  type SwipeSliderProps,
+} from './SwipeSlider';
