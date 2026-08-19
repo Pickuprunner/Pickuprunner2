@@ -1,17 +1,18 @@
 import { Tabs } from 'expo-router';
-import { Home, PlusCircle, User, Map, MessageCircle, DollarSign, Truck, ShoppingBag } from '@blinkdotnew/mobile-ui';
 import { View, Text, StyleSheet, Platform } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { APP_CONFIG } from '@/lib/config';
 import { useOrders } from '@/lib/orders';
 import { useDriverId } from '@/hooks/useDriverId';
 
-const ACTIVE = '#E5A93C';
-const INACTIVE = '#77777A';
-const TAB_BG = '#000000';
-const TAB_BORDER = '#1A1A1E';
+const ACTIVE = '#FFE399';
+const INACTIVE = '#C2C6D8';
+const TAB_BG = '#0F131C';
+const TAB_BORDER = 'rgba(255, 255, 255, 0.05)';
 
-function ActiveTabIcon({ color, size }: { color: string; size: number }) {
+/* ─── Material-styled Tab Icons (using library) ─── */
+
+function InventoryTabIcon({ color, size }: { color: string; size: number }) {
   const { data: orders = [] } = useOrders();
   const driverId = useDriverId();
   const count = orders.filter(
@@ -19,10 +20,10 @@ function ActiveTabIcon({ color, size }: { color: string; size: number }) {
   ).length;
 
   return (
-    <View>
-      <ShoppingBag color={color} size={size} />
+    <View style={styles.iconWrapper}>
+      <MaterialIcons name="inventory-2" size={size} color={color} />
       {count > 0 && (
-        <View style={[styles.badge, { backgroundColor: '#E5A93C' }]}>
+        <View style={styles.badge}>
           <Text style={styles.badgeText}>{count > 9 ? '9+' : count}</Text>
         </View>
       )}
@@ -32,7 +33,8 @@ function ActiveTabIcon({ color, size }: { color: string; size: number }) {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const bottomPad = Platform.OS === 'web' ? 10 : Math.max(insets.bottom, 12);
+  const androidBottomPad = Platform.OS === 'web' ? 10 : Math.max(insets.bottom, 12);
+  const hasHomeBar = insets.bottom > 0;
 
   return (
     <Tabs
@@ -44,53 +46,75 @@ export default function TabLayout() {
           backgroundColor: TAB_BG,
           borderTopWidth: 1,
           borderTopColor: TAB_BORDER,
-          height: 60 + bottomPad,
-          paddingBottom: bottomPad,
-          paddingTop: 8,
+          height: Platform.OS === 'ios' ? (hasHomeBar ? 52 + insets.bottom - 10 : 58) : 60 + androidBottomPad,
+          paddingBottom: Platform.OS === 'ios' ? (hasHomeBar ? insets.bottom - 14 : 8) : androidBottomPad,
+          paddingTop: Platform.OS === 'ios' ? 6 : 8,
           elevation: 12,
         },
         tabBarLabelStyle: {
           fontSize: 10,
-          fontWeight: '700',
+          fontWeight: '500',
           letterSpacing: 0.2,
         },
       }}
     >
+      {/* 1. Orders Tab (Home) */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Orders',
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="home" size={size || 24} color={color} />
+          ),
         }}
       />
+
+      {/* 2. My Orders Tab (Queue / Inventory) */}
       <Tabs.Screen
         name="active"
         options={{
           title: 'My Orders',
-          tabBarIcon: ({ color, size }) => <ActiveTabIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <InventoryTabIcon color={color} size={size || 24} />
+          ),
         }}
       />
+
+      {/* 3. New Order Tab */}
       <Tabs.Screen
         name="new-order"
         options={{
           title: 'New Order',
-          tabBarIcon: ({ color, size }) => <PlusCircle color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="add-circle-outline" size={size || 24} color={color} />
+          ),
         }}
       />
+
+      {/* 4. Chat Tab */}
       <Tabs.Screen
         name="chat"
         options={{
           title: 'Chat',
-          tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="chat-bubble-outline" size={size || 22} color={color} />
+          ),
         }}
       />
+
+      {/* 5. Map Tab */}
       <Tabs.Screen
         name="map"
         options={{
           title: 'Map',
-          tabBarIcon: ({ color, size }) => <Map color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="map" size={size || 24} color={color} />
+          ),
         }}
       />
+
+      {/* ─── Commented out options as requested (hidden from tab bar) ─── */}
+      {/*
       <Tabs.Screen
         name="earnings"
         options={{
@@ -98,12 +122,23 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <DollarSign color={color} size={size} />,
         }}
       />
+      */}
+      <Tabs.Screen
+        name="earnings"
+        options={{
+          href: null,
+        }}
+      />
+
+      {/* Admin screen */}
       <Tabs.Screen
         name="admin"
         options={{
           href: null,
         }}
       />
+
+      {/*
       <Tabs.Screen
         name="profile"
         options={{
@@ -111,26 +146,41 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />
+      */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
+  iconWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   badge: {
     position: 'absolute',
     top: -4,
-    right: -6,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#F5C400',
+    right: -7,
+    minWidth: 15,
+    height: 15,
+    borderRadius: 7.5,
+    backgroundColor: '#FFE399',
+    borderWidth: 1.5,
+    borderColor: '#0F131C',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
   },
   badgeText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '800',
-    color: '#000',
+    color: '#0F131C',
+    lineHeight: 10,
   },
 });
