@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { ShoppingBag, ClipboardList, User } from '@blinkdotnew/mobile-ui';
+import { ShoppingBag, ClipboardList, MessageCircle, User } from '@blinkdotnew/mobile-ui';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/design';
@@ -36,7 +36,6 @@ export default function CustomerTabLayout() {
         },
       }}
     >
-     
       <Tabs.Screen
         name="my-orders"
         options={{
@@ -45,7 +44,6 @@ export default function CustomerTabLayout() {
         }}
       />
 
-      
       <Tabs.Screen
         name="index"
         options={{
@@ -54,7 +52,14 @@ export default function CustomerTabLayout() {
         }}
       />
 
-      
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Chat',
+          tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} />,
+        }}
+      />
+
       <Tabs.Screen
         name="profile"
         options={{

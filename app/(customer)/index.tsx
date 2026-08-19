@@ -425,7 +425,7 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
               style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
             >
               <Text style={styles.primaryBtnText}>Next: Review Order</Text>
-              <ChevronRight size={20} color="#0F131C" />
+              <ChevronRight size={20} color="#FFFFFF" />
             </Pressable>
           </View>
         </Pressable>
@@ -724,12 +724,12 @@ function StepTwo({
           >
             {loading ? (
               <View style={styles.btnRow}>
-                <ActivityIndicator color="#0F131C" size="small" />
+                <ActivityIndicator color="#FFFFFF" size="small" />
                 <Text style={styles.primaryBtnText}>Placing order…</Text>
               </View>
             ) : (
               <View style={styles.btnRow}>
-                <Truck size={20} color="#0F131C" />
+                <Truck size={20} color="#FFFFFF" />
                 <Text style={styles.primaryBtnText}>
                   Place Order — {fmt(totalCents)}
                 </Text>
@@ -770,7 +770,7 @@ function SuccessScreen({ orderId, totalCents, onReset }: SuccessProps) {
           {/* Glowing Animated Icon Container */}
           <View style={styles.successIconHalo}>
             <View style={styles.successIconCircle}>
-              <Truck size={42} color="#0F131C" />
+              <Truck size={42} color="#FFFFFF" />
             </View>
             <View style={styles.successBadgeCheck}>
               <Ionicons name="checkmark-sharp" size={14} color="#0F131C" />
@@ -830,7 +830,7 @@ function SuccessScreen({ orderId, totalCents, onReset }: SuccessProps) {
                 pressed && styles.primaryBtnPressed,
               ]}
             >
-              <Ionicons name="receipt-outline" size={19} color="#0F131C" />
+              <Ionicons name="receipt-outline" size={19} color="#FFFFFF" />
               <Text style={styles.successPrimaryBtnText}>View in My Orders</Text>
             </Pressable>
 
@@ -1323,15 +1323,15 @@ const styles = StyleSheet.create({
   primaryBtn: {
     height: 54,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.secondaryContainer,
+    backgroundColor: '#0066FF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     marginTop: 10,
-    shadowColor: colors.secondaryContainer,
+    shadowColor: '#0066FF',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 4,
   },
@@ -1342,7 +1342,7 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#0F131C',
+    color: '#FFFFFF',
     letterSpacing: 0.2,
   },
   btnRow: {
@@ -1639,9 +1639,9 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: 'rgba(244, 195, 0, 0.12)',
+    backgroundColor: 'rgba(0, 102, 255, 0.12)',
     borderWidth: 1.5,
-    borderColor: 'rgba(244, 195, 0, 0.25)',
+    borderColor: 'rgba(0, 102, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
@@ -1651,10 +1651,10 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.secondaryContainer,
+    backgroundColor: '#0066FF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.secondaryContainer,
+    shadowColor: '#0066FF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 14,
@@ -1782,13 +1782,13 @@ const styles = StyleSheet.create({
   successPrimaryBtn: {
     height: 54,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.secondaryContainer,
+    backgroundColor: '#0066FF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     width: '100%',
-    shadowColor: colors.secondaryContainer,
+    shadowColor: '#0066FF',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
@@ -1797,7 +1797,7 @@ const styles = StyleSheet.create({
   successPrimaryBtnText: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#0F131C',
+    color: '#FFFFFF',
     letterSpacing: 0.2,
   },
   successSecondaryBtn: {

@@ -265,9 +265,9 @@ export function CustomerOrderCard({
         </View>
       )}
 
-      {/* Action Buttons */}
+      {/* Action Buttons (2 buttons per card: Live Tracking + Cancel for pending, Live Tracking + Support for active/delivered) */}
       <View style={styles.actionsContainer}>
-        {/* Live Tracking CTA */}
+        {/* Primary Action */}
         {!isDelivered ? (
           <TouchableOpacity
             onPress={() => {
@@ -287,21 +287,8 @@ export function CustomerOrderCard({
           </View>
         )}
 
-        {/* Support CTA */}
-        <TouchableOpacity
-          onPress={() => {
-            haptic();
-            Linking.openURL(`mailto:${APP_CONFIG.STORE_EMAIL}`);
-          }}
-          activeOpacity={0.85}
-          style={styles.supportButton}
-        >
-          <MaterialIcons name="mail-outline" size={18} color="#dfe2ef" />
-          <Text style={styles.supportButtonText}>Support</Text>
-        </TouchableOpacity>
-
-        {/* Cancel CTA (Pending only) */}
-        {isPending && onCancel && (
+        {/* Secondary Action: Cancel (for pending) OR Support (for active/delivered) */}
+        {isPending && onCancel ? (
           <TouchableOpacity
             onPress={() => {
               haptic();
@@ -312,6 +299,18 @@ export function CustomerOrderCard({
           >
             <MaterialIcons name="delete-outline" size={18} color="#FF6B6B" />
             <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() => {
+              haptic();
+              Linking.openURL(`mailto:${APP_CONFIG.STORE_EMAIL}`);
+            }}
+            activeOpacity={0.85}
+            style={styles.supportButton}
+          >
+            <MaterialIcons name="mail-outline" size={18} color="#dfe2ef" />
+            <Text style={styles.supportButtonText}>Support</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -618,8 +617,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   actionButton: {
-    flex: 2,
-    height: 46,
+    flex: 1,
+    height: 48,
     borderRadius: 24,
     backgroundColor: '#0066ff',
     flexDirection: 'row',
@@ -638,8 +637,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   supportButton: {
-    flex: 1,
-    height: 46,
+    paddingHorizontal: 20,
+    height: 48,
     borderRadius: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
@@ -655,25 +654,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   cancelButton: {
-    flex: 1,
-    height: 46,
+    paddingHorizontal: 18,
+    height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    backgroundColor: 'rgba(239, 68, 68, 0.10)',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.3)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 6,
   },
   cancelButtonText: {
     color: '#FF6B6B',
     fontSize: 13.5,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   deliveredBadgeButton: {
-    flex: 2,
-    height: 46,
+    flex: 1,
+    height: 48,
     borderRadius: 24,
     backgroundColor: 'rgba(0, 226, 151, 0.12)',
     borderWidth: 1,
