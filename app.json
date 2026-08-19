@@ -32,8 +32,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#0A0A0F"
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0052FF"
       },
       "package": "com.pickuprunner.app",
       "minSdkVersion": 26,

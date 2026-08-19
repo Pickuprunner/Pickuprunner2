@@ -141,7 +141,12 @@ export default function BackgroundCheckScreen() {
         )}
       </XStack>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
         <YStack gap="$5">
 
           {/* Intro */}

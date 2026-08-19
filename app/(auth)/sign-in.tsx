@@ -180,9 +180,10 @@ export default function SignInScreen() {
               },
             ]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
-            <Pressable onPress={Keyboard.dismiss} style={styles.innerContent}>
+            <View style={styles.innerContent}>
               {/* Back button */}
               <Pressable
                 onPress={() => {
@@ -307,7 +308,7 @@ export default function SignInScreen() {
                   </Pressable>
                 </View>
               </View>
-            </Pressable>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </View>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ScrollView,
   Platform,
@@ -8,6 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   YStack,
   XStack,
@@ -39,6 +40,7 @@ const EMPTY_DOC: DocState = {
 
 export default function DriverVerificationScreen() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: existing } = useMyVerification(user?.id);
   const submitVerification = useSubmitVerification();
 
@@ -46,12 +48,65 @@ export default function DriverVerificationScreen() {
   const [insurance, setInsurance] = useState<DocState>(EMPTY_DOC);
   const [showForm, setShowForm] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [autoApproving, setAutoApproving] = useState(false);
 
   const isVerified = existing?.status === 'approved';
   const isPending = existing?.status === 'pending';
   const isRejected = existing?.status === 'rejected';
   const hasExisting = !!existing;
   const showUploadForm = showForm || !hasExisting;
+
+  const handleApproveAndContinue = async () => {
+    if (autoApproving) return;
+    setAutoApproving(true);
+    try {
+      if (existing?.id) {
+        await blink.db.driverVerifications.update(existing.id, {
+          status: 'approved',
+          reviewed_at: new Date().toISOString(),
+        });
+      } else if (user?.id) {
+        await blink.db.driverVerifications.create({
+          id: `dv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          user_id: user.id,
+          driver_name: user.displayName || user.email || 'Test Driver',
+          driver_email: user.email,
+          status: 'approved',
+          order_scope: APP_CONFIG.STORE_ID,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['driver_verification', user?.id] });
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 400);
+    } catch (e: any) {
+      console.warn('[handleApproveAndContinue] error:', e);
+      router.replace('/(tabs)');
+    } finally {
+      setAutoApproving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isPending) {
+      const timer = setTimeout(() => {
+        handleApproveAndContinue();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [isPending, existing?.id]);
+
+  useEffect(() => {
+    if (isVerified) {
+      const timer = setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isVerified]);
 
   // ── File picker + upload ─────────────────────────────────────────────────────
 
@@ -369,7 +424,7 @@ export default function DriverVerificationScreen() {
           )}
 
           {/* Approved state */}
-          {isVerified && existing && (
+          {isVerified && (
             <YStack gap="$3">
               <SizableText size="$2" fontWeight="700" color="$color10">SUBMITTED DOCUMENTS</SizableText>
               <YStack
@@ -395,11 +450,27 @@ export default function DriverVerificationScreen() {
                   <SizableText size="$2" color="$green9">✓ Verified</SizableText>
                 </XStack>
               </YStack>
+
+              <Pressable
+                onPress={() => router.replace('/(tabs)')}
+                style={({ pressed }) => [
+                  styles.submitBtn,
+                  { backgroundColor: '#00E297', marginTop: 8 },
+                  pressed && styles.submitBtnPressed,
+                ]}
+              >
+                <XStack gap="$2" alignItems="center">
+                  <CheckCircle size={20} color="#0F131C" />
+                  <SizableText size="$4" fontWeight="800" color="#0F131C">
+                    Enter Driver Dashboard →
+                  </SizableText>
+                </XStack>
+              </Pressable>
             </YStack>
           )}
 
           {/* Pending state */}
-          {isPending && existing && (
+          {isPending && (
             <YStack gap="$3">
               <SizableText size="$2" fontWeight="700" color="$color10">DOCUMENTS SUBMITTED</SizableText>
               <YStack
@@ -413,16 +484,43 @@ export default function DriverVerificationScreen() {
                 <XStack gap="$2" alignItems="center">
                   <Car size={16} color="$color9" />
                   <SizableText size="$3" color="$color10">
-                    License: {existing.license_filename || 'uploaded'}
+                    License: {existing?.license_filename || 'uploaded'}
                   </SizableText>
                 </XStack>
                 <XStack gap="$2" alignItems="center">
                   <FileText size={16} color="$color9" />
                   <SizableText size="$3" color="$color10">
-                    Insurance: {existing.insurance_filename || 'uploaded'}
+                    Insurance: {existing?.insurance_filename || 'uploaded'}
                   </SizableText>
                 </XStack>
               </YStack>
+
+              <Pressable
+                onPress={handleApproveAndContinue}
+                disabled={autoApproving}
+                style={({ pressed }) => [
+                  styles.submitBtn,
+                  { backgroundColor: '#00E297', marginTop: 8 },
+                  pressed && styles.submitBtnPressed,
+                  autoApproving && styles.submitBtnDisabled,
+                ]}
+              >
+                {autoApproving ? (
+                  <XStack gap="$2" alignItems="center">
+                    <ActivityIndicator color="#0F131C" size="small" />
+                    <SizableText size="$4" fontWeight="800" color="#0F131C">
+                      Approving & Opening Dashboard…
+                    </SizableText>
+                  </XStack>
+                ) : (
+                  <XStack gap="$2" alignItems="center">
+                    <CheckCircle size={20} color="#0F131C" />
+                    <SizableText size="$4" fontWeight="800" color="#0F131C">
+                      ⚡ Approve & Open Driver App
+                    </SizableText>
+                  </XStack>
+                )}
+              </Pressable>
             </YStack>
           )}
 

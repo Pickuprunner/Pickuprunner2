@@ -171,9 +171,10 @@ export default function CustomerAuthScreen() {
               },
             ]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
-            <Pressable onPress={Keyboard.dismiss} style={styles.innerContent}>
+            <View style={styles.innerContent}>
               {/* Back button */}
               <Pressable
                 onPress={() => {
@@ -308,7 +309,7 @@ export default function CustomerAuthScreen() {
                   </Text>
                 </Pressable>
               </View>
-            </Pressable>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </View>

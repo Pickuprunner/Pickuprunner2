@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useState, useRef, useImperativeHandle } from 'react';
 import {
   TextInput,
   View,
@@ -81,8 +81,11 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
     },
     ref
   ) => {
+    const inputRef = useRef<TextInput>(null);
     const [isFocused, setIsFocused] = useState(false);
     const [internalShowPassword, setInternalShowPassword] = useState(false);
+
+    useImperativeHandle(ref, () => inputRef.current as TextInput);
 
     const isPasswordVisible =
       propShowPassword !== undefined ? propShowPassword : internalShowPassword;
@@ -99,6 +102,7 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
     const isSuccess = status === 'success' && !isError;
     const errorMessage = typeof error === 'string' ? error : undefined;
     const hasValue = Boolean(value && value.length > 0);
+    const isEditable = !disabled && restProps.editable !== false;
 
     const handleFocus = (e: any) => {
       setIsFocused(true);
@@ -113,6 +117,12 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
     const handleClear = () => {
       onChangeText?.('');
       onClear?.();
+    };
+
+    const handleWrapperPress = () => {
+      if (isEditable && inputRef.current) {
+        inputRef.current.focus();
+      }
     };
 
     const getBorderRadius = () => {
@@ -148,13 +158,6 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
               ? ({
                   boxShadow: '0 0 12px rgba(255, 77, 79, 0.40)',
                 } as any)
-              : Platform.OS === 'ios'
-              ? {
-                  shadowColor: '#FF4D4F',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.45,
-                  shadowRadius: 6,
-                }
               : {}),
           };
         }
@@ -166,13 +169,6 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
               ? ({
                   boxShadow: '0 0 12px rgba(0, 226, 151, 0.40)',
                 } as any)
-              : Platform.OS === 'ios'
-              ? {
-                  shadowColor: '#00E297',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: 0.45,
-                  shadowRadius: 6,
-                }
               : {}),
           };
         }
@@ -183,13 +179,6 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
             ? ({
                 boxShadow: `0 0 14px ${focusGlowColor}`,
               } as any)
-            : Platform.OS === 'ios'
-            ? {
-                shadowColor: focusBorderColor,
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.5,
-                shadowRadius: 8,
-              }
             : {}),
         };
       }
@@ -215,7 +204,9 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
       <View style={[styles.container, containerStyle]}>
         {label && <Text style={[styles.label, labelStyle]}>{label}</Text>}
 
-        <View
+        <Pressable
+          onPress={handleWrapperPress}
+          accessible={false}
           style={[
             styles.wrapper,
             {
@@ -240,14 +231,16 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
           )}
 
           <TextInput
-            ref={ref}
+            ref={inputRef}
             value={value}
             onChangeText={onChangeText}
             placeholderTextColor={placeholderTextColor}
             secureTextEntry={isPassword && !isPasswordVisible}
-            editable={!disabled}
+            editable={isEditable}
             onFocus={handleFocus}
             onBlur={handleBlur}
+            returnKeyType={restProps.returnKeyType || (restProps.multiline ? 'default' : 'done')}
+            blurOnSubmit={restProps.blurOnSubmit ?? !restProps.multiline}
             style={[
               styles.input,
               restProps.multiline && styles.multilineInput,
@@ -310,7 +303,7 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
               {rightIcon && <View style={styles.rightIconContainer}>{rightIcon}</View>}
             </View>
           )}
-        </View>
+        </Pressable>
 
         {isError && errorMessage ? (
           <Text style={[styles.errorText, errorStyle]}>{errorMessage}</Text>

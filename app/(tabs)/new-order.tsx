@@ -140,6 +140,7 @@ export default function NewOrderScreen() {
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           <NewOrderWizardForm
             customerName={customerName}

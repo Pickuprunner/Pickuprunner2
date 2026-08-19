@@ -8,6 +8,8 @@
 # @generated expo-cli
 expo-env.d.ts
 .expo/
+.expo
+.expo/*
 dist/
 web-build/
 
