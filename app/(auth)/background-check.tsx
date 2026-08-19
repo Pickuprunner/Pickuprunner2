@@ -4,7 +4,6 @@ import {
   Platform,
   StyleSheet,
   Pressable,
-  TextInput,
   ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -16,14 +15,8 @@ import {
   SafeArea,
   ArrowLeft,
   Shield,
-  CheckSquare,
   CheckCircle,
-  Clock,
-  XCircle,
   AlertCircle,
-  FileText,
-  ShieldCheck,
-  User,
   MapPin,
   Calendar,
   Lock,
@@ -36,143 +29,7 @@ import {
 } from '@/lib/backgroundCheck';
 import { APP_CONFIG } from '@/lib/config';
 import { colors, spacing, borderRadius } from '@/constants/design';
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function Field({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  keyboardType,
-  maxLength,
-  icon,
-  secureTextEntry,
-  hint,
-  error,
-  autoCapitalize,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (v: string) => void;
-  placeholder: string;
-  keyboardType?: any;
-  maxLength?: number;
-  icon: React.ReactNode;
-  secureTextEntry?: boolean;
-  hint?: string;
-  error?: boolean;
-  autoCapitalize?: any;
-}) {
-  return (
-    <YStack gap="$1">
-      <SizableText size="$2" fontWeight="700" color="$color10">{label}</SizableText>
-      <XStack
-        backgroundColor="$color3"
-        borderRadius={14}
-        borderWidth={1.5}
-        borderColor={error ? '$red7' : '$color5'}
-        paddingHorizontal="$3"
-        alignItems="center"
-        gap="$2"
-      >
-        {icon}
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textTertiary}
-          keyboardType={keyboardType ?? 'default'}
-          maxLength={maxLength}
-          secureTextEntry={secureTextEntry}
-          autoCapitalize={autoCapitalize ?? 'sentences'}
-          autoCorrect={false}
-          style={[
-            styles.input,
-            Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {},
-          ]}
-        />
-      </XStack>
-      {hint && (
-        <SizableText size="$1" color="$color9" paddingLeft="$1">{hint}</SizableText>
-      )}
-    </YStack>
-  );
-}
-
-// ── Status Banner ──────────────────────────────────────────────────────────────
-
-function StatusBanner({
-  status,
-  adminNote,
-  externalRef,
-  onResubmit,
-}: {
-  status: string;
-  adminNote?: string;
-  externalRef?: string;
-  onResubmit?: () => void;
-}) {
-  const configs = {
-    pending: {
-      bg: '$amber2', border: '$amber5', icon: <Clock size={26} color="$amber9" />,
-      title: 'Awaiting Review',
-      body: 'Your background check authorization has been submitted. The admin will initiate the check and update your status within 1–3 business days.',
-    },
-    in_review: {
-      bg: '$blue2', border: '$blue5', icon: <Shield size={26} color="$blue9" />,
-      title: 'Check In Progress',
-      body: 'Your background check is currently being processed. You will be notified once it is complete.',
-    },
-    approved: {
-      bg: '$green2', border: '$green5', icon: <ShieldCheck size={26} color="$green9" />,
-      title: 'Background Check Cleared ✓',
-      body: 'Your background check has been approved. You are fully cleared to make deliveries.',
-    },
-    rejected: {
-      bg: '$red2', border: '$red5', icon: <XCircle size={26} color="$red9" />,
-      title: 'Background Check Failed',
-      body: adminNote || 'Your background check could not be cleared. Please contact the admin for details.',
-    },
-  };
-
-  const cfg = configs[status as keyof typeof configs] ?? configs.pending;
-
-  return (
-    <YStack
-      backgroundColor={cfg.bg}
-      borderRadius="$4"
-      borderWidth={1}
-      borderColor={cfg.border}
-      padding="$4"
-      gap="$3"
-    >
-      <XStack gap="$3" alignItems="flex-start">
-        {cfg.icon}
-        <YStack flex={1} gap="$1">
-          <SizableText size="$5" fontWeight="800" color="$color12">{cfg.title}</SizableText>
-          <SizableText size="$2" color="$color10" lineHeight={20}>{cfg.body}</SizableText>
-        </YStack>
-      </XStack>
-      {externalRef && (
-        <XStack gap="$2" alignItems="center">
-          <SizableText size="$1" color="$color9" fontWeight="600">REFERENCE ID</SizableText>
-          <SizableText size="$2" fontWeight="700" color="$color11">{externalRef}</SizableText>
-        </XStack>
-      )}
-      {status === 'rejected' && onResubmit && (
-        <Pressable
-          onPress={onResubmit}
-          style={({ pressed }) => [styles.resubmitBtn, pressed && { opacity: 0.8 }]}
-        >
-          <SizableText size="$3" fontWeight="700" color="white">Resubmit Authorization</SizableText>
-        </Pressable>
-      )}
-    </YStack>
-  );
-}
-
-// ── Main Screen ────────────────────────────────────────────────────────────────
+import { AuthInput, StatusBanner } from '@/components/auth';
 
 export default function BackgroundCheckScreen() {
   const { user } = useAuth();
@@ -300,10 +157,11 @@ export default function BackgroundCheckScreen() {
           {/* Status banner for existing submissions */}
           {hasExisting && !showForm && (
             <StatusBanner
-              status={existing.status}
+              status={existing.status as any}
               adminNote={existing.admin_note}
               externalRef={existing.external_ref}
               onResubmit={isRejected ? () => setShowForm(true) : undefined}
+              resubmitLabel="Resubmit Authorization"
             />
           )}
 
@@ -376,7 +234,7 @@ export default function BackgroundCheckScreen() {
                 </Pressable>
               </XStack>
 
-              <Field
+              <AuthInput
                 label="DATE OF BIRTH"
                 value={dob}
                 onChangeText={setDob}
@@ -389,7 +247,7 @@ export default function BackgroundCheckScreen() {
                 autoCapitalize="none"
               />
 
-              <Field
+              <AuthInput
                 label="LAST 4 OF SSN"
                 value={ssn4}
                 onChangeText={(v) => setSsn4(v.replace(/\D/g, '').slice(0, 4))}
@@ -403,7 +261,7 @@ export default function BackgroundCheckScreen() {
                 autoCapitalize="none"
               />
 
-              <Field
+              <AuthInput
                 label="STREET ADDRESS"
                 value={address}
                 onChangeText={setAddress}
@@ -414,7 +272,7 @@ export default function BackgroundCheckScreen() {
 
               <XStack gap="$3">
                 <YStack flex={2}>
-                  <Field
+                  <AuthInput
                     label="CITY"
                     value={city}
                     onChangeText={setCity}
@@ -424,7 +282,7 @@ export default function BackgroundCheckScreen() {
                   />
                 </YStack>
                 <YStack flex={1}>
-                  <Field
+                  <AuthInput
                     label="STATE"
                     value={state}
                     onChangeText={(v) => setState(v.toUpperCase().slice(0, 2))}
@@ -436,7 +294,7 @@ export default function BackgroundCheckScreen() {
                   />
                 </YStack>
                 <YStack flex={1}>
-                  <Field
+                  <AuthInput
                     label="ZIP"
                     value={zip}
                     onChangeText={(v) => setZip(v.replace(/\D/g, '').slice(0, 5))}
@@ -566,12 +424,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxxl,
   },
-  input: {
-    flex: 1,
-    height: 52,
-    fontSize: 16,
-    color: colors.text,
-  },
   consentRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -587,11 +439,4 @@ const styles = StyleSheet.create({
   },
   submitBtnPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   submitBtnDisabled: { opacity: 0.45 },
-  resubmitBtn: {
-    height: 44,
-    borderRadius: borderRadius.lg,
-    backgroundColor: APP_CONFIG.PRIMARY_COLOR,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });

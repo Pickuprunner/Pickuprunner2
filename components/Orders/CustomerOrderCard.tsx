@@ -1,0 +1,691 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Pressable,
+  Linking,
+  Platform,
+  StyleProp,
+  ViewStyle,
+} from 'react-native';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { CustomCard } from '@/components/core';
+import { APP_CONFIG } from '@/lib/config';
+
+function haptic() {
+  if (Platform.OS !== 'web') {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
+}
+
+const DELIVERY_FEE = APP_CONFIG.DELIVERY_FEE_CENTS;
+const MILEAGE_FREE_MILES = APP_CONFIG.FREE_MILES;
+const MILEAGE_RATE_CENTS = APP_CONFIG.MILEAGE_RATE_CENTS;
+
+function calcMileageCents(miles?: number): number {
+  const m = Number(miles ?? 0);
+  if (!m || m <= MILEAGE_FREE_MILES) return 0;
+  return Math.round((m - MILEAGE_FREE_MILES) * MILEAGE_RATE_CENTS);
+}
+
+function fmt(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function formatRelativeTime(dateStr?: string): string {
+  if (!dateStr) return 'Just now';
+  const timestamp = new Date(dateStr).getTime();
+  if (isNaN(timestamp)) return 'Recently';
+
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+export type OrderStatusVariant = 'pending' | 'accepted' | 'picked_up' | 'delivered';
+
+export interface CustomerOrderData {
+  id: string;
+  customer_name?: string;
+  customerName?: string;
+  customer_phone?: string;
+  customerPhone?: string;
+  customer_email?: string;
+  customerEmail?: string;
+  pickup_address?: string;
+  pickupAddress?: string;
+  delivery_address?: string;
+  deliveryAddress?: string;
+  items?: string;
+  status: OrderStatusVariant;
+  created_at?: string;
+  createdAt?: string;
+  tip_amount?: number;
+  tipAmount?: number;
+  payment_status?: string;
+  paymentStatus?: string;
+  distance_miles?: number;
+  distanceMiles?: number;
+  driver_name?: string;
+  driverName?: string;
+  driver_photo_url?: string;
+}
+
+export interface CustomerOrderCardProps {
+  order: CustomerOrderData;
+  variant?: OrderStatusVariant;
+  onPress?: () => void;
+  onCancel?: (id: string) => void;
+  style?: StyleProp<ViewStyle>;
+}
+
+export function CustomerOrderCard({
+  order,
+  variant,
+  onPress,
+  onCancel,
+  style,
+}: CustomerOrderCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const currentStatus: OrderStatusVariant =
+    variant || (order.status as OrderStatusVariant) || 'pending';
+  const shortId = order.id ? order.id.slice(-6).toUpperCase() : '------';
+
+  const customerName = order.customerName || order.customer_name || 'Customer Order';
+  const customerPhone = order.customerPhone || order.customer_phone || '';
+  const pickupAddress = order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS || 'Store Pickup';
+  const deliveryAddress = order.deliveryAddress || order.delivery_address || '—';
+  const createdAt = order.createdAt || order.created_at;
+
+  const miles = Number(order.distanceMiles ?? order.distance_miles ?? 0);
+  const tipAmount = Number(order.tipAmount ?? order.tip_amount ?? 0);
+  const mileageCents = calcMileageCents(miles);
+  const totalCents = DELIVERY_FEE + mileageCents + tipAmount;
+  const hasMileageSurcharge = mileageCents > 0;
+
+  const isPending = currentStatus === 'pending';
+  const isAccepted = currentStatus === 'accepted';
+  const isPickedUp = currentStatus === 'picked_up';
+  const isDelivered = currentStatus === 'delivered';
+  const driverName = order.driverName || order.driver_name;
+
+  const initial = (customerName?.trim() || 'C').charAt(0).toUpperCase();
+
+  const getStatusBadge = () => {
+    switch (currentStatus) {
+      case 'accepted':
+        return {
+          label: 'DRIVER ON THE WAY',
+          color: '#0066FF',
+          bg: 'rgba(0, 102, 255, 0.15)',
+          border: 'rgba(0, 102, 255, 0.35)',
+        };
+      case 'picked_up':
+        return {
+          label: 'OUT FOR DELIVERY',
+          color: '#F4C300',
+          bg: 'rgba(244, 195, 0, 0.15)',
+          border: 'rgba(244, 195, 0, 0.35)',
+        };
+      case 'delivered':
+        return {
+          label: 'DELIVERED',
+          color: '#00E297',
+          bg: 'rgba(0, 226, 151, 0.12)',
+          border: 'rgba(0, 226, 151, 0.35)',
+        };
+      case 'pending':
+      default:
+        return {
+          label: 'PENDING',
+          color: '#F4C300',
+          bg: 'rgba(244, 195, 0, 0.1)',
+          border: 'rgba(244, 195, 0, 0.3)',
+        };
+    }
+  };
+
+  const badge = getStatusBadge();
+
+  // ─── Header Slot ───
+  const headerNode = (
+    <View style={styles.header}>
+      <View style={styles.userInfo}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initial}</Text>
+        </View>
+        <View style={styles.userTextCol}>
+          <Text style={styles.userName} numberOfLines={1}>
+            {customerName}
+          </Text>
+          <Text style={styles.orderId}>#{shortId} · {formatRelativeTime(createdAt)}</Text>
+        </View>
+      </View>
+
+      <View style={styles.badgesWrapper}>
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: badge.bg, borderColor: badge.border },
+          ]}
+        >
+          <Text style={[styles.statusText, { color: badge.color }]}>{badge.label}</Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  // ─── Footer Slot ───
+  const footerNode = (
+    <View style={styles.footer}>
+      {/* Driver banner if assigned */}
+      {driverName && !isDelivered && (
+        <View style={styles.driverBanner}>
+          <View style={styles.driverAvatar}>
+            <MaterialIcons name="person" size={16} color="#00E297" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.driverNameText}>{driverName}</Text>
+            <Text style={styles.driverStatusText}>
+              {isPickedUp ? 'Package picked up · Heading to you' : 'Driver assigned · Heading to store'}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Price Bar with breakdown toggle */}
+      <Pressable
+        onPress={() => {
+          haptic();
+          setExpanded((v) => !v);
+        }}
+        style={styles.priceRow}
+      >
+        <View style={styles.priceContainer}>
+          <Text style={styles.priceText}>{fmt(totalCents)}</Text>
+          <View style={styles.paymentTag}>
+            <Text style={styles.paymentTagText}>
+              {order.paymentStatus === 'paid' || order.payment_status === 'paid'
+                ? '✓ Paid'
+                : '$ Pay on Pickup'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.detailsToggle}>
+          <Text style={styles.detailsToggleText}>
+            {expanded ? 'Hide Details' : 'View Details'}
+          </Text>
+          <MaterialIcons
+            name={expanded ? 'expand-less' : 'expand-more'}
+            size={18}
+            color="#8C90A1"
+          />
+        </View>
+      </Pressable>
+
+      {/* Expandable Price Breakdown */}
+      {expanded && (
+        <View style={styles.breakdownDrawer}>
+          <Text style={styles.breakdownHeader}>PRICE BREAKDOWN</Text>
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownLabel}>Base delivery fee</Text>
+            <Text style={styles.breakdownValue}>{fmt(DELIVERY_FEE)}</Text>
+          </View>
+          {hasMileageSurcharge && (
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>
+                Mileage ({(miles - MILEAGE_FREE_MILES).toFixed(1)} mi surcharge)
+              </Text>
+              <Text style={[styles.breakdownValue, { color: '#F4C300' }]}>
+                {fmt(mileageCents)}
+              </Text>
+            </View>
+          )}
+          {tipAmount > 0 && (
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Driver tip</Text>
+              <Text style={[styles.breakdownValue, { color: '#00E297' }]}>{fmt(tipAmount)}</Text>
+            </View>
+          )}
+          <View style={styles.breakdownDivider} />
+          <View style={styles.breakdownRow}>
+            <Text style={styles.breakdownTotalLabel}>Estimated Total</Text>
+            <Text style={styles.breakdownTotalValue}>{fmt(totalCents)}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Action Buttons */}
+      <View style={styles.actionsContainer}>
+        {/* Live Tracking CTA */}
+        {!isDelivered ? (
+          <TouchableOpacity
+            onPress={() => {
+              haptic();
+              router.push(`/(customer)/track/${order.id}` as any);
+            }}
+            activeOpacity={0.85}
+            style={styles.actionButton}
+          >
+            <MaterialIcons name="near-me" size={18} color="#f8f7ff" />
+            <Text style={styles.actionButtonText}>Live Tracking</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.deliveredBadgeButton}>
+            <MaterialIcons name="check-circle" size={18} color="#00e297" />
+            <Text style={styles.deliveredBadgeText}>Delivered ✓</Text>
+          </View>
+        )}
+
+        {/* Support CTA */}
+        <TouchableOpacity
+          onPress={() => {
+            haptic();
+            Linking.openURL(`mailto:${APP_CONFIG.STORE_EMAIL}`);
+          }}
+          activeOpacity={0.85}
+          style={styles.supportButton}
+        >
+          <MaterialIcons name="mail-outline" size={18} color="#dfe2ef" />
+          <Text style={styles.supportButtonText}>Support</Text>
+        </TouchableOpacity>
+
+        {/* Cancel CTA (Pending only) */}
+        {isPending && onCancel && (
+          <TouchableOpacity
+            onPress={() => {
+              haptic();
+              onCancel(order.id);
+            }}
+            activeOpacity={0.85}
+            style={styles.cancelButton}
+          >
+            <MaterialIcons name="delete-outline" size={18} color="#FF6B6B" />
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
+  return (
+    <CustomCard
+      variant="glass"
+      header={headerNode}
+      footer={footerNode}
+      onPress={onPress}
+      style={[styles.cardContainer, style]}
+    >
+      {/* ─── Routes Timeline with Connecting Line ─── */}
+      <View style={styles.routesContainer}>
+        <View style={styles.connectingLine} />
+
+        {/* Pickup Step */}
+        <View style={styles.routeItem}>
+          <View style={[styles.routeIcon, { borderColor: '#b3c5ff' }]}>
+            <MaterialIcons name="inventory-2" size={12} color="#b3c5ff" />
+          </View>
+          <View style={styles.routeTextContainer}>
+            <Text style={[styles.routeLabel, { color: '#b3c5ff' }]}>Pick up from</Text>
+            <Text style={styles.routeAddress} numberOfLines={2}>
+              {pickupAddress}
+            </Text>
+          </View>
+        </View>
+
+        {/* Dropoff Step */}
+        <View style={styles.routeItem}>
+          <View style={[styles.routeIcon, { borderColor: '#00e297' }]}>
+            <MaterialIcons name="location-on" size={12} color="#00e297" />
+          </View>
+          <View style={styles.routeTextContainer}>
+            <Text style={[styles.routeLabel, { color: '#00e297' }]}>Deliver to</Text>
+            <Text style={styles.routeAddress} numberOfLines={2}>
+              {deliveryAddress}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Package Items & Preferences Note */}
+      {order.items ? (
+        <View style={styles.itemsPill}>
+          <Ionicons name="information-circle-outline" size={15} color="#8C90A1" />
+          <Text style={styles.itemsPillText} numberOfLines={2}>
+            {order.items}
+          </Text>
+        </View>
+      ) : null}
+    </CustomCard>
+  );
+}
+
+const styles = StyleSheet.create({
+  cardContainer: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  userTextCol: {
+    flex: 1,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#31353f',
+    borderWidth: 1,
+    borderColor: '#424656',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#ffe399',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  userName: {
+    color: '#dfe2ef',
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 24,
+  },
+  orderId: {
+    color: 'rgba(194, 198, 216, 0.7)',
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  badgesWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statusBadge: {
+    borderRadius: 9999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  routesContainer: {
+    flexDirection: 'column',
+    gap: 16,
+  },
+  connectingLine: {
+    position: 'absolute',
+    left: 10,
+    top: 24,
+    bottom: 24,
+    width: 1,
+    backgroundColor: 'rgba(66, 70, 86, 0.3)',
+  },
+  routeItem: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+    zIndex: 1,
+  },
+  routeIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#0f131c',
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  routeTextContainer: {
+    flexDirection: 'column',
+    flex: 1,
+  },
+  routeLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  routeAddress: {
+    color: '#dfe2ef',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  itemsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    marginTop: 12,
+  },
+  itemsPillText: {
+    fontSize: 12.5,
+    color: '#C2C6D8',
+    flex: 1,
+  },
+  footer: {
+    flexDirection: 'column',
+    gap: 14,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  driverBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(0, 226, 151, 0.08)',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.25)',
+  },
+  driverAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 226, 151, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  driverNameText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  driverStatusText: {
+    fontSize: 11,
+    color: '#00E297',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  priceText: {
+    color: '#ffe399',
+    fontSize: 24,
+    fontWeight: '800',
+    lineHeight: 30,
+  },
+  paymentTag: {
+    backgroundColor: 'rgba(244, 195, 0, 0.12)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(244, 195, 0, 0.25)',
+  },
+  paymentTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ffe399',
+  },
+  detailsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  detailsToggleText: {
+    fontSize: 12,
+    color: '#8C90A1',
+    fontWeight: '600',
+  },
+  breakdownDrawer: {
+    backgroundColor: '#10131B',
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  breakdownHeader: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#8C90A1',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  breakdownLabel: {
+    fontSize: 12.5,
+    color: '#C2C6D8',
+  },
+  breakdownValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  breakdownDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    marginVertical: 2,
+  },
+  breakdownTotalLabel: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  breakdownTotalValue: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#ffe399',
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionButton: {
+    flex: 2,
+    height: 46,
+    borderRadius: 24,
+    backgroundColor: '#0066ff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    shadowColor: 'rgba(0, 102, 255, 0.25)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  actionButtonText: {
+    color: '#f8f7ff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  supportButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  supportButtonText: {
+    color: '#dfe2ef',
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 24,
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  cancelButtonText: {
+    color: '#FF6B6B',
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+  deliveredBadgeButton: {
+    flex: 2,
+    height: 46,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deliveredBadgeText: {
+    color: '#00e297',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});

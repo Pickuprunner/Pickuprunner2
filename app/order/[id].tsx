@@ -8,72 +8,103 @@
  */
 import React, { useState, useEffect } from 'react';
 import {
-  ScrollView, Linking, Platform, StyleSheet,
-  View, Text, Pressable, Image, Alert,
+  ScrollView,
+  Linking,
+  Platform,
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import {
-  YStack, XStack, SizableText, Button, SafeArea, Spinner,
-  ChevronLeft, Navigation, CheckCircle, Truck, AlertCircle,
-  PackageCheck, Camera, ArrowUpCircle,
-} from '@blinkdotnew/mobile-ui';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useOrders, useUpdateOrderStatus } from '@/lib/orders';
-import type { Order } from '@/lib/orders';
+import { useOrders, useUpdateOrderStatus, type Order } from '@/lib/orders';
 import { getSelectedOrder } from '@/lib/selectedOrder';
 import { blink } from '@/lib/blink';
 import { calcDriverEarnings, APP_CONFIG } from '@/lib/config';
-import { toast } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue, MAX_QUEUE } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
+import { CustomCard, CustomLoading, SwipeSlider, useToast } from '@/components/core';
 
-const BLUE   = '#0066FF';
-const YELLOW = '#F5C400';
-const GREEN  = '#22C55E';
-const ORANGE = '#F97316';
-const BG     = '#0A0A0F';
-const CARD   = '#111827';
-const BORDER = 'rgba(255,255,255,0.07)';
+const BLUE = '#0066FF';
+const GOLD = '#FFE399';
+const GREEN = '#00E297';
+const BG = '#0F131C';
 const BACKEND_URL = 'https://vljh4v3j.backend.blink.new';
 
 function haptic(type: 'medium' | 'success' = 'medium') {
   if (Platform.OS === 'web') return;
-  if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-  else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+  if (type === 'success') {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  } else {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+  }
 }
 
 function openMaps(address: string) {
   if (!address) return;
   const encoded = encodeURIComponent(address);
-  const url = Platform.OS === 'ios'
-    ? `maps://maps.apple.com/?daddr=${encoded}`
-    : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
+  const url =
+    Platform.OS === 'ios'
+      ? `maps://maps.apple.com/?daddr=${encoded}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
   Linking.openURL(url);
 }
 
 // ── Step indicator row ────────────────────────────────────────────────────────
 function StepBar({ status }: { status: string }) {
-  const step1done   = status !== 'pending';
-  const step2done   = status === 'picked_up' || status === 'delivered';
-  const step3done   = status === 'delivered';
+  const step1done = status !== 'pending';
+  const step2done = status === 'picked_up' || status === 'delivered';
+  const step3done = status === 'delivered';
   const step1active = status === 'pending';
   const step2active = status === 'accepted';
   const step3active = status === 'picked_up';
 
   const dot = (done: boolean, active: boolean, n: number) => (
-    <View style={[styles.stepCircle, done ? styles.stepDone : active ? styles.stepActive : styles.stepFuture]}>
-      <Text style={[styles.stepNum, (done || active) ? { color: '#000' } : { color: 'rgba(255,255,255,0.3)' }]}>
+    <View
+      style={[
+        styles.stepCircle,
+        done ? styles.stepDone : active ? styles.stepActive : styles.stepFuture,
+      ]}
+    >
+      <Text
+        style={[
+          styles.stepNum,
+          done || active ? { color: '#0F131C' } : { color: 'rgba(255,255,255,0.4)' },
+        ]}
+      >
         {done ? '✓' : n}
       </Text>
     </View>
   );
+
   const line = (filled: boolean) => (
-    <View style={[styles.stepLine, { backgroundColor: filled ? GREEN : 'rgba(255,255,255,0.1)' }]} />
+    <View
+      style={[
+        styles.stepLine,
+        { backgroundColor: filled ? GREEN : 'rgba(255,255,255,0.1)' },
+      ]}
+    />
   );
+
   const label = (text: string, active: boolean, done: boolean) => (
-    <Text style={[styles.stepLabel, done ? { color: GREEN } : active ? { color: YELLOW } : { color: 'rgba(255,255,255,0.3)' }]}>
+    <Text
+      style={[
+        styles.stepLabel,
+        done
+          ? { color: GREEN }
+          : active
+          ? { color: GOLD }
+          : { color: 'rgba(255,255,255,0.4)' },
+      ]}
+    >
       {text}
     </Text>
   );
@@ -99,48 +130,87 @@ function StepBar({ status }: { status: string }) {
 }
 
 // ── Info row ─────────────────────────────────────────────────────────────────
-function InfoRow({ label, value, accent, onPress }: {
-  label: string; value?: string | null; accent?: string; onPress?: () => void;
+function InfoRow({
+  label,
+  value,
+  accent,
+  onPress,
+  icon,
+}: {
+  label: string;
+  value?: string | null;
+  accent?: string;
+  onPress?: () => void;
+  icon?: keyof typeof MaterialIcons.glyphMap;
 }) {
   if (!value) return null;
   return (
-    <Pressable onPress={onPress} disabled={!onPress} style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+      disabled={!onPress}
+      style={styles.infoRow}
+    >
+      <View style={styles.infoLeft}>
+        {icon && <MaterialIcons name={icon} size={16} color="rgba(194, 198, 216, 0.6)" />}
+        <Text style={styles.infoLabel}>{label}</Text>
+      </View>
       <View style={styles.infoRight}>
-        <Text style={[styles.infoValue, accent ? { color: accent } : undefined]} numberOfLines={3}>
+        <Text
+          style={[styles.infoValue, accent ? { color: accent } : undefined]}
+          numberOfLines={2}
+        >
           {value}
         </Text>
-        {onPress && <Text style={styles.infoTap}>→</Text>}
+        {onPress && <MaterialIcons name="chevron-right" size={18} color="rgba(255,255,255,0.3)" />}
       </View>
-    </Pressable>
+    </TouchableOpacity>
   );
 }
 
 // ── Address card ─────────────────────────────────────────────────────────────
-function AddressCard({ emoji, label, address, accent, onNavigate }: {
-  emoji: string; label: string; address: string; accent: string; onNavigate: () => void;
+function AddressCard({
+  icon,
+  label,
+  address,
+  accent,
+  onNavigate,
+}: {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  label: string;
+  address: string;
+  accent: string;
+  onNavigate: () => void;
 }) {
   return (
-    <View style={[styles.addrCard, { borderLeftColor: accent }]}>
+    <CustomCard variant="glass" style={styles.addrCard}>
       <View style={styles.addrTop}>
-        <Text style={styles.addrEmoji}>{emoji}</Text>
+        <View style={[styles.addrIconBox, { borderColor: accent }]}>
+          <MaterialIcons name={icon} size={16} color={accent} />
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.addrLabel, { color: accent }]}>{label}</Text>
           <Text style={styles.addrValue}>{address || '(not set)'}</Text>
         </View>
       </View>
       {!!address && (
-        <Pressable style={[styles.mapBtn, { borderColor: accent + '55', backgroundColor: accent + '14' }]} onPress={onNavigate}>
-          <Text style={{ fontSize: 14 }}>🗺️</Text>
-          <Text style={[styles.mapBtnText, { color: accent }]}>Open in Maps</Text>
-        </Pressable>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={styles.mapBtn}
+          onPress={onNavigate}
+        >
+          <MaterialIcons name="near-me" size={16} color="#DFE2EF" />
+          <Text style={styles.mapBtnText}>Open in Maps</Text>
+        </TouchableOpacity>
       )}
-    </View>
+    </CustomCard>
   );
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function OrderDetailScreen() {
+  const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
   const updateStatus = useUpdateOrderStatus();
   const { user } = useAuth();
@@ -148,18 +218,18 @@ export default function OrderDetailScreen() {
   const { data: allOrders = [] } = useOrders();
   const { queueCount, atCapacity } = useDriverQueue(allOrders, driverId);
 
-  const [order, setOrder]       = useState<Order | null>(getSelectedOrder);
-  const [loading, setLoading]   = useState(!getSelectedOrder());
-  const [status, setStatus]     = useState<string>(getSelectedOrder()?.status ?? 'pending');
+  const [order, setOrder] = useState<Order | null>(getSelectedOrder);
+  const [loading, setLoading] = useState(!getSelectedOrder());
+  const [status, setStatus] = useState<string>(getSelectedOrder()?.status ?? 'pending');
 
   // Action states
-  const [accepting,  setAccepting]  = useState(false);
-  const [pickingUp,  setPickingUp]  = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const [pickingUp, setPickingUp] = useState(false);
   const [delivering, setDelivering] = useState(false);
 
   // Delivery photo
-  const [photoUri,     setPhotoUri]     = useState<string | null>(null);
-  const [photoUrl,     setPhotoUrl]     = useState<string | null>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Load order from DB if not in memory
@@ -176,7 +246,6 @@ export default function OrderDetailScreen() {
     setLoading(true);
     (async () => {
       try {
-        // Try SDK first
         let result: any = null;
         try {
           result = await blink.db.orders.get(fetchId);
@@ -187,43 +256,59 @@ export default function OrderDetailScreen() {
             result = rows[0] ?? null;
           } catch {}
         }
-        // REST fallback
         if (!result) {
           try {
             const { blinkDbGet } = await import('@/lib/blinkApi');
             result = await blinkDbGet('orders', fetchId);
           } catch {}
         }
-        if (result) { setOrder(result as Order); setStatus(result.status); }
-      } finally { setLoading(false); }
+        if (result) {
+          setOrder(result as Order);
+          setStatus(result.status);
+        }
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, []);
+  }, [id]);
 
   if (!order && !loading) {
     return (
-      <SafeArea>
-        <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" gap="$4">
-          <AlertCircle size={48} color="#EF4444" />
-          <SizableText size="$5" fontWeight="700" color="white" textAlign="center">Order not found</SizableText>
-          <Button variant="outlined" onPress={() => router.back()}>← Go Back</Button>
-        </YStack>
-      </SafeArea>
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.errorContainer}>
+          <MaterialIcons name="error-outline" size={48} color="#FF4D4F" />
+          <Text style={styles.errorTitle}>Order not found</Text>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backBtnText}>← Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   }
 
-  const miles    = Number(order?.distanceMiles ?? 0);
+  const miles = Number(order?.distanceMiles ?? 0);
   const earnings = order ? calcDriverEarnings(miles, Number(order.tipAmount ?? 0)) : null;
-  const shortId  = order?.id?.slice(-6).toUpperCase() ?? '------';
-  const isMeetCustomer = !!(order?.items?.includes('[MEET CUSTOMER]'));
+  const shortId = order?.id?.slice(-6).toUpperCase() ?? '------';
+  const isMeetCustomer = !!order?.items?.includes('[MEET CUSTOMER]');
 
-  const statusColor =
-    status === 'delivered' ? GREEN :
-    status === 'picked_up' ? ORANGE :
-    status === 'accepted'  ? '#60A5FA' : YELLOW;
-  const statusLabel =
-    status === 'delivered' ? 'DELIVERED' :
-    status === 'picked_up' ? 'PICKED UP' :
-    status === 'accepted'  ? 'ACCEPTED'  : 'PENDING';
+  const getStatusBadge = () => {
+    switch (status) {
+      case 'delivered':
+        return { label: 'DELIVERED', color: GREEN, bg: 'rgba(0, 226, 151, 0.12)', border: 'rgba(0, 226, 151, 0.3)' };
+      case 'picked_up':
+        return { label: 'IN TRANSIT', color: GREEN, bg: 'rgba(0, 226, 151, 0.12)', border: 'rgba(0, 226, 151, 0.3)' };
+      case 'accepted':
+        return { label: 'ACCEPTED', color: GOLD, bg: 'rgba(255, 227, 153, 0.12)', border: 'rgba(255, 227, 153, 0.3)' };
+      case 'pending':
+      default:
+        return { label: 'UNASSIGNED', color: '#F4C300', bg: 'rgba(244, 195, 0, 0.1)', border: 'rgba(244, 195, 0, 0.3)' };
+    }
+  };
+
+  const badge = getStatusBadge();
 
   // ── Photo helpers ────────────────────────────────────────────────────────
   async function pickPhoto(source: 'camera' | 'library') {
@@ -232,27 +317,29 @@ export default function OrderDetailScreen() {
       if (source === 'camera' && Platform.OS !== 'web') {
         const { status: perm } = await ImagePicker.requestCameraPermissionsAsync();
         if (perm !== 'granted') {
-          Alert.alert('Camera permission needed', 'Please allow camera access in Settings to take a delivery photo.');
+          Alert.alert(
+            'Camera permission needed',
+            'Please allow camera access in Settings to take a delivery photo.'
+          );
           return;
         }
-        // CRITICAL: pass ONLY quality — mediaTypes/allowsEditing cause Android
-        // intent resolver to pick gallery over camera
-        console.log('[pickPhoto] Launching camera (bare options)…');
         result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
       } else {
-        console.log('[pickPhoto] Launching library…');
         result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'], quality: 0.7,
+          mediaTypes: ['images'],
+          quality: 0.7,
         });
       }
-      console.log('[pickPhoto] canceled:', result.canceled, 'assets:', result.assets?.length);
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       setPhotoUri(asset.uri);
       await uploadPhoto(asset.uri);
     } catch (err: any) {
       console.error('[pickPhoto] Error:', err?.message || err);
-      Alert.alert('Camera Error', `${err?.message || 'Could not open camera.'}\n\nUse "Choose File" instead.`);
+      Alert.alert(
+        'Camera Error',
+        `${err?.message || 'Could not open camera.'}\n\nUse "Choose File" instead.`
+      );
     }
   }
 
@@ -287,15 +374,14 @@ export default function OrderDetailScreen() {
       const data = JSON.parse(text || '{}');
       publicUrl = data?.data?.publicUrl || data?.publicUrl || data?.url || data?.data?.url;
       if (!publicUrl) throw new Error('Upload OK but no publicUrl in response');
-      console.log('[uploadPhoto] Upload success:', publicUrl);
 
       setPhotoUrl(publicUrl);
-      toast('Photo uploaded', { variant: 'success' });
+      showToast('Photo uploaded', { type: 'success' });
     } catch (e: any) {
-      console.error('[uploadPhoto] Final error:', e?.message || e);
-      toast('Upload failed', {
-        message: `${e?.message || 'unknown error'}. Please tap "Choose File" to retry.`,
-        variant: 'error',
+      console.error('[uploadPhoto] Error:', e?.message || e);
+      showToast('Upload failed', {
+        description: `${e?.message || 'unknown error'}. Please retry.`,
+        type: 'error',
       });
     } finally {
       setUploadingPhoto(false);
@@ -313,9 +399,9 @@ export default function OrderDetailScreen() {
       );
       return;
     }
-    haptic('medium'); setAccepting(true);
+    haptic('medium');
+    setAccepting(true);
     try {
-      console.log('[doAccept] Accepting order:', order.id, 'driverId:', driverId);
       await updateStatus.mutateAsync({
         id: order.id,
         status: 'accepted',
@@ -323,22 +409,26 @@ export default function OrderDetailScreen() {
         driverName: user?.displayName ?? user?.email ?? driverId?.slice(0, 8),
       });
       setStatus('accepted');
-      toast('Order Accepted!', { message: 'Head to the pickup address. Accept more from the Orders tab.', variant: 'success' });
+      showToast('Order Accepted!', {
+        description: 'Head to pickup address.',
+        type: 'success',
+      });
     } catch (e: any) {
-      console.error('[doAccept] Error:', e?.message || e);
-      toast('Error', { message: e?.message || 'Could not accept order', variant: 'error' });
+      showToast('Error', { description: e?.message || 'Could not accept order', type: 'error' });
+    } finally {
+      setAccepting(false);
     }
-    finally { setAccepting(false); }
   }
 
   async function doPickUp() {
     if (!order) return;
-    haptic('medium'); setPickingUp(true);
+    haptic('medium');
+    setPickingUp(true);
     try {
       await updateStatus.mutateAsync({ id: order.id, status: 'picked_up' });
       setStatus('picked_up');
 
-      // Send payment link to customer silently in background — driver doesn't see this
+      // Silently fire payment link in background
       const orderMiles = Number(order.distanceMiles ?? 0);
       const billableMiles = Math.max(0, orderMiles - APP_CONFIG.FREE_MILES);
       const mileageCents = Math.round(billableMiles * APP_CONFIG.MILEAGE_RATE_CENTS);
@@ -356,20 +446,30 @@ export default function OrderDetailScreen() {
           customerEmail: order.customerEmail,
           description: `Pickup Runner delivery — ${order.pickupAddress} → ${order.deliveryAddress}`,
         }),
-      }).catch(() => {}); // fire-and-forget
+      }).catch(() => {});
 
-      toast('Order Picked Up', { message: 'Head to the delivery address to complete the delivery.', variant: 'success' });
-    } catch { toast('Error', { message: 'Could not update status', variant: 'error' }); }
-    finally { setPickingUp(false); }
+      showToast('Order Picked Up', {
+        description: 'Head to delivery address to complete.',
+        type: 'success',
+      });
+    } catch {
+      showToast('Error', { description: 'Could not update status', type: 'error' });
+    } finally {
+      setPickingUp(false);
+    }
   }
 
   async function doDeliver() {
     if (!order) return;
     if (!photoUrl) {
-      Alert.alert('Delivery Photo Required', 'Please take or upload a photo and wait for the Uploaded confirmation before completing this delivery. The photo is sent to the customer with the delivery text.');
+      Alert.alert(
+        'Delivery Photo Required',
+        'Please take or upload a photo before completing this delivery.'
+      );
       return;
     }
-    haptic('success'); setDelivering(true);
+    haptic('success');
+    setDelivering(true);
     try {
       const updated = await updateStatus.mutateAsync({
         id: order.id,
@@ -379,197 +479,247 @@ export default function OrderDetailScreen() {
       setStatus('delivered');
       const notification = updated.deliveryNotification;
       const message = notification?.sent
-        ? `Customer texted with the delivery photo. You earned ${earnings?.totalDisplay ?? ''}.`
-        : `Delivered and earned ${earnings?.totalDisplay ?? ''}. ${notification?.reason ?? 'Customer text was not sent.'}`;
-      toast(notification?.sent ? 'Delivered! 🎉' : 'Delivered', { message, variant: notification?.sent ? 'success' : 'warning' });
+        ? `Customer notified with delivery photo. You earned ${earnings?.totalDisplay ?? ''}.`
+        : `Delivered and earned ${earnings?.totalDisplay ?? ''}.`;
+      showToast(notification?.sent ? 'Delivered! 🎉' : 'Delivered', {
+        description: message,
+        type: notification?.sent ? 'success' : 'warning',
+      });
     } catch (e: any) {
-      console.error('[doDeliver] Error:', e?.message || e);
-      toast('Error', { message: e?.message || 'Could not mark delivered', variant: 'error' });
+      showToast('Error', { description: e?.message || 'Could not mark delivered', type: 'error' });
+    } finally {
+      setDelivering(false);
     }
-    finally { setDelivering(false); }
   }
 
-  const displayStatus = order ? { ...order, status: status as Order['status'] } : order;
-
   return (
-    <SafeArea>
-
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* ── Header ── */}
-      <XStack
-        paddingHorizontal="$4" paddingTop="$3" paddingBottom="$3"
-        alignItems="center" gap="$3"
-        borderBottomWidth={1} borderBottomColor={BORDER}
-      >
-        <Button
-          size="$3" variant="outlined" borderRadius={20}
-          icon={<ChevronLeft size={20} />}
+      <View style={styles.topHeader}>
+        <TouchableOpacity
           onPress={() => router.back()}
-          paddingHorizontal="$2"
-        />
-        <YStack flex={1}>
-          <SizableText size="$6" fontWeight="800" color="white" numberOfLines={1}>
+          style={styles.backIconButton}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="arrow-back" size={22} color="#DFE2EF" />
+        </TouchableOpacity>
+
+        <View style={styles.headerTitles}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
             {order?.customerName || 'Order Details'}
-          </SizableText>
-          <SizableText size="$2" color="rgba(255,255,255,0.35)" fontFamily="$mono">
-            #{shortId}
-          </SizableText>
-        </YStack>
-        <View style={[styles.badge, { borderColor: statusColor + '66', backgroundColor: statusColor + '1A' }]}>
-          <Text style={[styles.badgeText, { color: statusColor }]}>{statusLabel}</Text>
+          </Text>
+          <Text style={styles.headerSubtitle}>#{shortId}</Text>
         </View>
-      </XStack>
+
+        <View
+          style={[
+            styles.badge,
+            { backgroundColor: badge.bg, borderColor: badge.border },
+          ]}
+        >
+          <Text style={[styles.badgeText, { color: badge.color }]}>
+            {badge.label}
+          </Text>
+        </View>
+      </View>
 
       {loading ? (
-        <YStack flex={1} alignItems="center" justifyContent="center" gap="$3">
-          <Spinner size="large" color={BLUE} />
-          <SizableText color="rgba(255,255,255,0.5)">Loading order…</SizableText>
-        </YStack>
+        <CustomLoading variant="fullscreen" text="Loading order details…" />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-
-          {/* ── Step progress ── */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
+        >
+          {/* ── Step Progress ── */}
           <StepBar status={status} />
 
-          {/* ── Earnings banner ── */}
-          {earnings && (earnings.mileageCents > 0 || earnings.tipCents > 0) && (
-            <View style={styles.earningsBanner}>
-              <View style={styles.earningsLeft}>
-                <Text style={styles.earningsLabel}>YOUR EARNINGS</Text>
-                <Text style={styles.earningsTotal}>{earnings.totalDisplay}</Text>
+          {/* ── Earnings Hero Card ── */}
+          {earnings && (
+            <CustomCard variant="glass" style={styles.earningsCard}>
+              <View style={styles.earningsRow}>
+                <View>
+                  <Text style={styles.earningsLabel}>YOUR EARNINGS</Text>
+                  <Text style={styles.earningsTotal}>{earnings.totalDisplay}</Text>
+                </View>
+                <View style={styles.earningsBreakdown}>
+                  {earnings.mileageCents > 0 && (
+                    <Text style={styles.earningsLine}>
+                      Mileage ({miles.toFixed(1)} mi): ${(earnings.mileageCents / 100).toFixed(2)}
+                    </Text>
+                  )}
+                  {earnings.tipCents > 0 && (
+                    <Text style={[styles.earningsLine, { color: GREEN }]}>
+                      Tip: +${(earnings.tipCents / 100).toFixed(2)}
+                    </Text>
+                  )}
+                </View>
               </View>
-              <View style={styles.earningsRight}>
-                {earnings.mileageCents > 0 && (
-                  <Text style={styles.earningsLine}>Mileage ({miles.toFixed(1)} mi): ${(earnings.mileageCents / 100).toFixed(2)}</Text>
-                )}
-                {earnings.tipCents > 0 && (
-                  <Text style={[styles.earningsLine, { color: GREEN }]}>Tip: ${(earnings.tipCents / 100).toFixed(2)}</Text>
-                )}
-              </View>
-            </View>
+            </CustomCard>
           )}
 
-          {/* ── Addresses ── */}
+          {/* ── Pickup Address Card ── */}
           <View style={styles.sectionHead}>
             <Text style={styles.sectionHeadText}>PICK UP FROM</Text>
           </View>
           <AddressCard
-            emoji="🛒" label="Pickup Runner"
+            icon="inventory-2"
+            label="Pickup Runner"
             address={order?.pickupAddress ?? ''}
-            accent={YELLOW}
+            accent="#B3C5FF"
             onNavigate={() => openMaps(order?.pickupAddress ?? '')}
           />
 
+          {/* ── Delivery Address Card ── */}
           <View style={styles.sectionHead}>
             <Text style={styles.sectionHeadText}>DELIVER TO</Text>
           </View>
           <AddressCard
-            emoji="📍" label="Customer Address"
+            icon="location-on"
+            label="Customer Address"
             address={order?.deliveryAddress ?? ''}
-            accent="#60A5FA"
+            accent={GREEN}
             onNavigate={() => openMaps(order?.deliveryAddress ?? '')}
           />
 
-          {/* ── Customer info ── */}
-          <View style={styles.card}>
-            <Text style={styles.cardHead}>CUSTOMER</Text>
-            <InfoRow label="Name" value={order?.customerName} />
+          {/* ── Customer Details Card ── */}
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionHeadText}>CUSTOMER DETAILS</Text>
+          </View>
+          <CustomCard variant="glass" style={styles.customerCard}>
             <InfoRow
-              label="Phone" value={order?.customerPhone}
-              accent={BLUE}
-              onPress={() => order?.customerPhone ? Linking.openURL(`tel:${order.customerPhone}`) : undefined}
+              icon="person"
+              label="Name"
+              value={order?.customerName}
+            />
+            <InfoRow
+              icon="phone"
+              label="Phone"
+              value={order?.customerPhone}
+              accent="#60A5FA"
+              onPress={() =>
+                order?.customerPhone ? Linking.openURL(`tel:${order.customerPhone}`) : undefined
+              }
             />
             {!!order?.items && order.items !== 'N/A' && (
-              <InfoRow label="Items" value={order.items} />
+              <InfoRow
+                icon="shopping-bag"
+                label="Items"
+                value={order.items}
+              />
             )}
             <InfoRow
+              icon="meeting-room"
               label="Delivery"
-              value={isMeetCustomer ? '🤝 Meet at Door' : '🚪 Leave at Door'}
+              value={isMeetCustomer ? 'Meet at Door' : 'Leave at Door'}
               accent={isMeetCustomer ? '#60A5FA' : undefined}
             />
-          </View>
+          </CustomCard>
 
-          <View style={styles.divider} />
-
-          {/* ════════════════════════════════════════════
-              STEP 1 — PENDING: accept the order
-          ════════════════════════════════════════════ */}
+          {/* ── STEP 1: PENDING ── */}
           {status === 'pending' && (
             <View style={styles.actionBox}>
               <Text style={styles.stepInstruction}>
                 Review the pickup and delivery addresses above, then accept this order to begin.
               </Text>
-              <Button
-                size="$5" borderRadius={14} width="100%"
-                backgroundColor={YELLOW} color="#000" fontWeight="800"
-                icon={accepting ? <Spinner size="small" color="#000" /> : <Truck size={18} color="#000" />}
-                onPress={doAccept} disabled={accepting}
+              {/* <SwipeSlider
+                title="Slide to Accept"
+                completedTitle="Order Accepted"
+                onSwipeComplete={doAccept}
+                loading={accepting}
+                disabled={accepting || atCapacity}
+                variant="primary"
+                style={{ marginTop: 8 }}
+              /> */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.primaryActionButton}
+                onPress={doAccept}
+                disabled={accepting}
               >
-                {accepting ? 'Accepting…' : 'Accept This Order'}
-              </Button>
+                {accepting ? (
+                  <ActivityIndicator color="#F8F7FF" size="small" />
+                ) : (
+                  <>
+                    <MaterialIcons name="local-shipping" size={20} color="#F8F7FF" />
+                    <Text style={styles.primaryActionText}>Accept This Order</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           )}
 
-          {/* ════════════════════════════════════════════
-              STEP 2 — ACCEPTED: go pick it up
-          ════════════════════════════════════════════ */}
+          {/* ── STEP 2: ACCEPTED ── */}
           {status === 'accepted' && (
             <View style={styles.actionBox}>
               <Text style={styles.stepInstruction}>
                 Head to the store and collect the order, then tap below once you have it.
               </Text>
-              <Button
-                size="$5" borderRadius={14} width="100%" marginBottom="$3"
-                variant="outlined"
-                icon={<Navigation size={18} />}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.secondaryActionButton}
                 onPress={() => openMaps(order?.pickupAddress ?? '')}
               >
-                Navigate to Pickup
-              </Button>
-              <Button
-                size="$5" borderRadius={14} width="100%"
-                backgroundColor={ORANGE} color="#000" fontWeight="800"
-                icon={pickingUp ? <Spinner size="small" color="#000" /> : <PackageCheck size={18} color="#000" />}
-                onPress={doPickUp} disabled={pickingUp}
+                <MaterialIcons name="near-me" size={20} color="#DFE2EF" />
+                <Text style={styles.secondaryActionText}>Navigate to Pickup</Text>
+              </TouchableOpacity>
+
+              {/* <SwipeSlider
+                title="Slide to Confirm Pickup"
+                completedTitle="Pickup Confirmed"
+                onSwipeComplete={doPickUp}
+                loading={pickingUp}
+                disabled={pickingUp}
+                variant="primary"
+                icon="inventory"
+                style={{ marginTop: 12 }}
+              /> */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[styles.primaryActionButton, { marginTop: 12 }]}
+                onPress={doPickUp}
+                disabled={pickingUp}
               >
-                {pickingUp ? 'Updating…' : 'Order Picked Up'}
-              </Button>
+                {pickingUp ? (
+                  <ActivityIndicator color="#F8F7FF" size="small" />
+                ) : (
+                  <>
+                    <MaterialIcons name="inventory" size={20} color="#F8F7FF" />
+                    <Text style={styles.primaryActionText}>Order Picked Up</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           )}
 
-          {/* ════════════════════════════════════════════
-              STEP 3 — PICKED_UP: deliver + photo
-          ════════════════════════════════════════════ */}
+          {/* ── STEP 3: PICKED_UP ── */}
           {status === 'picked_up' && (
             <View style={styles.actionBox}>
               <Text style={styles.stepInstruction}>
                 {isMeetCustomer
-                  ? 'The customer will meet you at their door. Head to the delivery address and hand off the order directly.'
-                  : 'Deliver the order, then take a photo at the delivery location before marking complete.'}
+                  ? 'The customer requested to meet at door. Complete handoff and capture a quick photo.'
+                  : 'Deliver the order, take a photo at the door, and confirm delivery.'}
               </Text>
 
-              <Button
-                size="$5" borderRadius={14} width="100%" marginBottom="$4"
-                variant="outlined"
-                icon={<Navigation size={18} />}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.secondaryActionButton}
                 onPress={() => openMaps(order?.deliveryAddress ?? '')}
               >
-                Navigate to Delivery
-              </Button>
+                <MaterialIcons name="near-me" size={20} color="#DFE2EF" />
+                <Text style={styles.secondaryActionText}>Navigate to Delivery</Text>
+              </TouchableOpacity>
 
-              {/* Photo section — required so the customer can receive the MMS confirmation */}
-              <View style={styles.photoSection}>
-                <Text style={styles.photoTitle}>
-                  📸 Delivery Photo  <Text style={styles.photoRequired}>(Required for customer text)</Text>
-                </Text>
-                {isMeetCustomer && (
-                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 20, marginBottom: 10 }}>
-                    The customer requested to meet you at the door. Take a quick handoff photo so the delivery confirmation can include it.
-                  </Text>
-                )}
+              {/* Photo Section */}
+              <CustomCard variant="glass" style={styles.photoBox}>
+                <View style={styles.photoHeader}>
+                  <MaterialIcons name="camera-alt" size={20} color="#DFE2EF" />
+                  <Text style={styles.photoTitle}>Delivery Photo</Text>
+                  <Text style={styles.photoRequired}>(Required)</Text>
+                </View>
 
-                {/* Preview */}
+                {/* Photo Preview */}
                 {(photoUri || photoUrl) && (
-                  <View style={styles.photoPreviewBox}>
+                  <View style={styles.photoPreviewWrapper}>
                     <Image
                       source={{ uri: photoUri ?? photoUrl ?? '' }}
                       style={styles.photoPreview}
@@ -577,8 +727,8 @@ export default function OrderDetailScreen() {
                     />
                     {uploadingPhoto && (
                       <View style={styles.photoUploadingOverlay}>
-                        <Spinner size="large" color="white" />
-                        <Text style={{ color: 'white', marginTop: 8, fontWeight: '700' }}>Uploading…</Text>
+                        <ActivityIndicator size="large" color="#FFFFFF" />
+                        <Text style={styles.photoUploadingText}>Uploading…</Text>
                       </View>
                     )}
                     {!uploadingPhoto && photoUrl && (
@@ -589,229 +739,491 @@ export default function OrderDetailScreen() {
                   </View>
                 )}
 
-                {/* Camera / Library buttons — always show both */}
-                <XStack gap="$3" marginTop="$3">
-                  <Button
-                    flex={1} size="$4" borderRadius={12}
-                    backgroundColor="rgba(249,115,22,0.12)"
-                    borderColor="rgba(249,115,22,0.4)" borderWidth={1}
-                    color={ORANGE}
-                    icon={<Camera size={16} color={ORANGE} />}
+                {/* Camera / Library Pickers */}
+                <View style={styles.photoPickersRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={styles.photoPickerBtn}
                     onPress={() => pickPhoto('camera')}
                     disabled={uploadingPhoto}
                   >
-                    Take Photo
-                  </Button>
-                  <Button
-                    flex={1} size="$4" borderRadius={12}
-                    backgroundColor="rgba(96,165,250,0.12)"
-                    borderColor="rgba(96,165,250,0.4)" borderWidth={1}
-                    color="#60A5FA"
-                    icon={<ArrowUpCircle size={16} color="#60A5FA" />}
+                    <MaterialIcons name="photo-camera" size={18} color="#FFE399" />
+                    <Text style={styles.photoPickerText}>Take Photo</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={styles.photoPickerBtn}
                     onPress={() => pickPhoto('library')}
                     disabled={uploadingPhoto}
                   >
-                    Choose File
-                  </Button>
-                </XStack>
-              </View>
+                    <MaterialIcons name="photo-library" size={18} color="#60A5FA" />
+                    <Text style={styles.photoPickerText}>Choose File</Text>
+                  </TouchableOpacity>
+                </View>
+              </CustomCard>
 
-              {/* Mark delivered button */}
-              <Button
-                size="$5" borderRadius={14} width="100%" marginTop="$4"
-                backgroundColor={photoUrl ? GREEN : 'rgba(34,197,94,0.25)'}
-                color="#000" fontWeight="800"
-                icon={delivering
-                  ? <Spinner size="small" color="#000" />
-                  : <CheckCircle size={18} color="#000" />}
+              {/* Complete Delivery Action */}
+              {/* <SwipeSlider
+                title="Slide to Complete Delivery"
+                completedTitle="Delivery Completed"
+                onSwipeComplete={doDeliver}
+                loading={delivering}
+                disabled={delivering || uploadingPhoto || !photoUrl}
+                variant="primary"
+                completedIcon="check-circle"
+                style={{ marginTop: 16 }}
+              /> */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[
+                  styles.primaryActionButton,
+                  { marginTop: 16 },
+                  !photoUrl && styles.actionDisabled,
+                ]}
                 onPress={doDeliver}
                 disabled={delivering || uploadingPhoto}
               >
-                {delivering ? 'Updating…' : 'Mark as Delivered'}
-              </Button>
-              {!photoUrl && (
-                <Text style={styles.photoHint}>Wait for the Uploaded confirmation before completing — the customer receives this photo by text</Text>
-              )}
+                {delivering ? (
+                  <ActivityIndicator color="#F8F7FF" size="small" />
+                ) : (
+                  <>
+                    <MaterialIcons name="check-circle" size={20} color="#F8F7FF" />
+                    <Text style={styles.primaryActionText}>Mark as Delivered</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           )}
 
-          {/* ════════════════════════════════════════════
-              DONE — DELIVERED
-          ════════════════════════════════════════════ */}
+          {/* ── STEP 4: DELIVERED ── */}
           {status === 'delivered' && (
             <View style={styles.actionBox}>
-              <View style={styles.deliveredCard}>
-                <Text style={{ fontSize: 36 }}>🎉</Text>
-                <YStack flex={1} gap="$1">
-                  <SizableText fontWeight="800" color={GREEN} size="$5">Order Delivered!</SizableText>
-                  {earnings && (earnings.mileageCents > 0 || earnings.tipCents > 0) && (
-                    <SizableText size="$3" color="rgba(34,197,94,0.8)">
+              <CustomCard variant="glass" style={styles.deliveredCard}>
+                <MaterialIcons name="celebration" size={36} color={GREEN} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.deliveredTitle}>Order Delivered!</Text>
+                  {earnings && (
+                    <Text style={styles.deliveredSubtitle}>
                       You earned {earnings.totalDisplay} on this delivery.
-                    </SizableText>
+                    </Text>
                   )}
-                </YStack>
-              </View>
+                </View>
+              </CustomCard>
 
-              {/* Show delivery photo if we have one */}
               {(photoUri || photoUrl || order?.deliveryPhotoUrl) && (
-                <View style={styles.deliveredPhotoBox}>
-                  <Text style={styles.deliveredPhotoLabel}>DELIVERY PHOTO</Text>
+                <View style={{ marginTop: 16 }}>
+                  <Text style={styles.sectionHeadText}>DELIVERY PHOTO</Text>
                   <Image
-                    source={{ uri: photoUri ?? photoUrl ?? order?.deliveryPhotoUrl ?? '' }}
+                    source={{
+                      uri: photoUri ?? photoUrl ?? order?.deliveryPhotoUrl ?? '',
+                    }}
                     style={styles.deliveredPhoto}
                     resizeMode="cover"
                   />
                 </View>
               )}
 
-              <Button
-                size="$4" borderRadius={12} marginTop="$4" width="100%"
-                variant="outlined"
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={[styles.secondaryActionButton, { marginTop: 20 }]}
                 onPress={() => router.back()}
               >
-                ← Back to Orders
-              </Button>
+                <Text style={styles.secondaryActionText}>← Back to Orders</Text>
+              </TouchableOpacity>
             </View>
           )}
 
-          <View style={{ height: 60 }} />
+          <View style={{ height: 40 }} />
         </ScrollView>
       )}
-    </SafeArea>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingBottom: 40 },
-
-  // Step bar
+  root: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    gap: 12,
+  },
+  backIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitles: {
+    flex: 1,
+  },
+  headerTitle: {
+    color: '#DFE2EF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    color: 'rgba(194, 198, 216, 0.6)',
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  badge: {
+    borderRadius: 9999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  scroll: {
+    paddingBottom: 40,
+  },
   stepBar: {
-    flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: 20, marginTop: 20, marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 12,
   },
-  stepItem:   { alignItems: 'center', gap: 6 },
-  stepLine:   { flex: 1, height: 2, marginHorizontal: 4, marginBottom: 22 },
-  stepCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  stepDone:   { backgroundColor: GREEN },
-  stepActive: { backgroundColor: YELLOW },
-  stepFuture: { backgroundColor: 'rgba(255,255,255,0.08)' },
-  stepNum:    { fontSize: 13, fontWeight: '800' },
-  stepLabel:  { fontSize: 11, fontWeight: '600' },
-
-  // Earnings
-  earningsBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(245,196,0,0.1)',
-    borderWidth: 1, borderColor: 'rgba(245,196,0,0.28)',
-    borderRadius: 14, marginHorizontal: 16, marginTop: 14,
-    padding: 14, gap: 14,
+  stepItem: {
+    alignItems: 'center',
+    gap: 6,
   },
-  earningsLeft:  { alignItems: 'center', minWidth: 80 },
-  earningsLabel: { color: 'rgba(245,196,0,0.7)', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 3 },
-  earningsTotal: { color: YELLOW, fontSize: 26, fontWeight: '900' },
-  earningsRight: { flex: 1 },
-  earningsLine:  { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 19 },
-
-  // Addresses
-  sectionHead: { marginHorizontal: 16, marginTop: 20, marginBottom: 8 },
+  stepLine: {
+    flex: 1,
+    height: 2,
+    marginHorizontal: 6,
+    marginBottom: 20,
+  },
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDone: {
+    backgroundColor: GREEN,
+  },
+  stepActive: {
+    backgroundColor: GOLD,
+  },
+  stepFuture: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  stepNum: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  stepLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  earningsCard: {
+    marginHorizontal: 20,
+    marginTop: 12,
+  },
+  earningsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  earningsLabel: {
+    color: 'rgba(194, 198, 216, 0.7)',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  earningsTotal: {
+    color: GOLD,
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  earningsBreakdown: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  earningsLine: {
+    color: '#C2C6D8',
+    fontSize: 12,
+  },
+  sectionHead: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 8,
+  },
   sectionHeadText: {
-    color: 'rgba(255,255,255,0.4)', fontSize: 11,
-    fontWeight: '700', letterSpacing: 1.4,
+    color: 'rgba(194, 198, 216, 0.5)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
   addrCard: {
-    marginHorizontal: 16, backgroundColor: CARD,
-    borderRadius: 14, borderLeftWidth: 3, overflow: 'hidden',
-    borderWidth: 1, borderColor: BORDER,
+    marginHorizontal: 20,
+    gap: 12,
   },
-  addrTop:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
-  addrEmoji:  { fontSize: 22, marginTop: 2 },
-  addrLabel:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, marginBottom: 4 },
-  addrValue:  { color: 'white', fontSize: 15, fontWeight: '600', lineHeight: 22 },
+  addrTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  addrIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  addrLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  addrValue: {
+    color: '#DFE2EF',
+    fontSize: 14,
+    lineHeight: 20,
+  },
   mapBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    margin: 10, marginTop: 0, padding: 10,
-    borderRadius: 10, borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    gap: 8,
   },
-  mapBtnText: { fontSize: 14, fontWeight: '700' },
-
-  // Customer card
-  card: {
-    marginHorizontal: 16, marginTop: 16,
-    backgroundColor: CARD, borderRadius: 14,
-    borderWidth: 1, borderColor: BORDER, overflow: 'hidden',
+  mapBtnText: {
+    color: '#DFE2EF',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  cardHead: {
-    color: 'rgba(255,255,255,0.35)', fontSize: 11,
-    fontWeight: '700', letterSpacing: 1.2,
-    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4,
+  customerCard: {
+    marginHorizontal: 20,
+    paddingVertical: 12,
   },
   infoRow: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', gap: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
-  infoLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 13, width: 60, flexShrink: 0, paddingTop: 1 },
-  infoRight: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' },
-  infoValue: { color: 'white', fontSize: 14, fontWeight: '500', flex: 1 },
-  infoTap:   { color: 'rgba(255,255,255,0.22)', fontSize: 11, paddingTop: 2 },
-
-  divider: { height: 1, backgroundColor: BORDER, marginHorizontal: 16, marginTop: 24 },
-
-  // Action boxes
-  actionBox: { marginHorizontal: 16, marginTop: 24 },
+  infoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoLabel: {
+    color: 'rgba(194, 198, 216, 0.7)',
+    fontSize: 13,
+  },
+  infoRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: '60%',
+  },
+  infoValue: {
+    color: '#DFE2EF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  actionBox: {
+    marginHorizontal: 20,
+    marginTop: 24,
+  },
   stepInstruction: {
-    color: 'rgba(255,255,255,0.45)', fontSize: 14,
-    lineHeight: 20, marginBottom: 18,
+    color: 'rgba(194, 198, 216, 0.7)',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 16,
   },
-
-  // Photo
-  photoSection: {
-    backgroundColor: CARD, borderRadius: 14,
-    borderWidth: 1, borderColor: BORDER,
-    padding: 16,
+  primaryActionButton: {
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#0066FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: 'rgba(0, 102, 255, 0.3)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  photoTitle:    { color: 'white', fontSize: 15, fontWeight: '700', marginBottom: 12 },
-  photoRequired: { color: ORANGE, fontSize: 13, fontWeight: '600' },
-  photoPreviewBox: {
-    width: '100%', height: 220, borderRadius: 12,
-    overflow: 'hidden', backgroundColor: '#1a1a2e',
-    position: 'relative',
+  primaryActionText: {
+    color: '#F8F7FF',
+    fontSize: 15,
+    fontWeight: '700',
   },
-  photoPreview: { width: '100%', height: '100%' },
+  secondaryActionButton: {
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  secondaryActionText: {
+    color: '#DFE2EF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  photoBox: {
+    marginTop: 16,
+  },
+  photoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  photoTitle: {
+    color: '#DFE2EF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  photoRequired: {
+    color: '#FFA940',
+    fontSize: 12,
+  },
+  photoPreviewWrapper: {
+    width: '100%',
+    height: 200,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    marginBottom: 12,
+  },
+  photoPreview: {
+    width: '100%',
+    height: '100%',
+  },
   photoUploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoUploadingText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 8,
   },
   photoUploadedBadge: {
-    position: 'absolute', bottom: 10, right: 10,
-    backgroundColor: 'rgba(34,197,94,0.9)',
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 226, 151, 0.9)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  photoUploadedText: { color: 'white', fontSize: 12, fontWeight: '700' },
-  photoHint: {
-    color: 'rgba(249,115,22,0.7)', fontSize: 12,
-    textAlign: 'center', marginTop: 8,
+  photoUploadedText: {
+    color: '#0F131C',
+    fontSize: 11,
+    fontWeight: '700',
   },
-
-  // Delivered
+  photoPickersRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  photoPickerBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  photoPickerText: {
+    color: '#DFE2EF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  actionDisabled: {
+    opacity: 0.5,
+  },
   deliveredCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: 'rgba(34,197,94,0.08)',
-    borderWidth: 1, borderColor: 'rgba(34,197,94,0.25)',
-    borderRadius: 14, padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    backgroundColor: 'rgba(0, 226, 151, 0.08)',
+    borderColor: 'rgba(0, 226, 151, 0.25)',
   },
-  deliveredPhotoBox: { marginTop: 20 },
-  deliveredPhotoLabel: {
-    color: 'rgba(255,255,255,0.4)', fontSize: 11,
-    fontWeight: '700', letterSpacing: 1.2, marginBottom: 8,
+  deliveredTitle: {
+    color: GREEN,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  deliveredSubtitle: {
+    color: 'rgba(0, 226, 151, 0.8)',
+    fontSize: 13,
+    marginTop: 4,
   },
   deliveredPhoto: {
-    width: '100%', height: 220, borderRadius: 12,
-    backgroundColor: '#1a1a2e',
+    width: '100%',
+    height: 200,
+    borderRadius: 16,
+    marginTop: 8,
   },
-
-  // Header badge
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
-  badgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+    padding: 24,
+  },
+  errorTitle: {
+    color: '#DFE2EF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  backBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  backBtnText: {
+    color: '#DFE2EF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });

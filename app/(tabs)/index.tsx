@@ -1,59 +1,69 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
+  Animated,
+  Easing,
   FlatList,
   RefreshControl,
-  Platform,
   StyleSheet,
   View,
   Text,
-  Pressable,
+  Platform,
+  LayoutChangeEvent,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
-  YStack,
-  XStack,
-  SizableText,
   Button,
-  SafeArea,
-  SearchBar,
-  Spinner,
-  Wifi,
-  WifiOff,
   Package,
-  Zap,
 } from '@blinkdotnew/mobile-ui';
-
 import * as Haptics from 'expo-haptics';
-
-import { useOrders, Order, ordersTable } from '@/lib/orders';
-import { useOrdersRealtime } from '@/lib/realtime';
-import { blink } from '@/lib/blink';
-import { DriverOrderCard } from '@/components/DriverOrderCard';
-import { setSelectedOrder } from '@/lib/selectedOrder';
 import { router } from 'expo-router';
-import { useAuth } from '@/hooks/useAuth';
-import { useDriverQueue, MAX_QUEUE } from '@/lib/driverQueue';
-import { useDriverId } from '@/hooks/useDriverId';
 
-const BLUE = '#0066FF';
-const YELLOW = '#F5C400';
-const GREEN = '#22C55E';
-const BG = '#0A0A0F';
+import { useOrders } from '@/lib/orders';
+import { useOrdersRealtime } from '@/lib/realtime';
+import { setSelectedOrder } from '@/lib/selectedOrder';
+import { useAuth } from '@/hooks/useAuth';
+import { useDriverQueue } from '@/lib/driverQueue';
+import { useDriverId } from '@/hooks/useDriverId';
+import { colors } from '@/constants/design';
+import { SkeletonList } from '@/components/core';
+
+import {
+  OrdersHeader,
+  OrdersSearchBar,
+  DriverOrderCard,
+  ActiveDeliveriesBanner,
+} from '@/components/Orders';
 
 function haptic() {
-  if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 }
 
 export default function OrdersScreen() {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [inserting, setInserting] = useState(false);
+
+  // ─── 1. State, Refs & Animated Values (Smooth Animation Logic) ───
+  const [headerHeight, setHeaderHeight] = useState(200);
+  const headerTranslateY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const accumDelta = useRef(0);
+  const lastDirectionChangeTime = useRef(0);
+  const isHeaderVisible = useRef(true);
 
   const { data: orders = [], isLoading, refetch } = useOrders();
   const { isConnected } = useOrdersRealtime();
   const { user } = useAuth();
   const driverId = useDriverId();
   const { queueCount, atCapacity, isMyOrder } = useDriverQueue(orders, driverId);
+
+  const avatarInitial = useMemo(() => {
+    const name = user?.displayName || user?.email || 'Driver';
+    return name.charAt(0).toUpperCase();
+  }, [user]);
+
+  const myActiveOrders = useMemo(
+    () => orders.filter((o) => isMyOrder(o.id)),
+    [orders, isMyOrder]
+  );
 
   const pendingOrders = useMemo(() => orders.filter((o) => o.status === 'pending'), [orders]);
 
@@ -64,7 +74,8 @@ export default function OrdersScreen() {
       (o) =>
         o.customerName?.toLowerCase().includes(q) ||
         o.customerPhone?.toLowerCase().includes(q) ||
-        o.deliveryAddress?.toLowerCase().includes(q)
+        o.deliveryAddress?.toLowerCase().includes(q) ||
+        o.pickupAddress?.toLowerCase().includes(q)
     );
   }, [pendingOrders, search]);
 
@@ -79,167 +90,205 @@ export default function OrdersScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  async function insertTestOrder() {
-    haptic();
-    setInserting(true);
-    try {
-      const testOrderData = {
-        customer_name: 'Test Customer',
-        customer_phone: '(520) 555-0100',
-        customer_email: 'test@example.com',
-        pickup_address: "350 W Sahuarita Rd, Sahuarita, AZ 85629",
-        delivery_address: '233 E La Huerta, Green Valley, AZ 85614',
-        items: "Pickup Runner — Test Order",
-        status: 'pending',
-        distance_miles: 8.2,
-        tip_amount: 500,
-        payment_status: 'unpaid',
-        city_id: 'sahuarita',
-        store_id: '',
-        order_scope: 'sahuarita',
-      };
-      // Direct REST (with secret key) first; SDK fallback.
-      try {
-        const { blinkDbCreate } = await import('@/lib/blinkApi');
-        await blinkDbCreate('orders', testOrderData);
-      } catch (restErr: any) {
-        console.warn('[insertTestOrder] REST failed, trying SDK fallback:', restErr?.message);
-        await ordersTable.create(testOrderData as any);
+  // ─── 2. Header Layout Measurement ───
+  const onHeaderLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { height } = event.nativeEvent.layout;
+      if (height && Math.abs(height - headerHeight) > 2) {
+        setHeaderHeight(height);
       }
-      await refetch();
-    } finally {
-      setInserting(false);
-    }
-  }
+    },
+    [headerHeight]
+  );
 
-  const ListHeader = (
-    <YStack paddingBottom="$2">
-      <LinearGradient
-        colors={['#000A1A', '#003380', '#0066FF']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <XStack justifyContent="space-between" alignItems="center" paddingHorizontal="$4" paddingTop="$2">
-          <YStack>
-            <SizableText size="$8" fontWeight="900" color="white">Orders</SizableText>
-            <SizableText size="$3" color="rgba(255,255,255,0.7)">{pendingCount} pending · tap Accept to grab orders</SizableText>
-          </YStack>
-          <XStack gap="$2" alignItems="center">
-            {/* Queue capacity pill */}
-            <View style={[
-              styles.queuePill,
-              atCapacity ? styles.queueFull : queueCount > 0 ? styles.queuePartial : styles.queueEmpty,
-            ]}>
-              <Text style={[styles.queueText, atCapacity ? styles.queueTextFull : queueCount > 0 ? styles.queueTextPartial : styles.queueTextEmpty]}>
-                MY QUEUE {queueCount}/{MAX_QUEUE}
-              </Text>
-            </View>
-            <View style={[styles.liveChip, isConnected ? styles.liveOn : styles.liveOff]}>
-              {isConnected ? <Wifi size={12} color={BLUE} /> : <WifiOff size={12} color="#888" />}
-              <Text style={[styles.liveText, isConnected ? styles.liveTextOn : styles.liveTextOff]}>
-                {isConnected ? 'LIVE' : 'OFFLINE'}
-              </Text>
-            </View>
-            <Button
-              size="$3"
-              onPress={insertTestOrder}
-              disabled={inserting}
-              backgroundColor="rgba(245,196,0,0.15)"
-              borderColor={YELLOW}
-              borderWidth={1}
-              color={YELLOW}
-              icon={inserting ? <Spinner size="small" color={YELLOW} /> : <Zap size={14} color={YELLOW} />}
-              paddingHorizontal="$3"
-            >
-              Test
-            </Button>
-          </XStack>
-        </XStack>
-        <YStack paddingHorizontal="$4" paddingTop="$3" paddingBottom="$4">
-          <SearchBar value={search} onChangeText={setSearch} placeholder="Search by name, phone, address…" />
-        </YStack>
-      </LinearGradient>
-      {isLoading && (
-        <YStack alignItems="center" paddingVertical="$6">
-          <Spinner size="large" color={BLUE} />
-          <SizableText size="$3" color="$color9" marginTop="$3">Loading orders…</SizableText>
-        </YStack>
-      )}
-    </YStack>
+  // ─── 3. Scroll Event Handler with Debounce ───
+  const handleScroll = useCallback(
+    (event: any) => {
+      const currentScrollY = event.nativeEvent.contentOffset.y;
+
+      // 1. Reset to visible when at top of list
+      if (currentScrollY <= 0) {
+        accumDelta.current = 0;
+        if (!isHeaderVisible.current) {
+          isHeaderVisible.current = true;
+          Animated.timing(headerTranslateY, {
+            toValue: 0,
+            duration: 250,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }).start();
+        }
+        lastScrollY.current = currentScrollY;
+        return;
+      }
+
+      // 2. Track delta and direction switches
+      const delta = currentScrollY - lastScrollY.current;
+      lastScrollY.current = currentScrollY;
+
+      const now = Date.now();
+      const isDirectionSwitch =
+        (delta > 0 && accumDelta.current < 0) ||
+        (delta < 0 && accumDelta.current > 0);
+
+      if (isDirectionSwitch) {
+        accumDelta.current = 0;
+        lastDirectionChangeTime.current = now;
+      }
+      accumDelta.current += delta;
+
+      // Debounce direction change for 100ms to eliminate jitter
+      if (now - lastDirectionChangeTime.current < 100) {
+        return;
+      }
+
+      // 3. Hide header: Scroll Down (accumDelta > 35 & scrollY > 50)
+      if (accumDelta.current > 35 && currentScrollY > 50 && isHeaderVisible.current) {
+        isHeaderVisible.current = false;
+        Animated.timing(headerTranslateY, {
+          toValue: -headerHeight,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      }
+      // 4. Show header: Scroll Up (accumDelta < -60)
+      else if (accumDelta.current < -60 && !isHeaderVisible.current) {
+        isHeaderVisible.current = true;
+        Animated.timing(headerTranslateY, {
+          toValue: 0,
+          duration: 350,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }).start();
+      }
+    },
+    [headerHeight, headerTranslateY]
+  );
+
+  // ─── 4. Reset Header on Search Change ───
+  useEffect(() => {
+    isHeaderVisible.current = true;
+    Animated.timing(headerTranslateY, {
+      toValue: 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [search, headerTranslateY]);
+
+  // ─── 5. List Header Spacer ───
+  const listHeader = useMemo(
+    () => (
+      <View>
+        <View style={{ height: headerHeight + 8 }} />
+        {isLoading && <SkeletonList count={3} />}
+      </View>
+    ),
+    [headerHeight, isLoading]
   );
 
   const EmptyView = !isLoading ? (
-    <YStack alignItems="center" justifyContent="center" paddingVertical="$10" paddingHorizontal="$6">
-      <Package size={56} color="rgba(255,255,255,0.15)" />
-      <SizableText size="$5" fontWeight="700" color="white" marginTop="$4" textAlign="center">
-        {search.trim() ? 'No matching orders' : 'No orders yet'}
-      </SizableText>
-      <SizableText size="$3" color="$color9" marginTop="$2" textAlign="center">
-        {search.trim() ? 'Try a different search term' : 'Pull down to refresh or tap ⚡ Test.'}
-      </SizableText>
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIconCircle}>
+        <Package size={36} color="rgba(244, 195, 0, 0.4)" />
+      </View>
+      <Text style={styles.emptyTitle}>
+        {search.trim() ? 'No matching orders' : 'No available orders'}
+      </Text>
+      <Text style={styles.emptySubtitle}>
+        {search.trim()
+          ? 'Try adjusting your search query'
+          : 'New incoming deliveries will appear here in real time.'}
+      </Text>
       {!search.trim() && (
-        <Button marginTop="$5" onPress={onRefresh} backgroundColor={BLUE} color="white" size="$4">
-          Refresh
+        <Button
+          marginTop="$4"
+          onPress={onRefresh}
+          backgroundColor="rgba(244,195,0,0.12)"
+          borderColor="rgba(244,195,0,0.35)"
+          borderWidth={1}
+          color={colors.secondary}
+          size="$3.5"
+          borderRadius={9999}
+        >
+          Refresh Orders
         </Button>
       )}
-    </YStack>
+    </View>
   ) : null;
 
   return (
-    // Use a plain View so the absolutely-positioned modal overlay can escape SafeArea clipping
     <View style={styles.root}>
-      <SafeArea>
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <DriverOrderCard
-              order={item}
-              isMyOrder={isMyOrder(item.id)}
-              driverAtCapacity={atCapacity && !isMyOrder(item.id)}
-              driverUserId={driverId}
-              driverDisplayName={user?.displayName ?? user?.email ?? driverId?.slice(0, 8)}
-              onPress={() => {
-                setSelectedOrder(item);
-                router.push(`/order/${item.id}`);
-              }}
-            />
-          )}
-          ListHeaderComponent={ListHeader}
-          ListEmptyComponent={EmptyView}
-          contentContainerStyle={[styles.list, queueCount > 0 && { paddingBottom: 96 }]}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BLUE} colors={[BLUE]} />
-          }
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
-      </SafeArea>
-
-      {/* Floating "My Orders" banner — visible when driver has active orders */}
-      {queueCount > 0 && (
-        <Pressable
-          onPress={() => {
-            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            router.push('/(tabs)/active');
+      {/* ─── Absolute Floating Animated Header ─── */}
+      <Animated.View
+        onLayout={onHeaderLayout}
+        style={[
+          styles.floatingHeader,
+          {
+            transform: [{ translateY: headerTranslateY }],
+          },
+        ]}
+      >
+        <OrdersHeader
+          showSearch={false}
+          showAvatar
+          avatar={avatarInitial}
+          onAvatarPress={() => {
+            haptic();
+            router.push('/(tabs)/profile');
           }}
-          style={({ pressed }) => [styles.floatingBanner, pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] }]}
-        >
-          <View style={styles.floatingBannerInner}>
-            <View style={styles.floatingLeft}>
-              <Text style={styles.floatingTitle}>My Orders</Text>
-              <Text style={styles.floatingSubtitle}>
-                {queueCount} active · tap to manage
-              </Text>
-            </View>
-            <View style={styles.floatingBadge}>
-              <Text style={styles.floatingBadgeText}>{queueCount}</Text>
-            </View>
-            <Text style={styles.floatingArrow}>→</Text>
-          </View>
-        </Pressable>
-      )}
+          pendingCount={pendingCount}
+          queueCount={queueCount}
+          atCapacity={atCapacity}
+          isConnected={isConnected}
+        />
+        <OrdersSearchBar
+          search={search}
+          onSearchChange={setSearch}
+          onFilterPress={haptic}
+        />
+      </Animated.View>
+
+      {/* ─── Scrollable Orders List ─── */}
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <DriverOrderCard
+            order={item}
+            isMyOrder={isMyOrder(item.id)}
+            driverAtCapacity={atCapacity && !isMyOrder(item.id)}
+            driverUserId={driverId}
+            driverDisplayName={user?.displayName ?? user?.email ?? driverId?.slice(0, 8)}
+            onPress={() => {
+              setSelectedOrder(item);
+              router.push(`/order/${item.id}`);
+            }}
+          />
+        )}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={EmptyView}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            progressViewOffset={Platform.OS === 'android' ? headerHeight : 0}
+            tintColor={colors.secondary}
+            colors={[colors.secondaryContainer]}
+          />
+        }
+        contentContainerStyle={[
+          styles.list,
+          queueCount > 0 && { paddingBottom: 110 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      />
+
+      {/* Floating Active Deliveries Banner (navigates directly to My Orders) */}
+      <ActiveDeliveriesBanner queueCount={queueCount} orders={myActiveOrders} />
     </View>
   );
 }
@@ -247,71 +296,51 @@ export default function OrdersScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: '#0F131C',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  floatingHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+    backgroundColor: 'transparent',
   },
   list: {
     paddingBottom: 32,
-    backgroundColor: BG,
+    backgroundColor: '#0F131C',
     flexGrow: 1,
   },
-  headerGradient: { paddingTop: 12 },
-  liveChip: {
-    flexDirection: 'row',
+  emptyContainer: {
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
+    justifyContent: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+  },
+  emptyIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-  },
-  liveOn: { backgroundColor: 'rgba(0,102,255,0.15)', borderColor: 'rgba(0,102,255,0.4)' },
-  liveOff: { backgroundColor: 'rgba(100,100,100,0.15)', borderColor: 'rgba(100,100,100,0.3)' },
-  liveText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
-  liveTextOn: { color: BLUE },
-  liveTextOff: { color: '#888' },
-  // Queue pill
-  queuePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  queueEmpty:   { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.15)' },
-  queuePartial: { backgroundColor: 'rgba(34,197,94,0.15)',   borderColor: 'rgba(34,197,94,0.4)' },
-  queueFull:    { backgroundColor: 'rgba(249,115,22,0.18)',  borderColor: 'rgba(249,115,22,0.5)' },
-  queueText:    { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  queueTextEmpty:   { color: 'rgba(255,255,255,0.4)' },
-  queueTextPartial: { color: GREEN },
-  queueTextFull:    { color: '#F97316' },
-  // Floating banner styles
-  floatingBanner: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-    borderRadius: 16,
-    backgroundColor: '#0066FF',
-    shadowColor: '#0066FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 12,
-  },
-  floatingBannerInner: {
-    flexDirection: 'row',
+    borderColor: 'rgba(244, 195, 0, 0.25)',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    gap: 12,
+    justifyContent: 'center',
+    marginBottom: 16,
   },
-  floatingLeft: { flex: 1 },
-  floatingTitle: { color: 'white', fontSize: 16, fontWeight: '800' },
-  floatingSubtitle: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 1 },
-  floatingBadge: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', justifyContent: 'center',
+  emptyTitle: {
+    color: '#DFE2EF',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
   },
-  floatingBadgeText: { color: 'white', fontSize: 15, fontWeight: '900' },
-  floatingArrow: { color: 'rgba(255,255,255,0.8)', fontSize: 20, fontWeight: '700' },
+  emptySubtitle: {
+    color: '#C2C6D8',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
 });

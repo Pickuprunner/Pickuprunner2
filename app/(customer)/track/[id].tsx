@@ -1,72 +1,89 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { StyleSheet, Platform, Pressable, RefreshControl, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, FlatList, Image } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import Animated, { FadeInDown, useSharedValue, withSpring } from 'react-native-reanimated';
 import {
-  YStack,
-  XStack,
-  SizableText,
-  SafeArea,
-  Avatar,
-  Card,
-  Spinner,
-  CheckCircle,
-  Clock,
-  MapPin,
-  Package,
-  User,
-  ChevronLeft,
-  RefreshCw,
-  MessageCircle,
-  Send,
-} from '@blinkdotnew/mobile-ui';
+  StyleSheet,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  ActivityIndicator,
+  TextInput,
+  Image,
+  View,
+  Text,
+  StatusBar,
+  Linking,
+  TouchableOpacity,
+} from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { blink } from '@/lib/blink';
 import { APP_CONFIG } from '@/lib/config';
-import { colors, spacing, borderRadius } from '@/constants/design';
-import { useOrderChat, getSavedDisplayName, saveDisplayName, ChatMessage } from '@/lib/chat';
+import { CustomCard } from '@/components/core';
+import { useOrderChat, getSavedDisplayName } from '@/lib/chat';
+
+function haptic() {
+  if (Platform.OS !== 'web') {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
+}
 
 const TEST_DRIVERS = [
-  { name: 'Marcus Johnson', photo: 'https://i.pravatar.cc/150?u=marcus' },
-  { name: 'Sarah Kim', photo: 'https://i.pravatar.cc/150?u=sarah' },
-  { name: 'David Torres', photo: 'https://i.pravatar.cc/150?u=david' },
+  { name: 'Marcus Johnson', photo: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop' },
+  { name: 'Sarah Kim', photo: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop' },
+  { name: 'David Torres', photo: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop' },
 ];
 
 const CHANNEL_NAME = 'order-updates';
 
 interface TrackedOrder {
   id: string;
-  customer_name: string;
-  delivery_address: string;
-  items: string;
-  status: 'pending' | 'delivered';
-  created_at: string;
+  customer_name?: string;
+  customerName?: string;
+  customer_phone?: string;
+  customerPhone?: string;
+  pickup_address?: string;
+  pickupAddress?: string;
+  delivery_address?: string;
+  deliveryAddress?: string;
+  items?: string;
+  status: 'pending' | 'accepted' | 'picked_up' | 'delivered';
+  created_at?: string;
+  createdAt?: string;
+  driver_name?: string;
   driverName?: string;
+  driver_photo_url?: string;
   driverPhotoUrl?: string;
   tip_amount?: number;
+  tipAmount?: number;
   distance_miles?: number;
+  distanceMiles?: number;
   delivery_photo_url?: string;
   deliveryPhotoUrl?: string;
+  payment_status?: string;
 }
 
-function fmt(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+function timeAgo(dateStr?: string): string {
+  if (!dateStr) return 'Just now';
+  const timestamp = new Date(dateStr).getTime();
+  if (isNaN(timestamp)) return 'Just now';
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const diff = Date.now() - timestamp;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
+  if (mins < 1) return 'Just now';
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
 }
 
 function CustomerOrderChat({ orderId, customerName }: { orderId: string; customerName: string }) {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [chatName, setChatName] = useState<string | null>(null);
-  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     getSavedDisplayName().then((n) => setChatName(n || customerName || 'Customer'));
@@ -83,78 +100,96 @@ function CustomerOrderChat({ orderId, customerName }: { orderId: string; custome
     if (!text || sending) return;
     setInputText('');
     setSending(true);
-    try { await sendMessage(text); } catch { setInputText(text); } finally { setSending(false); }
+    try {
+      await sendMessage(text);
+    } catch {
+      setInputText(text);
+    } finally {
+      setSending(false);
+    }
   }, [inputText, sending, sendMessage]);
 
   return (
-    <Card borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4" overflow="hidden">
+    <View style={styles.chatCard}>
       {/* Header */}
-      <XStack paddingHorizontal="$4" paddingTop="$3" paddingBottom="$2" alignItems="center" gap="$2">
-        <MessageCircle size={16} color="$color9" />
-        <SizableText size="$3" fontWeight="700" color="$color10">MESSAGE YOUR DRIVER</SizableText>
-        <YStack flex={1} />
-        <YStack width={6} height={6} borderRadius={3} backgroundColor={isConnected ? '$green9' : '$color7'} />
-      </XStack>
+      <View style={styles.chatHeader}>
+        <MaterialIcons name="chat" size={18} color="#FFE399" />
+        <Text style={styles.chatHeaderTitle}>MESSAGE YOUR DRIVER</Text>
+        <View style={{ flex: 1 }} />
+        <View
+          style={[
+            styles.chatStatusDot,
+            { backgroundColor: isConnected ? '#00E297' : '#8C90A1' },
+          ]}
+        />
+      </View>
 
-      {/* Messages (last 5) */}
-      {messages.length > 0 && (
-        <YStack paddingHorizontal="$4" paddingBottom="$2" maxHeight={160}>
-          {messages.slice(-5).map((msg) => {
+      {/* Messages */}
+      {messages.length > 0 ? (
+        <View style={styles.chatMessagesList}>
+          {messages.slice(-4).map((msg) => {
             const isMine = msg.role === 'customer';
             return (
-              <YStack key={msg.id} marginBottom="$1" alignItems={isMine ? 'flex-end' : 'flex-start'}>
-                <YStack
-                  backgroundColor={isMine ? '#2D6A4F' : '$color4'}
-                  borderRadius={12}
-                  borderBottomRightRadius={isMine ? 4 : 12}
-                  borderBottomLeftRadius={isMine ? 12 : 4}
-                  paddingHorizontal="$3"
-                  paddingVertical="$1.5"
-                  maxWidth="80%"
+              <View
+                key={msg.id}
+                style={[
+                  styles.chatBubbleRow,
+                  { justifyContent: isMine ? 'flex-end' : 'flex-start' },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.chatBubble,
+                    isMine ? styles.chatBubbleMine : styles.chatBubbleOther,
+                  ]}
                 >
-                  <SizableText size="$2" color={isMine ? 'white' : '$color12'}>{msg.text}</SizableText>
-                </YStack>
-              </YStack>
+                  <Text
+                    style={[
+                      styles.chatBubbleText,
+                      { color: isMine ? '#FFFFFF' : '#DFE2EF' },
+                    ]}
+                  >
+                    {msg.text}
+                  </Text>
+                </View>
+              </View>
             );
           })}
-        </YStack>
+        </View>
+      ) : (
+        <Text style={styles.chatEmptyText}>
+          Send a quick note or instructions to your driver.
+        </Text>
       )}
 
-      {messages.length === 0 && (
-        <YStack paddingHorizontal="$4" paddingBottom="$2">
-          <SizableText size="$2" color="$color9">Send a message to your driver about this delivery.</SizableText>
-        </YStack>
-      )}
-
-      {/* Input */}
-      <XStack paddingHorizontal="$3" paddingBottom="$3" gap="$2" alignItems="center">
-        <YStack flex={1} backgroundColor="$color4" borderRadius={20} paddingHorizontal="$3" paddingVertical="$1.5">
-          <TextInput
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Type a message…"
-            placeholderTextColor={colors.textTertiary}
-            maxLength={500}
-            returnKeyType="send"
-            blurOnSubmit={false}
-            onSubmitEditing={Platform.OS === 'web' ? handleSend : undefined}
-            style={[{ fontSize: 14, color: colors.text, padding: 0, minHeight: 36 }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}]}
-          />
-        </YStack>
-        <Pressable
+      {/* Input Row */}
+      <View style={styles.chatInputRow}>
+        <TextInput
+          value={inputText}
+          onChangeText={setInputText}
+          placeholder="Type a message to driver..."
+          placeholderTextColor="#8C90A1"
+          maxLength={500}
+          returnKeyType="send"
+          onSubmitEditing={Platform.OS === 'web' ? handleSend : undefined}
+          style={styles.chatInputField}
+        />
+        <TouchableOpacity
           onPress={handleSend}
           disabled={!inputText.trim() || sending}
-          style={({ pressed }) => ({
-            width: 36, height: 36, borderRadius: 18,
-            backgroundColor: inputText.trim() ? '#2D6A4F' : 'rgba(255,255,255,0.1)',
-            alignItems: 'center', justifyContent: 'center',
-            opacity: pressed ? 0.7 : 1,
-          })}
+          style={[
+            styles.chatSendButton,
+            { opacity: inputText.trim() && !sending ? 1 : 0.4 },
+          ]}
         >
-          {sending ? <Spinner size="small" color="white" /> : <Send size={14} color="white" />}
-        </Pressable>
-      </XStack>
-    </Card>
+          {sending ? (
+            <ActivityIndicator size="small" color="#0F131C" />
+          ) : (
+            <MaterialIcons name="send" size={16} color="#0F131C" />
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -163,52 +198,114 @@ export default function TrackOrderScreen() {
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
   const channelRef = useRef<any>(null);
-  const prevStatus = useRef<string>('');
-  const [justDelivered, setJustDelivered] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
 
-  const fetchOrder = useCallback(async (showRefresh = false) => {
-    if (!id) return;
-    if (showRefresh) setRefreshing(true);
-    try {
-      const result = await blink.db.orders.get(id) as TrackedOrder;
-      if (result) {
-        if (prevStatus.current === 'pending' && result.status === 'delivered') {
-          setJustDelivered(true);
+  const fetchOrder = useCallback(
+    async (showRefresh = false) => {
+      if (!id) return;
+      if (showRefresh) setRefreshing(true);
+
+      // Check local cache first
+      try {
+        const raw = await AsyncStorage.getItem('customer_local_orders');
+        if (raw) {
+          const list: TrackedOrder[] = JSON.parse(raw);
+          const found = list.find((o) => o.id === id);
+          if (found) setOrder(found);
         }
-        prevStatus.current = result.status;
-        setOrder(result);
+      } catch {}
+
+      try {
+        const result = (await blink.db.orders.get(id)) as TrackedOrder;
+        if (result) {
+          setOrder(result);
+        }
+      } catch (err) {
+        console.warn('[track] remote fetch failed:', err);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (err) {
-      console.warn('[track] fetch failed:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [id]);
+    },
+    [id]
+  );
 
   const handleAssignTestDriver = async () => {
     if (!id || !order) return;
     setTestBusy(true);
+    haptic();
     try {
       const driver = TEST_DRIVERS[Math.floor(Math.random() * TEST_DRIVERS.length)];
       await blink.db.orders.update(id, {
         driver_name: driver.name,
         driver_photo_url: driver.photo,
-      });
-      await fetchOrder();
+        status: 'accepted',
+      }).catch(() => {});
+
+      const updated: TrackedOrder = {
+        ...order,
+        driver_name: driver.name,
+        driverName: driver.name,
+        driver_photo_url: driver.photo,
+        driverPhotoUrl: driver.photo,
+        status: 'accepted',
+      };
+      setOrder(updated);
+
+      // Update local storage cache
+      try {
+        const raw = await AsyncStorage.getItem('customer_local_orders');
+        if (raw) {
+          const list: TrackedOrder[] = JSON.parse(raw);
+          const idx = list.findIndex((o) => o.id === id);
+          if (idx >= 0) {
+            list[idx] = updated;
+            await AsyncStorage.setItem('customer_local_orders', JSON.stringify(list));
+          }
+        }
+      } catch {}
     } finally {
       setTestBusy(false);
     }
   };
 
-  const handleTestDeliver = () => {
-    // Delivery completion must happen in the driver flow so a real photo is
-    // uploaded and the customer MMS is sent by the backend.
-    if (Platform.OS === 'web') {
-      window.alert('Use the driver app to complete delivery. A delivery photo is required so the customer receives the text.');
+  const handleTestDeliver = async () => {
+    if (!id || !order) return;
+    setTestBusy(true);
+    haptic();
+    try {
+      await blink.db.orders.update(id, {
+        status: 'delivered',
+        delivery_photo_url:
+          'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop',
+      }).catch(() => {});
+
+      const updated: TrackedOrder = {
+        ...order,
+        status: 'delivered',
+        delivery_photo_url:
+          'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop',
+        deliveryPhotoUrl:
+          'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop',
+      };
+      setOrder(updated);
+
+      // Update local storage cache
+      try {
+        const raw = await AsyncStorage.getItem('customer_local_orders');
+        if (raw) {
+          const list: TrackedOrder[] = JSON.parse(raw);
+          const idx = list.findIndex((o) => o.id === id);
+          if (idx >= 0) {
+            list[idx] = updated;
+            await AsyncStorage.setItem('customer_local_orders', JSON.stringify(list));
+          }
+        }
+      } catch {}
+    } finally {
+      setTestBusy(false);
     }
   };
 
@@ -231,7 +328,9 @@ export default function TrackOrderScreen() {
         setIsConnected(true);
         channel.onMessage((msg: any) => {
           if (!mounted) return;
-          if (msg.type === 'order-changed') fetchOrder();
+          if (msg.type === 'order-changed' || msg.type === 'order:status_change') {
+            fetchOrder();
+          }
         });
       } catch {
         if (mounted) setIsConnected(false);
@@ -241,441 +340,918 @@ export default function TrackOrderScreen() {
     connect();
     return () => {
       mounted = false;
-      channelRef.current?.unsubscribe().catch(() => {});
-      channelRef.current = null;
+      if (channelRef.current) {
+        try {
+          channelRef.current.unsubscribe();
+        } catch {}
+      }
     };
   }, [id, fetchOrder]);
 
-  const isDelivered = order?.status === 'delivered';
-  const hasDriver = !!(order?.driverName || order?.driverPhotoUrl);
+  const shortId = order?.id ? order.id.slice(-6).toUpperCase() : '------';
+  const customerName = order?.customerName || order?.customer_name || 'Customer';
+  const pickupAddress = order?.pickupAddress || order?.pickup_address || APP_CONFIG.STORE_ADDRESS || 'Store Pickup';
+  const deliveryAddress = order?.deliveryAddress || order?.delivery_address || '—';
+  const createdAt = order?.createdAt || order?.created_at;
+
+  const currentStatus = order?.status || 'pending';
+  const isDelivered = currentStatus === 'delivered';
+  const isAccepted = currentStatus === 'accepted';
+  const isPickedUp = currentStatus === 'picked_up';
+  const isPending = currentStatus === 'pending';
+
+  const driverName = order?.driverName || order?.driver_name;
+  const driverPhoto = order?.driverPhotoUrl || order?.driver_photo_url;
+  const deliveryPhoto = order?.deliveryPhotoUrl || order?.delivery_photo_url;
 
   if (loading) {
     return (
-      <SafeArea>
-        <YStack flex={1} alignItems="center" justifyContent="center" gap="$3">
-          <Spinner size="large" color="$color9" />
-          <SizableText color="$color10">Loading order…</SizableText>
-        </YStack>
-      </SafeArea>
+      <View style={[styles.root, styles.center]}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <ActivityIndicator size="large" color="#FFE399" />
+        <Text style={styles.loadingText}>Loading tracking status…</Text>
+      </View>
     );
   }
 
   if (!order) {
     return (
-      <SafeArea>
-        <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" gap="$4">
-          <SizableText size="$5" fontWeight="700" color="$color12">Order not found</SizableText>
-          <Pressable onPress={() => router.replace('/(customer)')} style={styles.btn}>
-            <SizableText size="$4" fontWeight="700" color="white">Go Home</SizableText>
-          </Pressable>
-        </YStack>
-      </SafeArea>
+      <View style={[styles.root, styles.center]}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <MaterialIcons name="error-outline" size={48} color="#F4C300" />
+        <Text style={styles.notFoundTitle}>Order Not Found</Text>
+        <Text style={styles.notFoundSubtitle}>
+          We couldn't locate this order request.
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.replace('/(customer)/my-orders')}
+          style={styles.primaryActionBtn}
+        >
+          <Text style={styles.primaryActionBtnText}>Back to My Orders</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
+  // Hero Status Theme Info
+  const getHeroTheme = () => {
+    if (isDelivered) {
+      return {
+        icon: 'check-circle',
+        title: 'Delivered ✓',
+        desc: 'Your package has been successfully delivered.',
+        color: '#00E297',
+        bg: 'rgba(0, 226, 151, 0.08)',
+        border: 'rgba(0, 226, 151, 0.3)',
+        iconBg: 'rgba(0, 226, 151, 0.18)',
+      };
+    }
+    if (isPickedUp) {
+      return {
+        icon: 'local-shipping',
+        title: 'Out For Delivery',
+        desc: 'Your driver has picked up the order and is heading to you.',
+        color: '#F4C300',
+        bg: 'rgba(244, 195, 0, 0.08)',
+        border: 'rgba(244, 195, 0, 0.3)',
+        iconBg: 'rgba(244, 195, 0, 0.18)',
+      };
+    }
+    if (isAccepted || driverName) {
+      return {
+        icon: 'near-me',
+        title: 'Driver On The Way',
+        desc: `${driverName || 'A driver'} is heading to pick up your order.`,
+        color: '#0066FF',
+        bg: 'rgba(0, 102, 255, 0.08)',
+        border: 'rgba(0, 102, 255, 0.3)',
+        iconBg: 'rgba(0, 102, 255, 0.18)',
+      };
+    }
+    return {
+      icon: 'access-time',
+      title: 'Order Placed',
+      desc: 'Searching for an available driver in your area...',
+      color: '#FFE399',
+      bg: 'rgba(255, 227, 153, 0.06)',
+      border: 'rgba(255, 227, 153, 0.25)',
+      iconBg: 'rgba(255, 227, 153, 0.15)',
+    };
+  };
+
+  const hero = getHeroTheme();
+
   return (
-    <SafeArea>
-      {/* Header */}
-      <XStack
-        paddingHorizontal="$4" paddingTop="$3" paddingBottom="$2"
-        alignItems="center" gap="$3"
-        borderBottomWidth={1} borderBottomColor="$color4"
-      >
-        <Pressable onPress={() => router.replace('/(customer)/my-orders')} hitSlop={8}>
-          <ChevronLeft size={24} color="$color10" />
-        </Pressable>
-        <YStack flex={1}>
-          <SizableText size="$5" fontWeight="800" color="$color12">Track Order</SizableText>
-          <SizableText size="$2" color="$color9" fontFamily="$mono">
-            #{order?.id ? order.id.slice(-6).toUpperCase() : '------'}
-          </SizableText>
-        </YStack>
-        {/* Live indicator */}
-        <XStack
-          gap="$1" alignItems="center"
-          paddingHorizontal="$2" paddingVertical="$1"
-          borderRadius="$full"
-          backgroundColor={isConnected ? '$green3' : '$color3'}
-          borderWidth={1}
-          borderColor={isConnected ? '$green6' : '$color6'}
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {/* ── Top Header ── */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => {
+            haptic();
+            router.replace('/(customer)/my-orders');
+          }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={styles.backButton}
         >
-          <YStack
-            width={6} height={6} borderRadius={3}
-            backgroundColor={isConnected ? '$green9' : '$color8'}
+          <MaterialIcons name="chevron-left" size={28} color="#DFE2EF" />
+        </TouchableOpacity>
+
+        <View style={styles.headerTitleCol}>
+          <Text style={styles.headerTitle}>Track Order</Text>
+          <Text style={styles.headerOrderId}>#{shortId}</Text>
+        </View>
+
+        {/* Live indicator badge */}
+        <View style={styles.liveBadge}>
+          <View
+            style={[
+              styles.livePulseDot,
+              { backgroundColor: isConnected ? '#00E297' : '#8C90A1' },
+            ]}
           />
-          <SizableText size="$1" fontWeight="700" color={isConnected ? '$green9' : '$color9'}>
+          <Text
+            style={[
+              styles.liveBadgeText,
+              { color: isConnected ? '#00E297' : '#8C90A1' },
+            ]}
+          >
             {isConnected ? 'LIVE' : 'OFFLINE'}
-          </SizableText>
-        </XStack>
-      </XStack>
+          </Text>
+        </View>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => fetchOrder(true)}
-            tintColor="#22c55e"
+            tintColor="#FFE399"
           />
         }
       >
-        <YStack padding="$4" gap="$4" paddingBottom="$10">
+        {/* ── Status Hero Card ── */}
+        <Animated.View entering={FadeInDown.springify()}>
+          <View
+            style={[
+              styles.heroCard,
+              { backgroundColor: hero.bg, borderColor: hero.border },
+            ]}
+          >
+            <View style={[styles.heroIconBox, { backgroundColor: hero.iconBg }]}>
+              <MaterialIcons name={hero.icon as any} size={36} color={hero.color} />
+            </View>
 
-          {/* ── Status hero ── */}
-          <Animated.View entering={FadeInDown.springify()}>
-            {isDelivered ? (
-              <YStack
-                backgroundColor="rgba(22,163,74,0.10)"
-                borderRadius={20} borderWidth={1.5} borderColor="rgba(22,163,74,0.35)"
-                padding="$6" alignItems="center" gap="$3"
-              >
-                <YStack
-                  width={80} height={80} borderRadius={40}
-                  backgroundColor="rgba(22,163,74,0.18)"
-                  alignItems="center" justifyContent="center"
-                >
-                  <CheckCircle size={44} color="$green9" />
-                </YStack>
-                <YStack alignItems="center" gap="$1">
-                  <SizableText size="$7" fontWeight="900" color="$green10">
-                    {justDelivered ? '🎉 Delivered!' : 'Delivered'}
-                  </SizableText>
-                  <SizableText size="$3" color="$green9" textAlign="center">
-                    Your order has been delivered successfully
-                  </SizableText>
-                </YStack>
+            <View style={styles.heroTextCol}>
+              <Text style={[styles.heroTitle, { color: hero.color }]}>
+                {hero.title}
+              </Text>
+              <Text style={styles.heroDesc}>{hero.desc}</Text>
+            </View>
 
-                {/* Delivery photo from the driver */}
-                {(order.deliveryPhotoUrl || order.delivery_photo_url) && (
-                  <YStack
-                    marginTop="$3"
-                    width="100%"
-                    borderRadius={14}
-                    overflow="hidden"
-                    borderWidth={1}
-                    borderColor="rgba(22,163,74,0.25)"
-                    backgroundColor="rgba(22,163,74,0.04)"
-                  >
-                    <XStack
-                      paddingHorizontal="$3"
-                      paddingVertical="$2"
-                      backgroundColor="rgba(22,163,74,0.12)"
-                      alignItems="center"
-                      gap="$2"
-                    >
-                      <SizableText size="$3" fontWeight="700" color="$green10">
-                        📸 Delivery photo
-                      </SizableText>
-                    </XStack>
-                    <Pressable
-                      onPress={() => {
-                        const url = order.deliveryPhotoUrl || order.delivery_photo_url || '';
-                        if (url && typeof window !== 'undefined') window.open(url, '_blank');
-                      }}
-                    >
-                      <Image
-                        source={{ uri: order.deliveryPhotoUrl || order.delivery_photo_url || '' }}
-                        style={{ width: '100%', height: 240, backgroundColor: '#0a0a0f' } as any}
-                        resizeMode="cover"
-                      />
-                    </Pressable>
-                    <XStack
-                      paddingHorizontal="$3"
-                      paddingVertical="$2"
-                      backgroundColor="rgba(22,163,74,0.04)"
-                      alignItems="center"
-                      justifyContent="space-between"
-                    >
-                      <SizableText size="$2" color="$green9">
-                        Photo taken by your driver
-                      </SizableText>
-                      <SizableText size="$2" color="$green9" fontWeight="700">
-                        Tap to enlarge
-                      </SizableText>
-                    </XStack>
-                  </YStack>
-                )}
-              </YStack>
-            ) : (
-              <YStack
-                backgroundColor="rgba(217,119,6,0.08)"
-                borderRadius={20} borderWidth={1.5} borderColor="rgba(217,119,6,0.3)"
-                padding="$5" alignItems="center" gap="$3"
-              >
-                {/* Animated pulse ring */}
-                <YStack position="relative" alignItems="center" justifyContent="center">
-                  <YStack
-                    width={80} height={80} borderRadius={40}
-                    backgroundColor="rgba(217,119,6,0.15)"
-                    alignItems="center" justifyContent="center"
-                  >
-                    <Clock size={40} color="$amber9" />
-                  </YStack>
-                </YStack>
-                <YStack alignItems="center" gap="$1">
-                  <SizableText size="$6" fontWeight="900" color="$amber10">On the Way</SizableText>
-                  <SizableText size="$3" color="$amber9" textAlign="center">
-                    Your driver is heading to you
-                  </SizableText>
-                </YStack>
-              </YStack>
+            {/* Delivery Photo preview if delivered */}
+            {isDelivered && deliveryPhoto && (
+              <View style={styles.photoContainer}>
+                <View style={styles.photoHeader}>
+                  <MaterialIcons name="camera-alt" size={16} color="#00E297" />
+                  <Text style={styles.photoHeaderText}>Delivery Photo by Driver</Text>
+                </View>
+                <Image
+                  source={{ uri: deliveryPhoto }}
+                  style={styles.deliveryImage}
+                  resizeMode="cover"
+                />
+              </View>
             )}
-          </Animated.View>
+          </View>
+        </Animated.View>
 
-          {/* ── Progress steps ── */}
-          <Animated.View entering={FadeInDown.delay(80).springify()}>
-            <Card padding="$4" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-              <YStack gap="$3">
-                <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
-                  ORDER STATUS
-                </SizableText>
-                {/* Step 1 */}
-                <XStack gap="$3" alignItems="center">
-                  <YStack
-                    width={32} height={32} borderRadius={16}
-                    backgroundColor="$green3"
-                    alignItems="center" justifyContent="center"
-                  >
-                    <CheckCircle size={18} color="$green9" />
-                  </YStack>
-                  <YStack flex={1}>
-                    <SizableText size="$3" fontWeight="700" color="$color12">Order Placed</SizableText>
-                    <SizableText size="$2" color="$color9">{timeAgo(order.created_at)}</SizableText>
-                  </YStack>
-                </XStack>
+        {/* ── Progress Timeline Steps ── */}
+        <Animated.View entering={FadeInDown.delay(70).springify()}>
+          <View style={styles.card}>
+            <Text style={styles.cardHeaderLabel}>ORDER STATUS</Text>
 
-                {/* Connector */}
-                <YStack marginLeft={15} width={2} height={16} backgroundColor={hasDriver ? '$green6' : '$color5'} />
+            <View style={styles.timelineContainer}>
+              {/* Step 1: Placed */}
+              <View style={styles.timelineStep}>
+                <View style={[styles.stepDot, styles.stepDotDone]}>
+                  <MaterialIcons name="check" size={16} color="#00E297" />
+                </View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Order Placed</Text>
+                  <Text style={styles.stepSubtitle}>{timeAgo(createdAt)}</Text>
+                </View>
+              </View>
 
-                {/* Step 2 */}
-                <XStack gap="$3" alignItems="center">
-                  <YStack
-                    width={32} height={32} borderRadius={16}
-                    backgroundColor={hasDriver ? '$green3' : '$color4'}
-                    alignItems="center" justifyContent="center"
-                  >
-                    {hasDriver
-                      ? <CheckCircle size={18} color="$green9" />
-                      : <SizableText size="$3" fontWeight="800" color="$color9">2</SizableText>
-                    }
-                  </YStack>
-                  <YStack flex={1}>
-                    <SizableText size="$3" fontWeight="700" color={hasDriver ? '$color12' : '$color9'}>
-                      Driver Assigned
-                    </SizableText>
-                    <SizableText size="$2" color="$color9">
-                      {hasDriver ? `${order.driverName || 'Your driver'} is on the way` : 'Waiting for a driver…'}
-                    </SizableText>
-                  </YStack>
-                </XStack>
+              {/* Line 1 */}
+              <View
+                style={[
+                  styles.timelineConnector,
+                  (isAccepted || isPickedUp || isDelivered || driverName) &&
+                    styles.timelineConnectorActive,
+                ]}
+              />
 
-                {/* Connector */}
-                <YStack marginLeft={15} width={2} height={16} backgroundColor={isDelivered ? '$green6' : '$color5'} />
-
-                {/* Step 3 */}
-                <XStack gap="$3" alignItems="center">
-                  <YStack
-                    width={32} height={32} borderRadius={16}
-                    backgroundColor={isDelivered ? '$green3' : '$color4'}
-                    alignItems="center" justifyContent="center"
-                  >
-                    {isDelivered
-                      ? <CheckCircle size={18} color="$green9" />
-                      : <SizableText size="$3" fontWeight="800" color="$color9">3</SizableText>
-                    }
-                  </YStack>
-                  <YStack flex={1}>
-                    <SizableText size="$3" fontWeight="700" color={isDelivered ? '$color12' : '$color9'}>
-                      Delivered
-                    </SizableText>
-                    <SizableText size="$2" color="$color9">
-                      {isDelivered ? 'Order complete!' : 'Your order will be delivered soon'}
-                    </SizableText>
-                  </YStack>
-                </XStack>
-              </YStack>
-            </Card>
-          </Animated.View>
-
-          {/* ── Driver card ── */}
-          {hasDriver && (
-            <Animated.View entering={FadeInDown.delay(160).springify()}>
-              <Card padding="$4" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-                <YStack gap="$3">
-                  <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
-                    YOUR DRIVER
-                  </SizableText>
-                  <XStack gap="$3" alignItems="center">
-                    <Avatar size="$5" borderRadius="$full" backgroundColor="rgba(22,163,74,0.15)">
-                      {order.driverPhotoUrl
-                        ? <Avatar.Image source={{ uri: order.driverPhotoUrl }} />
-                        : <User size={26} color="$green9" />
-                      }
-                    </Avatar>
-                    <YStack flex={1} gap="$0.5">
-                      <SizableText size="$4" fontWeight="700" color="$color12">
-                        {order.driverName || 'Your Driver'}
-                      </SizableText>
-                      <SizableText size="$2" color="$green9">On the way to you</SizableText>
-                    </YStack>
-                    <YStack
-                      paddingHorizontal="$2" paddingVertical="$1"
-                      borderRadius="$full" backgroundColor="$green3"
-                      borderWidth={1} borderColor="$green6"
-                    >
-                      <SizableText size="$1" fontWeight="800" color="$green9">EN ROUTE</SizableText>
-                    </YStack>
-                  </XStack>
-                </YStack>
-              </Card>
-            </Animated.View>
-          )}
-
-          {/* ── Order details ── */}
-          <Animated.View entering={FadeInDown.delay(240).springify()}>
-            <Card padding="$4" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-              <YStack gap="$3">
-                <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
-                  ORDER DETAILS
-                </SizableText>
-                <XStack gap="$3" alignItems="flex-start">
-                  <YStack width={32} height={32} borderRadius={16} backgroundColor="$color4" alignItems="center" justifyContent="center" flexShrink={0}>
-                    <MapPin size={16} color="$color9" />
-                  </YStack>
-                  <YStack flex={1} gap="$0.5">
-                    <SizableText size="$2" color="$color9" fontWeight="600">DELIVERY ADDRESS</SizableText>
-                    <SizableText size="$3" color="$color12">{order.delivery_address}</SizableText>
-                  </YStack>
-                </XStack>
-                <XStack gap="$3" alignItems="flex-start">
-                  <YStack width={32} height={32} borderRadius={16} backgroundColor="$color4" alignItems="center" justifyContent="center" flexShrink={0}>
-                    <Package size={16} color="$color9" />
-                  </YStack>
-                  <YStack flex={1} gap="$0.5">
-                    <SizableText size="$2" color="$color9" fontWeight="600">PICKUP INFO</SizableText>
-                    <SizableText size="$3" color="$color12">{order.items}</SizableText>
-                  </YStack>
-                </XStack>
-              </YStack>
-            </Card>
-          </Animated.View>
-
-          {/* ── Actions ── */}
-          <Animated.View entering={FadeInDown.delay(320).springify()}>
-            <YStack gap="$3">
-
-              {/* Message Driver — only when driver is assigned and order is active */}
-              {hasDriver && !isDelivered && (
-                <CustomerOrderChat orderId={id!} customerName={order.customer_name} />
-              )}
-
-              {/* Test controls — only shown while order is pending */}
-              {!isDelivered && (
-                <YStack
-                  borderRadius={14}
-                  borderWidth={1}
-                  borderColor="rgba(0,102,255,0.3)"
-                  backgroundColor="rgba(0,102,255,0.06)"
-                  padding="$3"
-                  gap="$2"
+              {/* Step 2: Driver Assigned */}
+              <View style={styles.timelineStep}>
+                <View
+                  style={[
+                    styles.stepDot,
+                    (isAccepted || isPickedUp || isDelivered || driverName)
+                      ? styles.stepDotDone
+                      : styles.stepDotPending,
+                  ]}
                 >
-                  <SizableText size="$1" fontWeight="700" color="$blue9" letterSpacing={0.5}>
-                    ⚡ TEST CONTROLS — delivery requires a driver photo
-                  </SizableText>
-                  <XStack gap="$2">
-                    <Pressable
-                      onPress={handleAssignTestDriver}
-                      disabled={testBusy || !!order?.driverName}
-                      style={({ pressed }) => ({
-                        flex: 1,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 4,
-                        paddingVertical: 9,
-                        borderRadius: 10,
-                        borderWidth: 1,
-                        borderColor: order?.driverName ? 'rgba(0,102,255,0.15)' : 'rgba(0,102,255,0.4)',
-                        backgroundColor: order?.driverName ? 'rgba(0,102,255,0.04)' : 'rgba(0,102,255,0.12)',
-                        opacity: (testBusy || !!order?.driverName) ? 0.5 : 1,
-                      })}
-                    >
-                      {testBusy
-                        ? <ActivityIndicator size="small" color="#3b82f6" />
-                        : <SizableText size="$2" fontWeight="700" color="$blue9">
-                            {order?.driverName ? '✓ Driver assigned' : 'Assign driver'}
-                          </SizableText>
-                      }
-                    </Pressable>
-                    <Pressable
-                      onPress={handleTestDeliver}
-                      disabled={testBusy}
-                      style={({ pressed }) => ({
-                        flex: 1,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 4,
-                        paddingVertical: 9,
-                        borderRadius: 10,
-                        borderWidth: 1,
-                        borderColor: 'rgba(22,163,74,0.4)',
-                        backgroundColor: pressed ? 'rgba(22,163,74,0.2)' : 'rgba(22,163,74,0.12)',
-                        opacity: testBusy ? 0.5 : 1,
-                      })}
-                    >
-                      {testBusy
-                        ? <ActivityIndicator size="small" color="#16a34a" />
-                        : <SizableText size="$2" fontWeight="700" color="$green9">Driver completes delivery</SizableText>
-                      }
-                    </Pressable>
-                  </XStack>
-                </YStack>
-              )}
+                  {(isAccepted || isPickedUp || isDelivered || driverName) ? (
+                    <MaterialIcons name="check" size={16} color="#00E297" />
+                  ) : (
+                    <Text style={styles.stepNumber}>2</Text>
+                  )}
+                </View>
+                <View style={styles.stepContent}>
+                  <Text
+                    style={[
+                      styles.stepTitle,
+                      !(isAccepted || isPickedUp || isDelivered || driverName) &&
+                        styles.stepTitleInactive,
+                    ]}
+                  >
+                    Driver Assigned
+                  </Text>
+                  <Text style={styles.stepSubtitle}>
+                    {driverName ? `${driverName} is on the way` : 'Waiting for a driver...'}
+                  </Text>
+                </View>
+              </View>
 
-              <Pressable
-                onPress={() => router.replace('/(customer)/my-orders')}
-                style={({ pressed }) => [styles.outlineBtn, pressed && styles.btnPressed]}
-              >
-                <SizableText size="$4" fontWeight="700" color="$color12">View All My Orders</SizableText>
-              </Pressable>
+              {/* Line 2 */}
+              <View
+                style={[
+                  styles.timelineConnector,
+                  isDelivered && styles.timelineConnectorActive,
+                ]}
+              />
 
-              <Pressable
-                onPress={() => router.replace('/(customer)')}
-                style={({ pressed }) => [styles.ghostBtn, pressed && styles.btnPressed]}
-              >
-                <SizableText size="$3" color="$color9" textAlign="center">Place Another Order</SizableText>
-              </Pressable>
-            </YStack>
+              {/* Step 3: Delivered */}
+              <View style={styles.timelineStep}>
+                <View
+                  style={[
+                    styles.stepDot,
+                    isDelivered ? styles.stepDotDone : styles.stepDotPending,
+                  ]}
+                >
+                  {isDelivered ? (
+                    <MaterialIcons name="check" size={16} color="#00E297" />
+                  ) : (
+                    <Text style={styles.stepNumber}>3</Text>
+                  )}
+                </View>
+                <View style={styles.stepContent}>
+                  <Text
+                    style={[
+                      styles.stepTitle,
+                      !isDelivered && styles.stepTitleInactive,
+                    ]}
+                  >
+                    Delivered
+                  </Text>
+                  <Text style={styles.stepSubtitle}>
+                    {isDelivered ? 'Order completed successfully!' : 'Will be delivered soon'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* ── Driver Profile Card (if assigned) ── */}
+        {driverName && (
+          <Animated.View entering={FadeInDown.delay(130).springify()}>
+            <View style={styles.card}>
+              <Text style={styles.cardHeaderLabel}>ASSIGNED DRIVER</Text>
+              <View style={styles.driverRow}>
+                {driverPhoto ? (
+                  <Image source={{ uri: driverPhoto }} style={styles.driverAvatarImg} />
+                ) : (
+                  <View style={styles.driverAvatarFallback}>
+                    <MaterialIcons name="person" size={24} color="#FFE399" />
+                  </View>
+                )}
+
+                <View style={styles.driverInfoCol}>
+                  <Text style={styles.driverName}>{driverName}</Text>
+                  <Text style={styles.driverRole}>
+                    {isPickedUp ? 'Package picked up · En route' : 'Driver en route to store'}
+                  </Text>
+                </View>
+
+                <View style={styles.enRoutePill}>
+                  <Text style={styles.enRoutePillText}>EN ROUTE</Text>
+                </View>
+              </View>
+            </View>
           </Animated.View>
+        )}
 
-        </YStack>
+        {/* ── Order Details Card ── */}
+        <Animated.View entering={FadeInDown.delay(180).springify()}>
+          <View style={styles.card}>
+            <Text style={styles.cardHeaderLabel}>ORDER DETAILS</Text>
+
+            <View style={styles.detailItem}>
+              <View style={[styles.detailIconBox, { borderColor: '#B3C5FF' }]}>
+                <MaterialIcons name="inventory-2" size={14} color="#B3C5FF" />
+              </View>
+              <View style={styles.detailTextCol}>
+                <Text style={[styles.detailLabel, { color: '#B3C5FF' }]}>PICK UP FROM</Text>
+                <Text style={styles.detailValue}>{pickupAddress}</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailDivider} />
+
+            <View style={styles.detailItem}>
+              <View style={[styles.detailIconBox, { borderColor: '#00E297' }]}>
+                <MaterialIcons name="location-on" size={14} color="#00E297" />
+              </View>
+              <View style={styles.detailTextCol}>
+                <Text style={[styles.detailLabel, { color: '#00E297' }]}>DELIVER TO</Text>
+                <Text style={styles.detailValue}>{deliveryAddress}</Text>
+              </View>
+            </View>
+
+            {order.items ? (
+              <>
+                <View style={styles.detailDivider} />
+                <View style={styles.detailItem}>
+                  <View style={[styles.detailIconBox, { borderColor: '#FFE399' }]}>
+                    <Ionicons name="information-circle-outline" size={14} color="#FFE399" />
+                  </View>
+                  <View style={styles.detailTextCol}>
+                    <Text style={[styles.detailLabel, { color: '#FFE399' }]}>PREFERENCES / ITEMS</Text>
+                    <Text style={styles.detailValue}>{order.items}</Text>
+                  </View>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </Animated.View>
+
+        {/* ── Chat with Driver ── */}
+        {driverName && !isDelivered && (
+          <Animated.View entering={FadeInDown.delay(220).springify()}>
+            <CustomerOrderChat orderId={id!} customerName={customerName} />
+          </Animated.View>
+        )}
+
+        {/* ── Simulator / Test Controls (if pending/in testing) ── */}
+        {!isDelivered && (
+          <Animated.View entering={FadeInDown.delay(260).springify()}>
+            <View style={styles.testControlsCard}>
+              <View style={styles.testControlsHeader}>
+                <MaterialIcons name="bolt" size={15} color="#FFE399" />
+                <Text style={styles.testControlsTitle}>TEST SIMULATION CONTROLS</Text>
+              </View>
+
+              <View style={styles.testBtnRow}>
+                <TouchableOpacity
+                  onPress={handleAssignTestDriver}
+                  disabled={testBusy || !!driverName}
+                  style={[
+                    styles.testBtn,
+                    driverName ? styles.testBtnDisabled : styles.testBtnBlue,
+                  ]}
+                >
+                  {testBusy ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.testBtnBlueText}>
+                      {driverName ? '✓ Driver Assigned' : 'Assign Test Driver'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleTestDeliver}
+                  disabled={testBusy}
+                  style={[styles.testBtn, styles.testBtnGreen]}
+                >
+                  <Text style={styles.testBtnGreenText}>Complete Delivery</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* ── Footer Navigation Actions ── */}
+        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.footerButtons}>
+          <TouchableOpacity
+            onPress={() => {
+              haptic();
+              router.replace('/(customer)/my-orders');
+            }}
+            activeOpacity={0.85}
+            style={styles.primaryBlueBtn}
+          >
+            <MaterialIcons name="list-alt" size={20} color="#FFFFFF" />
+            <Text style={styles.primaryBlueBtnText}>View All My Orders</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              haptic();
+              router.replace('/(customer)');
+            }}
+            activeOpacity={0.85}
+            style={styles.secondaryOutlineBtn}
+          >
+            <MaterialIcons name="add" size={20} color="#DFE2EF" />
+            <Text style={styles.secondaryOutlineBtnText}>Request Another Pickup</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </ScrollView>
-    </SafeArea>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  btn: {
-    height: 52,
-    borderRadius: borderRadius.xl,
-    backgroundColor: colors.primary,
+  root: {
+    flex: 1,
+    backgroundColor: '#0F131C',
+  },
+  center: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
+    padding: 24,
+    gap: 12,
   },
-  outlineBtn: {
-    height: 52,
-    borderRadius: borderRadius.xl,
+  loadingText: {
+    fontSize: 14,
+    color: '#8C90A1',
+    fontWeight: '600',
+  },
+  notFoundTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#DFE2EF',
+  },
+  notFoundSubtitle: {
+    fontSize: 14,
+    color: '#8C90A1',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  primaryActionBtn: {
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
+    fontWeight: '700',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 64 : 56,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleCol: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#DFE2EF',
+  },
+  headerOrderId: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8C90A1',
+    marginTop: 1,
+    letterSpacing: 0.5,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.35)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  livePulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#00E297',
+  },
+  liveBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#00E297',
+    letterSpacing: 0.8,
+  },
+  scrollContent: {
+    padding: 20,
+    gap: 16,
+    paddingBottom: 60,
+  },
+  heroCard: {
+    borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    padding: 22,
+    alignItems: 'center',
+    gap: 14,
+  },
+  heroIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.backgroundSecondary,
   },
-  ghostBtn: {
-    paddingVertical: spacing.sm,
+  heroTextCol: {
     alignItems: 'center',
+    gap: 4,
   },
-  btnPressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
+  heroTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  heroDesc: {
+    fontSize: 13.5,
+    color: '#C2C6D8',
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: 12,
+  },
+  photoContainer: {
+    width: '100%',
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.3)',
+    marginTop: 6,
+    backgroundColor: '#10131B',
+  },
+  photoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+  },
+  photoHeaderText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#00E297',
+  },
+  deliveryImage: {
+    width: '100%',
+    height: 220,
+  },
+  card: {
+    backgroundColor: '#151821',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 18,
+    gap: 14,
+  },
+  cardHeaderLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#8C90A1',
+    letterSpacing: 1,
+  },
+  timelineContainer: {
+    gap: 0,
+  },
+  timelineStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  stepDot: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDotDone: {
+    backgroundColor: 'rgba(0, 226, 151, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 226, 151, 0.4)',
+  },
+  stepDotPending: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  stepNumber: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#8C90A1',
+  },
+  stepContent: {
+    flex: 1,
+    gap: 1,
+  },
+  stepTitle: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#DFE2EF',
+  },
+  stepTitleInactive: {
+    color: '#8C90A1',
+  },
+  stepSubtitle: {
+    fontSize: 12,
+    color: '#8C90A1',
+  },
+  timelineConnector: {
+    width: 2,
+    height: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginLeft: 15,
+    marginVertical: 3,
+  },
+  timelineConnectorActive: {
+    backgroundColor: '#00E297',
+  },
+  driverRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  driverAvatarImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  driverAvatarFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 227, 153, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  driverInfoCol: {
+    flex: 1,
+  },
+  driverName: {
+    fontSize: 15.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  driverRole: {
+    fontSize: 12,
+    color: '#00E297',
+    marginTop: 1,
+  },
+  enRoutePill: {
+    backgroundColor: 'rgba(0, 102, 255, 0.15)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 102, 255, 0.3)',
+  },
+  enRoutePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#60A5FA',
+    letterSpacing: 0.5,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  detailIconBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#10131B',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  detailTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  detailLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  detailValue: {
+    fontSize: 13.5,
+    color: '#DFE2EF',
+    lineHeight: 19,
+    fontWeight: '500',
+  },
+  detailDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  chatCard: {
+    backgroundColor: '#151821',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 16,
+    gap: 12,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chatHeaderTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFE399',
+    letterSpacing: 1,
+  },
+  chatStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  chatMessagesList: {
+    gap: 8,
+  },
+  chatBubbleRow: {
+    flexDirection: 'row',
+  },
+  chatBubble: {
+    maxWidth: '80%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  chatBubbleMine: {
+    backgroundColor: '#0066FF',
+  },
+  chatBubbleOther: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  chatBubbleText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  chatEmptyText: {
+    fontSize: 12.5,
+    color: '#8C90A1',
+    fontStyle: 'italic',
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chatInputField: {
+    flex: 1,
+    height: 42,
+    backgroundColor: '#0F131C',
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 14,
+    color: '#DFE2EF',
+    fontSize: 13.5,
+  },
+  chatSendButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFE399',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  testControlsCard: {
+    backgroundColor: 'rgba(0, 102, 255, 0.06)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 102, 255, 0.25)',
+    padding: 14,
+    gap: 10,
+  },
+  testControlsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  testControlsTitle: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#60A5FA',
+    letterSpacing: 0.8,
+  },
+  testBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  testBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  testBtnBlue: {
+    backgroundColor: 'rgba(0, 102, 255, 0.15)',
+    borderColor: 'rgba(0, 102, 255, 0.4)',
+  },
+  testBtnBlueText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#60A5FA',
+  },
+  testBtnDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    opacity: 0.5,
+  },
+  testBtnGreen: {
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderColor: 'rgba(0, 226, 151, 0.35)',
+  },
+  testBtnGreenText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#00E297',
+  },
+  footerButtons: {
+    gap: 10,
+    marginTop: 4,
+  },
+  primaryBlueBtn: {
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#0066FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    shadowColor: 'rgba(0, 102, 255, 0.35)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  primaryBlueBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  secondaryOutlineBtn: {
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  secondaryOutlineBtnText: {
+    color: '#DFE2EF',
+    fontSize: 14.5,
+    fontWeight: '600',
+  },
 });

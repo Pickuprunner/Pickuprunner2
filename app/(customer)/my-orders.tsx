@@ -1,421 +1,227 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { FlatList, RefreshControl, Pressable, StyleSheet, Alert, Platform } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSequence,
-  withTiming,
-  withSpring,
-  FadeInDown,
-} from 'react-native-reanimated';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
-  YStack,
-  XStack,
-  SizableText,
-  SafeArea,
-  AppHeader,
-  Card,
-  Badge,
-  Avatar,
-  EmptyState,
-  ClipboardList,
-  MapPin,
-  Package,
-  Trash2,
-  CheckCircle,
-  Clock,
-  ChevronDown,
-  ChevronUp,
-  Navigation,
-  DollarSign,
-  Wifi,
-  WifiOff,
-  Phone,
-  Mail,
-  User,
-} from '@blinkdotnew/mobile-ui';
+  FlatList,
+  RefreshControl,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+  Alert,
+  Platform,
+  View,
+  Text,
+  StatusBar,
+  ActivityIndicator,
+} from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { blink } from '@/lib/blink';
-import { APP_CONFIG } from '@/lib/config';
-import { Linking } from 'react-native';
-import { colors, spacing, borderRadius } from '@/constants/design';
+import { CustomerOrderCard, CustomerOrderData } from '@/components/Orders';
 
 const SESSION_KEY = 'customer_session_id';
 const CHANNEL_NAME = 'order-updates';
 
-interface Order {
-  id: string;
-  customer_name: string;
-  customer_phone: string;
-  delivery_address: string;
-  items: string;
-  status: 'pending' | 'delivered';
-  created_at: string;
-  customer_session_id?: string;
-  tip_amount?: number;
-  payment_status?: string;
-  distance_miles?: number;
-  driver_name?: string;
-  driver_photo_url?: string;
+const STATIC_SAMPLE_ORDERS: CustomerOrderData[] = [
+  {
+    id: 'ord-6ef6bf-sample',
+    customerName: 'Jamie Test',
+    customerPhone: '(520) 555-1234',
+    pickupAddress: '5765 S Camino del Sol, Green Valley, AZ 85622',
+    deliveryAddress: '123 E Test Ave, Sahuarita, AZ 85629',
+    items: '[LEAVE AT DOOR] #1042',
+    status: 'pending',
+    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    tipAmount: 500,
+    distanceMiles: 4.2,
+    paymentStatus: 'unpaid',
+  },
+  {
+    id: 'ord-jqspfm-sample',
+    customerName: 'Jamie Test',
+    customerPhone: '(520) 555-1234',
+    pickupAddress: '5765 S Camino del Sol, Green Valley, AZ 85622',
+    deliveryAddress: '123 E Test Ave, Sahuarita, AZ 85629',
+    items: '[MEET AT DOOR] Hand off at door',
+    status: 'delivered',
+    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+    tipAmount: 1000,
+    distanceMiles: 6.8,
+    paymentStatus: 'paid',
+    driverName: 'Alex Miller',
+  },
+];
+
+async function getOrCreateSessionId(): Promise<string> {
+  try {
+    const stored = await AsyncStorage.getItem(SESSION_KEY);
+    if (stored) return stored;
+    const id = 'cust-' + Math.random().toString(36).slice(2, 10);
+    await AsyncStorage.setItem(SESSION_KEY, id);
+    return id;
+  } catch {
+    return 'cust-' + Math.random().toString(36).slice(2, 10);
+  }
 }
-
-const DELIVERY_FEE = APP_CONFIG.DELIVERY_FEE_CENTS;
-const MILEAGE_FREE_MILES = APP_CONFIG.FREE_MILES;
-const MILEAGE_RATE_CENTS = APP_CONFIG.MILEAGE_RATE_CENTS;
-
-function calcMileageCents(miles?: number): number {
-  const m = Number(miles ?? 0);
-  if (!m || m <= MILEAGE_FREE_MILES) return 0;
-  return Math.round((m - MILEAGE_FREE_MILES) * MILEAGE_RATE_CENTS);
-}
-
-function fmt(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
-// ─── Animated order card ──────────────────────────────────────────────────────
-
-function OrderCard({
-  item,
-  index,
-  isNewlyDelivered,
-  onCancel,
-}: {
-  item: Order;
-  index: number;
-  isNewlyDelivered: boolean;
-  onCancel: (id: string) => void;
-}) {
-  const isPending = item.status === 'pending';
-  const tip = Number(item.tip_amount ?? 0);
-  const miles = Number(item.distance_miles ?? 0);
-  const mileageCents = calcMileageCents(miles);
-  const total = DELIVERY_FEE + mileageCents + tip;
-  const hasMileageSurcharge = mileageCents > 0;
-  const [expanded, setExpanded] = useState(false);
-
-  // Pulse animation for newly-delivered orders
-  const glowScale = useSharedValue(1);
-  const glowOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    if (isNewlyDelivered) {
-      glowOpacity.value = withSequence(
-        withTiming(1, { duration: 300 }),
-        withTiming(0.4, { duration: 400 }),
-        withTiming(1, { duration: 300 }),
-        withTiming(0, { duration: 500 }),
-      );
-      glowScale.value = withSequence(
-        withSpring(1.03, { damping: 8 }),
-        withSpring(1, { damping: 12 }),
-      );
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      }
-    }
-  }, [isNewlyDelivered]);
-
-  const glowStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: glowScale.value }],
-    shadowOpacity: glowOpacity.value * 0.6,
-    shadowColor: '#22c55e',
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 0 },
-  }));
-
-  return (
-    <Animated.View entering={FadeInDown.delay(index * 60).springify()} style={glowStyle}>
-      <Card
-        marginVertical="$2"
-        padding="$4"
-        borderRadius="$4"
-        backgroundColor={isNewlyDelivered ? '$green2' : '$color2'}
-        borderWidth={isNewlyDelivered ? 2 : 1}
-        borderColor={isNewlyDelivered ? '$green6' : isPending ? '$amber4' : '$color4'}
-        elevation={2}
-      >
-        <YStack gap="$3">
-          {/* Status + time */}
-          <XStack justifyContent="space-between" alignItems="center">
-            <XStack gap="$2" alignItems="center">
-              {isPending
-                ? <Clock size={14} color="$amber9" />
-                : <CheckCircle size={14} color="$green9" />}
-              <Badge variant={isPending ? 'warning' : 'success'}>
-                {isPending ? 'PENDING' : 'DELIVERED'}
-              </Badge>
-              {isNewlyDelivered && (
-                <SizableText size="$2" color="$green9" fontWeight="700">🎉 Just delivered!</SizableText>
-              )}
-            </XStack>
-            <SizableText size="$2" color="$color9">{timeAgo(item.created_at)}</SizableText>
-          </XStack>
-
-          {/* Order ID + name */}
-          <YStack gap="$1">
-            <SizableText size="$5" fontWeight="700" color="$color12">{item.customer_name}</SizableText>
-            <SizableText size="$2" color="$color9">Order #{item?.id ? item.id.slice(-6).toUpperCase() : '------'}</SizableText>
-          </YStack>
-
-          {/* Address + items */}
-          <YStack gap="$2">
-            <XStack gap="$2" alignItems="flex-start">
-              <MapPin size={13} color="$color9" style={{ marginTop: 2 }} />
-              <SizableText size="$3" color="$color11" flex={1} numberOfLines={2}>
-                {item.delivery_address}
-              </SizableText>
-            </XStack>
-            <XStack gap="$2" alignItems="flex-start">
-              <Package size={13} color="$color9" style={{ marginTop: 2 }} />
-              <SizableText size="$3" color="$color11" flex={1} numberOfLines={2}>
-                {item.items}
-              </SizableText>
-            </XStack>
-            {miles > 0 && (
-              <XStack gap="$2" alignItems="center">
-                <Navigation size={13} color="$color9" />
-                <SizableText size="$3" color="$color11">
-                  {miles.toFixed(1)} mi
-                  {hasMileageSurcharge ? ` · ${(miles - MILEAGE_FREE_MILES).toFixed(1)} mi over limit` : ' · within free zone'}
-                </SizableText>
-              </XStack>
-            )}
-          </YStack>
-
-          {/* Payment badge + expand toggle */}
-          <Pressable onPress={() => setExpanded((v) => !v)}>
-            <XStack
-              justifyContent="space-between"
-              alignItems="center"
-              backgroundColor={item.payment_status === 'paid' ? '$green2' : '$amber2'}
-              borderRadius={8}
-              padding="$2"
-              paddingHorizontal="$3"
-            >
-              <XStack gap="$2" alignItems="center">
-                <DollarSign size={13} color={item.payment_status === 'paid' ? '$green9' : '$amber9'} />
-                <SizableText
-                  size="$2"
-                  color={item.payment_status === 'paid' ? '$green10' : '$amber10'}
-                  fontWeight="600"
-                >
-                  {item.payment_status === 'paid' ? '✓ Paid' : 'Pay on Pickup'}
-                </SizableText>
-              </XStack>
-              <XStack gap="$2" alignItems="center">
-                <SizableText size="$3" fontWeight="800" color={item.payment_status === 'paid' ? '$green10' : '$amber10'}>
-                  {fmt(total)}
-                </SizableText>
-                {expanded
-                  ? <ChevronUp size={14} color="$color9" />
-                  : <ChevronDown size={14} color="$color9" />}
-              </XStack>
-            </XStack>
-          </Pressable>
-
-          {/* Expandable cost breakdown */}
-          {expanded && (
-            <YStack
-              backgroundColor="$color3"
-              borderRadius={10}
-              padding="$3"
-              gap="$2"
-              borderWidth={1}
-              borderColor="$color5"
-            >
-              <SizableText size="$2" fontWeight="700" color="$color10">COST BREAKDOWN</SizableText>
-              <XStack justifyContent="space-between">
-                <SizableText size="$2" color="$color11">Delivery fee (incl. first 5 mi)</SizableText>
-                <SizableText size="$2" color="$color12" fontWeight="600">{fmt(DELIVERY_FEE)}</SizableText>
-              </XStack>
-              {hasMileageSurcharge && (
-                <XStack justifyContent="space-between">
-                  <SizableText size="$2" color="$color11">
-                    Mileage ({(miles - MILEAGE_FREE_MILES).toFixed(1)} mi × $2.00)
-                  </SizableText>
-                  <SizableText size="$2" color="$amber10" fontWeight="600">{fmt(mileageCents)}</SizableText>
-                </XStack>
-              )}
-              <XStack justifyContent="space-between">
-                <SizableText size="$2" color="$color11">Driver tip</SizableText>
-                <SizableText size="$2" color="$green10" fontWeight="600">{fmt(tip)}</SizableText>
-              </XStack>
-              <YStack height={1} backgroundColor="$color5" />
-              <XStack justifyContent="space-between">
-                <SizableText size="$3" fontWeight="700" color="$color12">Total due on pickup</SizableText>
-                <SizableText size="$3" fontWeight="800" color="$color12">{fmt(total)}</SizableText>
-              </XStack>
-            </YStack>
-          )}
-
-          {/* Driver info card — shown when a driver is assigned and order is in progress */}
-          {isPending && (item.driver_name || item.driver_photo_url) && (
-            <XStack
-              backgroundColor="rgba(22,163,74,0.08)"
-              borderRadius={10}
-              borderWidth={1}
-              borderColor="rgba(22,163,74,0.25)"
-              padding="$3"
-              gap="$3"
-              alignItems="center"
-            >
-              <Avatar size="$3" borderRadius="$full" backgroundColor="rgba(22,163,74,0.18)">
-                {item.driver_photo_url ? (
-                  <Avatar.Image source={{ uri: item.driver_photo_url }} />
-                ) : (
-                  <User size={18} color="$green9" />
-                )}
-              </Avatar>
-              <YStack flex={1}>
-                {item.driver_name ? (
-                  <SizableText size="$3" fontWeight="700" color="$green10">
-                    {item.driver_name}
-                  </SizableText>
-                ) : null}
-                <SizableText size="$2" color="$green9">
-                  Your driver is on the way!
-                </SizableText>
-              </YStack>
-            </XStack>
-          )}
-
-          {/* Action buttons for pending orders */}
-          {isPending && (
-            <XStack gap="$2">
-              {/* Call store for questions */}
-              <Pressable
-                onPress={() => Linking.openURL(`mailto:${APP_CONFIG.STORE_EMAIL}`)}
-                style={({ pressed }) => [styles.callBtn, pressed && styles.cancelBtnPressed]}
-              >
-                <XStack gap="$1" alignItems="center" justifyContent="center">
-                  <Mail size={13} color="$color10" />
-                  <SizableText size="$2" fontWeight="600" color="$color10">Email Us</SizableText>
-                </XStack>
-              </Pressable>
-
-              {/* Cancel */}
-              <Pressable
-                onPress={() => onCancel(item.id)}
-                style={({ pressed }) => [styles.cancelBtn, pressed && styles.cancelBtnPressed]}
-              >
-                <XStack gap="$1" alignItems="center" justifyContent="center">
-                  <Trash2 size={13} color="$red9" />
-                  <SizableText size="$2" fontWeight="600" color="$red9">Cancel</SizableText>
-                </XStack>
-              </Pressable>
-            </XStack>
-          )}
-        </YStack>
-      </Card>
-    </Animated.View>
-  );
-}
-
-// ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function MyOrdersScreen() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<CustomerOrderData[]>(STATIC_SAMPLE_ORDERS);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [newlyDeliveredIds, setNewlyDeliveredIds] = useState<Set<string>>(new Set());
+  const [isConnected, setIsConnected] = useState(true);
   const prevStatusMap = useRef<Map<string, string>>(new Map());
   const channelRef = useRef<any>(null);
 
-  useEffect(() => {
-    AsyncStorage.getItem(SESSION_KEY).then((id) => setSessionId(id));
-  }, []);
+  const fetchOrders = useCallback(
+    async (sid?: string) => {
+      const id = sid || sessionId || (await AsyncStorage.getItem(SESSION_KEY));
 
-  const fetchOrders = useCallback(async (sid?: string) => {
-    const id = sid ?? sessionId;
-    if (!id) { setLoading(false); return; }
-    setLoading(true);
-    try {
-      const result = await blink.db.orders.list({
-        where: { customer_session_id: id },
-        orderBy: { created_at: 'desc' },
-      }) as Order[];
+      // 1. Read locally cached orders from AsyncStorage
+      let localOrders: CustomerOrderData[] = [];
+      try {
+        const raw = await AsyncStorage.getItem('customer_local_orders');
+        if (raw) localOrders = JSON.parse(raw);
+      } catch {}
 
-      // Detect newly delivered orders vs previous state
-      const newly = new Set<string>();
-      result.forEach((o) => {
-        const prev = prevStatusMap.current.get(o.id);
-        if (prev === 'pending' && o.status === 'delivered') {
-          newly.add(o.id);
-        }
-        prevStatusMap.current.set(o.id, o.status);
-      });
+      const timeoutPromise = new Promise((resolve) =>
+        setTimeout(() => resolve([]), 3500)
+      );
 
-      if (newly.size > 0) {
-        setNewlyDeliveredIds(newly);
-        // Clear highlight after 6 seconds
-        setTimeout(() => setNewlyDeliveredIds(new Set()), 6000);
+      try {
+        const authUser = await blink.auth.me().catch(() => null);
+        const userEmail = authUser?.email;
+
+        // 2. Fetch from Blink DB with all filter options
+        const fetchPromise = Promise.all([
+          id
+            ? blink.db.orders
+                .list({
+                  where: { customer_session_id: id },
+                  orderBy: { created_at: 'desc' },
+                  limit: 50,
+                })
+                .catch(() => [])
+            : Promise.resolve([]),
+          id
+            ? blink.db.orders
+                .list({
+                  where: { customerSessionId: id },
+                  orderBy: { createdAt: 'desc' },
+                  limit: 50,
+                })
+                .catch(() => [])
+            : Promise.resolve([]),
+          userEmail
+            ? blink.db.orders
+                .list({
+                  where: { customer_email: userEmail },
+                  orderBy: { created_at: 'desc' },
+                  limit: 50,
+                })
+                .catch(() => [])
+            : Promise.resolve([]),
+        ]);
+
+        const [sessionOrders1, sessionOrders2, emailOrders] = (await Promise.race([
+          fetchPromise,
+          timeoutPromise,
+        ])) as [CustomerOrderData[], CustomerOrderData[], CustomerOrderData[]];
+
+        const orderMap = new Map<string, CustomerOrderData>();
+        (STATIC_SAMPLE_ORDERS || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+        (localOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+        (sessionOrders1 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+        (sessionOrders2 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+        (emailOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+
+        const result = Array.from(orderMap.values()).sort(
+          (a, b) =>
+            new Date(b.createdAt || b.created_at || 0).getTime() -
+            new Date(a.createdAt || a.created_at || 0).getTime()
+        );
+
+        setOrders(result);
+      } catch (err) {
+        console.warn('[my-orders] fetch failed or timed out:', err);
+        const orderMap = new Map<string, CustomerOrderData>();
+        (STATIC_SAMPLE_ORDERS || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+        (localOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+        setOrders(Array.from(orderMap.values()));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
+    },
+    [sessionId]
+  );
 
-      setOrders(result);
-    } catch (err) {
-      console.warn('[my-orders] fetch failed:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [sessionId]);
-
-  // Initial fetch
   useEffect(() => {
-    if (sessionId !== null) fetchOrders(sessionId);
-  }, [sessionId]);
-
-  // Real-time subscription — listen for driver status updates
-  useEffect(() => {
-    if (!sessionId) return;
     let mounted = true;
 
-    const connect = async () => {
+    async function init() {
+      const sid = await getOrCreateSessionId();
+      if (!mounted) return;
+      setSessionId(sid);
+      await fetchOrders(sid);
+
       try {
         const channel = blink.realtime.channel(CHANNEL_NAME);
         channelRef.current = channel;
-        await channel.subscribe({ userId: 'customer-' + sessionId });
-        if (!mounted) return;
-        setIsConnected(true);
 
+        await channel.subscribe({ userId: sid });
         channel.onMessage((msg: any) => {
           if (!mounted) return;
-          if (msg.type !== 'order-changed') return;
-          // Refresh our orders on any change
-          fetchOrders();
+          const data = msg.data || msg;
+          if (
+            data?.type === 'order:status_change' ||
+            data?.type === 'order:created' ||
+            data?.type === 'order-changed'
+          ) {
+            fetchOrders(sid);
+          }
         });
+
+        if (mounted) setIsConnected(true);
       } catch (err) {
-        console.warn('[my-orders] realtime failed, degrading to manual refresh');
+        console.warn('[my-orders] realtime subscription failed:', err);
         if (mounted) setIsConnected(false);
       }
-    };
+    }
 
-    connect();
+    init();
 
     return () => {
       mounted = false;
-      channelRef.current?.unsubscribe().catch(() => {});
-      channelRef.current = null;
-      setIsConnected(false);
+      if (channelRef.current) {
+        try {
+          channelRef.current.unsubscribe();
+        } catch {}
+      }
     };
-  }, [sessionId]);
+  }, [fetchOrders]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchOrders();
+  }, [fetchOrders]);
 
   const handleCancel = useCallback(async (id: string) => {
     const doCancel = async () => {
       try {
-        await blink.db.orders.delete(id);
+        // Remove locally from AsyncStorage
+        try {
+          const raw = await AsyncStorage.getItem('customer_local_orders');
+          if (raw) {
+            const list = JSON.parse(raw);
+            const filtered = list.filter((o: any) => o.id !== id);
+            await AsyncStorage.setItem('customer_local_orders', JSON.stringify(filtered));
+          }
+        } catch {}
+
+        await blink.db.orders.delete(id).catch(() => {});
         setOrders((prev) => prev.filter((o) => o.id !== id));
         prevStatusMap.current.delete(id);
         if (Platform.OS !== 'web') {
@@ -429,103 +235,241 @@ export default function MyOrdersScreen() {
     if (Platform.OS === 'web') {
       if (window.confirm('Cancel this pickup request?')) doCancel();
     } else {
-      Alert.alert('Cancel Pickup?', 'This will remove your pickup request.', [
+      Alert.alert('Cancel Pickup?', 'This will cancel and remove your pickup request.', [
         { text: 'Keep It', style: 'cancel' },
         { text: 'Cancel Pickup', style: 'destructive', onPress: doCancel },
       ]);
     }
   }, []);
 
-  const renderItem = useCallback(({ item, index }: { item: Order; index: number }) => (
-    <OrderCard
-      key={item.id}
-      item={item}
-      index={index}
-      isNewlyDelivered={newlyDeliveredIds.has(item.id)}
-      onCancel={handleCancel}
-    />
-  ), [newlyDeliveredIds, handleCancel]);
+  const filteredOrders = useMemo(() => {
+    if (!search.trim()) return orders;
+    const q = search.toLowerCase();
+    return orders.filter(
+      (o) =>
+        (o.customerName || o.customer_name || '').toLowerCase().includes(q) ||
+        (o.customerPhone || o.customer_phone || '').toLowerCase().includes(q) ||
+        (o.pickupAddress || o.pickup_address || '').toLowerCase().includes(q) ||
+        (o.deliveryAddress || o.delivery_address || '').toLowerCase().includes(q)
+    );
+  }, [orders, search]);
+
+  const pendingCount = orders.filter((o) => o.status === 'pending').length;
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: CustomerOrderData; index: number }) => (
+      <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
+        <CustomerOrderCard order={item} onCancel={handleCancel} />
+      </Animated.View>
+    ),
+    [handleCancel]
+  );
 
   return (
-    <SafeArea>
-      {/* Header with live indicator */}
-      <XStack
-        paddingHorizontal="$4"
-        paddingTop="$2"
-        paddingBottom="$1"
-        justifyContent="space-between"
-        alignItems="center"
-      >
-        <SizableText size="$6" fontWeight="800" color="$color12">My Orders</SizableText>
-        <XStack
-          gap="$1"
-          alignItems="center"
-          paddingHorizontal="$3"
-          paddingVertical="$1"
-          borderRadius="$full"
-          backgroundColor={isConnected ? '$green3' : '$color3'}
-          borderWidth={1}
-          borderColor={isConnected ? '$green6' : '$color6'}
-        >
-          {isConnected
-            ? <Wifi size={12} color="$green9" />
-            : <WifiOff size={12} color="$color9" />}
-          <SizableText size="$1" fontWeight="700" color={isConnected ? '$green9' : '$color10'}>
-            {isConnected ? 'LIVE' : 'OFFLINE'}
-          </SizableText>
-        </XStack>
-      </XStack>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
+      {/* ─── Header Section ─── */}
+      <View style={styles.headerContainer}>
+        <View style={styles.titleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>My Orders</Text>
+            <Text style={styles.headerSubtitle}>
+              View and track all your pickup requests
+            </Text>
+          </View>
+
+          {/* Live Indicator Badge */}
+          <View style={styles.liveBadge}>
+            <View style={styles.livePulseDot} />
+            <Text style={styles.liveBadgeText}>LIVE</Text>
+          </View>
+        </View>
+
+        {/* Search Bar + Filter Icon */}
+        <View style={styles.searchRow}>
+          <View style={styles.searchBar}>
+            <MaterialIcons name="search" size={20} color="#8C90A1" />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search by name, phone, address..."
+              placeholderTextColor="#8C90A1"
+              style={styles.searchInput}
+              clearButtonMode="while-editing"
+            />
+          </View>
+          <TouchableOpacity
+            onPress={() => {
+              if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              }
+            }}
+            activeOpacity={0.8}
+            style={styles.filterButton}
+          >
+            <MaterialIcons name="tune" size={20} color="#dfe2ef" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Orders List */}
       <FlatList
-        data={orders}
+        data={filteredOrders}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={() => fetchOrders()}
-            tintColor="#22c55e"
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#ffe399"
           />
         }
         ListEmptyComponent={
-          !loading ? (
-            <YStack alignItems="center" paddingTop="$10">
-              <EmptyState
-                icon={<ClipboardList size={56} color="$color8" />}
-                title="No orders yet"
-                description="Request a pickup and it will appear here."
-              />
-            </YStack>
-          ) : null
+          loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#ffe399" />
+              <Text style={styles.loadingText}>Loading orders…</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No Matching Orders</Text>
+              <Text style={styles.emptySubtitle}>
+                {search.trim()
+                  ? 'Try adjusting your search query'
+                  : 'New pickup requests will appear here in real time.'}
+              </Text>
+            </View>
+          )
         }
       />
-    </SafeArea>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xxxl,
+  root: {
+    flex: 1,
+    backgroundColor: '#0f131c',
+  },
+  headerContainer: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 64 : 56,
+    paddingBottom: 12,
+    gap: 12,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#dfe2ef',
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: '#8C90A1',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  goldHighlight: {
+    color: '#ffe399',
+    fontWeight: '800',
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.35)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  livePulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#00E297',
+  },
+  liveBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#00E297',
+    letterSpacing: 0.8,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  searchBar: {
+    flex: 1,
+    height: 46,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#dfe2ef',
+    fontSize: 14,
+    height: '100%',
+  },
+  filterButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listContainer: {
+    paddingTop: 8,
+    paddingBottom: 100,
     flexGrow: 1,
   },
-  cancelBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#7f1d1d40',
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: '#7f1d1d10',
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+    gap: 12,
   },
-  callBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.backgroundSecondary,
+  loadingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8C90A1',
   },
-  cancelBtnPressed: { opacity: 0.7 },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#dfe2ef',
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#8C90A1',
+    textAlign: 'center',
+  },
 });
