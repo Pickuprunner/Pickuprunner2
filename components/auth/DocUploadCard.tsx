@@ -1,13 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, ActivityIndicator } from 'react-native';
-import {
-  YStack,
-  XStack,
-  SizableText,
-  CheckCircle,
-  Upload,
-} from '@blinkdotnew/mobile-ui';
-import { APP_CONFIG } from '@/lib/config';
+import { Pressable, StyleSheet, ActivityIndicator, View, Text } from 'react-native';
+import { CheckCircle, Upload } from '@blinkdotnew/mobile-ui';
 import { colors, spacing, borderRadius } from '@/constants/design';
 
 export interface DocState {
@@ -42,78 +35,66 @@ export function DocUploadCard({
       style={({ pressed }) => [
         styles.docCard,
         hasDoc && styles.docCardDone,
-        pressed && !doc.uploading && { opacity: 0.85 },
+        pressed && !doc.uploading && styles.docCardPressed,
       ]}
     >
-      <XStack gap="$4" alignItems="center">
+      <View style={styles.contentRow}>
         {/* Icon circle */}
-        <YStack
-          width={52}
-          height={52}
-          borderRadius={26}
-          backgroundColor={
-            hasDoc ? 'rgba(22,163,74,0.12)' : 'rgba(0,102,255,0.08)'
-          }
-          alignItems="center"
-          justifyContent="center"
-          borderWidth={1.5}
-          borderColor={
-            hasDoc ? 'rgba(22,163,74,0.35)' : 'rgba(0,102,255,0.25)'
-          }
+        <View
+          style={[
+            styles.iconCircle,
+            hasDoc ? styles.iconCircleDone : styles.iconCircleDefault,
+          ]}
         >
           {doc.uploading ? (
-            <ActivityIndicator size="small" color={APP_CONFIG.PRIMARY_COLOR} />
+            <ActivityIndicator size="small" color={colors.primaryContainer} />
           ) : hasDoc ? (
-            <CheckCircle size={26} color="$green9" />
+            <CheckCircle size={24} color={colors.tertiary} />
           ) : (
             icon
           )}
-        </YStack>
+        </View>
 
-        {/* Text */}
-        <YStack flex={1} gap="$0">
-          <SizableText size="$4" fontWeight="700" color="$color12">
-            {label}
-          </SizableText>
+        {/* Text info */}
+        <View style={styles.textContainer}>
+          <Text style={styles.label}>{label}</Text>
           {doc.uploading ? (
-            <SizableText size="$2" color="$amber9">
+            <Text style={styles.uploadingText}>
               Uploading… {doc.progress > 0 ? `${Math.round(doc.progress)}%` : ''}
-            </SizableText>
+            </Text>
           ) : hasDoc ? (
-            <SizableText size="$2" color="$green9" numberOfLines={1}>
+            <Text style={styles.doneText} numberOfLines={1}>
               ✓ {doc.name || 'Uploaded'}
-            </SizableText>
+            </Text>
           ) : (
-            <SizableText size="$2" color="$color10">
-              {description}
-            </SizableText>
+            <Text style={styles.description}>{description}</Text>
           )}
-        </YStack>
+        </View>
 
-        {/* Arrow / replace hint */}
+        {/* Action hint / icon */}
         {!doc.uploading && (
-          <YStack alignItems="center" gap="$0">
+          <View style={styles.actionContainer}>
             {hasDoc ? (
-              <SizableText size="$1" color="$color9">
-                Replace
-              </SizableText>
+              <View style={styles.replaceBadge}>
+                <Text style={styles.replaceText}>Replace</Text>
+              </View>
             ) : (
-              <Upload size={18} color="$color9" />
+              <Upload size={18} color={colors.outline} />
             )}
-          </YStack>
+          </View>
         )}
-      </XStack>
+      </View>
 
       {/* Progress bar */}
       {doc.uploading && doc.progress > 0 && (
-        <YStack marginTop="$2" height={3} backgroundColor="$color4" borderRadius={2}>
-          <YStack
-            height={3}
-            borderRadius={2}
-            backgroundColor={APP_CONFIG.PRIMARY_COLOR}
-            width={`${doc.progress}%` as any}
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressBar,
+              { width: `${doc.progress}%` },
+            ]}
           />
-        </YStack>
+        </View>
       )}
     </Pressable>
   );
@@ -128,9 +109,90 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.glassLevel2Border,
     padding: spacing.md,
+    overflow: 'hidden',
+  },
+  docCardPressed: {
+    backgroundColor: 'rgba(0, 102, 255, 0.08)',
+    borderColor: 'rgba(0, 102, 255, 0.35)',
+    transform: [{ scale: 0.99 }],
   },
   docCardDone: {
-    borderColor: 'rgba(22, 163, 74, 0.4)',
-    backgroundColor: 'rgba(22, 163, 74, 0.06)',
+    borderColor: 'rgba(0, 226, 151, 0.35)',
+    backgroundColor: 'rgba(0, 226, 151, 0.06)',
+  },
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  iconCircleDefault: {
+    backgroundColor: 'rgba(0, 102, 255, 0.1)',
+    borderColor: 'rgba(0, 102, 255, 0.3)',
+  },
+  iconCircleDone: {
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderColor: 'rgba(0, 226, 151, 0.35)',
+  },
+  textContainer: {
+    flex: 1,
+    gap: 3,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.onSurface,
+    letterSpacing: -0.2,
+  },
+  description: {
+    fontSize: 13,
+    color: colors.onSurfaceVariant,
+  },
+  uploadingText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.secondaryContainer,
+  },
+  doneText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.tertiary,
+  },
+  actionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  replaceBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: colors.glassLevel2Border,
+    borderWidth: 1,
+    borderRadius: borderRadius.xs,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  replaceText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.outline,
+  },
+  progressTrack: {
+    marginTop: 10,
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.primaryContainer,
   },
 });
+

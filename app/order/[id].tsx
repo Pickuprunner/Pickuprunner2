@@ -621,7 +621,7 @@ export default function OrderDetailScreen() {
               <Text style={styles.stepInstruction}>
                 Review the pickup and delivery addresses above, then accept this order to begin.
               </Text>
-              {/* <SwipeSlider
+              <SwipeSlider
                 title="Slide to Accept"
                 completedTitle="Order Accepted"
                 onSwipeComplete={doAccept}
@@ -629,22 +629,7 @@ export default function OrderDetailScreen() {
                 disabled={accepting || atCapacity}
                 variant="primary"
                 style={{ marginTop: 8 }}
-              /> */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={styles.primaryActionButton}
-                onPress={doAccept}
-                disabled={accepting}
-              >
-                {accepting ? (
-                  <ActivityIndicator color="#F8F7FF" size="small" />
-                ) : (
-                  <>
-                    <MaterialIcons name="local-shipping" size={20} color="#F8F7FF" />
-                    <Text style={styles.primaryActionText}>Accept This Order</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              />
             </View>
           )}
 
@@ -663,7 +648,7 @@ export default function OrderDetailScreen() {
                 <Text style={styles.secondaryActionText}>Navigate to Pickup</Text>
               </TouchableOpacity>
 
-              {/* <SwipeSlider
+              <SwipeSlider
                 title="Slide to Confirm Pickup"
                 completedTitle="Pickup Confirmed"
                 onSwipeComplete={doPickUp}
@@ -672,22 +657,7 @@ export default function OrderDetailScreen() {
                 variant="primary"
                 icon="inventory"
                 style={{ marginTop: 12 }}
-              /> */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={[styles.primaryActionButton, { marginTop: 12 }]}
-                onPress={doPickUp}
-                disabled={pickingUp}
-              >
-                {pickingUp ? (
-                  <ActivityIndicator color="#F8F7FF" size="small" />
-                ) : (
-                  <>
-                    <MaterialIcons name="inventory" size={20} color="#F8F7FF" />
-                    <Text style={styles.primaryActionText}>Order Picked Up</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              />
             </View>
           )}
 
@@ -764,7 +734,7 @@ export default function OrderDetailScreen() {
               </CustomCard>
 
               {/* Complete Delivery Action */}
-              {/* <SwipeSlider
+              <SwipeSlider
                 title="Slide to Complete Delivery"
                 completedTitle="Delivery Completed"
                 onSwipeComplete={doDeliver}
@@ -773,26 +743,7 @@ export default function OrderDetailScreen() {
                 variant="primary"
                 completedIcon="check-circle"
                 style={{ marginTop: 16 }}
-              /> */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={[
-                  styles.primaryActionButton,
-                  { marginTop: 16 },
-                  !photoUrl && styles.actionDisabled,
-                ]}
-                onPress={doDeliver}
-                disabled={delivering || uploadingPhoto}
-              >
-                {delivering ? (
-                  <ActivityIndicator color="#F8F7FF" size="small" />
-                ) : (
-                  <>
-                    <MaterialIcons name="check-circle" size={20} color="#F8F7FF" />
-                    <Text style={styles.primaryActionText}>Mark as Delivered</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              />
             </View>
           )}
 

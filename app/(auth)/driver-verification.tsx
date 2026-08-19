@@ -6,20 +6,22 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  View,
+  Text,
+  StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  YStack,
-  XStack,
-  SizableText,
-  SafeArea,
   ArrowLeft,
   ShieldCheck,
   FileText,
   Car,
   CheckCircle,
   AlertCircle,
+  Zap,
 } from '@blinkdotnew/mobile-ui';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
@@ -27,7 +29,7 @@ import { blink } from '@/lib/blink';
 import { useAuth } from '@/hooks/useAuth';
 import { useMyVerification, useSubmitVerification } from '@/lib/verification';
 import { APP_CONFIG } from '@/lib/config';
-import { spacing, borderRadius } from '@/constants/design';
+import { colors, gradients, spacing, borderRadius } from '@/constants/design';
 import { StatusBanner, DocUploadCard, DocState } from '@/components/auth';
 
 const EMPTY_DOC: DocState = {
@@ -39,6 +41,7 @@ const EMPTY_DOC: DocState = {
 };
 
 export default function DriverVerificationScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { data: existing } = useMyVerification(user?.id);
@@ -224,63 +227,84 @@ export default function DriverVerificationScreen() {
     !insurance.uploading;
 
   return (
-    <SafeArea>
-      {/* Header */}
-      <XStack
-        paddingHorizontal="$4"
-        paddingVertical="$3"
-        alignItems="center"
-        gap="$3"
-        borderBottomWidth={1}
-        borderBottomColor="$borderColor"
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {/* Hero glow gradient */}
+      <LinearGradient
+        colors={gradients.heroGlow}
+        locations={gradients.heroGlowLocations}
+        style={[styles.heroGlow, { height: 320 + insets.top }]}
+        pointerEvents="none"
+      />
+
+      {/* Top Header */}
+      <View
+        style={[
+          styles.headerRow,
+          { paddingTop: Math.max(insets.top + 8, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 16) },
+        ]}
       >
         <Pressable
-          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
           hitSlop={12}
+          style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
         >
-          <ArrowLeft size={22} color="$color10" />
+          <ArrowLeft size={20} color={colors.onSurface} />
         </Pressable>
-        <XStack flex={1} gap="$2" alignItems="center">
-          <ShieldCheck size={18} color={APP_CONFIG.PRIMARY_COLOR} />
-          <SizableText size="$5" fontWeight="800" color="$color12">
-            Driver Verification
-          </SizableText>
-        </XStack>
-        {/* Status pill */}
-        {existing && (
-          <YStack
-            paddingHorizontal={10}
-            paddingVertical={4}
-            borderRadius={999}
-            backgroundColor={
-              isVerified ? 'rgba(22,163,74,0.12)' :
-              isPending  ? 'rgba(217,119,6,0.12)'  :
-                           'rgba(220,38,38,0.12)'
-            }
+
+        <View style={styles.headerTitleRow}>
+          <ShieldCheck size={18} color={colors.primaryContainer} />
+          <Text style={styles.headerTitle}>Driver Verification</Text>
+        </View>
+
+        {/* Status pill badge */}
+        {existing ? (
+          <View
+            style={[
+              styles.statusBadge,
+              isVerified
+                ? styles.statusBadgeApproved
+                : isPending
+                ? styles.statusBadgePending
+                : styles.statusBadgeRejected,
+            ]}
           >
-            <SizableText
-              size="$1"
-              fontWeight="800"
-              color={isVerified ? '$green9' : isPending ? '$amber9' : '$red9'}
+            <Text
+              style={[
+                styles.statusBadgeText,
+                isVerified
+                  ? { color: colors.tertiary }
+                  : isPending
+                  ? { color: colors.secondary }
+                  : { color: colors.error },
+              ]}
             >
               {isVerified ? 'APPROVED' : isPending ? 'PENDING' : 'REJECTED'}
-            </SizableText>
-          </YStack>
+            </Text>
+          </View>
+        ) : (
+          <View style={{ width: 40 }} />
         )}
-      </XStack>
+      </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <YStack gap="$5">
-
-          {/* Intro */}
-          <YStack gap="$2">
-            <SizableText size="$6" fontWeight="800" color="$color12">
-              Verify Your Identity
-            </SizableText>
-            <SizableText size="$3" color="$color10" lineHeight={22}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          {
+            paddingBottom: Math.max(insets.bottom + spacing.xl, 44),
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.mainContainer}>
+          {/* Intro Section */}
+          <View style={styles.introSection}>
+            <Text style={styles.mainHeading}>Verify Your Identity</Text>
+            <Text style={styles.mainDescription}>
               To make deliveries for {APP_CONFIG.STORE_NAME}, you must upload a valid driver's license and current proof of vehicle insurance. Documents are reviewed by the admin within 24 hours.
-            </SizableText>
-          </YStack>
+            </Text>
+          </View>
 
           {/* Status banner for existing submissions */}
           {hasExisting && !showForm && (
@@ -291,60 +315,62 @@ export default function DriverVerificationScreen() {
             />
           )}
 
-          {/* What we check */}
+          {/* What we check card */}
           {!hasExisting && (
-            <YStack
-              backgroundColor="$color2"
-              borderRadius="$4"
-              borderWidth={1}
-              borderColor="$borderColor"
-              padding="$4"
-              gap="$3"
-            >
-              <SizableText size="$2" fontWeight="700" color="$color10">
-                WHAT WE VERIFY
-              </SizableText>
-              {[
-                { icon: <Car size={16} color="$color9" />, text: "Valid driver's license (not expired)" },
-                { icon: <FileText size={16} color="$color9" />, text: 'Current vehicle insurance policy' },
-                { icon: <ShieldCheck size={16} color="$color9" />, text: 'Identity matching your account name' },
-                { icon: <CheckCircle size={16} color="$color9" />, text: 'Arizona state driving eligibility' },
-              ].map((item, i) => (
-                <XStack key={i} gap="$3" alignItems="center">
-                  {item.icon}
-                  <SizableText size="$3" color="$color11">{item.text}</SizableText>
-                </XStack>
-              ))}
-            </YStack>
+            <View style={styles.infoCard}>
+              <Text style={styles.sectionHeader}>WHAT WE VERIFY</Text>
+              <View style={styles.checkList}>
+                {[
+                  { icon: <Car size={16} color={colors.primary} />, text: "Valid driver's license (not expired)" },
+                  { icon: <FileText size={16} color={colors.primary} />, text: 'Current vehicle insurance policy' },
+                  { icon: <ShieldCheck size={16} color={colors.primary} />, text: 'Identity matching your account name' },
+                  { icon: <CheckCircle size={16} color={colors.primary} />, text: 'Arizona state driving eligibility' },
+                ].map((item, i) => (
+                  <View key={i} style={styles.checkItemRow}>
+                    <View style={styles.checkIconBox}>{item.icon}</View>
+                    <Text style={styles.checkItemText}>{item.text}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
           )}
 
           {/* Upload form */}
           {showUploadForm && !isPending && !isVerified && (
-            <YStack gap="$4">
-              <XStack justifyContent="space-between" alignItems="center">
-                <SizableText size="$2" fontWeight="700" color="$color10">UPLOAD DOCUMENTS</SizableText>
+            <View style={styles.formSection}>
+              <View style={styles.uploadHeaderRow}>
+                <Text style={styles.sectionHeader}>UPLOAD DOCUMENTS</Text>
                 <Pressable
                   onPress={() => {
-                    setLicense({ uri: 'https://picsum.photos/400/250', name: 'test-license.jpg', uploading: false, publicUrl: 'https://picsum.photos/400/250', progress: 100 });
-                    setInsurance({ uri: 'https://picsum.photos/400/250', name: 'test-insurance.jpg', uploading: false, publicUrl: 'https://picsum.photos/400/250', progress: 100 });
+                    setLicense({
+                      uri: 'https://picsum.photos/400/250',
+                      name: 'test-license.jpg',
+                      uploading: false,
+                      publicUrl: 'https://picsum.photos/400/250',
+                      progress: 100,
+                    });
+                    setInsurance({
+                      uri: 'https://picsum.photos/400/250',
+                      name: 'test-insurance.jpg',
+                      uploading: false,
+                      publicUrl: 'https://picsum.photos/400/250',
+                      progress: 100,
+                    });
                   }}
-                  style={({ pressed }) => ({
-                    backgroundColor: pressed ? 'rgba(0,102,255,0.2)' : 'rgba(0,102,255,0.1)',
-                    borderRadius: 999,
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderWidth: 1,
-                    borderColor: 'rgba(0,102,255,0.35)',
-                  })}
+                  style={({ pressed }) => [
+                    styles.fillTestBtn,
+                    pressed && styles.fillTestBtnPressed,
+                  ]}
                 >
-                  <SizableText size="$1" fontWeight="700" color="$blue9">⚡ Fill test data</SizableText>
+                  <Zap size={12} color={colors.primary} />
+                  <Text style={styles.fillTestBtnText}>Fill test data</Text>
                 </Pressable>
-              </XStack>
+              </View>
 
               <DocUploadCard
                 label="Driver's License"
                 description="Front side — tap to choose photo or PDF"
-                icon={<Car size={26} color={APP_CONFIG.PRIMARY_COLOR} />}
+                icon={<Car size={22} color={colors.primaryContainer} />}
                 doc={license}
                 onPick={() => pickAndUpload('license', setLicense)}
               />
@@ -352,51 +378,38 @@ export default function DriverVerificationScreen() {
               <DocUploadCard
                 label="Proof of Insurance"
                 description="Insurance card or declaration page"
-                icon={<FileText size={26} color={APP_CONFIG.PRIMARY_COLOR} />}
+                icon={<FileText size={22} color={colors.primaryContainer} />}
                 doc={insurance}
                 onPick={() => pickAndUpload('insurance', setInsurance)}
               />
 
               {/* Tips */}
-              <YStack
-                backgroundColor="$blue2"
-                borderRadius="$3"
-                padding="$3"
-                gap="$2"
-                borderWidth={1}
-                borderColor="$blue4"
-              >
-                <SizableText size="$2" fontWeight="700" color="$blue10">TIPS FOR BEST RESULTS</SizableText>
-                {[
-                  'Use good lighting — avoid glare and shadows',
-                  'Ensure all text is readable and not cut off',
-                  'Accepted formats: JPG, PNG, HEIC, PDF',
-                  'Max file size: 10 MB',
-                ].map((tip, i) => (
-                  <XStack key={i} gap="$2" alignItems="flex-start">
-                    <SizableText size="$2" color="$blue9">•</SizableText>
-                    <SizableText size="$2" color="$blue9" flex={1}>{tip}</SizableText>
-                  </XStack>
-                ))}
-              </YStack>
+              <View style={styles.tipsCard}>
+                <Text style={styles.tipsHeader}>TIPS FOR BEST RESULTS</Text>
+                <View style={styles.tipsList}>
+                  {[
+                    'Use good lighting — avoid glare and shadows',
+                    'Ensure all text is readable and not cut off',
+                    'Accepted formats: JPG, PNG, HEIC, PDF',
+                    'Max file size: 10 MB',
+                  ].map((tip, i) => (
+                    <View key={i} style={styles.tipRow}>
+                      <Text style={styles.tipDot}>•</Text>
+                      <Text style={styles.tipText}>{tip}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
 
               {/* Error */}
               {!!submitError && (
-                <XStack
-                  backgroundColor="$red2"
-                  borderRadius="$3"
-                  padding="$3"
-                  gap="$2"
-                  alignItems="center"
-                  borderWidth={1}
-                  borderColor="$red5"
-                >
-                  <AlertCircle size={16} color="$red9" />
-                  <SizableText size="$2" color="$red10" flex={1}>{submitError}</SizableText>
-                </XStack>
+                <View style={styles.errorBox}>
+                  <AlertCircle size={16} color={colors.error} />
+                  <Text style={styles.errorText}>{submitError}</Text>
+                </View>
               )}
 
-              {/* Submit */}
+              {/* Submit CTA */}
               <Pressable
                 onPress={handleSubmit}
                 disabled={!canSubmit || submitVerification.isPending}
@@ -407,143 +420,402 @@ export default function DriverVerificationScreen() {
                 ]}
               >
                 {submitVerification.isPending ? (
-                  <XStack gap="$2" alignItems="center">
-                    <ActivityIndicator color="white" size="small" />
-                    <SizableText size="$4" fontWeight="700" color="white">Submitting…</SizableText>
-                  </XStack>
+                  <View style={styles.btnContent}>
+                    <ActivityIndicator color={colors.onPrimaryContainer} size="small" />
+                    <Text style={styles.submitBtnText}>Submitting…</Text>
+                  </View>
                 ) : (
-                  <XStack gap="$2" alignItems="center">
-                    <ShieldCheck size={20} color="white" />
-                    <SizableText size="$4" fontWeight="800" color="white">
-                      Submit for Review
-                    </SizableText>
-                  </XStack>
+                  <View style={styles.btnContent}>
+                    <ShieldCheck size={20} color={colors.onPrimaryContainer} />
+                    <Text style={styles.submitBtnText}>Submit for Review</Text>
+                  </View>
                 )}
               </Pressable>
-            </YStack>
+            </View>
           )}
 
           {/* Approved state */}
           {isVerified && (
-            <YStack gap="$3">
-              <SizableText size="$2" fontWeight="700" color="$color10">SUBMITTED DOCUMENTS</SizableText>
-              <YStack
-                backgroundColor="$color2"
-                borderRadius="$4"
-                borderWidth={1}
-                borderColor="$borderColor"
-                padding="$4"
-                gap="$3"
-              >
-                <XStack gap="$3" alignItems="center" justifyContent="space-between">
-                  <XStack gap="$2" alignItems="center">
-                    <Car size={18} color="$green9" />
-                    <SizableText size="$3" color="$color12" fontWeight="600">Driver's License</SizableText>
-                  </XStack>
-                  <SizableText size="$2" color="$green9">✓ Verified</SizableText>
-                </XStack>
-                <XStack gap="$3" alignItems="center" justifyContent="space-between">
-                  <XStack gap="$2" alignItems="center">
-                    <FileText size={18} color="$green9" />
-                    <SizableText size="$3" color="$color12" fontWeight="600">Proof of Insurance</SizableText>
-                  </XStack>
-                  <SizableText size="$2" color="$green9">✓ Verified</SizableText>
-                </XStack>
-              </YStack>
+            <View style={styles.approvedSection}>
+              <Text style={styles.sectionHeader}>SUBMITTED DOCUMENTS</Text>
+              <View style={styles.verifiedCard}>
+                <View style={styles.verifiedRow}>
+                  <View style={styles.verifiedLeft}>
+                    <Car size={18} color={colors.tertiary} />
+                    <Text style={styles.verifiedLabel}>Driver's License</Text>
+                  </View>
+                  <Text style={styles.verifiedBadge}>✓ Verified</Text>
+                </View>
+                <View style={styles.verifiedDivider} />
+                <View style={styles.verifiedRow}>
+                  <View style={styles.verifiedLeft}>
+                    <FileText size={18} color={colors.tertiary} />
+                    <Text style={styles.verifiedLabel}>Proof of Insurance</Text>
+                  </View>
+                  <Text style={styles.verifiedBadge}>✓ Verified</Text>
+                </View>
+              </View>
 
               <Pressable
                 onPress={() => router.replace('/(tabs)')}
                 style={({ pressed }) => [
-                  styles.submitBtn,
-                  { backgroundColor: '#00E297', marginTop: 8 },
-                  pressed && styles.submitBtnPressed,
+                  styles.enterAppBtn,
+                  pressed && styles.enterAppBtnPressed,
                 ]}
               >
-                <XStack gap="$2" alignItems="center">
-                  <CheckCircle size={20} color="#0F131C" />
-                  <SizableText size="$4" fontWeight="800" color="#0F131C">
-                    Enter Driver Dashboard →
-                  </SizableText>
-                </XStack>
+                <CheckCircle size={20} color="#0F131C" />
+                <Text style={styles.enterAppBtnText}>Enter Driver Dashboard →</Text>
               </Pressable>
-            </YStack>
+            </View>
           )}
 
           {/* Pending state */}
           {isPending && (
-            <YStack gap="$3">
-              <SizableText size="$2" fontWeight="700" color="$color10">DOCUMENTS SUBMITTED</SizableText>
-              <YStack
-                backgroundColor="$color2"
-                borderRadius="$4"
-                borderWidth={1}
-                borderColor="$borderColor"
-                padding="$4"
-                gap="$3"
-              >
-                <XStack gap="$2" alignItems="center">
-                  <Car size={16} color="$color9" />
-                  <SizableText size="$3" color="$color10">
-                    License: {existing?.license_filename || 'uploaded'}
-                  </SizableText>
-                </XStack>
-                <XStack gap="$2" alignItems="center">
-                  <FileText size={16} color="$color9" />
-                  <SizableText size="$3" color="$color10">
-                    Insurance: {existing?.insurance_filename || 'uploaded'}
-                  </SizableText>
-                </XStack>
-              </YStack>
+            <View style={styles.pendingSection}>
+              <Text style={styles.sectionHeader}>DOCUMENTS SUBMITTED</Text>
+              <View style={styles.verifiedCard}>
+                <View style={styles.verifiedRow}>
+                  <View style={styles.verifiedLeft}>
+                    <Car size={16} color={colors.outline} />
+                    <Text style={styles.pendingDocText}>
+                      License: {existing?.license_filename || 'uploaded'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.verifiedDivider} />
+                <View style={styles.verifiedRow}>
+                  <View style={styles.verifiedLeft}>
+                    <FileText size={16} color={colors.outline} />
+                    <Text style={styles.pendingDocText}>
+                      Insurance: {existing?.insurance_filename || 'uploaded'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
               <Pressable
                 onPress={handleApproveAndContinue}
                 disabled={autoApproving}
                 style={({ pressed }) => [
-                  styles.submitBtn,
-                  { backgroundColor: '#00E297', marginTop: 8 },
-                  pressed && styles.submitBtnPressed,
+                  styles.enterAppBtn,
+                  pressed && styles.enterAppBtnPressed,
                   autoApproving && styles.submitBtnDisabled,
                 ]}
               >
                 {autoApproving ? (
-                  <XStack gap="$2" alignItems="center">
+                  <View style={styles.btnContent}>
                     <ActivityIndicator color="#0F131C" size="small" />
-                    <SizableText size="$4" fontWeight="800" color="#0F131C">
+                    <Text style={styles.enterAppBtnText}>
                       Approving & Opening Dashboard…
-                    </SizableText>
-                  </XStack>
+                    </Text>
+                  </View>
                 ) : (
-                  <XStack gap="$2" alignItems="center">
+                  <View style={styles.btnContent}>
                     <CheckCircle size={20} color="#0F131C" />
-                    <SizableText size="$4" fontWeight="800" color="#0F131C">
+                    <Text style={styles.enterAppBtnText}>
                       ⚡ Approve & Open Driver App
-                    </SizableText>
-                  </XStack>
+                    </Text>
+                  </View>
                 )}
               </Pressable>
-            </YStack>
+            </View>
           )}
-
-        </YStack>
+        </View>
       </ScrollView>
-    </SafeArea>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+    position: 'relative',
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.marginMobile,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  backBtnPressed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.onSurface,
+    letterSpacing: -0.3,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+  },
+  statusBadgeApproved: {
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderColor: 'rgba(0, 226, 151, 0.35)',
+  },
+  statusBadgePending: {
+    backgroundColor: 'rgba(244, 195, 0, 0.12)',
+    borderColor: 'rgba(244, 195, 0, 0.35)',
+  },
+  statusBadgeRejected: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: 'rgba(239, 68, 68, 0.35)',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.marginMobile,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xxxl,
   },
-  submitBtn: {
-    height: 56,
-    borderRadius: borderRadius.xl,
-    backgroundColor: APP_CONFIG.PRIMARY_COLOR,
+  mainContainer: {
+    gap: 24,
+  },
+  introSection: {
+    gap: 8,
+  },
+  mainHeading: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: colors.onSurface,
+    letterSpacing: -0.5,
+  },
+  mainDescription: {
+    fontSize: 14.5,
+    lineHeight: 22,
+    color: colors.onSurfaceVariant,
+  },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.outline,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  infoCard: {
+    backgroundColor: colors.glassLevel2Bg,
+    borderRadius: borderRadius.DEFAULT,
+    borderWidth: 1,
+    borderColor: colors.glassLevel2Border,
+    padding: spacing.md,
+    gap: 14,
+  },
+  checkList: {
+    gap: 12,
+  },
+  checkItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  checkIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 102, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  submitBtnPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-  submitBtnDisabled: { opacity: 0.45 },
+  checkItemText: {
+    fontSize: 14,
+    color: colors.onSurface,
+    flex: 1,
+  },
+  formSection: {
+    gap: 16,
+  },
+  uploadHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  fillTestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0, 102, 255, 0.1)',
+    borderColor: 'rgba(0, 102, 255, 0.35)',
+    borderWidth: 1,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  fillTestBtnPressed: {
+    backgroundColor: 'rgba(0, 102, 255, 0.2)',
+    transform: [{ scale: 0.97 }],
+  },
+  fillTestBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  tipsCard: {
+    backgroundColor: 'rgba(0, 102, 255, 0.05)',
+    borderRadius: borderRadius.DEFAULT,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 102, 255, 0.2)',
+    padding: spacing.md,
+    gap: 10,
+  },
+  tipsHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: 0.5,
+  },
+  tipsList: {
+    gap: 6,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  tipDot: {
+    fontSize: 14,
+    color: colors.primary,
+    lineHeight: 18,
+  },
+  tipText: {
+    fontSize: 13,
+    color: colors.onSurfaceVariant,
+    lineHeight: 18,
+    flex: 1,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  errorText: {
+    fontSize: 13.5,
+    color: '#ff8b8b',
+    flex: 1,
+  },
+  submitBtn: {
+    height: 54,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  submitBtnPressed: {
+    backgroundColor: 'rgba(0, 102, 255, 0.85)',
+    transform: [{ scale: 0.98 }],
+  },
+  submitBtnDisabled: {
+    opacity: 0.45,
+  },
+  btnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  submitBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.onPrimaryContainer,
+    letterSpacing: 0.2,
+  },
+  approvedSection: {
+    gap: 16,
+  },
+  pendingSection: {
+    gap: 16,
+  },
+  verifiedCard: {
+    backgroundColor: colors.glassLevel2Bg,
+    borderRadius: borderRadius.DEFAULT,
+    borderWidth: 1,
+    borderColor: colors.glassLevel2Border,
+    padding: spacing.md,
+    gap: 12,
+  },
+  verifiedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  verifiedLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  verifiedLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.onSurface,
+  },
+  verifiedBadge: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.tertiary,
+  },
+  verifiedDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  pendingDocText: {
+    fontSize: 14,
+    color: colors.onSurfaceVariant,
+  },
+  enterAppBtn: {
+    height: 54,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.tertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  enterAppBtnPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.98 }],
+  },
+  enterAppBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F131C',
+    letterSpacing: 0.2,
+  },
 });
+

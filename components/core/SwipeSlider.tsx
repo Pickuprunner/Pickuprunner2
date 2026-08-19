@@ -75,6 +75,8 @@ export function SwipeSlider({
     extrapolate: 'clamp',
   });
 
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const triggerHapticLight = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -90,6 +92,8 @@ export function SwipeSlider({
   const reset = () => {
     passedRef.current = false;
     setPassedThreshold(false);
+    setIsProcessing(false);
+    setIsCompleted(false);
     Animated.spring(pan, {
       toValue: { x: 0, y: 0 },
       useNativeDriver: false,
@@ -97,28 +101,31 @@ export function SwipeSlider({
     }).start();
   };
 
-  const unlock = () => {
-    Animated.spring(pan, {
-      toValue: { x: maxSlide, y: 0 },
+  const unlock = async () => {
+    setIsProcessing(true);
+    triggerHapticSuccess();
+
+    Animated.timing(pan.x, {
+      toValue: maxSlide,
+      duration: 100,
       useNativeDriver: false,
-      bounciness: 0,
-    }).start(async () => {
+    }).start();
+
+    try {
+      await onSwipeComplete();
       setIsCompleted(true);
-      triggerHapticSuccess();
-      try {
-        await onSwipeComplete();
-      } catch {
-        reset();
-        setIsCompleted(false);
-      }
-    });
+    } catch {
+      reset();
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabled && !loading && !isCompleted,
+      onStartShouldSetPanResponder: () => !disabled && !loading && !isProcessing && !isCompleted,
       onMoveShouldSetPanResponder: (_, g) =>
-        !disabled && !loading && !isCompleted && Math.abs(g.dx) > 2,
+        !disabled && !loading && !isProcessing && !isCompleted && Math.abs(g.dx) > 2,
       onPanResponderGrant: () => {
         triggerHapticLight();
       },
@@ -146,16 +153,18 @@ export function SwipeSlider({
   ).current;
 
   const getPrimaryColor = () => {
-    if (passedThreshold || isCompleted) return colors.tertiary; // #00E297
+    if (passedThreshold || isCompleted || isProcessing) return colors.tertiary; // #00E297
     if (variant === 'secondary') return colors.secondaryContainer; // #F4C300
     return colors.primaryContainer; // #0066FF
   };
+
+  const showActiveLoading = loading || isProcessing;
 
   return (
     <View
       style={[
         styles.container,
-        loading && styles.containerLoading,
+        showActiveLoading && styles.containerLoading,
         isCompleted && styles.containerCompleted,
         style,
       ]}
@@ -167,7 +176,7 @@ export function SwipeSlider({
       }}
     >
       {/* 1. Progress Fill Behind Thumb (Active Drag Only) */}
-      {!isCompleted && !loading && (
+      {!isCompleted && !showActiveLoading && (
         <Animated.View
           style={[
             styles.progressFill,
@@ -183,7 +192,7 @@ export function SwipeSlider({
 
       {/* 2. Center Background Label */}
       <View style={styles.labelContainer} pointerEvents="none">
-        {loading ? (
+        {showActiveLoading ? (
           <View style={styles.centerRow}>
             <ActivityIndicator color={colors.tertiary} size="small" />
             <Text style={styles.statusText}>Processing...</Text>
@@ -209,7 +218,7 @@ export function SwipeSlider({
       </View>
 
       {/* 3. Draggable Thumb */}
-      {!isCompleted && !loading && (
+      {!isCompleted && !showActiveLoading && (
         <Animated.View
           {...panResponder.panHandlers}
           style={[
