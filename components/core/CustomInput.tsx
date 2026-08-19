@@ -15,11 +15,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 export type InputVariant = 'pill' | 'rounded' | 'square';
+export type InputStatus = 'default' | 'success' | 'error';
 
 export interface CustomInputProps extends TextInputProps {
   label?: string;
   hint?: string;
   error?: string | boolean;
+  status?: InputStatus;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   isPassword?: boolean;
@@ -48,6 +50,7 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
       label,
       hint,
       error,
+      status = 'default',
       leftIcon,
       rightIcon,
       isPassword = false,
@@ -92,7 +95,8 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
       }
     };
 
-    const hasError = Boolean(error);
+    const isError = Boolean(error) || status === 'error';
+    const isSuccess = status === 'success' && !isError;
     const errorMessage = typeof error === 'string' ? error : undefined;
     const hasValue = Boolean(value && value.length > 0);
 
@@ -125,31 +129,54 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
 
     const getBgColor = () => {
       if (backgroundColor) return backgroundColor;
-      if (hasError) return 'rgba(255, 77, 79, 0.06)';
-      if (isFocused) return '#181C28';
+      if (isFocused) {
+        if (isError) return 'rgba(255, 77, 79, 0.08)';
+        if (isSuccess) return 'rgba(0, 226, 151, 0.04)';
+        return '#181C28';
+      }
+      if (errorMessage) return 'rgba(255, 77, 79, 0.06)';
+      if (isSuccess) return 'rgba(0, 226, 151, 0.02)';
       return '#151821';
     };
 
     const getDynamicWrapperStyle = (): ViewStyle => {
-      if (hasError) {
-        return {
-          borderColor: '#FF4D4F',
-          ...(Platform.OS === 'web'
-            ? ({
-                boxShadow: '0 0 12px rgba(255, 77, 79, 0.40)',
-              } as any)
-            : Platform.OS === 'ios'
-            ? {
-                shadowColor: '#FF4D4F',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.45,
-                shadowRadius: 6,
-              }
-            : {}),
-        };
-      }
-
       if (isFocused) {
+        if (isError) {
+          return {
+            borderColor: '#FF4D4F',
+            ...(Platform.OS === 'web'
+              ? ({
+                  boxShadow: '0 0 12px rgba(255, 77, 79, 0.40)',
+                } as any)
+              : Platform.OS === 'ios'
+              ? {
+                  shadowColor: '#FF4D4F',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.45,
+                  shadowRadius: 6,
+                }
+              : {}),
+          };
+        }
+
+        if (isSuccess) {
+          return {
+            borderColor: '#00E297',
+            ...(Platform.OS === 'web'
+              ? ({
+                  boxShadow: '0 0 12px rgba(0, 226, 151, 0.40)',
+                } as any)
+              : Platform.OS === 'ios'
+              ? {
+                  shadowColor: '#00E297',
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.45,
+                  shadowRadius: 6,
+                }
+              : {}),
+          };
+        }
+
         return {
           borderColor: focusBorderColor,
           ...(Platform.OS === 'web'
@@ -164,6 +191,18 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
                 shadowRadius: 8,
               }
             : {}),
+        };
+      }
+
+      if (errorMessage) {
+        return {
+          borderColor: '#FF4D4F',
+        };
+      }
+
+      if (isSuccess) {
+        return {
+          borderColor: '#00E297',
         };
       }
 
@@ -228,6 +267,12 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
                 </Pressable>
               )}
 
+              {isSuccess && !isPassword && !rightIcon && (
+                <View style={styles.rightAction}>
+                  <Ionicons name="checkmark-circle" size={19} color="#00E297" />
+                </View>
+              )}
+
               {isPassword && (
                 <Pressable
                   onPress={togglePasswordVisibility}
@@ -238,7 +283,15 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
                   <Ionicons
                     name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
                     size={20}
-                    color={isFocused ? focusBorderColor : '#8C90A1'}
+                    color={
+                      !isFocused
+                        ? '#8C90A1'
+                        : isError
+                        ? '#FF4D4F'
+                        : isSuccess
+                        ? '#00E297'
+                        : focusBorderColor
+                    }
                   />
                 </Pressable>
               )}
@@ -248,7 +301,7 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
           )}
         </View>
 
-        {hasError && errorMessage ? (
+        {isError && errorMessage ? (
           <Text style={[styles.errorText, errorStyle]}>{errorMessage}</Text>
         ) : hint ? (
           <Text style={[styles.hintText, hintStyle]}>{hint}</Text>

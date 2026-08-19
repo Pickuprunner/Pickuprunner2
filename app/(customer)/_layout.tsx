@@ -2,12 +2,12 @@ import { Tabs } from 'expo-router';
 import { ShoppingBag, ClipboardList, User } from '@blinkdotnew/mobile-ui';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { APP_CONFIG } from '@/lib/config';
+import { colors } from '@/constants/design';
 
-const ACTIVE = APP_CONFIG.PRIMARY_COLOR;
-const INACTIVE = 'rgba(255,255,255,0.4)';
-const TAB_BG = '#0A0A0F';
-const TAB_BORDER = `rgba(204,0,0,0.25)`;
+const ACTIVE = colors.secondaryContainer; // Gold #F4C300
+const INACTIVE = '#8C90A1';
+const TAB_BG = '#0F131C';
+const TAB_BORDER = 'rgba(255, 255, 255, 0.08)';
 
 export default function CustomerTabLayout() {
   const insets = useSafeAreaInsets();
@@ -15,6 +15,7 @@ export default function CustomerTabLayout() {
 
   return (
     <Tabs
+      initialRouteName="my-orders"
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: ACTIVE,
@@ -23,24 +24,19 @@ export default function CustomerTabLayout() {
           backgroundColor: TAB_BG,
           borderTopColor: TAB_BORDER,
           borderTopWidth: 1,
-          height: 64 + bottomPad,
+          height: 60 + bottomPad,
           paddingBottom: bottomPad,
           paddingTop: 8,
+          elevation: 12,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 10.5,
           fontWeight: '700',
-          letterSpacing: 0.3,
+          letterSpacing: 0.2,
         },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Request',
-          tabBarIcon: ({ color, size }) => <ShoppingBag size={size} color={color} />,
-        }}
-      />
+     
       <Tabs.Screen
         name="my-orders"
         options={{
@@ -48,6 +44,17 @@ export default function CustomerTabLayout() {
           tabBarIcon: ({ color, size }) => <ClipboardList size={size} color={color} />,
         }}
       />
+
+      
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Request',
+          tabBarIcon: ({ color, size }) => <ShoppingBag size={size} color={color} />,
+        }}
+      />
+
+      
       <Tabs.Screen
         name="profile"
         options={{
@@ -55,7 +62,8 @@ export default function CustomerTabLayout() {
           tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
         }}
       />
-      {/* Track order — hides tab bar */}
+
+     
       <Tabs.Screen
         name="track/[id]"
         options={{

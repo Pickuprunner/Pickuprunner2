@@ -10,14 +10,14 @@ export default function Index() {
       AsyncStorage.getItem('driver_test_mode'),
     ]).then(async ([role, testMode]) => {
       if (role === 'customer') {
-        router.replace('/(customer)');
+        router.replace('/(customer)/my-orders');
       } else if (role === 'driver') {
-        // Test mode: skip auth + verification entirely
+        
         if (testMode === 'true') {
           router.replace('/(tabs)');
           return;
         }
-        // Check auth + verification before routing to tabs
+       
         const me = await blink.auth.me().catch(() => null);
         if (!me) {
           router.replace('/sign-in');

@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, TextInput, Platform, StyleSheet, Pressable, Alert, Linking } from 'react-native';
 import {
-  YStack,
-  XStack,
-  SizableText,
-  Avatar,
-  AppHeader,
-  SafeArea,
+  ScrollView,
+  TextInput,
+  Platform,
+  StyleSheet,
+  Pressable,
+  Alert,
+  Linking,
+  View,
+  Text,
+  StatusBar,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
   User,
   Truck,
   Edit3,
@@ -15,28 +21,38 @@ import {
   RefreshCw,
   Phone,
   Mail,
-  Package,
   CheckCircle,
   Clock,
   LogIn,
   LogOut,
   Trash2,
+  ChevronRight,
+  ShoppingBag,
+  MapPin,
+  ShieldCheck,
 } from '@blinkdotnew/mobile-ui';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { saveRole } from '@/hooks/useRole';
 import { useAuth } from '@/hooks/useAuth';
 import { blink } from '@/lib/blink';
-import { colors, spacing, borderRadius } from '@/constants/design';
+import { colors, gradients, spacing, borderRadius } from '@/constants/design';
 import { APP_CONFIG } from '@/lib/config';
+import CustomInput from '@/components/core/CustomInput';
 
 const NAME_KEY = 'customer_display_name';
 const SESSION_KEY = 'customer_session_id';
 const SUPPORT_EMAIL = APP_CONFIG.STORE_EMAIL;
 
 function initials(name: string) {
-  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  return name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || 'CU';
 }
 
 export default function CustomerProfileScreen() {
@@ -47,26 +63,28 @@ export default function CustomerProfileScreen() {
   const [orderStats, setOrderStats] = useState({ pending: 0, delivered: 0 });
 
   useEffect(() => {
-    // If authenticated, prefer auth display name
     if (isAuthenticated && user?.displayName) {
       setDisplayName(user.displayName);
       setEditValue(user.displayName);
       AsyncStorage.setItem(NAME_KEY, user.displayName).catch(() => {});
     } else {
       AsyncStorage.getItem(NAME_KEY).then((n) => {
-        if (n) { setDisplayName(n); setEditValue(n); }
-        else { setEditValue('Customer'); }
+        if (n) {
+          setDisplayName(n);
+          setEditValue(n);
+        } else {
+          setEditValue('Customer');
+        }
       });
     }
 
-    // Load order stats for this customer session
     AsyncStorage.getItem(SESSION_KEY).then(async (sid) => {
       if (!sid) return;
       try {
-        const orders = await blink.db.orders.list({
+        const orders = (await blink.db.orders.list({
           where: { customer_session_id: sid },
-        }) as any[];
-        const pending = orders.filter((o) => o.status === 'pending').length;
+        })) as any[];
+        const pending = orders.filter((o) => o.status !== 'delivered').length;
         const delivered = orders.filter((o) => o.status === 'delivered').length;
         setOrderStats({ pending, delivered });
       } catch {}
@@ -90,14 +108,13 @@ export default function CustomerProfileScreen() {
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       }
-      // Tab layout will check auth and redirect to sign-in if needed
       router.replace('/(tabs)');
     };
 
     if (Platform.OS === 'web') {
       if (window.confirm("Switch to Driver mode? You'll need to sign in.")) doSwitch();
     } else {
-      Alert.alert('Switch to Driver Mode?', 'You\'ll need to sign in with your driver account.', [
+      Alert.alert('Switch to Driver Mode?', "You'll need to sign in with your driver account.", [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Switch', onPress: doSwitch },
       ]);
@@ -106,7 +123,7 @@ export default function CustomerProfileScreen() {
 
   const chooseRole = async () => {
     await AsyncStorage.removeItem('app_role');
-    router.replace('/role-select');
+    router.replace('/(landing)/role-select');
   };
 
   const emailSupport = () => {
@@ -125,228 +142,596 @@ export default function CustomerProfileScreen() {
   };
 
   return (
-    <SafeArea>
-      <AppHeader title="My Profile" />
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <YStack padding="$4" gap="$6">
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-          {/* Avatar + name */}
-          <YStack alignItems="center" gap="$3">
-            <Avatar size="$8" borderRadius="$full" backgroundColor="$color4">
-              <SizableText size="$7" fontWeight="800" color="$color12">
-                {initials(displayName)}
-              </SizableText>
-            </Avatar>
+      
+      <LinearGradient
+        colors={gradients.heroGlow}
+        locations={gradients.heroGlowLocations}
+        style={styles.heroGlow}
+        pointerEvents="none"
+      />
 
-            {editing ? (
-              <YStack gap="$2" width="100%" alignItems="center">
-                <TextInput
-                  value={editValue}
-                  onChangeText={setEditValue}
-                  placeholder="Your name"
-                  placeholderTextColor={colors.textTertiary}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={confirmEdit}
-                  style={[
-                    styles.nameInput,
-                    Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {},
-                  ]}
-                />
-                <XStack gap="$2">
-                  <Pressable onPress={() => setEditing(false)} style={styles.editBtn}>
-                    <X size={16} color="$color10" />
-                    <SizableText size="$3" color="$color10"> Cancel</SizableText>
-                  </Pressable>
-                  <Pressable onPress={confirmEdit} style={[styles.editBtn, styles.editBtnPrimary]}>
-                    <Check size={16} color="white" />
-                    <SizableText size="$3" color="white" fontWeight="700"> Save</SizableText>
-                  </Pressable>
-                </XStack>
-              </YStack>
-            ) : (
-              <YStack alignItems="center" gap="$1">
-                <XStack gap="$2" alignItems="center">
-                  <SizableText size="$6" fontWeight="700" color="$color12">{displayName}</SizableText>
-                  <Pressable onPress={() => { setEditValue(displayName); setEditing(true); }} hitSlop={8}>
-                    <Edit3 size={16} color="$color9" />
-                  </Pressable>
-                </XStack>
-                <SizableText size="$2" color="$color9">Customer</SizableText>
-              </YStack>
-            )}
-          </YStack>
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
+       
+        <View style={styles.screenHeader}>
+          <Text style={styles.screenTitle}>My Profile</Text>
+          <Text style={styles.screenSubtitle}>Manage your account, preferences & support</Text>
+        </View>
 
-          {/* Order stats */}
-          <XStack gap="$3">
-            <YStack
-              flex={1} padding="$4" borderRadius="$4"
-              backgroundColor="$amber2" borderWidth={1} borderColor="$amber4"
-              alignItems="center" gap="$1"
+       
+        <View style={styles.profileHeroCard}>
+          <View style={styles.avatarHalo}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarLetters}>{initials(displayName)}</Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                setEditValue(displayName);
+                setEditing((v) => !v);
+                if (Platform.OS !== 'web') {
+                  Haptics.selectionAsync().catch(() => {});
+                }
+              }}
+              style={styles.avatarEditBadge}
             >
-              <Clock size={18} color="$amber9" />
-              <SizableText size="$6" fontWeight="800" color="$amber9">{orderStats.pending}</SizableText>
-              <SizableText size="$2" fontWeight="600" color="$amber10">PENDING</SizableText>
-            </YStack>
-            <YStack
-              flex={1} padding="$4" borderRadius="$4"
-              backgroundColor="$green2" borderWidth={1} borderColor="$green4"
-              alignItems="center" gap="$1"
-            >
-              <CheckCircle size={18} color="$green9" />
-              <SizableText size="$6" fontWeight="800" color="$green9">{orderStats.delivered}</SizableText>
-              <SizableText size="$2" fontWeight="600" color="$green10">DELIVERED</SizableText>
-            </YStack>
-          </XStack>
+              <Edit3 size={13} color={colors.secondaryContainer} />
+            </Pressable>
+          </View>
 
-          {/* Account — sign in/out */}
-          <YStack gap="$3">
-            <SizableText size="$2" fontWeight="700" color="$color10" paddingLeft="$1">ACCOUNT</SizableText>
-            {isAuthenticated ? (
-              <>
-                <YStack
-                  backgroundColor="$green2" borderRadius="$4" padding="$4"
-                  borderWidth={1} borderColor="$green5" gap="$1"
-                >
-                  <SizableText size="$3" fontWeight="700" color="$green10">Signed in</SizableText>
-                  <SizableText size="$2" color="$green9">{user?.email}</SizableText>
-                </YStack>
-                <Pressable onPress={handleSignOut} style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}>
-                  <XStack alignItems="center" gap="$3">
-                    <YStack width={44} height={44} borderRadius={22} backgroundColor="$red3" alignItems="center" justifyContent="center">
-                      <LogOut size={22} color="$red9" />
-                    </YStack>
-                    <YStack flex={1}>
-                      <SizableText size="$4" fontWeight="700" color="$red10">Sign Out</SizableText>
-                      <SizableText size="$2" color="$color10">You can still browse without an account</SizableText>
-                    </YStack>
-                  </XStack>
+          {editing ? (
+            <View style={styles.editSection}>
+              <CustomInput
+                value={editValue}
+                onChangeText={setEditValue}
+                placeholder="Enter your name"
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={confirmEdit}
+                status={editValue.trim().length >= 2 ? 'success' : 'default'}
+              />
+              <View style={styles.editButtonsRow}>
+                <Pressable onPress={() => setEditing(false)} style={styles.editCancelBtn}>
+                  <X size={15} color="#8C90A1" />
+                  <Text style={styles.editCancelText}>Cancel</Text>
                 </Pressable>
-              </>
-            ) : (
-              <Pressable onPress={() => router.push('/customer-auth')} style={({ pressed }) => [styles.signInCard, pressed && styles.actionCardPressed]}>
-                <XStack alignItems="center" gap="$3">
-                  <YStack width={44} height={44} borderRadius={22} backgroundColor="rgba(245,196,0,0.15)" alignItems="center" justifyContent="center" borderWidth={1} borderColor="rgba(245,196,0,0.35)">
-                    <LogIn size={22} color="$yellow9" />
-                  </YStack>
-                  <YStack flex={1}>
-                    <SizableText size="$4" fontWeight="700" color="$color12">Sign In / Create Account</SizableText>
-                    <SizableText size="$2" color="$color10">Save your order history across devices</SizableText>
-                  </YStack>
-                </XStack>
+                <Pressable onPress={confirmEdit} style={styles.editSaveBtn}>
+                  <Check size={15} color="#0F131C" />
+                  <Text style={styles.editSaveText}>Save Name</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.profileTextContainer}>
+              <View style={styles.nameRow}>
+                <Text style={styles.displayName}>{displayName}</Text>
+                <View style={styles.customerRoleTag}>
+                  <ShoppingBag size={11} color={colors.secondaryContainer} />
+                  <Text style={styles.customerRoleTagText}>Customer</Text>
+                </View>
+              </View>
+              <Text style={styles.displayEmail}>
+                {isAuthenticated && user?.email ? user.email : 'Guest Session'}
+              </Text>
+            </View>
+          )}
+        </View>
+
+       
+        <View style={styles.statsGrid}>
+          
+          <View style={styles.statCard}>
+            <View style={[styles.statIconBox, { backgroundColor: 'rgba(244, 195, 0, 0.15)' }]}>
+              <Clock size={18} color={colors.secondaryContainer} />
+            </View>
+            <Text style={styles.statNumberGold}>{orderStats.pending}</Text>
+            <Text style={styles.statLabel}>ACTIVE ORDERS</Text>
+          </View>
+
+          
+          <View style={styles.statCard}>
+            <View style={[styles.statIconBox, { backgroundColor: 'rgba(0, 226, 151, 0.15)' }]}>
+              <CheckCircle size={18} color={colors.tertiary} />
+            </View>
+            <Text style={styles.statNumberGreen}>{orderStats.delivered}</Text>
+            <Text style={styles.statLabel}>DELIVERED</Text>
+          </View>
+        </View>
+
+        
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeader}>ACCOUNT</Text>
+          {isAuthenticated ? (
+            <>
+              <View style={styles.signedInCard}>
+                <View style={styles.signedInLeft}>
+                  <View style={styles.verifiedDot} />
+                  <View>
+                    <Text style={styles.signedInLabel}>Verified Account</Text>
+                    <Text style={styles.signedInEmail}>{user?.email}</Text>
+                  </View>
+                </View>
+                <ShieldCheck size={18} color={colors.tertiary} />
+              </View>
+
+              <Pressable
+                onPress={handleSignOut}
+                style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
+              >
+                <View style={[styles.actionIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+                  <LogOut size={18} color="#FF6B6B" />
+                </View>
+                <View style={styles.actionTextContainer}>
+                  <Text style={styles.actionTitleDanger}>Sign Out</Text>
+                  <Text style={styles.actionSubtitle}>You can still place orders as guest</Text>
+                </View>
+                <ChevronRight size={18} color={colors.outline} />
               </Pressable>
-            )}
-          </YStack>
-
-          {/* Support */}
-          <YStack gap="$3">
-            <SizableText size="$2" fontWeight="700" color="$color10" paddingLeft="$1">SUPPORT</SizableText>
-            <Pressable onPress={emailSupport} style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}>
-              <XStack alignItems="center" gap="$3">
-                <YStack width={44} height={44} borderRadius={22} backgroundColor="$color4" alignItems="center" justifyContent="center">
-                  <Mail size={22} color="$color10" />
-                </YStack>
-                <YStack flex={1}>
-                  <SizableText size="$4" fontWeight="700" color="$color12">Email {APP_CONFIG.STORE_NAME}</SizableText>
-                  <SizableText size="$2" color="$color10">{SUPPORT_EMAIL}</SizableText>
-                </YStack>
-              </XStack>
+            </>
+          ) : (
+            <Pressable
+              onPress={() => router.push('/(auth)/customer-auth')}
+              style={({ pressed }) => [
+                styles.signInCtaCard,
+                pressed && styles.actionCardPressed,
+              ]}
+            >
+              <View
+                style={[
+                  styles.actionIconBox,
+                  {
+                    backgroundColor: 'rgba(244, 195, 0, 0.15)',
+                    borderColor: 'rgba(244, 195, 0, 0.35)',
+                    borderWidth: 1,
+                  },
+                ]}
+              >
+                <LogIn size={20} color={colors.secondaryContainer} />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>Sign In / Create Account</Text>
+                <Text style={styles.actionSubtitle}>
+                  Save your addresses & order history across devices
+                </Text>
+              </View>
+              <ChevronRight size={18} color={colors.secondaryContainer} />
             </Pressable>
-          </YStack>
+          )}
+        </View>
 
-          {/* Switch / role */}
-          <YStack gap="$3">
-            <SizableText size="$2" fontWeight="700" color="$color10" paddingLeft="$1">SWITCH MODE</SizableText>
+       
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeader}>HELP & SUPPORT</Text>
+          <Pressable
+            onPress={emailSupport}
+            style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
+          >
+            <View style={styles.actionIconBox}>
+              <Mail size={18} color={colors.primary} />
+            </View>
+            <View style={styles.actionTextContainer}>
+              <Text style={styles.actionTitle}>Email {APP_CONFIG.STORE_NAME}</Text>
+              <Text style={styles.actionSubtitle}>{SUPPORT_EMAIL || 'support@pickuprunner.com'}</Text>
+            </View>
+            <ChevronRight size={18} color={colors.outline} />
+          </Pressable>
 
-            <Pressable onPress={switchToDriver} style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}>
-              <XStack alignItems="center" gap="$3">
-                <YStack width={44} height={44} borderRadius={22} backgroundColor="$color4" alignItems="center" justifyContent="center">
-                  <Truck size={22} color="$color10" />
-                </YStack>
-                <YStack flex={1}>
-                  <SizableText size="$4" fontWeight="700" color="$color12">Sign In as Driver</SizableText>
-                  <SizableText size="$2" color="$color10">View and manage pickup orders</SizableText>
-                </YStack>
-                <LogIn size={16} color="$color9" />
-              </XStack>
+          {APP_CONFIG.STORE_PHONE ? (
+            <Pressable
+              onPress={() => Linking.openURL(`tel:${APP_CONFIG.STORE_PHONE}`)}
+              style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
+            >
+              <View style={styles.actionIconBox}>
+                <Phone size={18} color={colors.tertiary} />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <Text style={styles.actionTitle}>Call Store Support</Text>
+                <Text style={styles.actionSubtitle}>{APP_CONFIG.STORE_PHONE}</Text>
+              </View>
+              <ChevronRight size={18} color={colors.outline} />
             </Pressable>
+          ) : null}
+        </View>
 
-            <Pressable onPress={chooseRole} style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}>
-              <XStack alignItems="center" gap="$3">
-                <YStack width={44} height={44} borderRadius={22} backgroundColor="$color4" alignItems="center" justifyContent="center">
-                  <RefreshCw size={22} color="$color10" />
-                </YStack>
-                <YStack flex={1}>
-                  <SizableText size="$4" fontWeight="700" color="$color12">Choose Role Again</SizableText>
-                  <SizableText size="$2" color="$color10">Go back to the role selection screen</SizableText>
-                </YStack>
-              </XStack>
-            </Pressable>
-          </YStack>
+       
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeader}>SWITCH MODE</Text>
 
-          {/* Delete Account */}
-          <YStack gap="$3">
-            <SizableText size="$2" fontWeight="700" color="$color10" paddingLeft="$1">DANGER ZONE</SizableText>
-            <Pressable onPress={() => router.push('/delete-account')} style={({ pressed }) => [styles.deleteCard, pressed && styles.actionCardPressed]}>
-              <XStack alignItems="center" gap="$3">
-                <YStack width={44} height={44} borderRadius={22} backgroundColor="rgba(220,38,38,0.1)" alignItems="center" justifyContent="center">
-                  <Trash2 size={22} color="$red9" />
-                </YStack>
-                <YStack flex={1}>
-                  <SizableText size="$4" fontWeight="700" color="$red10">Delete Account</SizableText>
-                  <SizableText size="$2" color="$color10">Permanently remove your account and data</SizableText>
-                </YStack>
-              </XStack>
-            </Pressable>
-          </YStack>
+          <Pressable
+            onPress={switchToDriver}
+            style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: 'rgba(0, 102, 255, 0.15)' }]}>
+              <Truck size={18} color={colors.primary} />
+            </View>
+            <View style={styles.actionTextContainer}>
+              <Text style={styles.actionTitle}>Sign In as Driver</Text>
+              <Text style={styles.actionSubtitle}>Accept and deliver pickup orders</Text>
+            </View>
+            <ChevronRight size={18} color={colors.outline} />
+          </Pressable>
 
-        </YStack>
+          <Pressable
+            onPress={chooseRole}
+            style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: 'rgba(244, 195, 0, 0.12)' }]}>
+              <RefreshCw size={18} color={colors.secondaryContainer} />
+            </View>
+            <View style={styles.actionTextContainer}>
+              <Text style={styles.actionTitle}>Choose Role Again</Text>
+              <Text style={styles.actionSubtitle}>Return to the landing role selection</Text>
+            </View>
+            <ChevronRight size={18} color={colors.outline} />
+          </Pressable>
+        </View>
+
+       
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionHeader}>DATA & PRIVACY</Text>
+          <Pressable
+            onPress={() => router.push('/delete-account')}
+            style={({ pressed }) => [styles.dangerCard, pressed && styles.actionCardPressed]}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.12)' }]}>
+              <Trash2 size={18} color="#FF6B6B" />
+            </View>
+            <View style={styles.actionTextContainer}>
+              <Text style={styles.actionTitleDanger}>Delete Account</Text>
+              <Text style={styles.actionSubtitle}>Permanently remove your account and data</Text>
+            </View>
+            <ChevronRight size={18} color="#FF6B6B" />
+          </Pressable>
+        </View>
+
+       
+        <View style={styles.footerContainer}>
+          <Text style={styles.footerBrand}>{APP_CONFIG.STORE_NAME}</Text>
+          <Text style={styles.footerVersion}>Version 1.0.0 · Midnight Tech Noir</Text>
+        </View>
       </ScrollView>
-    </SafeArea>
+    </View>
   );
 }
 
+
+
 const styles = StyleSheet.create({
-  nameInput: {
-    width: '80%', height: 48,
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    fontSize: 16, fontWeight: '600',
-    color: colors.text, borderWidth: 1,
-    borderColor: colors.border, textAlign: 'center',
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+    position: 'relative',
   },
-  editBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.backgroundSecondary,
-    borderWidth: 1, borderColor: colors.border,
+  heroGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 320,
+    width: '100%',
   },
-  editBtnPrimary: {
-    backgroundColor: APP_CONFIG.PRIMARY_COLOR,
-    borderColor: APP_CONFIG.PRIMARY_COLOR,
+  scrollContainer: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 44,
+    paddingBottom: 110,
+    gap: 20,
+  },
+  screenHeader: {
+    gap: 4,
+    marginBottom: 4,
+  },
+  screenTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  screenSubtitle: {
+    fontSize: 13,
+    color: '#8C90A1',
+    fontWeight: '500',
+  },
+
+  
+  profileHeroCard: {
+    backgroundColor: '#151821',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 20,
+    alignItems: 'center',
+    gap: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  avatarHalo: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: 'rgba(244, 195, 0, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(244, 195, 0, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    shadowColor: colors.secondaryContainer,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  avatarCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.secondaryContainer,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.secondaryContainer,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  avatarLetters: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#0F131C',
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#0F131C',
+    borderWidth: 2,
+    borderColor: colors.secondaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileTextContainer: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  displayName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  customerRoleTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(244, 195, 0, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(244, 195, 0, 0.3)',
+  },
+  customerRoleTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.secondaryContainer,
+  },
+  displayEmail: {
+    fontSize: 13,
+    color: '#8C90A1',
+  },
+  editSection: {
+    width: '100%',
+    gap: 10,
+    marginTop: 4,
+  },
+  editButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  editCancelBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  editCancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8C90A1',
+  },
+  editSaveBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: colors.secondaryContainer,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  editSaveText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F131C',
+  },
+
+ 
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#151821',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 16,
+    alignItems: 'center',
+    gap: 6,
+  },
+  statIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statNumberGold: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: colors.secondaryContainer,
+  },
+  statNumberGreen: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: colors.tertiary,
+  },
+  statLabel: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#8C90A1',
+    letterSpacing: 0.8,
+  },
+
+ 
+  sectionBlock: {
+    gap: 10,
+  },
+  sectionHeader: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#8C90A1',
+    letterSpacing: 1.2,
+    marginLeft: 4,
+  },
+  signedInCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0, 226, 151, 0.08)',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 226, 151, 0.25)',
+    padding: 14,
+  },
+  signedInLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  verifiedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.tertiary,
+  },
+  signedInLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.tertiary,
+  },
+  signedInEmail: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginTop: 1,
+  },
+  signInCtaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#151821',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(244, 195, 0, 0.35)',
+    padding: 14,
   },
   actionCard: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: borderRadius.xl,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#151821',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 14,
   },
-  actionCardPressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
-  signInCard: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: borderRadius.xl,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+  actionCardPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.99 }],
   },
-  deleteCard: {
-    backgroundColor: 'rgba(220,38,38,0.04)',
-    borderRadius: borderRadius.xl,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(220,38,38,0.2)',
+  dangerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    padding: 14,
+  },
+  actionIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#1C202E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  actionTitle: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#DFE2EF',
+  },
+  actionTitleDanger: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#FF6B6B',
+  },
+  actionSubtitle: {
+    fontSize: 12,
+    color: '#8C90A1',
+    lineHeight: 16,
+  },
+
+  // Footer
+  footerContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 4,
+  },
+  footerBrand: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#8C90A1',
+  },
+  footerVersion: {
+    fontSize: 11,
+    color: '#6B7280',
   },
 });

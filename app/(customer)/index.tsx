@@ -1,44 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ScrollView,
-  TextInput,
   Platform,
   StyleSheet,
   Pressable,
   KeyboardAvoidingView,
   ActivityIndicator,
   View,
+  Text,
+  StatusBar,
+  Keyboard,
+  TouchableWithoutFeedback,
+  Linking,
 } from 'react-native';
 import {
-  YStack,
-  XStack,
-  SizableText,
-  SafeArea,
   ShoppingBag,
   MapPin,
   Phone,
   User,
   Package,
   Mail,
-  CheckCircle,
   CreditCard,
   ChevronRight,
   ChevronLeft,
-  DollarSign,
   Navigation,
-  CheckSquare,
-  Square,
   Truck,
+  Zap,
 } from '@blinkdotnew/mobile-ui';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { blink } from '@/lib/blink';
 import { blinkDbCreate } from '@/lib/blinkApi';
-import { colors, spacing, borderRadius } from '@/constants/design';
+import { colors, gradients, borderRadius } from '@/constants/design';
 import { APP_CONFIG, IS_STORE_BUILD, ORDER_SCOPE } from '@/lib/config';
-import { Linking } from 'react-native';
 import { calcDistanceMiles } from '@/lib/distance';
+import { isValidEmail } from '@/lib/validation';
+import CustomInput from '@/components/core/CustomInput';
 
 const SESSION_KEY = 'customer_session_id';
 const DELIVERY_FEE = APP_CONFIG.DELIVERY_FEE_CENTS;
@@ -68,9 +68,17 @@ interface FormState {
   deliveryType: 'door' | 'meet';
 }
 
-// Pre-fill pickup address from store config when LOCK_PICKUP_ADDRESS is true
 const INITIAL_ADDRESS = APP_CONFIG.LOCK_PICKUP_ADDRESS ? APP_CONFIG.STORE_ADDRESS : '';
-const EMPTY_FORM: FormState = { name: '', phone: '', email: '', pickupNumber: '', address: INITIAL_ADDRESS, deliveryAddress: '', miles: '', deliveryType: 'door' };
+const EMPTY_FORM: FormState = {
+  name: '',
+  phone: '',
+  email: '',
+  pickupNumber: '',
+  address: INITIAL_ADDRESS,
+  deliveryAddress: '',
+  miles: '',
+  deliveryType: 'door',
+};
 
 const TIP_OPTIONS = [
   { label: '$5', cents: 5_00 },
@@ -114,296 +122,319 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
     const pickup = form.address?.trim();
     const delivery = form.deliveryAddress?.trim();
     if (!pickup || !delivery) return;
-    
+
     timerRef.current = setTimeout(async () => {
       setCalculating(true);
       try {
-        const miles = await calcDistanceMiles(pickup, delivery);
-        if (miles !== null && miles > 0) {
-          set('miles')(String(miles));
+        const calculatedMiles = await calcDistanceMiles(pickup, delivery);
+        if (calculatedMiles !== null && calculatedMiles > 0) {
+          set('miles')(String(calculatedMiles));
         }
       } catch {}
       setCalculating(false);
-    }, 1500); // 1.5s debounce after user stops typing
-    
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    }, 1500);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [form.address, form.deliveryAddress]);
 
-  const fields: {
-    label: string;
-    key: keyof FormState;
-    placeholder: string;
-    icon: React.ReactNode;
-    multiline?: boolean;
-    keyboardType?: 'default' | 'phone-pad' | 'email-address' | 'numeric' | 'decimal-pad';
-    autoCapitalize?: 'none' | 'sentences' | 'words';
-  }[] = [
-    { label: 'YOUR NAME', key: 'name', placeholder: 'e.g. Alex Rivera', icon: <User size={20} color="#6B7280" />, autoCapitalize: 'words' },
-    { label: 'PHONE NUMBER', key: 'phone', placeholder: 'e.g. (555) 123-4567', icon: <Phone size={20} color="#6B7280" />, keyboardType: 'phone-pad', autoCapitalize: 'none' },
-    { label: 'PICKUP INFO', key: 'pickupNumber', placeholder: 'e.g. #1042 or "Deli Counter"', icon: <Package size={20} color="#6B7280" />, autoCapitalize: 'none' },
-    { label: 'EMAIL (optional)', key: 'email', placeholder: 'For order updates', icon: <Mail size={20} color="#6B7280" />, keyboardType: 'email-address', autoCapitalize: 'none' },
-    { label: 'PICKUP ADDRESS', key: 'address', placeholder: '123 Main St, City, State', icon: <MapPin size={20} color="#6B7280" />, autoCapitalize: 'words' },
-    { label: 'DELIVERY ADDRESS', key: 'deliveryAddress', placeholder: 'Where should we bring it?', icon: <Navigation size={20} color="#6B7280" />, autoCapitalize: 'words' },
-  ];
+  const nameStatus =
+    form.name.length === 0 ? 'default' : form.name.trim().length >= 2 ? 'success' : 'default';
+
+  const phoneStatus =
+    form.phone.length === 0 ? 'default' : form.phone.trim().length >= 7 ? 'success' : 'default';
+
+  const isEmailValid = isValidEmail(form.email);
+  const emailStatus =
+    form.email.length === 0 ? 'default' : isEmailValid ? 'success' : 'error';
+
+  const isPickupLocked = APP_CONFIG.LOCK_PICKUP_ADDRESS && IS_STORE_BUILD;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {/* Store info banner — shown on store-specific builds */}
-        {IS_STORE_BUILD && (
-          <YStack
-            backgroundColor="rgba(0,102,255,0.1)"
-            borderRadius={14}
-            borderWidth={1.5}
-            borderColor="rgba(0,102,255,0.3)"
-            padding="$4"
-            marginBottom="$4"
-            gap="$2"
-          >
-            <XStack alignItems="center" gap="$3">
-              <YStack
-                width={44} height={44} borderRadius={22}
-                backgroundColor="rgba(0,102,255,0.18)"
-                alignItems="center" justifyContent="center"
-                borderWidth={1} borderColor="rgba(0,102,255,0.4)"
-              >
-                <ShoppingBag size={24} color={APP_CONFIG.PRIMARY_COLOR} />
-              </YStack>
-              <YStack flex={1}>
-                <SizableText size="$6" fontWeight="900" color="#111827">
-                  {APP_CONFIG.STORE_NAME}
-                </SizableText>
-                <SizableText size="$3" color="#374151">{APP_CONFIG.STORE_TYPE}</SizableText>
-              </YStack>
-            </XStack>
-            <XStack gap="$2" alignItems="center" marginTop="$1">
-              <MapPin size={15} color="#6B7280" />
-              <SizableText size="$3" color="#374151" flex={1}>{APP_CONFIG.STORE_ADDRESS}</SizableText>
-            </XStack>
-            {APP_CONFIG.STORE_PHONE ? (
-              <XStack gap="$2" alignItems="center">
-                <Phone size={15} color="#6B7280" />
-                <SizableText size="$3" color="#374151">{APP_CONFIG.STORE_PHONE}</SizableText>
-              </XStack>
-            ) : null}
-            <XStack gap="$2" alignItems="center">
-              <Navigation size={15} color="#6B7280" />
-              <SizableText size="$3" color="#374151">{APP_CONFIG.STORE_HOURS}</SizableText>
-            </XStack>
-          </YStack>
-        )}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Pressable onPress={Keyboard.dismiss} style={styles.innerContent}>
+          {/* Store Info Banner (For store-specific builds) */}
+          {IS_STORE_BUILD && (
+            <View style={styles.storeBanner}>
+              <View style={styles.storeHeaderRow}>
+                <View style={styles.storeIconContainer}>
+                  <ShoppingBag size={22} color={colors.secondaryContainer} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.storeTitle}>{APP_CONFIG.STORE_NAME}</Text>
+                  <Text style={styles.storeSubtitle}>{APP_CONFIG.STORE_TYPE}</Text>
+                </View>
+              </View>
+              <View style={styles.storeDetailRow}>
+                <MapPin size={14} color={colors.outline} />
+                <Text style={styles.storeDetailText}>{APP_CONFIG.STORE_ADDRESS}</Text>
+              </View>
+              {APP_CONFIG.STORE_PHONE ? (
+                <View style={styles.storeDetailRow}>
+                  <Phone size={14} color={colors.outline} />
+                  <Text style={styles.storeDetailText}>{APP_CONFIG.STORE_PHONE}</Text>
+                </View>
+              ) : null}
+              <View style={styles.storeDetailRow}>
+                <Navigation size={14} color={colors.outline} />
+                <Text style={styles.storeDetailText}>{APP_CONFIG.STORE_HOURS}</Text>
+              </View>
+            </View>
+          )}
 
-        {/* Header */}
-        <XStack alignItems="center" gap="$3" marginBottom="$6">
-          <YStack width={48} height={48} borderRadius={24} backgroundColor="#DBEAFE" alignItems="center" justifyContent="center">
-            <ShoppingBag size={26} color="#2563EB" />
-          </YStack>
-          <YStack>
-            <SizableText size="$7" fontWeight="800" color="#111827">
-              {IS_STORE_BUILD ? `Order from ${APP_CONFIG.STORE_NAME}` : 'Request a Pickup'}
-            </SizableText>
-            <SizableText size="$3" color="#374151">Step 1 of 2 — Your details</SizableText>
-            <SizableText size="$3" color="#6B7280" marginTop="$1">Give us your phone number and delivery address</SizableText>
-          </YStack>
-        </XStack>
+          {/* Header */}
+          <View style={styles.headerSection}>
+            <View style={styles.headerIconWrapper}>
+              <ShoppingBag size={24} color="#0F131C" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle}>
+                {IS_STORE_BUILD ? `Order from ${APP_CONFIG.STORE_NAME}` : 'Request a Pickup'}
+              </Text>
+              <Text style={styles.headerStepText}>Step 1 of 2 — Your details</Text>
+              <Text style={styles.headerDescText}>
+                Give us your phone number and delivery address
+              </Text>
+            </View>
+          </View>
 
-        {/* Progress bar */}
-        <XStack height={4} borderRadius={2} backgroundColor="#E5E7EB" marginBottom="$6">
-          <YStack width="50%" height={4} borderRadius={2} backgroundColor="#2563EB" />
-        </XStack>
+          {/* Progress Bar */}
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: '50%' }]} />
+          </View>
 
-        {/* Test data fill button */}
-        <XStack justifyContent="flex-end" marginBottom="$2" marginTop={-8}>
-          <Pressable
-            onPress={() => {
-              set('name')('Jamie Test');
-              set('phone')('(520) 555-1234');
-              set('pickupNumber')('#1042');
-              set('email')('test@example.com');
-              set('address')('5765 S Camino del Sol, Green Valley, AZ 85622');
-              set('deliveryAddress')('123 E Test Ave, Sahuarita, AZ 85629');
-            }}
-            style={({ pressed }: { pressed: boolean }) => ({
-              backgroundColor: pressed ? 'rgba(0,102,255,0.2)' : 'rgba(0,102,255,0.1)',
-              borderRadius: 999,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-              borderWidth: 1,
-              borderColor: 'rgba(0,102,255,0.35)',
-            })}
-          >
-            <SizableText size="$2" fontWeight="700" color="#2563EB">⚡ Fill test data</SizableText>
-          </Pressable>
-        </XStack>
+          {/* Quick Fill Form */}
+          <View style={styles.testDataRow}>
+            <Pressable
+              onPress={() => {
+                set('name')('Jamie Test');
+                set('phone')('(520) 555-1234');
+                set('pickupNumber')('#1042');
+                set('email')('test@example.com');
+                set('address')('5765 S Camino del Sol, Green Valley, AZ 85622');
+                set('deliveryAddress')('123 E Test Ave, Sahuarita, AZ 85629');
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                }
+              }}
+              style={({ pressed }) => [styles.testDataBadge, pressed && { opacity: 0.75 }]}
+            >
+              <Zap size={13} color={colors.secondaryContainer} />
+              <Text style={styles.testDataText}>Fill the form</Text>
+            </Pressable>
+          </View>
 
-        {/* Standard fields */}
-        <YStack gap="$4">
-          {fields.map(({ label, key, placeholder, icon, multiline, keyboardType, autoCapitalize }) => {
-            // Lock pickup address field for store builds
-            const isLocked = key === 'address' && APP_CONFIG.LOCK_PICKUP_ADDRESS && IS_STORE_BUILD;
-            return (
-            <YStack key={key} gap="$1">
-              <XStack alignItems="center" gap="$2">
-                <SizableText size="$3" fontWeight="700" color="#374151">{label}</SizableText>
-                {isLocked && (
-                  <SizableText size="$2" fontWeight="700"
-                    color={APP_CONFIG.PRIMARY_COLOR}
-                    backgroundColor="rgba(0,102,255,0.12)"
-                    paddingHorizontal={6} paddingVertical={2}
-                    borderRadius={4}
-                  >
-                    STORE ADDRESS
-                  </SizableText>
-                )}
-              </XStack>
-              <XStack
-                alignItems={multiline ? 'flex-start' : 'center'}
-                backgroundColor={isLocked ? 'rgba(0,102,255,0.07)' : '#F9FAFB'}
-                borderRadius={14}
-                borderWidth={1}
-                borderColor={isLocked ? 'rgba(0,102,255,0.3)' : '#E5E7EB'}
-                paddingHorizontal="$4"
-                paddingVertical={multiline ? '$3' : '$0'}
-                gap="$2"
-              >
-                <YStack marginTop={multiline ? 2 : 0}>{icon}</YStack>
-                <TextInput
-                  value={form[key]}
-                  onChangeText={isLocked ? undefined : set(key)}
-                  editable={!isLocked}
-                  placeholder={placeholder}
-                  placeholderTextColor="#9CA3AF"
-                  multiline={multiline}
-                  numberOfLines={multiline ? 3 : 1}
-                  keyboardType={keyboardType ?? 'default'}
-                  autoCapitalize={autoCapitalize ?? 'sentences'}
-                  returnKeyType={multiline ? 'default' : 'next'}
+          {/* Input Fields */}
+          <View style={styles.formFields}>
+            {/* Delivery Preference Toggle */}
+            <View style={styles.deliveryPrefSection}>
+              <Text style={styles.fieldSectionLabel}>DELIVERY PREFERENCE</Text>
+              <View style={styles.prefRow}>
+                <Pressable
+                  onPress={() => {
+                    setDeliveryType('door');
+                    if (Platform.OS !== 'web') {
+                      Haptics.selectionAsync().catch(() => {});
+                    }
+                  }}
                   style={[
-                    styles.input,
-                    multiline && styles.inputMultiline,
-                    Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {},
+                    styles.prefCard,
+                    form.deliveryType === 'door' && styles.prefCardActiveGreen,
                   ]}
-                />
-              </XStack>
-            </YStack>
-          );})}
+                >
+                  <View style={styles.prefTopRow}>
+                    <Text style={styles.prefEmoji}>🚪</Text>
+                    <Text
+                      style={[
+                        styles.prefTitle,
+                        form.deliveryType === 'door' && { color: colors.tertiary },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      Leave at Door
+                    </Text>
+                  </View>
+                  <Text style={styles.prefDesc} numberOfLines={1}>
+                    Photo on delivery
+                  </Text>
+                </Pressable>
 
-          {/* Auto-calculated distance display */}
-          <YStack gap="$1">
-            <SizableText size="$3" fontWeight="700" color="#374151">ESTIMATED DISTANCE</SizableText>
-            {calculating ? (
-              <XStack
-                alignItems="center"
-                backgroundColor="#F0F9FF"
-                borderRadius={14}
-                borderWidth={1}
-                borderColor="#93C5FD"
-                paddingHorizontal="$4"
-                height={52}
-                gap="$2"
-              >
-                <ActivityIndicator size="small" color="#2563EB" />
-                <SizableText size="$4" color="#2563EB">Calculating distance…</SizableText>
-              </XStack>
-            ) : hasValidMiles ? (
-              <XStack
-                alignItems="center"
-                backgroundColor="#ECFDF5"
-                borderRadius={14}
-                borderWidth={1}
-                borderColor="#86EFAC"
-                paddingHorizontal="$4"
-                height={52}
-                gap="$2"
-              >
-                <Navigation size={20} color="#16A34A" />
-                <SizableText size="$5" fontWeight="800" color="#111827">{miles.toFixed(1)} miles</SizableText>
-                <SizableText size="$4" color="#6B7280">·</SizableText>
-                <SizableText size="$4" fontWeight="700" color={mileageCents > 0 ? '#D97706' : '#15803D'}>
-                  {mileageCents > 0 ? `+${fmt(mileageCents)} surcharge` : 'No surcharge'}
-                </SizableText>
-              </XStack>
-            ) : (
-              <XStack
-                alignItems="center"
-                backgroundColor="#F9FAFB"
-                borderRadius={14}
-                borderWidth={1}
-                borderColor="#E5E7EB"
-                paddingHorizontal="$4"
-                height={52}
-                gap="$2"
-              >
-                <Navigation size={20} color="#9CA3AF" />
-                <SizableText size="$4" color="#9CA3AF">
-                  {form.address?.trim() && form.deliveryAddress?.trim()
-                    ? 'Could not calculate distance — enter addresses more specifically'
-                    : 'Enter both addresses to calculate distance'}
-                </SizableText>
-              </XStack>
+                <Pressable
+                  onPress={() => {
+                    setDeliveryType('meet');
+                    if (Platform.OS !== 'web') {
+                      Haptics.selectionAsync().catch(() => {});
+                    }
+                  }}
+                  style={[
+                    styles.prefCard,
+                    form.deliveryType === 'meet' && styles.prefCardActiveBlue,
+                  ]}
+                >
+                  <View style={styles.prefTopRow}>
+                    <Text style={styles.prefEmoji}>🤝</Text>
+                    <Text
+                      style={[
+                        styles.prefTitle,
+                        form.deliveryType === 'meet' && { color: colors.primary },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      Meet at Door
+                    </Text>
+                  </View>
+                  <Text style={styles.prefDesc} numberOfLines={1}>
+                    Meet at your door
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* YOUR NAME */}
+            <CustomInput
+              label="YOUR NAME"
+              value={form.name}
+              onChangeText={set('name')}
+              placeholder="e.g. Alex Rivera"
+              autoCapitalize="words"
+              returnKeyType="next"
+              leftIcon={<User size={18} color={colors.outline} />}
+              status={nameStatus}
+            />
+
+            {/* PHONE NUMBER */}
+            <CustomInput
+              label="PHONE NUMBER"
+              value={form.phone}
+              onChangeText={set('phone')}
+              placeholder="e.g. (555) 123-4567"
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              returnKeyType="next"
+              leftIcon={<Phone size={18} color={colors.outline} />}
+              status={phoneStatus}
+            />
+
+            {/* PICKUP INFO */}
+            <CustomInput
+              label="PICKUP INFO"
+              value={form.pickupNumber}
+              onChangeText={set('pickupNumber')}
+              placeholder="e.g. #1042 or 'Deli Counter'"
+              autoCapitalize="none"
+              returnKeyType="next"
+              leftIcon={<Package size={18} color={colors.outline} />}
+            />
+
+            {/* EMAIL (optional) */}
+            <CustomInput
+              label="EMAIL (OPTIONAL)"
+              value={form.email}
+              onChangeText={set('email')}
+              placeholder="For order updates"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              returnKeyType="next"
+              leftIcon={<Mail size={18} color={colors.outline} />}
+              status={emailStatus}
+            />
+
+            {/* PICKUP ADDRESS */}
+            <CustomInput
+              label={isPickupLocked ? 'PICKUP ADDRESS (STORE)' : 'PICKUP ADDRESS'}
+              value={form.address}
+              onChangeText={isPickupLocked ? undefined : set('address')}
+              editable={!isPickupLocked}
+              placeholder="123 Main St, City, State"
+              autoCapitalize="words"
+              returnKeyType="next"
+              leftIcon={<MapPin size={18} color={colors.outline} />}
+              status={form.address.trim().length >= 5 ? 'success' : 'default'}
+            />
+
+            {/* DELIVERY ADDRESS */}
+            <CustomInput
+              label="DELIVERY ADDRESS"
+              value={form.deliveryAddress}
+              onChangeText={set('deliveryAddress')}
+              placeholder="Where should we bring it?"
+              autoCapitalize="words"
+              returnKeyType="done"
+              leftIcon={<Navigation size={18} color={colors.outline} />}
+              status={form.deliveryAddress.trim().length >= 5 ? 'success' : 'default'}
+            />
+
+            {/* Auto-calculated Distance Card */}
+            <View style={styles.distanceSection}>
+              <Text style={styles.fieldSectionLabel}>ESTIMATED DISTANCE</Text>
+              {calculating ? (
+                <View style={styles.distanceBoxLoading}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.distanceTextLoading}>Calculating route distance…</Text>
+                </View>
+              ) : hasValidMiles ? (
+                <View style={styles.distanceBoxSuccess}>
+                  <Navigation size={18} color={colors.tertiary} />
+                  <Text style={styles.distanceValueText}>{miles.toFixed(1)} miles</Text>
+                  <Text style={styles.distanceDot}>·</Text>
+                  <Text
+                    style={[
+                      styles.distanceSurchargeText,
+                      mileageCents > 0
+                        ? { color: colors.secondaryContainer }
+                        : { color: colors.tertiary },
+                    ]}
+                  >
+                    {mileageCents > 0 ? `+${fmt(mileageCents)} mileage surcharge` : 'No surcharge'}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.distanceBoxEmpty}>
+                  <Navigation size={18} color={colors.outline} />
+                  <Text style={styles.distanceTextEmpty}>
+                    {form.address?.trim() && form.deliveryAddress?.trim()
+                      ? 'Could not calculate distance — enter specific street address'
+                      : 'Enter pickup and delivery addresses to calculate distance'}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.distanceFootnote}>
+                $2.00/mile · distance calculated automatically
+              </Text>
+            </View>
+
+            {/* Error Message */}
+            {!!error && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
             )}
-            <SizableText size="$3" color="#6B7280" paddingLeft="$1">
-              $2.00/mile · distance calculated automatically
-            </SizableText>
-          </YStack>
-        </YStack>
 
-        {/* Delivery preference toggle */}
-        <YStack marginBottom="$5" gap="$2" marginTop="$5">
-          <SizableText size="$3" fontWeight="700" color="#374151" letterSpacing={1}>DELIVERY PREFERENCE</SizableText>
-          <XStack gap="$3">
+            {/* Next CTA Button */}
             <Pressable
-              onPress={() => setDeliveryType('door')}
-              style={({ pressed }: { pressed: boolean }) => ({
-                flex: 1, borderRadius: 14, borderWidth: 2,
-                borderColor: form.deliveryType === 'door' ? '#22c55e' : '#E5E7EB',
-                backgroundColor: form.deliveryType === 'door' ? 'rgba(34,197,94,0.10)' : '#F9FAFB',
-                padding: 14, alignItems: 'center', gap: 6,
-                opacity: pressed ? 0.85 : 1,
-              })}
+              onPress={onNext}
+              style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
             >
-              <SizableText size="$6">🚪</SizableText>
-              <SizableText size="$4" fontWeight="700" color={form.deliveryType === 'door' ? '#16A34A' : '#1F2937'}>Leave at Door</SizableText>
-              <SizableText size="$2" color="#6B7280" textAlign="center">{'Driver takes a photo\nas proof of delivery'}</SizableText>
+              <Text style={styles.primaryBtnText}>Next: Review Order</Text>
+              <ChevronRight size={20} color="#0F131C" />
             </Pressable>
-            <Pressable
-              onPress={() => setDeliveryType('meet')}
-              style={({ pressed }: { pressed: boolean }) => ({
-                flex: 1, borderRadius: 14, borderWidth: 2,
-                borderColor: form.deliveryType === 'meet' ? '#0066FF' : '#E5E7EB',
-                backgroundColor: form.deliveryType === 'meet' ? 'rgba(0,102,255,0.08)' : '#F9FAFB',
-                padding: 14, alignItems: 'center', gap: 6,
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <SizableText size="$6">🤝</SizableText>
-              <SizableText size="$4" fontWeight="700" color={form.deliveryType === 'meet' ? '#2563EB' : '#1F2937'}>Meet at Door</SizableText>
-              <SizableText size="$2" color="#6B7280" textAlign="center">{"You'll meet the driver\nat your door"}</SizableText>
-            </Pressable>
-          </XStack>
-        </YStack>
-
-        {!!error && (
-          <YStack backgroundColor="#FEE2E2" borderRadius={10} padding="$3" borderWidth={1} borderColor="#FCA5A5" marginTop="$3">
-            <SizableText size="$4" color="#DC2626">{error}</SizableText>
-          </YStack>
-        )}
-
-        <Pressable
-          onPress={onNext}
-          style={({ pressed }) => [styles.btn, { marginTop: spacing.lg }, pressed && styles.btnPressed]}
-        >
-          <XStack alignItems="center" gap="$2">
-            <SizableText size="$6" fontWeight="800" color="white">Next: Review Order</SizableText>
-            <ChevronRight size={22} color="white" />
-          </XStack>
+          </View>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-// ─── Step 2: Payment Summary ─────────────────────────────────────────────────
+// ─── Step 2: Payment Summary & Review ─────────────────────────────────────────
 
 interface StepTwoProps {
   form: FormState;
@@ -421,374 +452,302 @@ interface StepTwoProps {
   setCustomTipText: (v: string) => void;
 }
 
-function StepTwo({ form, tipCents, setTipCents, mileageCents, onBack, onSubmit, loading, error, deliveryType, showCustomTip, setShowCustomTip, customTipText, setCustomTipText }: StepTwoProps) {
+function StepTwo({
+  form,
+  tipCents,
+  setTipCents,
+  mileageCents,
+  onBack,
+  onSubmit,
+  loading,
+  error,
+  deliveryType,
+  showCustomTip,
+  setShowCustomTip,
+  customTipText,
+  setCustomTipText,
+}: StepTwoProps) {
   const miles = parseFloat(form.miles);
-  const hasDistance = isFinite(miles) && miles > 0;
   const totalCents = DELIVERY_FEE + mileageCents + tipCents;
   const [agreedToTerms, setAgreedToTerms] = React.useState(false);
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <XStack alignItems="center" gap="$3" marginBottom="$6">
-        <YStack width={48} height={48} borderRadius={24} backgroundColor="#BBF7D0" alignItems="center" justifyContent="center">
-          <CreditCard size={26} color="#16A34A" />
-        </YStack>
-        <YStack>
-          <SizableText size="$7" fontWeight="800" color="#111827">Review Order</SizableText>
-          <SizableText size="$3" color="#374151">Step 2 of 2 — Confirm your pickup request</SizableText>
-        </YStack>
-      </XStack>
-
-      {/* Progress bar */}
-      <XStack height={4} borderRadius={2} backgroundColor="#E5E7EB" marginBottom="$6">
-        <YStack width="100%" height={4} borderRadius={2} backgroundColor="#16A34A" />
-      </XStack>
-
-      {/* Order summary card */}
-      <YStack backgroundColor="#F9FAFB" borderRadius={16} borderWidth={1} borderColor="#E5E7EB" padding="$4" gap="$3" marginBottom="$5">
-        <SizableText size="$4" fontWeight="700" color="#374151">ORDER SUMMARY</SizableText>
-        <YStack gap="$2">
-          <XStack justifyContent="space-between">
-            <SizableText size="$4" color="#1F2937">Customer</SizableText>
-            <SizableText size="$4" color="#111827" fontWeight="600">{form.name}</SizableText>
-          </XStack>
-          <XStack justifyContent="space-between">
-            <SizableText size="$4" color="#1F2937">Phone</SizableText>
-            <SizableText size="$4" color="#111827" fontWeight="600">{form.phone}</SizableText>
-          </XStack>
-          <XStack justifyContent="space-between" alignItems="flex-start">
-            <SizableText size="$4" color="#1F2937">Pickup at</SizableText>
-            <SizableText size="$4" color="#111827" fontWeight="600" textAlign="right" flex={1} marginLeft="$4">{form.address}</SizableText>
-          </XStack>
-          <XStack justifyContent="space-between" alignItems="flex-start">
-            <SizableText size="$4" color="#1F2937">Pickup Info</SizableText>
-            <SizableText size="$4" color="#111827" fontWeight="600" textAlign="right" flex={1} marginLeft="$4">{form.pickupNumber || '—'}</SizableText>
-          </XStack>
-          {hasDistance && (
-            <XStack justifyContent="space-between">
-              <SizableText size="$4" color="#1F2937">Distance</SizableText>
-              <SizableText size="$4" color="#111827" fontWeight="600">{miles.toFixed(1)} mi</SizableText>
-            </XStack>
-          )}
-          <XStack justifyContent="space-between" alignItems="flex-start">
-            <SizableText size="$4" color="#1F2937">Deliver to</SizableText>
-            <SizableText size="$4" color="#111827" fontWeight="600" textAlign="right" flex={1} marginLeft="$4">
-              {form.deliveryAddress || '—'}
-            </SizableText>
-          </XStack>
-          <XStack justifyContent="space-between" alignItems="center">
-            <SizableText size="$4" color="#1F2937">Delivery</SizableText>
-            <XStack gap="$1" alignItems="center">
-              <SizableText size="$4">{deliveryType === 'meet' ? '🤝' : '🚪'}</SizableText>
-              <SizableText size="$4" color="#111827" fontWeight="600">{deliveryType === 'meet' ? 'Meet at Door' : 'Leave at Door'}</SizableText>
-            </XStack>
-          </XStack>
-        </YStack>
-      </YStack>
-
-      {/* Pricing */}
-      <YStack backgroundColor="#F9FAFB" borderRadius={16} borderWidth={1} borderColor="#E5E7EB" padding="$4" gap="$4" marginBottom="$5">
-        <SizableText size="$4" fontWeight="700" color="#374151">PRICING</SizableText>
-
-        {/* Delivery fee */}
-        <XStack justifyContent="space-between" alignItems="center">
-          <YStack>
-            <SizableText size="$5" color="#111827" fontWeight="600">Delivery Fee</SizableText>
-            <SizableText size="$3" color="#6B7280">Base pickup & drop-off</SizableText>
-          </YStack>
-          <SizableText size="$6" fontWeight="800" color="#111827">{fmt(DELIVERY_FEE)}</SizableText>
-        </XStack>
-
-        {/* Mileage surcharge — only show if applicable */}
-        {mileageCents > 0 && (
-          <>
-            <YStack height={1} backgroundColor="#E5E7EB" />
-            <XStack justifyContent="space-between" alignItems="center">
-              <YStack>
-                <SizableText size="$5" color="#111827" fontWeight="600">Mileage Surcharge</SizableText>
-                <SizableText size="$3" color="#6B7280">
-                  {(miles - MILEAGE_FREE_MILES).toFixed(1)} mi × $2.00/mi
-                </SizableText>
-              </YStack>
-              <SizableText size="$6" fontWeight="800" color="#D97706">{fmt(mileageCents)}</SizableText>
-            </XStack>
-          </>
-        )}
-
-        {/* Divider */}
-        <YStack height={1} backgroundColor="#E5E7EB" />
-
-        {/* Tip for driver */}
-        <YStack gap="$3">
-          <XStack justifyContent="space-between" alignItems="center">
-            <YStack>
-              <SizableText size="$5" color="#111827" fontWeight="600">Tip for Driver</SizableText>
-              <SizableText size="$3" color="#6B7280">Starting at $5 · no limit · 100% to driver</SizableText>
-            </YStack>
-            <SizableText size="$6" fontWeight="800" color="#16A34A">{fmt(tipCents)}</SizableText>
-          </XStack>
-
-          {/* Tip selector */}
-          <XStack flexWrap="wrap" gap="$2">
-            {TIP_OPTIONS.map((opt) => {
-              const active = tipCents === opt.cents;
-              return (
-                <Pressable
-                  key={opt.cents}
-                  onPress={() => {
-                    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
-                    setTipCents(opt.cents);
-                  }}
-                  style={({ pressed }) => [
-                    styles.tipBtn,
-                    active && styles.tipBtnActive,
-                    pressed && styles.tipBtnPressed,
-                  ]}
-                >
-                  <SizableText size="$4" fontWeight="700" color={active ? 'white' : '#1F2937'}>
-                    {opt.label}
-                  </SizableText>
-                </Pressable>
-              );
-            })}
-
-            {/* Custom tip button — opens input to enter a custom amount */}
-            <Pressable
-              onPress={() => {
-                if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
-                setShowCustomTip(true);
-              }}
-              style={({ pressed }) => [
-                styles.tipBtn,
-                showCustomTip && styles.tipBtnActive,
-                pressed && styles.tipBtnPressed,
-              ]}
-            >
-              <SizableText
-                size="$4"
-                fontWeight="700"
-                color={showCustomTip ? 'white' : '#1F2937'}
-              >
-                Custom
-              </SizableText>
-            </Pressable>
-          </XStack>
-
-          {/* Custom tip input — shown when "Custom" is tapped */}
-          {showCustomTip && (
-            <XStack
-              alignItems="center"
-              gap="$2"
-              marginTop="$2"
-              backgroundColor="#F3F4F6"
-              borderRadius={10}
-              paddingHorizontal="$3"
-              paddingVertical="$2"
-              borderWidth={1}
-              borderColor="#D1D5DB"
-            >
-              <SizableText size="$4" fontWeight="600" color="#374151">$</SizableText>
-              <TextInput
-                style={styles.customTipInput as any}
-                value={customTipText}
-                onChangeText={(t) => {
-                  // Allow only digits and one decimal
-                  const cleaned = t.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
-                  setCustomTipText(cleaned);
-                  const dollars = parseFloat(cleaned);
-                  if (isFinite(dollars) && dollars >= 0) {
-                    setTipCents(Math.round(dollars * 100));
-                  } else if (cleaned === '') {
-                    setTipCents(0);
-                  }
-                }}
-                placeholder="Enter amount"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-                autoFocus
-              />
-              {customTipText.length > 0 && (
-                <Pressable
-                  onPress={() => {
-                    setCustomTipText('');
-                    setTipCents(5_00);
-                    setShowCustomTip(false);
-                    if (Platform.OS !== 'web') Haptics.selectionAsync().catch(() => {});
-                  }}
-                  hitSlop={10}
-                >
-                  <SizableText size="$4" color="#6B7280" fontWeight="600">✕</SizableText>
-                </Pressable>
-              )}
-            </XStack>
-          )}
-
-          {showCustomTip && tipCents < 5_00 && tipCents > 0 && (
-            <SizableText size="$3" color="#DC2626" fontWeight="600">
-              Minimum tip is $5.00
-            </SizableText>
-          )}
-        </YStack>
-
-        {/* Divider */}
-        <YStack height={1} backgroundColor="#E5E7EB" />
-
-        {/* Total */}
-        <XStack justifyContent="space-between" alignItems="center">
-          <SizableText size="$6" fontWeight="800" color="#111827">Total</SizableText>
-          <SizableText size="$7" fontWeight="800" color="#16A34A">{fmt(totalCents)}</SizableText>
-        </XStack>
-      </YStack>
-
-      {/* What to expect */}
-      <YStack
-        backgroundColor="#F9FAFB"
-        borderRadius={14}
-        borderWidth={1}
-        borderColor="#E5E7EB"
-        padding="$4"
-        gap="$2"
-        marginBottom="$4"
-      >
-        <SizableText size="$4" fontWeight="700" color="#374151">WHAT TO EXPECT</SizableText>
-        <XStack gap="$2" alignItems="flex-start">
-          <SizableText size="$4" color="#6B7280">1.</SizableText>
-          <SizableText size="$4" color="#1F2937" flex={1}>A driver picks up your order from the store</SizableText>
-        </XStack>
-        <XStack gap="$2" alignItems="flex-start">
-          <SizableText size="$4" color="#6B7280">2.</SizableText>
-          <SizableText size="$4" color="#1F2937" flex={1}>They deliver to your address — usually within the hour</SizableText>
-        </XStack>
-        <XStack gap="$2" alignItems="flex-start">
-          <SizableText size="$4" color="#6B7280">3.</SizableText>
-          <SizableText size="$4" color="#1F2937" flex={1}>You'll receive a payment link via email to pay securely</SizableText>
-        </XStack>
-        {APP_CONFIG.STORE_EMAIL ? (
-          <XStack gap="$2" alignItems="flex-start">
-            <SizableText size="$4" color="#6B7280">?</SizableText>
-            <SizableText
-              size="$4" color="#1D4ED8" flex={1}
-              onPress={() => Linking.openURL(`mailto:${APP_CONFIG.STORE_EMAIL}`)}
-            >
-              Questions? Email us at {APP_CONFIG.STORE_EMAIL}
-            </SizableText>
-          </XStack>
-        ) : null}
-      </YStack>
-
-      {/* Payment notice */}
-      <XStack
-        backgroundColor="#DCFCE7"
-        borderRadius={12}
-        borderWidth={1}
-        borderColor="#86EFAC"
-        padding="$3"
-        gap="$2"
-        alignItems="center"
-        marginBottom="$3"
-      >
-        <CreditCard size={18} color="#16A34A" />
-        <SizableText size="$3" color="#15803D" flex={1}>
-          No payment now — you'll receive a secure Stripe link when a driver picks up your order.
-        </SizableText>
-      </XStack>
-
-      {/* Terms of Use consent — large black highlighted box */}
-      <YStack
-        backgroundColor="#111827"
-        borderRadius={16}
-        borderWidth={3}
-        borderColor={agreedToTerms ? '#22C55E' : '#9CA3AF'}
-        padding="$5"
-        gap="$3"
-        marginBottom="$2"
-        shadowColor="#000"
-        shadowOpacity={0.3}
-        shadowRadius={8}
-        shadowOffset={{ width: 0, height: 4 }}
-      >
-        <SizableText size="$4" fontWeight="800" color="white" marginBottom="$1">
-          {agreedToTerms ? '✓ AGREED' : 'AGREE TO CONTINUE'}
-        </SizableText>
-        <Pressable
-          onPress={() => setAgreedToTerms((v) => !v)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 6 }}
-        >
-          <View
-            style={{
-              width: 32, height: 32, borderRadius: 8,
-              borderWidth: 2.5,
-              borderColor: agreedToTerms ? '#22C55E' : '#6B7280',
-              backgroundColor: agreedToTerms ? '#22C55E' : 'transparent',
-              alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            {agreedToTerms && (
-              <SizableText size="$5" fontWeight="900" color="white">✓</SizableText>
-            )}
+    <ScrollView
+      contentContainerStyle={styles.scroll}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <Pressable onPress={Keyboard.dismiss} style={styles.innerContent}>
+        {/* Header */}
+        <View style={styles.headerSection}>
+          <View style={[styles.headerIconWrapper, { backgroundColor: colors.tertiary }]}>
+            <CreditCard size={24} color="#0F131C" />
           </View>
-          <SizableText size="$4" color="#E5E7EB" flex={1} lineHeight={24}>
-            I agree to the{' '}
-            <SizableText
-              size="$4"
-              fontWeight="800"
-              color="#22C55E"
-              textDecorationLine="underline"
-              onPress={(e: any) => { e?.stopPropagation?.(); router.push('/terms'); }}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Review Order</Text>
+            <Text style={styles.headerStepText}>Step 2 of 2 — Confirm pickup request</Text>
+          </View>
+        </View>
+
+        {/* Progress Bar (100%) */}
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: '100%', backgroundColor: colors.tertiary },
+            ]}
+          />
+        </View>
+
+        {/* Order Summary Card */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryCardTitle}>ORDER DETAILS</Text>
+
+          <View style={styles.summaryAddressBlock}>
+            <View style={styles.summaryAddressItem}>
+              <View style={styles.summaryDotGreen} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.summaryAddressLabel}>PICKUP FROM</Text>
+                <Text style={styles.summaryAddressValue}>{form.address}</Text>
+                {form.pickupNumber ? (
+                  <Text style={styles.summaryAddressNote}>Info: {form.pickupNumber}</Text>
+                ) : null}
+              </View>
+            </View>
+
+            <View style={styles.summaryAddressDivider} />
+
+            <View style={styles.summaryAddressItem}>
+              <View style={styles.summaryDotBlue} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.summaryAddressLabel}>DELIVER TO</Text>
+                <Text style={styles.summaryAddressValue}>{form.deliveryAddress}</Text>
+                <Text style={styles.summaryAddressNote}>
+                  {deliveryType === 'door' ? 'Leave at Door' : 'Meet at Door'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Pricing Breakdown */}
+          <View style={styles.priceBreakdown}>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Base Delivery Fee</Text>
+              <Text style={styles.priceValue}>{fmt(DELIVERY_FEE)}</Text>
+            </View>
+
+            {mileageCents > 0 ? (
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Mileage ({miles.toFixed(1)} mi)</Text>
+                <Text style={styles.priceValue}>{fmt(mileageCents)}</Text>
+              </View>
+            ) : null}
+
+            {/* Tip Selection */}
+            <View style={styles.tipSection}>
+              <Text style={styles.priceLabel}>Driver Tip</Text>
+              <View style={styles.tipRow}>
+                {TIP_OPTIONS.map((opt) => {
+                  const isSelected = !showCustomTip && tipCents === opt.cents;
+                  return (
+                    <Pressable
+                      key={opt.cents}
+                      onPress={() => {
+                        setShowCustomTip(false);
+                        setCustomTipText('');
+                        setTipCents(opt.cents);
+                        if (Platform.OS !== 'web') {
+                          Haptics.selectionAsync().catch(() => {});
+                        }
+                      }}
+                      style={[styles.tipBtn, isSelected && styles.tipBtnActive]}
+                    >
+                      <Text style={[styles.tipBtnText, isSelected && styles.tipBtnTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+
+                <Pressable
+                  onPress={() => {
+                    setShowCustomTip(true);
+                    if (Platform.OS !== 'web') {
+                      Haptics.selectionAsync().catch(() => {});
+                    }
+                  }}
+                  style={[styles.tipBtn, showCustomTip && styles.tipBtnActive]}
+                >
+                  <Text
+                    style={[styles.tipBtnText, showCustomTip && styles.tipBtnTextActive]}
+                  >
+                    Custom
+                  </Text>
+                </Pressable>
+              </View>
+
+              {showCustomTip && (
+                <View style={{ marginTop: 8 }}>
+                  <CustomInput
+                    placeholder="Enter tip amount ($)"
+                    value={customTipText}
+                    keyboardType="decimal-pad"
+                    returnKeyType="done"
+                    onChangeText={(text) => {
+                      const cleaned = text.replace(/[^0-9.]/g, '');
+                      setCustomTipText(cleaned);
+                      const dollars = parseFloat(cleaned);
+                      if (isFinite(dollars) && dollars >= 0) {
+                        setTipCents(Math.round(dollars * 100));
+                      } else if (cleaned === '') {
+                        setTipCents(0);
+                      }
+                    }}
+                  />
+                  {tipCents < 5_00 && tipCents > 0 && (
+                    <Text style={styles.tipWarningText}>Minimum tip is $5.00</Text>
+                  )}
+                </View>
+              )}
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Total */}
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Estimated Total</Text>
+              <Text style={styles.totalValue}>{fmt(totalCents)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* What to Expect Card */}
+        <View style={styles.expectCard}>
+          <Text style={styles.expectTitle}>WHAT TO EXPECT</Text>
+          <View style={styles.expectItem}>
+            <Text style={styles.expectNumber}>1.</Text>
+            <Text style={styles.expectText}>
+              A driver accepts and picks up your order from the store.
+            </Text>
+          </View>
+          <View style={styles.expectItem}>
+            <Text style={styles.expectNumber}>2.</Text>
+            <Text style={styles.expectText}>
+              They deliver directly to your address — usually within the hour.
+            </Text>
+          </View>
+          <View style={styles.expectItem}>
+            <Text style={styles.expectNumber}>3.</Text>
+            <Text style={styles.expectText}>
+              You'll receive a secure Stripe payment link once picked up.
+            </Text>
+          </View>
+          {APP_CONFIG.STORE_EMAIL ? (
+            <Pressable
+              onPress={() => Linking.openURL(`mailto:${APP_CONFIG.STORE_EMAIL}`)}
+              style={styles.expectItem}
             >
-              Terms of Use
-            </SizableText>
-            {' '}including the delivery and payment policies.
-          </SizableText>
-        </Pressable>
-      </YStack>
+              <Text style={styles.expectNumber}>?</Text>
+              <Text style={[styles.expectText, { color: colors.primary }]}>
+                Questions? Email {APP_CONFIG.STORE_EMAIL}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
 
-      {!!error && (
-        <YStack backgroundColor="#FEE2E2" borderRadius={10} padding="$3" borderWidth={1} borderColor="#FCA5A5" marginBottom="$3">
-          <SizableText size="$4" color="#DC2626">{error}</SizableText>
-        </YStack>
-      )}
+        {/* Payment Notice */}
+        <View style={styles.paymentNotice}>
+          <CreditCard size={18} color={colors.tertiary} />
+          <Text style={styles.paymentNoticeText}>
+            No payment required right now. You'll receive a secure Stripe link when a driver
+            picks up your delivery.
+          </Text>
+        </View>
 
-      {/* Actions */}
-      <YStack gap="$3">
-        <Pressable
-          onPress={agreedToTerms ? onSubmit : undefined}
-          disabled={loading || !agreedToTerms}
-          style={({ pressed }) => [
-            styles.btn,
-            pressed && agreedToTerms && styles.btnPressed,
-            (loading || !agreedToTerms) && styles.btnDisabled,
+        {/* Terms Agreement */}
+        <View
+          style={[
+            styles.termsCard,
+            agreedToTerms && { borderColor: colors.tertiary },
           ]}
         >
-          {loading ? (
-            <XStack gap="$2" alignItems="center">
-              <ActivityIndicator color="white" size="small" />
-              <SizableText size="$5" fontWeight="700" color="white">Placing order…</SizableText>
-            </XStack>
-          ) : (
-            <XStack alignItems="center" gap="$2">
-              <Truck size={22} color="white" />
-              <SizableText size="$6" fontWeight="800" color="white">
-                Place Order — {fmt(totalCents)} estimated
-              </SizableText>
-            </XStack>
-          )}
-        </Pressable>
+          <Pressable
+            onPress={() => setAgreedToTerms((v) => !v)}
+            style={styles.termsPressable}
+          >
+            <View
+              style={[
+                styles.termsCheckbox,
+                agreedToTerms && {
+                  backgroundColor: colors.tertiary,
+                  borderColor: colors.tertiary,
+                },
+              ]}
+            >
+              {agreedToTerms && (
+                <Ionicons name="checkmark" size={18} color="#0F131C" />
+              )}
+            </View>
+            <Text style={styles.termsText}>
+              I agree to the{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  router.push('/terms');
+                }}
+              >
+                Terms of Use
+              </Text>{' '}
+              including delivery and payment policies.
+            </Text>
+          </Pressable>
+        </View>
 
-        <Pressable onPress={onBack} style={({ pressed }) => [styles.backBtn, pressed && styles.btnPressed]}>
-          <XStack alignItems="center" justifyContent="center" gap="$2">
-            <ChevronLeft size={20} color="#374151" />
-            <SizableText size="$4" color="#374151">Edit Details</SizableText>
-          </XStack>
-        </Pressable>
-      </YStack>
+        {/* Error */}
+        {!!error && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtonsRow}>
+          <Pressable
+            onPress={agreedToTerms ? onSubmit : undefined}
+            disabled={loading || !agreedToTerms}
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              pressed && agreedToTerms && styles.primaryBtnPressed,
+              (!agreedToTerms || loading) && styles.btnDisabled,
+            ]}
+          >
+            {loading ? (
+              <View style={styles.btnRow}>
+                <ActivityIndicator color="#0F131C" size="small" />
+                <Text style={styles.primaryBtnText}>Placing order…</Text>
+              </View>
+            ) : (
+              <View style={styles.btnRow}>
+                <Truck size={20} color="#0F131C" />
+                <Text style={styles.primaryBtnText}>
+                  Place Order — {fmt(totalCents)}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+
+          <Pressable onPress={onBack} style={styles.backBtnOutline}>
+            <ChevronLeft size={18} color={colors.onSurfaceVariant} />
+            <Text style={styles.backBtnText}>Edit Details</Text>
+          </Pressable>
+        </View>
+      </Pressable>
     </ScrollView>
   );
 }
 
-// ─── Success screen ──────────────────────────────────────────────────────────
+// ─── Success Screen ──────────────────────────────────────────────────────────
 
 interface SuccessProps {
   orderId: string | null;
@@ -797,42 +756,115 @@ interface SuccessProps {
 }
 
 function SuccessScreen({ orderId, totalCents, onReset }: SuccessProps) {
+  const formattedOrderId = orderId ? `#${orderId.slice(-6).toUpperCase()}` : '#CONFIRMED';
+
   return (
-    <SafeArea>
-      <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" gap="$5">
-        <YStack width={88} height={88} borderRadius={44} backgroundColor="#DBEAFE" alignItems="center" justifyContent="center">
-          <Truck size={50} color="#2563EB" />
-        </YStack>
-        <YStack alignItems="center" gap="$2">
-          <SizableText size="$8" fontWeight="800" color="#111827" textAlign="center">Order Placed!</SizableText>
-          <SizableText size="$4" color="#374151" textAlign="center">
-            A driver will accept your order shortly. You'll receive a payment link when your delivery is picked up.
-          </SizableText>
-          {orderId && (
-            <SizableText size="$3" color="#6B7280" textAlign="center">
-              Order #{orderId ? orderId.slice(-6).toUpperCase() : '------'}
-            </SizableText>
-          )}
-        </YStack>
+    <View style={styles.successRoot}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-        {/* Total summary */}
-        <YStack backgroundColor="#F3F4F6" borderRadius={12} padding="$4" width="100%" alignItems="center">
-          <SizableText size="$4" color="#374151">Estimated total</SizableText>
-          <SizableText size="$8" fontWeight="800" color="#111827">{fmt(totalCents)}</SizableText>
-          <SizableText size="$2" color="#9CA3AF" textAlign="center" marginTop="$1">
-            Payment is collected when a driver picks up your order
-          </SizableText>
-        </YStack>
+      {/* Ambient Hero Glow */}
+      <LinearGradient
+        colors={gradients.heroGlow}
+        locations={gradients.heroGlowLocations}
+        style={styles.heroGlow}
+        pointerEvents="none"
+      />
 
-        <Pressable onPress={onReset} style={({ pressed }) => [styles.btn, { width: '100%', backgroundColor: '#6b7280' }, pressed && styles.btnPressed]}>
-          <SizableText size="$5" fontWeight="700" color="white">Request Another Pickup</SizableText>
-        </Pressable>
-      </YStack>
-    </SafeArea>
+      <ScrollView
+        contentContainerStyle={styles.successScroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.successContent}>
+          {/* Glowing Animated Icon Container */}
+          <View style={styles.successIconHalo}>
+            <View style={styles.successIconCircle}>
+              <Truck size={42} color="#0F131C" />
+            </View>
+            <View style={styles.successBadgeCheck}>
+              <Ionicons name="checkmark-sharp" size={14} color="#0F131C" />
+            </View>
+          </View>
+
+          {/* Titles */}
+          <Text style={styles.successTitle}>Order Placed!</Text>
+          <Text style={styles.successSubtitle}>
+            A driver will accept your order shortly. You'll receive a live tracking and payment link when your delivery is picked up.
+          </Text>
+
+          {/* Order ID Pill */}
+          <View style={styles.orderIdBadge}>
+            <View style={styles.greenLiveDot} />
+            <Text style={styles.orderIdText}>Order {formattedOrderId}</Text>
+          </View>
+
+          {/* Order Status & Total Card */}
+          <View style={styles.successCard}>
+            {/* Status Step Row */}
+            <View style={styles.statusPillRow}>
+              <View style={styles.statusPill}>
+                <Ionicons name="radio-button-on" size={12} color={colors.tertiary} />
+                <Text style={styles.statusPillText}>Driver matching in progress</Text>
+              </View>
+            </View>
+
+            {/* Total Amount */}
+            <View style={styles.successAmountContainer}>
+              <Text style={styles.successTotalLabel}>ESTIMATED TOTAL</Text>
+              <Text style={styles.successTotalValue}>{fmt(totalCents)}</Text>
+            </View>
+
+            <View style={styles.successCardDivider} />
+
+            {/* Payment Notice */}
+            <View style={styles.successPaymentNotice}>
+              <CreditCard size={16} color={colors.tertiary} />
+              <Text style={styles.successPaymentNoticeText}>
+                No payment needed now · Stripe link sent upon pickup
+              </Text>
+            </View>
+          </View>
+
+          {/* Action CTAs */}
+          <View style={styles.successActionButtons}>
+            <Pressable
+              onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                }
+                router.push('/(customer)/my-orders');
+              }}
+              style={({ pressed }) => [
+                styles.successPrimaryBtn,
+                pressed && styles.primaryBtnPressed,
+              ]}
+            >
+              <Ionicons name="receipt-outline" size={19} color="#0F131C" />
+              <Text style={styles.successPrimaryBtnText}>View in My Orders</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.selectionAsync().catch(() => {});
+                }
+                onReset();
+              }}
+              style={({ pressed }) => [
+                styles.successSecondaryBtn,
+                pressed && { opacity: 0.75 },
+              ]}
+            >
+              <Ionicons name="add-circle-outline" size={19} color="#DFE2EF" />
+              <Text style={styles.successSecondaryBtnText}>Request Another Pickup</Text>
+            </Pressable>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
-// ─── Root screen ─────────────────────────────────────────────────────────────
+// ─── Root Screen ─────────────────────────────────────────────────────────────
 
 const NAME_KEY = 'customer_display_name';
 
@@ -840,12 +872,12 @@ export default function RequestPickupScreen() {
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
-  // Pre-fill name from Profile on first load
   useEffect(() => {
     AsyncStorage.getItem(NAME_KEY).then((saved) => {
       if (saved) setForm((f) => ({ ...f, name: f.name || saved }));
     });
   }, []);
+
   const [tipCents, setTipCents] = useState(5_00);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -854,7 +886,8 @@ export default function RequestPickupScreen() {
   const [showCustomTip, setShowCustomTip] = useState(false);
   const [customTipText, setCustomTipText] = useState('');
 
-  const set = (key: keyof FormState) => (val: string) => setForm((f) => ({ ...f, [key]: val }));
+  const set = (key: keyof FormState) => (val: string) =>
+    setForm((f) => ({ ...f, [key]: val }));
 
   const goToStep2 = () => {
     setError('');
@@ -863,7 +896,9 @@ export default function RequestPickupScreen() {
       setError('Please fill in Name, Phone, Pickup Address, and Delivery Address.');
       return;
     }
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
     setStep(2);
   };
 
@@ -874,10 +909,7 @@ export default function RequestPickupScreen() {
     try {
       const sessionId = await getOrCreateSessionId();
       const mileageCents = calcMileageCents(form.miles);
-
-      // Enforce $5 minimum tip (custom or preset)
       const finalTipCents = tipCents < 5_00 ? 5_00 : tipCents;
-      const totalCents = DELIVERY_FEE + mileageCents + finalTipCents;
 
       const orderData = {
         customerName: form.name.trim(),
@@ -885,7 +917,9 @@ export default function RequestPickupScreen() {
         customerEmail: form.email.trim(),
         pickupAddress: form.address.trim(),
         deliveryAddress: form.deliveryAddress.trim(),
-        items: `${form.deliveryType === 'meet' ? '[MEET CUSTOMER] ' : '[LEAVE AT DOOR] '}${form.pickupNumber.trim() || 'N/A'}`,
+        items: `${form.deliveryType === 'meet' ? '[MEET CUSTOMER] ' : '[LEAVE AT DOOR] '}${
+          form.pickupNumber.trim() || 'N/A'
+        }`,
         distanceMiles: parseFloat(form.miles) || 0,
         status: 'pending',
         customerSessionId: sessionId,
@@ -896,55 +930,46 @@ export default function RequestPickupScreen() {
         orderScope: ORDER_SCOPE,
       };
 
-      // 1. Create the order — Direct REST first (publishable key works on web/mobile);
-      //    SDK `db.create` requires a secret_key on server-to-server routes and a
-      //    signed user JWT for user-authenticated routes. The public orders table
-      //    accepts the publishable key for unauthenticated creates.
       let result: any = null;
       let lastErr: any = null;
 
-      // Build snake_case payload for the direct REST endpoint
       const snakeData: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(orderData)) {
-        const snakeKey = key.replace(/[A-Z]/g, m => `_${m.toLowerCase()}`);
+        const snakeKey = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
         snakeData[snakeKey] = value;
       }
 
-      // Attempt A: Direct REST with publishable key (always works)
       try {
-        console.log('[OrderCreate] Direct REST attempt…');
         result = await blinkDbCreate('orders', snakeData);
-        console.log(`[OrderCreate] REST success: ${result?.id}`);
       } catch (restErr: any) {
         lastErr = restErr;
-        console.error('[OrderCreate] REST failed:', restErr?.message || restErr);
       }
 
-      // Attempt B: SDK fallback (only if REST failed completely)
       if (!result) {
         try {
-          console.log('[OrderCreate] SDK fallback attempt…');
-          result = await blink.db.orders.create(orderData) as any;
-          console.log(`[OrderCreate] SDK success: ${result?.id}`);
+          result = (await blink.db.orders.create(orderData)) as any;
         } catch (sdkErr: any) {
           lastErr = sdkErr;
-          console.error('[OrderCreate] SDK fallback failed:', sdkErr?.message || sdkErr);
         }
       }
 
       if (!result && lastErr) {
-        throw new Error(`Could not save order: ${lastErr?.message || 'Network error. Please check your connection and try again.'}`);
+        throw new Error(
+          `Could not save order: ${
+            lastErr?.message || 'Network error. Please check your connection and try again.'
+          }`
+        );
       }
 
       const orderId = result?.id;
       setLastOrderId(orderId ?? null);
 
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
 
-      // 2. Order created — payment happens when driver picks up
       setSuccess(true);
     } catch (err: any) {
-      console.error('[OrderSubmit] Error:', err?.message || err);
       setError(err?.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
@@ -963,101 +988,842 @@ export default function RequestPickupScreen() {
   };
 
   if (success) {
-    return <SuccessScreen orderId={lastOrderId} totalCents={DELIVERY_FEE + calcMileageCents(form.miles) + tipCents} onReset={handleReset} />;
+    return (
+      <SuccessScreen
+        orderId={lastOrderId}
+        totalCents={DELIVERY_FEE + calcMileageCents(form.miles) + tipCents}
+        onReset={handleReset}
+      />
+    );
   }
 
   return (
-    <SafeArea>
-      {step === 1 ? (
-        <StepOne
-          form={form}
-          set={set}
-          onNext={goToStep2}
-          error={error}
-          setDeliveryType={(v) => setForm((f) => ({ ...f, deliveryType: v }))}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={styles.root}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+        {/* Hero Glow Background */}
+        <LinearGradient
+          colors={gradients.heroGlow}
+          locations={gradients.heroGlowLocations}
+          style={styles.heroGlow}
+          pointerEvents="none"
         />
-      ) : (
-        <StepTwo
-          form={form}
-          tipCents={tipCents}
-          setTipCents={setTipCents}
-          mileageCents={calcMileageCents(form.miles)}
-          onBack={() => { setError(''); setStep(1); }}
-          onSubmit={handleSubmit}
-          loading={loading}
-          error={error}
-          deliveryType={form.deliveryType}
-          showCustomTip={showCustomTip}
-          setShowCustomTip={setShowCustomTip}
-          customTipText={customTipText}
-          setCustomTipText={setCustomTipText}
-        />
-      )}
-    </SafeArea>
+
+        {step === 1 ? (
+          <StepOne
+            form={form}
+            set={set}
+            onNext={goToStep2}
+            error={error}
+            setDeliveryType={(v) => setForm((f) => ({ ...f, deliveryType: v }))}
+          />
+        ) : (
+          <StepTwo
+            form={form}
+            tipCents={tipCents}
+            setTipCents={setTipCents}
+            mileageCents={calcMileageCents(form.miles)}
+            onBack={() => {
+              setError('');
+              setStep(1);
+            }}
+            onSubmit={handleSubmit}
+            loading={loading}
+            error={error}
+            deliveryType={form.deliveryType}
+            showCustomTip={showCustomTip}
+            setShowCustomTip={setShowCustomTip}
+            customTipText={customTipText}
+            setCustomTipText={setCustomTipText}
+          />
+        )}
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+    position: 'relative',
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 320,
+    width: '100%',
+  },
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxxl,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 56 : 40,
+    paddingBottom: 40,
   },
-  input: {
+  innerContent: {
     flex: 1,
-    height: 52,
-    fontSize: 18,
-    color: '#111827',
   },
-  inputMultiline: {
-    height: 80,
-    textAlignVertical: 'top',
-    paddingTop: 4,
+
+  // Store Banner
+  storeBanner: {
+    backgroundColor: 'rgba(0, 102, 255, 0.08)',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 102, 255, 0.3)',
+    padding: 16,
+    marginBottom: 20,
+    gap: 8,
   },
-  btn: {
-    height: 56,
-    borderRadius: borderRadius.xl,
-    backgroundColor: '#22c55e',
+  storeHeaderRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
+    gap: 12,
   },
-  btnPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-  btnDisabled: { opacity: 0.5 },
-  backBtn: {
+  storeIconContainer: {
+    width: 44,
     height: 44,
-    borderRadius: borderRadius.xl,
+    borderRadius: 22,
+    backgroundColor: 'rgba(244, 195, 0, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(244, 195, 0, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  storeTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#DFE2EF',
+  },
+  storeSubtitle: {
+    fontSize: 13,
+    color: '#8C90A1',
+  },
+  storeDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  storeDetailText: {
+    fontSize: 13,
+    color: '#C2C6D8',
+    flex: 1,
+  },
+
+  // Header Section
+  headerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 16,
+  },
+  headerIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.secondaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.secondaryContainer,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#DFE2EF',
+    letterSpacing: -0.3,
+  },
+  headerStepText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+    marginTop: 2,
+  },
+  headerDescText: {
+    fontSize: 12.5,
+    color: '#8C90A1',
+    marginTop: 2,
+  },
+
+  // Progress Bar
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 18,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.secondaryContainer,
+  },
+
+  // Test Data Badge
+  testDataRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 14,
+  },
+  testDataBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(244, 195, 0, 0.12)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(244, 195, 0, 0.35)',
+  },
+  testDataText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.secondaryContainer,
+  },
+
+  // Form
+  formFields: {
+    gap: 16,
+  },
+  fieldSectionLabel: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#8C90A1',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+    marginLeft: 2,
+  },
+
+  // Distance Section
+  distanceSection: {
+    gap: 4,
+    marginTop: 4,
+  },
+  distanceBoxLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 102, 255, 0.08)',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 102, 255, 0.3)',
+    paddingHorizontal: 16,
+    height: 52,
+    gap: 10,
+  },
+  distanceTextLoading: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '500',
+  },
+  distanceBoxSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 226, 151, 0.08)',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 226, 151, 0.35)',
+    paddingHorizontal: 16,
+    height: 52,
+    gap: 8,
+  },
+  distanceValueText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  distanceDot: {
+    fontSize: 14,
+    color: '#8C90A1',
+  },
+  distanceSurchargeText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  distanceBoxEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#151821',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    paddingHorizontal: 16,
+    height: 52,
+    gap: 10,
+  },
+  distanceTextEmpty: {
+    fontSize: 13.5,
+    color: '#6B7280',
+    flex: 1,
+  },
+  distanceFootnote: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginLeft: 4,
+    marginTop: 2,
+  },
+
+  // Delivery Preferences
+  deliveryPrefSection: {
+    gap: 4,
+    marginBottom: 4,
+  },
+  prefRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  prefCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#151821',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 2,
+    justifyContent: 'center',
+  },
+  prefCardActiveGreen: {
+    borderColor: colors.tertiary,
+    backgroundColor: 'rgba(0, 226, 151, 0.10)',
+    shadowColor: colors.tertiary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+  },
+  prefCardActiveBlue: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0, 102, 255, 0.12)',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+  },
+  prefTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  prefEmoji: {
+    fontSize: 16,
+  },
+  prefTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#DFE2EF',
+    letterSpacing: -0.2,
+  },
+  prefDesc: {
+    fontSize: 11,
+    color: '#8C90A1',
+    marginTop: 1,
+  },
+
+  // Buttons
+  primaryBtn: {
+    height: 54,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.secondaryContainer,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+    shadowColor: colors.secondaryContainer,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  primaryBtnPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
+  primaryBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F131C',
+    letterSpacing: 0.2,
+  },
+  btnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  btnDisabled: {
+    opacity: 0.4,
+  },
+  backBtnOutline: {
+    height: 48,
+    borderRadius: borderRadius.full,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  backBtnText: {
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#C2C6D8',
+  },
+
+  // Error
+  errorBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.35)',
+  },
+  errorText: {
+    color: '#FF8B8B',
+    fontSize: 13.5,
+  },
+
+  // Step 2 Summary Card
+  summaryCard: {
+    backgroundColor: '#151821',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 18,
+    gap: 14,
+    marginBottom: 16,
+  },
+  summaryCardTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8C90A1',
+    letterSpacing: 1.2,
+  },
+  summaryAddressBlock: {
+    backgroundColor: '#12151E',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    gap: 10,
+  },
+  summaryAddressItem: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  summaryDotGreen: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.tertiary,
+    marginTop: 5,
+  },
+  summaryDotBlue: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+    marginTop: 5,
+  },
+  summaryAddressDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    marginLeft: 20,
+  },
+  summaryAddressLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#8C90A1',
+    letterSpacing: 0.8,
+  },
+  summaryAddressValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginTop: 2,
+  },
+  summaryAddressNote: {
+    fontSize: 12,
+    color: '#8C90A1',
+    marginTop: 2,
+  },
+  priceBreakdown: {
+    gap: 10,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  priceLabel: {
+    fontSize: 14,
+    color: '#C2C6D8',
+  },
+  priceValue: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  tipSection: {
+    gap: 8,
+    marginTop: 4,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
   },
   tipBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
-    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#12151E',
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   tipBtnActive: {
-    backgroundColor: '#22c55e',
-    borderColor: '#22c55e',
+    backgroundColor: colors.secondaryContainer,
+    borderColor: colors.secondaryContainer,
   },
-  tipBtnPressed: { opacity: 0.8, transform: [{ scale: 0.96 }] },
-  customTipInput: {
-    flex: 1,
+  tipBtnText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#DFE2EF',
+  },
+  tipBtnTextActive: {
+    color: '#0F131C',
+  },
+  tipWarningText: {
+    fontSize: 12,
+    color: '#FF8B8B',
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    marginVertical: 4,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 4,
+  },
+  totalLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    paddingVertical: 4,
-    ...(Platform.OS === 'web' ? { outlineStyle: 'none' as const } : {}),
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
-  termsRow: {
+  totalValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: colors.secondaryContainer,
+  },
+
+  // What to Expect
+  expectCard: {
+    backgroundColor: '#151821',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 16,
+    gap: 10,
+    marginBottom: 16,
+  },
+  expectTitle: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#8C90A1',
+    letterSpacing: 1.2,
+  },
+  expectItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    paddingVertical: 4,
+  },
+  expectNumber: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: colors.primary,
+    width: 16,
+  },
+  expectText: {
+    fontSize: 13,
+    color: '#C2C6D8',
+    flex: 1,
+    lineHeight: 18,
+  },
+
+  // Payment Notice
+  paymentNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(0, 226, 151, 0.08)',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 226, 151, 0.25)',
+    padding: 14,
     marginBottom: 16,
+  },
+  paymentNoticeText: {
+    fontSize: 12.5,
+    color: colors.tertiary,
+    flex: 1,
+    lineHeight: 17,
+    fontWeight: '500',
+  },
+
+  // Terms Agreement
+  termsCard: {
+    backgroundColor: '#151821',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    padding: 16,
+    marginBottom: 16,
+  },
+  termsPressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  termsCheckbox: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  termsText: {
+    fontSize: 13,
+    color: '#C2C6D8',
+    flex: 1,
+    lineHeight: 18,
+  },
+  termsLink: {
+    fontWeight: '700',
+    color: colors.secondaryContainer,
+    textDecorationLine: 'underline',
+  },
+  actionButtonsRow: {
+    gap: 8,
+  },
+
+  // Success Screen
+  successRoot: {
+    flex: 1,
+    backgroundColor: colors.background,
+    position: 'relative',
+  },
+  successScroll: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 70 : 50,
+    paddingBottom: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successContent: {
+    width: '100%',
+    maxWidth: 420,
+    alignItems: 'center',
+    gap: 16,
+  },
+  successIconHalo: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(244, 195, 0, 0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(244, 195, 0, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+    position: 'relative',
+  },
+  successIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.secondaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.secondaryContainer,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  successBadgeCheck: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.tertiary,
+    borderWidth: 2.5,
+    borderColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successTitle: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  successSubtitle: {
+    fontSize: 14,
+    color: '#8C90A1',
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 12,
+  },
+  orderIdBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  greenLiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.tertiary,
+  },
+  orderIdText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: 0.5,
+  },
+  successCard: {
+    backgroundColor: '#151821',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 20,
+    width: '100%',
+    alignItems: 'center',
+    gap: 14,
+    marginVertical: 4,
+  },
+  statusPillRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0, 226, 151, 0.08)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.25)',
+  },
+  statusPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.tertiary,
+  },
+  successAmountContainer: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  successTotalLabel: {
+    fontSize: 11.5,
+    color: '#8C90A1',
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  successTotalValue: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: colors.secondaryContainer,
+  },
+  successCardDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    width: '100%',
+  },
+  successPaymentNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  successPaymentNoticeText: {
+    fontSize: 12,
+    color: '#C2C6D8',
+    flex: 1,
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  successActionButtons: {
+    width: '100%',
+    gap: 10,
+    marginTop: 6,
+  },
+  successPrimaryBtn: {
+    height: 54,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.secondaryContainer,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+    shadowColor: colors.secondaryContainer,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  successPrimaryBtnText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F131C',
+    letterSpacing: 0.2,
+  },
+  successSecondaryBtn: {
+    height: 50,
+    borderRadius: borderRadius.full,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+  },
+  successSecondaryBtnText: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#DFE2EF',
   },
 });
