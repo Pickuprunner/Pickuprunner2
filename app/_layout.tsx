@@ -11,6 +11,7 @@ import { RealtimeProvider } from '@/components/RealtimeProvider';
 // In Expo Go SDK 53+, remote notifications were removed on Android, so we skip it in Expo Go
 import { getOrderIdFromNotification, getScreenFromNotification } from '@/lib/notifications';
 import { colors } from '@/constants/design';
+import { ToastProvider } from '@/components/core';
 
 const isExpoGoAndroid =
   Platform.OS === 'android' &&
@@ -88,26 +89,28 @@ export default function RootLayout() {
       <Theme name="dark">
         <QueryClientProvider client={queryClient}>
           <BlinkToastProvider>
-            <RealtimeProvider />
-            <WebStyleReset />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.background },
-                animation: 'slide_from_right',
-              }}
-            >
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(landing)" />
-              <Stack.Screen name="role-select" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="(customer)" />
-              <Stack.Screen name="order/[id]" />
-              <Stack.Screen name="terms" />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="auto" />
+            <ToastProvider>
+              <RealtimeProvider />
+              <WebStyleReset />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.background },
+                  animation: 'slide_from_right',
+                }}
+              >
+                <Stack.Screen name="index" />
+                <Stack.Screen name="(landing)" />
+                <Stack.Screen name="role-select" />
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="(customer)" />
+                <Stack.Screen name="order/[id]" />
+                <Stack.Screen name="terms" />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <StatusBar style="auto" />
+            </ToastProvider>
           </BlinkToastProvider>
         </QueryClientProvider>
       </Theme>

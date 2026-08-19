@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { Order } from '@/lib/orders';
-import { colors } from '@/constants/design';
-import { ActiveDeliveriesModal } from './ActiveDeliveriesModal';
 
 interface Props {
   queueCount: number;
@@ -13,8 +12,6 @@ interface Props {
 }
 
 export function ActiveDeliveriesBanner({ queueCount, orders = [], onPress }: Props) {
-  const [modalVisible, setModalVisible] = useState(false);
-
   if (queueCount <= 0 && orders.length <= 0) return null;
 
   const count = orders.length > 0 ? orders.length : queueCount;
@@ -26,44 +23,35 @@ export function ActiveDeliveriesBanner({ queueCount, orders = [], onPress }: Pro
     if (onPress) {
       onPress();
     } else {
-      setModalVisible(true);
+      router.push('/(tabs)/my-orders');
     }
   };
 
   return (
-    <>
-      <View style={styles.floatingWrapper} pointerEvents="box-none">
-        <Pressable
-          onPress={handlePress}
-          accessibilityLabel="Active Deliveries"
-          style={({ pressed }) => [
-            styles.floatingPanel,
-            pressed && { transform: [{ scale: 0.98 }] },
-          ]}
-        >
-          <View style={styles.floatingTextCol}>
-            <Text style={styles.floatingTitle}>Active Deliveries</Text>
-            <Text style={styles.floatingSubtitle}>
-              {count} order{count > 1 ? 's' : ''} in progress · Tap to manage
-            </Text>
-          </View>
+    <View style={styles.floatingWrapper} pointerEvents="box-none">
+      <Pressable
+        onPress={handlePress}
+        accessibilityLabel="Active Deliveries"
+        style={({ pressed }) => [
+          styles.floatingPanel,
+          pressed && { transform: [{ scale: 0.98 }] },
+        ]}
+      >
+        <View style={styles.floatingTextCol}>
+          <Text style={styles.floatingTitle}>Active Deliveries</Text>
+          <Text style={styles.floatingSubtitle}>
+            {count} order{count > 1 ? 's' : ''} in progress · Tap to view
+          </Text>
+        </View>
 
-          <View style={styles.floatingRightRow}>
-            <View style={styles.floatingCountBadge}>
-              <Text style={styles.floatingCountText}>{count}</Text>
-            </View>
-            <MaterialIcons name="arrow-forward" size={18} color={colors.secondary} />
+        <View style={styles.floatingRightRow}>
+          <View style={styles.floatingCountBadge}>
+            <Text style={styles.floatingCountText}>{count}</Text>
           </View>
-        </Pressable>
-      </View>
-
-      {/* Pop-up Modal */}
-      <ActiveDeliveriesModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        orders={orders}
-      />
-    </>
+          <MaterialIcons name="arrow-forward" size={18} color="#FFE399" />
+        </View>
+      </Pressable>
+    </View>
   );
 }
 

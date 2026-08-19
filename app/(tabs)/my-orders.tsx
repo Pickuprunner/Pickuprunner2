@@ -1,88 +1,115 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useRef } from 'react';
 import {
   Animated,
   Easing,
   FlatList,
   RefreshControl,
+  Platform,
   StyleSheet,
   View,
   Text,
-  Platform,
   LayoutChangeEvent,
 } from 'react-native';
-import {
-  Button,
-  Package,
-} from '@blinkdotnew/mobile-ui';
+import { Package } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 
 import { useOrders } from '@/lib/orders';
 import { useOrdersRealtime } from '@/lib/realtime';
-import { setSelectedOrder } from '@/lib/selectedOrder';
-import { useAuth } from '@/hooks/useAuth';
-import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
+import { useAuth } from '@/hooks/useAuth';
+import { setSelectedOrder } from '@/lib/selectedOrder';
+import { calcDriverEarnings } from '@/lib/config';
 import { colors } from '@/constants/design';
 import { SkeletonList } from '@/components/core';
 
 import {
-  OrdersHeader,
-  OrdersSearchBar,
-  DriverOrderCard,
-  ActiveDeliveriesBanner,
+  MyOrdersHeader,
+  TodayEarningsCard,
+  DriverOrderCard as OrderCard,
 } from '@/components/Orders';
 
 function haptic() {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  if (Platform.OS !== 'web') {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  }
 }
 
-export default function OrdersScreen() {
-  const [search, setSearch] = useState('');
+function getGreeting(name?: string) {
+  const hour = new Date().getHours();
+  const timeGreeting =
+    hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const driverName = name ? name.split(' ')[0] : 'Driver';
+  return `${timeGreeting}, ${driverName}`;
+}
+
+export default function MyOrdersScreen() {
+  const { user } = useAuth();
+  const { data: orders = [], isLoading, refetch } = useOrders();
+  const { isConnected } = useOrdersRealtime();
+  const driverId = useDriverId();
   const [refreshing, setRefreshing] = useState(false);
 
-  // ─── 1. State, Refs & Animated Values (Smooth Animation Logic) ───
-  const [headerHeight, setHeaderHeight] = useState(200);
+  // ─── 1. Header State & Smooth Scroll Animation Logic ───
+  const [headerHeight, setHeaderHeight] = useState(150);
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
   const accumDelta = useRef(0);
   const lastDirectionChangeTime = useRef(0);
   const isHeaderVisible = useRef(true);
 
-  const { data: orders = [], isLoading, refetch } = useOrders();
-  const { isConnected } = useOrdersRealtime();
-  const { user } = useAuth();
-  const driverId = useDriverId();
-  const { queueCount, atCapacity, isMyOrder } = useDriverQueue(orders, driverId);
-
   const avatarInitial = useMemo(() => {
     const name = user?.displayName || user?.email || 'Driver';
     return name.charAt(0).toUpperCase();
   }, [user]);
 
-  const myActiveOrders = useMemo(
-    () => orders.filter((o) => isMyOrder(o.id)),
-    [orders, isMyOrder]
-  );
+  const greetingText = useMemo(() => {
+    return getGreeting(user?.displayName || user?.email);
+  }, [user]);
 
-  const pendingOrders = useMemo(() => orders.filter((o) => o.status === 'pending'), [orders]);
+  // Driver active orders in progress
+  const activeOrders = useMemo(() => {
+    return orders
+      .filter((o) => o.driverUserId === driverId && (o.status === 'accepted' || o.status === 'picked_up'))
+      .sort((a, b) => Number(a.distanceMiles ?? 0) - Number(b.distanceMiles ?? 0));
+  }, [orders, driverId]);
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return pendingOrders;
-    const q = search.toLowerCase();
-    return pendingOrders.filter(
-      (o) =>
-        o.customerName?.toLowerCase().includes(q) ||
-        o.customerPhone?.toLowerCase().includes(q) ||
-        o.deliveryAddress?.toLowerCase().includes(q) ||
-        o.pickupAddress?.toLowerCase().includes(q)
-    );
-  }, [pendingOrders, search]);
+  const availableOrders = useMemo(() => {
+    return orders.filter((o) => o.status === 'pending');
+  }, [orders]);
 
-  const pendingCount = useMemo(
-    () => orders.filter((o) => o.status === 'pending').length,
-    [orders]
-  );
+  const deliveredOrders = useMemo(() => {
+    return orders.filter((o) => o.status === 'delivered' && o.driverUserId === driverId);
+  }, [orders, driverId]);
+
+  const allDriverOrders = useMemo(() => {
+    return orders.filter((o) => o.driverUserId === driverId);
+  }, [orders, driverId]);
+
+  // Compute Today's Stats from driver's completed and active deliveries
+  const todayStats = useMemo(() => {
+    const totalDeliveries = deliveredOrders.length > 0 ? deliveredOrders.length : allDriverOrders.length;
+    let totalCents = 0;
+    let totalMiles = 0;
+    let totalTipCents = 0;
+
+    const source = deliveredOrders.length > 0 ? deliveredOrders : allDriverOrders;
+    for (const o of source) {
+      const miles = Number(o.distanceMiles) || 0;
+      const tip = Number(o.tipAmount) || 0;
+      const earned = calcDriverEarnings(miles, tip);
+      totalCents += earned.totalCents;
+      totalMiles += miles;
+      totalTipCents += tip;
+    }
+
+    return {
+      deliveries: totalDeliveries,
+      miles: totalMiles.toFixed(1),
+      totalDisplay: (totalCents / 100).toFixed(2),
+      tipsDisplay: (totalTipCents / 100).toFixed(2),
+    };
+  }, [deliveredOrders, allDriverOrders]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -106,7 +133,7 @@ export default function OrdersScreen() {
     (event: any) => {
       const currentScrollY = event.nativeEvent.contentOffset.y;
 
-      // 1. Reset to visible when at top of list
+      // Reset to visible at top of list
       if (currentScrollY <= 0) {
         accumDelta.current = 0;
         if (!isHeaderVisible.current) {
@@ -122,7 +149,6 @@ export default function OrdersScreen() {
         return;
       }
 
-      // 2. Track delta and direction switches
       const delta = currentScrollY - lastScrollY.current;
       lastScrollY.current = currentScrollY;
 
@@ -137,12 +163,11 @@ export default function OrdersScreen() {
       }
       accumDelta.current += delta;
 
-      // Debounce direction change for 100ms to eliminate jitter
       if (now - lastDirectionChangeTime.current < 100) {
         return;
       }
 
-      // 3. Hide header: Scroll Down (accumDelta > 35 & scrollY > 50)
+      // Hide header on scroll down
       if (accumDelta.current > 35 && currentScrollY > 50 && isHeaderVisible.current) {
         isHeaderVisible.current = false;
         Animated.timing(headerTranslateY, {
@@ -152,7 +177,7 @@ export default function OrdersScreen() {
           useNativeDriver: true,
         }).start();
       }
-      // 4. Show header: Scroll Up (accumDelta < -60)
+      // Show header on scroll up
       else if (accumDelta.current < -60 && !isHeaderVisible.current) {
         isHeaderVisible.current = true;
         Animated.timing(headerTranslateY, {
@@ -166,25 +191,36 @@ export default function OrdersScreen() {
     [headerHeight, headerTranslateY]
   );
 
-  // ─── 4. Reset Header on Search Change ───
-  useEffect(() => {
-    isHeaderVisible.current = true;
-    Animated.timing(headerTranslateY, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [search, headerTranslateY]);
+  const hasActive = activeOrders.length > 0;
+  const displayList = hasActive ? activeOrders : availableOrders;
+  const sectionTitle = hasActive ? 'Active Deliveries' : 'Available Deliveries';
+  const pillCountText = hasActive
+    ? `${activeOrders.length} ACTIVE`
+    : `${availableOrders.length} NEARBY`;
 
-  // ─── 5. List Header Spacer ───
+  // ─── 4. List Header Component (Earnings Hero + Section Title) ───
   const listHeader = useMemo(
     () => (
       <View>
-        <View style={{ height: headerHeight + 8 }} />
-        {isLoading && <SkeletonList count={3} />}
+        <View style={{ height: headerHeight + 4 }} />
+
+        {/* Today's Earnings Hero Card */}
+        <TodayEarningsCard stats={todayStats} />
+
+        {/* Section Header */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+          <View style={[styles.sectionPill, hasActive && styles.sectionPillActive]}>
+            <Text style={[styles.sectionPillText, hasActive && styles.sectionPillActiveText]}>
+              {pillCountText}
+            </Text>
+          </View>
+        </View>
+
+        {isLoading && <SkeletonList count={2} />}
       </View>
     ),
-    [headerHeight, isLoading]
+    [headerHeight, todayStats, sectionTitle, hasActive, pillCountText, isLoading]
   );
 
   const EmptyView = !isLoading ? (
@@ -193,27 +229,13 @@ export default function OrdersScreen() {
         <Package size={36} color="rgba(244, 195, 0, 0.4)" />
       </View>
       <Text style={styles.emptyTitle}>
-        {search.trim() ? 'No matching orders' : 'No available orders'}
+        {hasActive ? 'No active orders' : 'No available orders'}
       </Text>
       <Text style={styles.emptySubtitle}>
-        {search.trim()
-          ? 'Try adjusting your search query'
+        {hasActive
+          ? 'Accept orders from the Orders tab to begin deliveries.'
           : 'New incoming deliveries will appear here in real time.'}
       </Text>
-      {!search.trim() && (
-        <Button
-          marginTop="$4"
-          onPress={onRefresh}
-          backgroundColor="rgba(244,195,0,0.12)"
-          borderColor="rgba(244,195,0,0.35)"
-          borderWidth={1}
-          color={colors.secondary}
-          size="$3.5"
-          borderRadius={9999}
-        >
-          Refresh Orders
-        </Button>
-      )}
     </View>
   ) : null;
 
@@ -229,35 +251,27 @@ export default function OrdersScreen() {
           },
         ]}
       >
-        <OrdersHeader
-          showSearch={false}
+        <MyOrdersHeader
+          greetingText={greetingText}
+          activeCount={activeOrders.length}
+          isConnected={isConnected}
           showAvatar
           avatar={avatarInitial}
           onAvatarPress={() => {
             haptic();
             router.push('/(tabs)/profile');
           }}
-          pendingCount={pendingCount}
-          queueCount={queueCount}
-          atCapacity={atCapacity}
-          isConnected={isConnected}
-        />
-        <OrdersSearchBar
-          search={search}
-          onSearchChange={setSearch}
-          onFilterPress={haptic}
         />
       </Animated.View>
 
       {/* ─── Scrollable Orders List ─── */}
       <FlatList
-        data={filtered}
+        data={displayList}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <DriverOrderCard
+          <OrderCard
             order={item}
-            isMyOrder={isMyOrder(item.id)}
-            driverAtCapacity={atCapacity && !isMyOrder(item.id)}
+            isMyOrder={item.driverUserId === driverId}
             driverUserId={driverId}
             driverDisplayName={user?.displayName ?? user?.email ?? driverId?.slice(0, 8)}
             onPress={() => {
@@ -279,16 +293,10 @@ export default function OrdersScreen() {
             colors={[colors.secondaryContainer]}
           />
         }
-        contentContainerStyle={[
-          styles.list,
-          queueCount > 0 && { paddingBottom: 110 },
-        ]}
+        contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       />
-
-      {/* Floating Active Deliveries Banner (navigates directly to My Orders) */}
-      <ActiveDeliveriesBanner queueCount={queueCount} orders={myActiveOrders} />
     </View>
   );
 }
@@ -309,9 +317,45 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   list: {
-    paddingBottom: 32,
+    paddingBottom: 40,
     backgroundColor: '#0F131C',
     flexGrow: 1,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    color: '#DFE2EF',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  sectionPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  sectionPillActive: {
+    backgroundColor: 'rgba(244, 195, 0, 0.12)',
+    borderColor: 'rgba(244, 195, 0, 0.3)',
+  },
+  sectionPillText: {
+    color: '#8C90A1',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  sectionPillActiveText: {
+    color: '#FFE399',
   },
   emptyContainer: {
     alignItems: 'center',

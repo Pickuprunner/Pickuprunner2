@@ -30,6 +30,8 @@ export interface CustomHeaderProps {
   subtitle?: string | React.ReactNode;
   /** Highlighted accent text inside subtitle (e.g. count) */
   highlightText?: string | number;
+  /** Alias for highlightText */
+  subtitleHighlight?: string | number;
   /** Header visual style variant */
   variant?: HeaderVariant;
   /** Title typography sizing */
@@ -56,6 +58,8 @@ export interface CustomHeaderProps {
   rightIconName?: keyof typeof MaterialIcons.glyphMap;
   /** Custom right action node */
   rightAction?: React.ReactNode;
+  /** Custom right action node alias */
+  rightContent?: React.ReactNode;
   /** Press handler for right action button */
   onRightActionPress?: () => void;
   /** Accessibility label for right action */
@@ -150,6 +154,7 @@ export function CustomHeader({
   title,
   subtitle,
   highlightText,
+  subtitleHighlight,
   variant = 'glass',
   titleSize = 'large',
   withSafeArea = true,
@@ -164,6 +169,7 @@ export function CustomHeader({
 
   rightIconName,
   rightAction,
+  rightContent,
   onRightActionPress,
   rightActionLabel,
   rightActionLoading = false,
@@ -192,6 +198,9 @@ export function CustomHeader({
   subtitleStyle,
 }: CustomHeaderProps) {
   const insets = useSafeAreaInsets();
+  const activeHighlight = subtitleHighlight ?? highlightText;
+  const activeRightContent = rightContent ?? rightAction;
+
   const topInset = withSafeArea
     ? Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 16)
     : 0;
@@ -301,10 +310,10 @@ export function CustomHeader({
             title
           )}
 
-          {highlightText !== undefined || subtitle ? (
+          {activeHighlight !== undefined || subtitle ? (
             <Text style={[styles.subtitle, subtitleStyle]} numberOfLines={2}>
-              {highlightText !== undefined && (
-                <Text style={styles.highlightText}>{highlightText} </Text>
+              {activeHighlight !== undefined && (
+                <Text style={styles.highlightText}>{activeHighlight} </Text>
               )}
               {subtitle}
             </Text>
@@ -313,8 +322,8 @@ export function CustomHeader({
 
         {/* Right Actions Group */}
         <View style={styles.rightActionsGroup}>
-          {rightAction ? (
-            rightAction
+          {activeRightContent ? (
+            activeRightContent
           ) : rightIconName ? (
             <Pressable
               onPress={handleRightAction}

@@ -71,7 +71,7 @@ export default function TabLayout() {
 
       {/* 2. My Orders Tab (Queue / Inventory) */}
       <Tabs.Screen
-        name="active"
+        name="my-orders"
         options={{
           title: 'My Orders',
           tabBarIcon: ({ color, size }) => (
@@ -113,16 +113,7 @@ export default function TabLayout() {
         }}
       />
 
-      {/* ─── Commented out options as requested (hidden from tab bar) ─── */}
-      {/*
-      <Tabs.Screen
-        name="earnings"
-        options={{
-          title: 'Earnings',
-          tabBarIcon: ({ color, size }) => <DollarSign color={color} size={size} />,
-        }}
-      />
-      */}
+      {/* Hidden Utility Routes */}
       <Tabs.Screen
         name="earnings"
         options={{
@@ -130,7 +121,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Admin screen */}
       <Tabs.Screen
         name="admin"
         options={{
@@ -138,15 +128,6 @@ export default function TabLayout() {
         }}
       />
 
-      {/*
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
-        }}
-      />
-      */}
       <Tabs.Screen
         name="profile"
         options={{
@@ -171,16 +152,16 @@ const styles = StyleSheet.create({
     height: 15,
     borderRadius: 7.5,
     backgroundColor: '#FFE399',
-    borderWidth: 1.5,
-    borderColor: '#0F131C',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 2,
+    paddingHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#0F131C',
   },
   badgeText: {
-    fontSize: 8,
-    fontWeight: '800',
     color: '#0F131C',
-    lineHeight: 10,
+    fontSize: 9,
+    fontWeight: '800',
+    lineHeight: 11,
   },
 });

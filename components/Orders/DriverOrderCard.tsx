@@ -6,12 +6,15 @@ import {
   TouchableOpacity,
   Linking,
   Platform,
+  StyleProp,
+  ViewStyle,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Order, useUpdateOrderStatus } from '@/lib/orders';
 import { calcDriverEarnings } from '@/lib/config';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { CustomCard, useToast } from '@/components/core';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -29,118 +32,275 @@ function openNav(address: string) {
   Linking.openURL(url);
 }
 
+export type OrderStatusVariant = 'pending' | 'accepted' | 'picked_up' | 'delivered';
+
 export interface DriverOrderCardProps {
   order: Order;
+  variant?: OrderStatusVariant;
   onPress?: () => void;
-  /** True when this order belongs to the current driver */
   isMyOrder?: boolean;
-  /** True when driver is at 3-order capacity and this is NOT their order */
   driverAtCapacity?: boolean;
-  /** Current driver's user ID — needed to stamp on accept */
   driverUserId?: string;
-  /** Current driver's display name — stamped on accept */
   driverDisplayName?: string;
+  onAccept?: () => void | Promise<void>;
+  onPickup?: () => void | Promise<void>;
+  onDeliver?: () => void | Promise<void>;
+  showPhone?: boolean;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function DriverOrderCard({
   order,
+  variant,
   onPress,
   isMyOrder = false,
   driverAtCapacity = false,
   driverUserId,
   driverDisplayName,
+  onAccept,
+  onPickup,
+  onDeliver,
+  showPhone = true,
+  style,
 }: DriverOrderCardProps) {
+  const { showToast } = useToast();
   const updateStatus = useUpdateOrderStatus();
-  const { status } = order;
+  const currentStatus: OrderStatusVariant = variant || (order.status as OrderStatusVariant) || 'pending';
   const shortId = order.id ? order.id.slice(-6).toUpperCase() : '------';
 
   const miles = Number(order.distanceMiles ?? 0);
   const tipAmount = Number(order.tipAmount ?? 0);
   const earnings = calcDriverEarnings(miles, tipAmount);
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const initial = (order.customerName?.trim() || 'C').charAt(0).toUpperCase();
 
-  const statusLabel =
-    status === 'pending'
-      ? 'Unassigned'
-      : status === 'accepted'
-      ? 'Accepted'
-      : status === 'picked_up'
-      ? 'In Transit'
-      : 'Delivered';
+  const getStatusBadge = () => {
+    switch (currentStatus) {
+      case 'accepted':
+        return { label: 'ACCEPTED', color: '#FFE399', bg: 'rgba(255, 227, 153, 0.12)', border: 'rgba(255, 227, 153, 0.3)' };
+      case 'picked_up':
+        return { label: 'IN TRANSIT', color: '#00E297', bg: 'rgba(0, 226, 151, 0.12)', border: 'rgba(0, 226, 151, 0.3)' };
+      case 'delivered':
+        return { label: 'DELIVERED', color: '#00E297', bg: 'rgba(0, 226, 151, 0.12)', border: 'rgba(0, 226, 151, 0.3)' };
+      case 'pending':
+      default:
+        return { label: 'UNASSIGNED', color: '#F4C300', bg: 'rgba(244, 195, 0, 0.1)', border: 'rgba(244, 195, 0, 0.3)' };
+    }
+  };
 
-  const navAddress =
-    status === 'accepted'
-      ? order.pickupAddress
-      : order.deliveryAddress;
+  const badge = getStatusBadge();
+  const navAddress = currentStatus === 'accepted' ? order.pickupAddress : order.deliveryAddress;
 
-  const handleAccept = async () => {
-    if (driverAtCapacity) return;
+  const handleDefaultAccept = async () => {
+    if (driverAtCapacity) {
+      showToast('Queue Limit Reached', {
+        type: 'warning',
+        description: 'Complete existing deliveries before accepting more',
+      });
+      return;
+    }
     haptic();
-    setCheckoutError(null);
+    setActionError(null);
+
+    if (onAccept) {
+      await onAccept();
+      return;
+    }
 
     const uid = driverUserId || `guest-${Date.now()}`;
     const uname = driverDisplayName || 'Driver';
 
     try {
-      if (!order.id) {
-        throw new Error('This order is missing its ID. Refresh the Orders tab and try again.');
-      }
+      if (!order.id) throw new Error('Missing order ID.');
       await updateStatus.mutateAsync({
         id: order.id,
         status: 'accepted',
         driverUserId: uid,
         driverName: uname,
       });
+      showToast('Order Accepted!', {
+        type: 'success',
+        description: `Added #${shortId} to your active deliveries`,
+      });
     } catch (err: any) {
-      console.error('[Accept] Failed to accept order:', err);
-      setCheckoutError(err?.message || 'Could not accept order');
+      console.error('[DriverOrderCard Accept Error]:', err);
+      setActionError(err?.message || 'Could not accept order');
+      showToast(err?.message || 'Could not accept order', 'error');
     }
   };
 
-  const handleNextStatus = () => {
+  const handleDefaultPickup = async () => {
     haptic();
-    if (status === 'accepted') {
-      updateStatus.mutate({ id: order.id, status: 'picked_up' });
-    } else if (status === 'picked_up') {
-      router.push(`/order/${order.id}`);
+    setActionError(null);
+    if (onPickup) {
+      await onPickup();
+      return;
     }
+    updateStatus.mutate(
+      { id: order.id, status: 'picked_up' },
+      {
+        onSuccess: () => {
+          showToast('Order Picked Up', {
+            type: 'info',
+            description: `En route to ${order.customerName || 'customer'}`,
+          });
+        },
+        onError: (err: any) => {
+          showToast(err?.message || 'Pickup update failed', 'error');
+        },
+      }
+    );
   };
+
+  const handleDefaultDeliver = async () => {
+    haptic();
+    if (onDeliver) {
+      await onDeliver();
+      return;
+    }
+    router.push(`/order/${order.id}`);
+  };
+
+  // Header Slot
+  const headerNode = (
+    <View style={styles.header}>
+      <View style={styles.userInfo}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initial}</Text>
+        </View>
+        <View style={styles.userTextCol}>
+          <Text style={styles.userName} numberOfLines={1}>
+            {order.customerName || 'Customer'}
+          </Text>
+          <Text style={styles.orderId}>#{shortId}</Text>
+        </View>
+      </View>
+
+      <View style={styles.badgesWrapper}>
+        {isMyOrder && currentStatus === 'pending' && (
+          <View style={styles.mineBadge}>
+            <Text style={styles.mineBadgeText}>YOURS</Text>
+          </View>
+        )}
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: badge.bg, borderColor: badge.border },
+          ]}
+        >
+          <Text style={[styles.statusText, { color: badge.color }]}>
+            {badge.label}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  // Footer Slot
+  const footerNode = (
+    <View style={styles.footer}>
+      <View style={styles.footerTop}>
+        <View style={styles.priceContainer}>
+          <Text style={styles.priceText}>{earnings.totalDisplay}</Text>
+          <Text style={styles.tipText}>
+            {earnings.tipCents > 0
+              ? `${(earnings.tipCents / 100).toFixed(2)} tip`
+              : '0.00 tip'}
+          </Text>
+        </View>
+
+        {showPhone && !!order.customerPhone && (
+          <Text style={styles.phoneText}>{order.customerPhone}</Text>
+        )}
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity
+          onPress={() => {
+            haptic();
+            openNav(navAddress ?? '');
+          }}
+          style={styles.mapButton}
+        >
+          <MaterialIcons name="near-me" size={20} color="#dfe2ef" />
+          <Text style={styles.mapButtonText}>Map</Text>
+        </TouchableOpacity>
+
+        {currentStatus === 'pending' && (
+          <TouchableOpacity
+            onPress={handleDefaultAccept}
+            disabled={updateStatus.isPending || driverAtCapacity}
+            style={[
+              styles.actionButton,
+              driverAtCapacity && styles.actionButtonDisabled,
+            ]}
+          >
+            <MaterialIcons name="local-shipping" size={20} color="#f8f7ff" />
+            <Text style={styles.actionButtonText}>
+              {updateStatus.isPending
+                ? 'Accepting…'
+                : driverAtCapacity
+                ? 'Queue Full'
+                : 'Accept'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {currentStatus === 'accepted' && (
+          <TouchableOpacity
+            onPress={handleDefaultPickup}
+            disabled={updateStatus.isPending}
+            style={styles.actionButton}
+          >
+            <MaterialIcons name="inventory" size={20} color="#f8f7ff" />
+            <Text style={styles.actionButtonText}>
+              {updateStatus.isPending ? '…' : 'Picked Up'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {currentStatus === 'picked_up' && (
+          <TouchableOpacity
+            onPress={handleDefaultDeliver}
+            disabled={updateStatus.isPending}
+            style={styles.actionButton}
+          >
+            <MaterialIcons name="check-circle" size={20} color="#f8f7ff" />
+            <Text style={styles.actionButtonText}>Deliver</Text>
+          </TouchableOpacity>
+        )}
+
+        {currentStatus === 'delivered' && (
+          <View style={styles.deliveredBadgeButton}>
+            <MaterialIcons name="check-circle" size={20} color="#00e297" />
+            <Text style={styles.deliveredBadgeText}>Delivered ✓</Text>
+          </View>
+        )}
+      </View>
+
+      {actionError && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>⚠️ {actionError}</Text>
+        </View>
+      )}
+    </View>
+  );
 
   return (
-    <View style={styles.card}>
-      {/* Header */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={onPress}
-        style={styles.header}
-      >
-        <View style={styles.userInfo}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
-          <View>
-            <Text style={styles.userName} numberOfLines={1}>
-              {order.customerName || 'Customer'}
-            </Text>
-            <Text style={styles.orderId}>#{shortId}</Text>
-          </View>
-        </View>
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>{statusLabel}</Text>
-        </View>
-      </TouchableOpacity>
-
-      {/* Routes */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={onPress}
-        style={styles.routesContainer}
-      >
+    <CustomCard
+      variant="glass"
+      header={headerNode}
+      footer={footerNode}
+      onPress={onPress}
+      style={[styles.cardContainer, style]}
+    >
+      {/* ─── Routes Timeline with Connecting Line ─── */}
+      <View style={styles.routesContainer}>
         <View style={styles.connectingLine} />
 
-        {/* Pickup */}
+        {/* Pickup Step */}
         <View style={styles.routeItem}>
           <View style={[styles.routeIcon, { borderColor: '#b3c5ff' }]}>
             <MaterialIcons name="inventory-2" size={12} color="#b3c5ff" />
@@ -153,7 +313,7 @@ export function DriverOrderCard({
           </View>
         </View>
 
-        {/* Dropoff */}
+        {/* Dropoff Step */}
         <View style={styles.routeItem}>
           <View style={[styles.routeIcon, { borderColor: '#00e297' }]}>
             <MaterialIcons name="location-on" size={12} color="#00e297" />
@@ -165,115 +325,15 @@ export function DriverOrderCard({
             </Text>
           </View>
         </View>
-      </TouchableOpacity>
-
-      {/* Footer / Pricing & Actions */}
-      <View style={styles.footer}>
-        <View style={styles.footerTop}>
-          <View style={styles.priceContainer}>
-            <Text style={styles.priceText}>{earnings.totalDisplay}</Text>
-            <Text style={styles.tipText}>
-              {earnings.tipCents > 0
-                ? `${(earnings.tipCents / 100).toFixed(2)} tip`
-                : '0.00 tip'}
-            </Text>
-          </View>
-          {!!order.customerPhone && (
-            <Text style={styles.phoneText}>{order.customerPhone}</Text>
-          )}
-        </View>
-
-        {/* Actions Container */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            onPress={() => {
-              haptic();
-              openNav(navAddress);
-            }}
-            style={styles.mapButton}
-          >
-            <MaterialIcons name="near-me" size={20} color="#dfe2ef" />
-            <Text style={styles.mapButtonText}>Map</Text>
-          </TouchableOpacity>
-
-          {status === 'pending' && (
-            <TouchableOpacity
-              onPress={handleAccept}
-              disabled={updateStatus.isPending || driverAtCapacity}
-              style={[
-                styles.acceptButton,
-                driverAtCapacity && styles.acceptButtonDisabled,
-              ]}
-            >
-              <MaterialIcons name="local-shipping" size={20} color="#f8f7ff" />
-              <Text style={styles.acceptButtonText}>
-                {updateStatus.isPending
-                  ? 'Accepting…'
-                  : driverAtCapacity
-                  ? 'Queue Full'
-                  : 'Accept'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {status === 'accepted' && (
-            <TouchableOpacity
-              onPress={handleNextStatus}
-              disabled={updateStatus.isPending}
-              style={[styles.acceptButton, { backgroundColor: '#ffe399' }]}
-            >
-              <MaterialIcons name="inventory" size={20} color="#0f131c" />
-              <Text style={[styles.acceptButtonText, { color: '#0f131c' }]}>
-                {updateStatus.isPending ? '…' : 'Order Picked Up'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {status === 'picked_up' && (
-            <TouchableOpacity
-              onPress={handleNextStatus}
-              disabled={updateStatus.isPending}
-              style={[styles.acceptButton, { backgroundColor: '#00e297' }]}
-            >
-              <MaterialIcons name="check-circle" size={20} color="#0f131c" />
-              <Text style={[styles.acceptButtonText, { color: '#0f131c' }]}>
-                Complete Delivery
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {status === 'delivered' && (
-            <View style={[styles.acceptButton, { backgroundColor: 'rgba(0, 226, 151, 0.15)', borderWidth: 1, borderColor: 'rgba(0, 226, 151, 0.3)' }]}>
-              <MaterialIcons name="check-circle" size={20} color="#00e297" />
-              <Text style={[styles.acceptButtonText, { color: '#00e297' }]}>
-                Delivered ✓
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Error message */}
-        {checkoutError && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>⚠️ {checkoutError}</Text>
-          </View>
-        )}
       </View>
-    </View>
+    </CustomCard>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 32,
-    padding: 20,
-    gap: 20,
+  cardContainer: {
     marginHorizontal: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
@@ -286,23 +346,26 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
+  userTextCol: {
+    flex: 1,
+  },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#31353f', // surface-variant
+    backgroundColor: '#31353f',
     borderWidth: 1,
-    borderColor: '#424656', // outline-variant
+    borderColor: '#424656',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: '#ffe399', // secondary
+    color: '#ffe399',
     fontSize: 14,
     fontWeight: '600',
   },
   userName: {
-    color: '#dfe2ef', // on-surface
+    color: '#dfe2ef',
     fontSize: 20,
     fontWeight: '600',
     lineHeight: 28,
@@ -314,18 +377,34 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 2,
   },
+  badgesWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  mineBadge: {
+    borderRadius: 9999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: 'rgba(0, 102, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 102, 255, 0.4)',
+  },
+  mineBadgeText: {
+    color: '#60A5FA',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   statusBadge: {
     borderRadius: 9999,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(244, 195, 0, 0.3)',
-    backgroundColor: 'rgba(244, 195, 0, 0.1)',
   },
   statusText: {
-    color: '#f4c300', // secondary-container
     fontSize: 10,
-    fontWeight: '500',
+    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -351,7 +430,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#0f131c', // background
+    backgroundColor: '#0f131c',
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -369,14 +448,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   routeAddress: {
-    color: '#dfe2ef', // on-surface
+    color: '#dfe2ef',
     fontSize: 14,
     lineHeight: 20,
   },
   footer: {
     flexDirection: 'column',
     gap: 16,
-    marginTop: 8,
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.05)',
@@ -392,13 +470,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   priceText: {
-    color: '#ffe399', // secondary
+    color: '#ffe399',
     fontSize: 24,
-    fontWeight: '600',
+    fontWeight: '700',
     lineHeight: 32,
   },
   tipText: {
-    color: '#c2c6d8', // on-surface-variant
+    color: '#c2c6d8',
     fontSize: 14,
   },
   phoneText: {
@@ -422,31 +500,48 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   mapButtonText: {
-    color: '#dfe2ef', // on-surface
+    color: '#dfe2ef',
     fontSize: 14,
     fontWeight: '600',
   },
-  acceptButton: {
+  actionButton: {
     flex: 2,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#0066ff', // primary-container
+    backgroundColor: '#0066ff',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: 'rgba(0, 102, 255, 0.2)',
-    shadowOffset: { width: 0, height: 0 },
+    shadowColor: 'rgba(0, 102, 255, 0.25)',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
-    shadowRadius: 15,
-    elevation: 5,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  acceptButtonDisabled: {
+  actionButtonDisabled: {
     opacity: 0.5,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  acceptButtonText: {
-    color: '#f8f7ff', // on-primary-container
+  actionButtonText: {
+    color: '#f8f7ff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  deliveredBadgeButton: {
+    flex: 2,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deliveredBadgeText: {
+    color: '#00e297',
     fontSize: 14,
     fontWeight: '600',
   },
