@@ -145,14 +145,6 @@ export default function CustomerProfileScreen() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      
-      <LinearGradient
-        colors={gradients.heroGlow}
-        locations={gradients.heroGlowLocations}
-        style={styles.heroGlow}
-        pointerEvents="none"
-      />
-
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
@@ -403,20 +395,11 @@ export default function CustomerProfileScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
-    position: 'relative',
-  },
-  heroGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 320,
-    width: '100%',
+    backgroundColor: '#0F131C',
   },
   scrollContainer: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 44,
+    paddingTop: Platform.OS === 'ios' ? 64 : 56,
     paddingBottom: 110,
     gap: 20,
   },

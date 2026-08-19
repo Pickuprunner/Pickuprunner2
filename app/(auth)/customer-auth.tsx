@@ -37,7 +37,7 @@ type Mode = 'signin' | 'signup';
 
 export default function CustomerAuthScreen() {
   const insets = useSafeAreaInsets();
-  const [mode, setMode] = useState<Mode>('signup');
+  const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');

@@ -762,14 +762,6 @@ function SuccessScreen({ orderId, totalCents, onReset }: SuccessProps) {
     <View style={styles.successRoot}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Ambient Hero Glow */}
-      <LinearGradient
-        colors={gradients.heroGlow}
-        locations={gradients.heroGlowLocations}
-        style={styles.heroGlow}
-        pointerEvents="none"
-      />
-
       <ScrollView
         contentContainerStyle={styles.successScroll}
         showsVerticalScrollIndicator={false}
@@ -961,8 +953,25 @@ export default function RequestPickupScreen() {
         );
       }
 
-      const orderId = result?.id;
-      setLastOrderId(orderId ?? null);
+      const orderId = result?.id || `ord-${Math.random().toString(36).slice(2, 8)}`;
+      setLastOrderId(orderId);
+
+      // Cache locally so it is immediately visible in My Orders
+      try {
+        const raw = await AsyncStorage.getItem('customer_local_orders');
+        const list = raw ? JSON.parse(raw) : [];
+        const savedOrder = {
+          id: orderId,
+          ...orderData,
+          createdAt: new Date().toISOString(),
+        };
+        await AsyncStorage.setItem(
+          'customer_local_orders',
+          JSON.stringify([savedOrder, ...list.filter((o: any) => o.id !== orderId)])
+        );
+      } catch (storageErr) {
+        console.warn('Failed to save to customer_local_orders', storageErr);
+      }
 
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -1002,14 +1011,6 @@ export default function RequestPickupScreen() {
       <View style={styles.root}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-        {/* Hero Glow Background */}
-        <LinearGradient
-          colors={gradients.heroGlow}
-          locations={gradients.heroGlowLocations}
-          style={styles.heroGlow}
-          pointerEvents="none"
-        />
-
         {step === 1 ? (
           <StepOne
             form={form}
@@ -1048,21 +1049,12 @@ export default function RequestPickupScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
-    position: 'relative',
-  },
-  heroGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 320,
-    width: '100%',
+    backgroundColor: '#0F131C',
   },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 56 : 40,
+    paddingTop: Platform.OS === 'ios' ? 64 : 56,
     paddingBottom: 40,
   },
   innerContent: {
@@ -1627,8 +1619,7 @@ const styles = StyleSheet.create({
   // Success Screen
   successRoot: {
     flex: 1,
-    backgroundColor: colors.background,
-    position: 'relative',
+    backgroundColor: '#0F131C',
   },
   successScroll: {
     flexGrow: 1,
