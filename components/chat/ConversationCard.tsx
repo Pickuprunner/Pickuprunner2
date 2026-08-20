@@ -55,7 +55,7 @@ export function ConversationCard({ item, role = 'driver', onPress, style }: Conv
 
   const handlePress = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     onPress();
   };
@@ -114,7 +114,6 @@ export function ConversationCard({ item, role = 'driver', onPress, style }: Conv
         style,
       ]}
     >
-      {/* Avatar with Status Ring */}
       <View style={styles.avatarWrap}>
         <View style={[styles.statusRing, { borderColor: getAvatarRingColor() }]} />
         <LinearGradient
@@ -129,9 +128,7 @@ export function ConversationCard({ item, role = 'driver', onPress, style }: Conv
         </LinearGradient>
       </View>
 
-      {/* Content Column */}
       <View style={styles.content}>
-        {/* Top Row: Name + Unread Badge + Time */}
         <View style={styles.topRow}>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>
@@ -146,7 +143,6 @@ export function ConversationCard({ item, role = 'driver', onPress, style }: Conv
           {item.time && <Text style={styles.timeText}>{item.time}</Text>}
         </View>
 
-        {/* Order Meta Row (if present) */}
         {(item.orderNumber || item.orderMetaText) && (
           <View style={styles.orderMetaRow}>
             {item.orderNumber && (
@@ -166,7 +162,6 @@ export function ConversationCard({ item, role = 'driver', onPress, style }: Conv
           </View>
         )}
 
-        {/* Address Row */}
         {item.address && (
           <View style={styles.addressRow}>
             <MapPin size={12} color="rgba(194, 198, 216, 0.6)" />
@@ -176,7 +171,6 @@ export function ConversationCard({ item, role = 'driver', onPress, style }: Conv
           </View>
         )}
 
-        {/* Status Meta Row */}
         <View style={styles.metaRow}>
           <View
             style={[

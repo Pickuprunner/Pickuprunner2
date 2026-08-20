@@ -17,13 +17,10 @@ interface Props {
 export function TodayEarningsCard({ stats, containerStyle }: Props) {
   return (
     <CustomCard variant="glass" style={[styles.card, containerStyle]}>
-      {/* Title */}
       <Text style={styles.title}>Today's Earnings</Text>
 
-      {/* Main Earnings Amount */}
       <Text style={styles.amount}>${stats.totalDisplay}</Text>
 
-      {/* 3 Metrics Row */}
       <View style={styles.metricsRow}>
         <View style={styles.metricCol}>
           <Text style={styles.metricLabel}>Deliveries</Text>

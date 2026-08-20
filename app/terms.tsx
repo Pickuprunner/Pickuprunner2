@@ -128,7 +128,6 @@ export default function TermsScreen() {
         ))}
       </ScrollView>
 
-      {/* Sticky Bottom Bar */}
       <View
         style={[
           styles.bottomBar,

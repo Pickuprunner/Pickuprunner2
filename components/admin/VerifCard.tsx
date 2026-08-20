@@ -94,7 +94,7 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
       setBusy(true);
       try {
         await review.mutateAsync({ id: v.id, status: action, adminNote: note });
-        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
         setShowReject(false); setRejNote('');
       } finally { setBusy(false); }
     };
@@ -111,7 +111,6 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
       borderColor={v.status === 'approved' ? 'rgba(22,163,74,0.3)' : v.status === 'rejected' ? 'rgba(220,38,38,0.3)' : '$borderColor'}
     >
       <YStack gap="$3">
-        {/* Driver info header */}
         <XStack justifyContent="space-between" alignItems="flex-start">
           <YStack flex={1} marginRight="$2">
             <SizableText size="$4" fontWeight="700" color="$color12">{v.driver_name}</SizableText>
@@ -127,7 +126,6 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
           </XStack>
         </XStack>
 
-        {/* Driver profile details (collapsible) */}
         {profile && (
           <Pressable onPress={() => setShowProfile((s) => !s)} hitSlop={6}>
             <XStack gap="$1" alignItems="center">
@@ -165,7 +163,6 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
           </XStack>
         )}
 
-        {/* Document image previews */}
         <YStack gap="$1">
           <SizableText size="$1" fontWeight="700" color="$color9" letterSpacing={0.3}>
             UPLOADED DOCUMENTS
@@ -178,7 +175,6 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
           />
         </YStack>
 
-        {/* Admin note */}
         {v.admin_note && (
           <XStack gap="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
             <AlertCircle size={14} color="$color9" />
@@ -186,7 +182,6 @@ export default function VerifCard({ v }: { v: DriverVerification }) {
           </XStack>
         )}
 
-        {/* Pending actions */}
         {isPending && (
           <YStack gap="$2">
             {showReject && (

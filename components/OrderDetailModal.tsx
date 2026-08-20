@@ -16,19 +16,19 @@ import { calcDriverEarnings } from '@/lib/config';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import * as Haptics from 'expo-haptics';
 
-const BLUE    = '#0066FF';
-const YELLOW  = '#F5C400';
-const GREEN   = '#22C55E';
-const ORANGE  = '#F97316';
-const BG      = '#0A0A0F';
-const CARD    = '#111827';
-const BORDER  = 'rgba(255,255,255,0.08)';
+const BLUE = '#0066FF';
+const YELLOW = '#F5C400';
+const GREEN = '#22C55E';
+const ORANGE = '#F97316';
+const BG = '#0A0A0F';
+const CARD = '#111827';
+const BORDER = 'rgba(255,255,255,0.08)';
 
 function haptic(type: 'light' | 'medium' | 'success' = 'medium') {
   if (Platform.OS === 'web') return;
-  if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-  else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-  else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+  else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+  else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
 }
 
 function openMaps(address: string) {
@@ -93,8 +93,8 @@ function NavButton({ label, accent, onPress }: { label: string; accent: string; 
 
 // ── Step indicator ────────────────────────────────────────────────────────────
 function StepBadge({ step, label, active, done }: { step: number; label: string; active: boolean; done: boolean }) {
-  const bg   = done ? GREEN : active ? YELLOW : 'rgba(255,255,255,0.08)';
-  const col  = done || active ? '#000' : 'rgba(255,255,255,0.3)';
+  const bg = done ? GREEN : active ? YELLOW : 'rgba(255,255,255,0.08)';
+  const col = done || active ? '#000' : 'rgba(255,255,255,0.3)';
   const tcol = done ? GREEN : active ? YELLOW : 'rgba(255,255,255,0.3)';
   return (
     <View style={styles.stepBadge}>
@@ -116,8 +116,8 @@ interface Props {
 export default function OrderDetailModal({ order, onClose, onStatusChange }: Props) {
   const updateStatus = useUpdateOrderStatus();
   const [status, setStatus] = useState<string>('pending');
-  const [accepting,  setAccepting]  = useState(false);
-  const [pickingUp,  setPickingUp]  = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const [pickingUp, setPickingUp] = useState(false);
   const [delivering, setDelivering] = useState(false);
 
   useEffect(() => {
@@ -126,19 +126,19 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
 
   if (!order) return null;
 
-  const shortId  = order.id?.slice(-6).toUpperCase() ?? '';
-  const miles    = Number(order.distanceMiles ?? 0);
+  const shortId = order.id?.slice(-6).toUpperCase() ?? '';
+  const miles = Number(order.distanceMiles ?? 0);
   const earnings = calcDriverEarnings(miles, Number(order.tipAmount ?? 0));
 
   const statusColor =
     status === 'delivered' ? GREEN :
-    status === 'picked_up' ? ORANGE :
-    status === 'accepted'  ? '#60A5FA' : YELLOW;
+      status === 'picked_up' ? ORANGE :
+        status === 'accepted' ? '#60A5FA' : YELLOW;
 
   const statusLabel =
     status === 'delivered' ? 'DELIVERED' :
-    status === 'picked_up' ? 'PICKED UP' :
-    status === 'accepted'  ? 'ACCEPTED'  : 'PENDING';
+      status === 'picked_up' ? 'PICKED UP' :
+        status === 'accepted' ? 'ACCEPTED' : 'PENDING';
 
   // Step progress: 1=accept, 2=pick up, 3=deliver
   const step1done = status !== 'pending';
@@ -153,7 +153,7 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
     try {
       await updateStatus.mutateAsync({ id: order!.id, status: 'accepted' });
       setStatus('accepted'); onStatusChange?.(order!.id, 'accepted');
-    } catch {} finally { setAccepting(false); }
+    } catch { } finally { setAccepting(false); }
   }
 
   async function doPickUp() {
@@ -161,7 +161,7 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
     try {
       await updateStatus.mutateAsync({ id: order!.id, status: 'picked_up' });
       setStatus('picked_up'); onStatusChange?.(order!.id, 'picked_up');
-    } catch {} finally { setPickingUp(false); }
+    } catch { } finally { setPickingUp(false); }
   }
 
   function doDeliver() {
@@ -180,7 +180,6 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
       <View style={styles.sheet}>
         <View style={styles.handle} />
 
-        {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={onClose} style={styles.closeBtn}>
             <Text style={styles.closeBtnText}>✕</Text>
@@ -196,16 +195,14 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-          {/* ─── STEP PROGRESS ─── */}
           <View style={styles.stepRow}>
-            <StepBadge step={1} label="Accept"   active={step1active} done={step1done} />
+            <StepBadge step={1} label="Accept" active={step1active} done={step1done} />
             <View style={[styles.stepLine, { backgroundColor: step1done ? GREEN : BORDER }]} />
-            <StepBadge step={2} label="Pick Up"  active={step2active} done={step2done} />
+            <StepBadge step={2} label="Pick Up" active={step2active} done={step2done} />
             <View style={[styles.stepLine, { backgroundColor: step2done ? GREEN : BORDER }]} />
-            <StepBadge step={3} label="Deliver"  active={step3active} done={step3done} />
+            <StepBadge step={3} label="Deliver" active={step3active} done={step3done} />
           </View>
 
-          {/* ─── EARNINGS BANNER ─── */}
           <View style={styles.earningsBanner}>
             <View style={styles.earningsLeft}>
               <Text style={styles.earningsLabel}>YOUR EARNINGS</Text>
@@ -224,14 +221,12 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
             </View>
           </View>
 
-          {/* ─── ADDRESSES ─── */}
           <Text style={styles.sectionHead}>PICK UP FROM</Text>
           <AddressBlock title="Pickup Location" address={order.pickupAddress} accent={YELLOW} />
 
           <Text style={styles.sectionHead}>DELIVER TO</Text>
           <AddressBlock title="Delivery Address" address={order.deliveryAddress} accent="#60A5FA" />
 
-          {/* Customer contact */}
           {(!!order.customerPhone || !!order.customerEmail) && (
             <View style={styles.customerCard}>
               {!!order.customerPhone && (
@@ -252,7 +247,6 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
 
           <View style={styles.divider} />
 
-          {/* ─── STEP 1: PENDING → Accept ─── */}
           {status === 'pending' && (
             <>
               <Text style={styles.instruction}>
@@ -262,7 +256,6 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
             </>
           )}
 
-          {/* ─── STEP 2: ACCEPTED → Navigate to Pickup → Mark Picked Up ─── */}
           {status === 'accepted' && (
             <>
               <Text style={styles.instruction}>Head to the pickup location and collect the order.</Text>
@@ -276,7 +269,6 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
             </>
           )}
 
-          {/* ─── STEP 3: PICKED_UP → Navigate to Delivery → Mark Delivered ─── */}
           {status === 'picked_up' && (
             <>
               <Text style={styles.instruction}>Order in hand — head to the customer and complete the delivery.</Text>
@@ -290,7 +282,6 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
             </>
           )}
 
-          {/* ─── DELIVERED ─── */}
           {status === 'delivered' && (
             <View style={styles.deliveredBanner}>
               <Text style={{ fontSize: 32 }}>✓</Text>
@@ -311,7 +302,7 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
 }
 
 const styles = StyleSheet.create({
-  overlay:  { ...StyleSheet.absoluteFillObject, zIndex: 1000, justifyContent: 'flex-end' },
+  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 1000, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)' },
   sheet: {
     height: '92%', backgroundColor: BG,
@@ -335,20 +326,20 @@ const styles = StyleSheet.create({
   },
   closeBtnText: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '700' },
   headerName: { color: 'white', fontSize: 17, fontWeight: '800' },
-  headerId:   { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 1 },
+  headerId: { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 1 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
-  statusText:  { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  statusText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
 
-  scroll:        { flex: 1 },
+  scroll: { flex: 1 },
   scrollContent: { padding: 16 },
 
   // Step progress
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 4 },
   stepBadge: { alignItems: 'center', gap: 4 },
   stepCircle: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  stepNum:   { fontSize: 12, fontWeight: '800' },
+  stepNum: { fontSize: 12, fontWeight: '800' },
   stepLabel: { fontSize: 10, fontWeight: '600' },
-  stepLine:  { flex: 1, height: 2, marginHorizontal: 4, marginBottom: 14 },
+  stepLine: { flex: 1, height: 2, marginHorizontal: 4, marginBottom: 14 },
 
   // Earnings
   earningsBanner: {
@@ -357,11 +348,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(245,196,0,0.3)',
     borderRadius: 14, padding: 16, gap: 16, marginBottom: 4,
   },
-  earningsLeft:  { alignItems: 'center', minWidth: 78 },
+  earningsLeft: { alignItems: 'center', minWidth: 78 },
   earningsLabel: { color: 'rgba(245,196,0,0.7)', fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
   earningsTotal: { color: '#F5C400', fontSize: 28, fontWeight: '900' },
   earningsRight: { flex: 1 },
-  earningsLine:  { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 19 },
+  earningsLine: { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 19 },
 
   // Address
   sectionHead: {
@@ -386,11 +377,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', padding: 12,
     borderBottomWidth: 1, borderBottomColor: BORDER, gap: 10,
   },
-  customerIcon:  { fontSize: 15 },
+  customerIcon: { fontSize: 15 },
   customerPhone: { color: '#60A5FA', fontSize: 14, fontWeight: '500', flex: 1 },
-  customerCta:   { color: 'rgba(255,255,255,0.25)', fontSize: 11 },
+  customerCta: { color: 'rgba(255,255,255,0.25)', fontSize: 11 },
 
-  divider:     { height: 1, backgroundColor: BORDER, marginVertical: 20 },
+  divider: { height: 1, backgroundColor: BORDER, marginVertical: 20 },
   instruction: { color: 'rgba(255,255,255,0.45)', fontSize: 13, lineHeight: 19, marginBottom: 14 },
 
   // Nav button
@@ -417,5 +408,5 @@ const styles = StyleSheet.create({
     borderRadius: 14, padding: 18, marginTop: 8,
   },
   deliveredTitle: { color: GREEN, fontSize: 17, fontWeight: '800' },
-  deliveredSub:   { color: 'rgba(34,197,94,0.65)', fontSize: 13, marginTop: 3 },
+  deliveredSub: { color: 'rgba(34,197,94,0.65)', fontSize: 13, marginTop: 3 },
 });

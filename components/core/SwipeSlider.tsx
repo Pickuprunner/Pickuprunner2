@@ -79,13 +79,13 @@ export function SwipeSlider({
 
   const triggerHapticLight = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
   };
 
   const triggerHapticSuccess = () => {
     if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
     }
   };
 
@@ -175,7 +175,6 @@ export function SwipeSlider({
         }
       }}
     >
-      {/* 1. Progress Fill Behind Thumb (Active Drag Only) */}
       {!isCompleted && !showActiveLoading && (
         <Animated.View
           style={[
@@ -190,7 +189,6 @@ export function SwipeSlider({
         />
       )}
 
-      {/* 2. Center Background Label */}
       <View style={styles.labelContainer} pointerEvents="none">
         {showActiveLoading ? (
           <View style={styles.centerRow}>
@@ -217,7 +215,6 @@ export function SwipeSlider({
         )}
       </View>
 
-      {/* 3. Draggable Thumb */}
       {!isCompleted && !showActiveLoading && (
         <Animated.View
           {...panResponder.panHandlers}

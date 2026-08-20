@@ -94,7 +94,6 @@ export function ProfileHeroCard({
   return (
     <View style={styles.heroCard}>
       <View style={styles.heroTopRow}>
-        {/* Avatar with Photo Picker */}
         <View style={styles.avatarWrap}>
           <Pressable onPress={onPickPhoto} disabled={isUploading || !onPickPhoto}>
             <Avatar size="$7" borderRadius="$full" backgroundColor="#31353f" borderWidth={1} borderColor="#424656">
@@ -111,7 +110,6 @@ export function ProfileHeroCard({
             )}
           </Pressable>
 
-          {/* Camera Icon Overlay */}
           {onPickPhoto && (
             <Pressable onPress={onPickPhoto} style={styles.cameraBadge}>
               <Camera size={12} color="#FFFFFF" />
@@ -119,7 +117,6 @@ export function ProfileHeroCard({
           )}
         </View>
 
-        {/* User Info */}
         <View style={styles.infoCol}>
           {editing ? (
             <View style={styles.editingWrap}>
@@ -153,7 +150,6 @@ export function ProfileHeroCard({
         </View>
       </View>
 
-      {/* 3 Metrics Row */}
       {metrics && metrics.length > 0 && (
         <View style={styles.metricsRow}>
           {metrics.map((item, idx) => (

@@ -47,7 +47,6 @@ export function DocThumbnail({
       style={({ pressed }) => [styles.thumbContainer, pressed && { opacity: 0.8 }]}
     >
       <YStack gap="$1">
-        {/* Image preview */}
         <YStack
           width={140}
           height={100}
@@ -79,7 +78,6 @@ export function DocThumbnail({
                   <ActivityIndicator size="small" color={colors.textTertiary} />
                 </YStack>
               )}
-              {/* Zoom overlay hint */}
               <YStack
                 position="absolute"
                 bottom={4}
@@ -100,7 +98,6 @@ export function DocThumbnail({
           )}
         </YStack>
 
-        {/* Label */}
         <XStack gap="$1" alignItems="center" maxWidth={140}>
           {icon}
           <SizableText size="$1" fontWeight="600" color="$color11" numberOfLines={1} flex={1}>
@@ -112,7 +109,6 @@ export function DocThumbnail({
   );
 }
 
-// ── Document Lightbox Modal ─────────────────────────────────────────────────
 
 interface DocItem {
   label: string;
@@ -134,7 +130,6 @@ export function DocumentLightbox({
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [loading, setLoading] = useState(true);
 
-  // Reset index when reopening
   React.useEffect(() => {
     if (visible) {
       setActiveIndex(initialIndex);
@@ -159,7 +154,6 @@ export function DocumentLightbox({
         style={styles.overlay}
         onPress={onClose}
       >
-        {/* Close button */}
         <XStack
           position="absolute"
           top={isWeb ? 20 : 50}
@@ -178,7 +172,6 @@ export function DocumentLightbox({
           </Pressable>
         </XStack>
 
-        {/* Document label */}
         <XStack
           position="absolute"
           top={isWeb ? 20 : 50}
@@ -206,7 +199,6 @@ export function DocumentLightbox({
           )}
         </XStack>
 
-        {/* Image viewer */}
         <Pressable
           onPress={(e) => e.stopPropagation()}
           style={styles.imageContainer}
@@ -241,7 +233,6 @@ export function DocumentLightbox({
           </ScrollView>
         </Pressable>
 
-        {/* Document navigation (if multiple) */}
         {documents.length > 1 && (
           <XStack
             position="absolute"
@@ -277,7 +268,6 @@ export function DocumentLightbox({
           </XStack>
         )}
 
-        {/* Filename */}
         {doc.filename && (
           <XStack
             position="absolute"
@@ -296,7 +286,6 @@ export function DocumentLightbox({
   );
 }
 
-// ── Convenience wrapper: Doc thumbnails + lightbox combined ──────────────────
 
 export function DocumentPreviewRow({
   licenseUrl,

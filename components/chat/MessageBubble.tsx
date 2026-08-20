@@ -24,7 +24,6 @@ export function MessageBubble({ msg, isMine, role }: MessageBubbleProps) {
         { alignItems: isMine ? 'flex-end' : 'flex-start' },
       ]}
     >
-      {/* Sender label with Icon */}
       {!isMine && (
         <View style={styles.senderLabelRow}>
           {isCustomer ? (

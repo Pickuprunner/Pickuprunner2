@@ -343,7 +343,6 @@ export default function ProfileScreen() {
           />
         </ProfileSection>
 
-        {/* ── 4. Preferences ── */}
         <ProfileSection title="PREFERENCES">
           <ProfileActionRow
             icon={<Bell size={18} color="#FFFFFF" />}

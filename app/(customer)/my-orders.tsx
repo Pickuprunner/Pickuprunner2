@@ -88,7 +88,7 @@ export default function MyOrdersScreen() {
       try {
         const raw = await AsyncStorage.getItem('customer_local_orders');
         if (raw) localOrders = JSON.parse(raw);
-      } catch {}
+      } catch { }
 
       const timeoutPromise = new Promise((resolve) =>
         setTimeout(() => resolve([]), 3500)
@@ -102,30 +102,30 @@ export default function MyOrdersScreen() {
         const fetchPromise = Promise.all([
           id
             ? blink.db.orders
-                .list({
-                  where: { customer_session_id: id },
-                  orderBy: { created_at: 'desc' },
-                  limit: 50,
-                })
-                .catch(() => [])
+              .list({
+                where: { customer_session_id: id },
+                orderBy: { created_at: 'desc' },
+                limit: 50,
+              })
+              .catch(() => [])
             : Promise.resolve([]),
           id
             ? blink.db.orders
-                .list({
-                  where: { customerSessionId: id },
-                  orderBy: { createdAt: 'desc' },
-                  limit: 50,
-                })
-                .catch(() => [])
+              .list({
+                where: { customerSessionId: id },
+                orderBy: { createdAt: 'desc' },
+                limit: 50,
+              })
+              .catch(() => [])
             : Promise.resolve([]),
           userEmail
             ? blink.db.orders
-                .list({
-                  where: { customer_email: userEmail },
-                  orderBy: { created_at: 'desc' },
-                  limit: 50,
-                })
-                .catch(() => [])
+              .list({
+                where: { customer_email: userEmail },
+                orderBy: { created_at: 'desc' },
+                limit: 50,
+              })
+              .catch(() => [])
             : Promise.resolve([]),
         ]);
 
@@ -202,7 +202,7 @@ export default function MyOrdersScreen() {
       if (channelRef.current) {
         try {
           channelRef.current.unsubscribe();
-        } catch {}
+        } catch { }
       }
     };
   }, [fetchOrders]);
@@ -222,7 +222,6 @@ export default function MyOrdersScreen() {
     const id = cancelTargetOrder.id;
     setCancelling(true);
     try {
-      // Remove locally from AsyncStorage
       try {
         const raw = await AsyncStorage.getItem('customer_local_orders');
         if (raw) {
@@ -230,13 +229,13 @@ export default function MyOrdersScreen() {
           const filtered = list.filter((o: any) => o.id !== id);
           await AsyncStorage.setItem('customer_local_orders', JSON.stringify(filtered));
         }
-      } catch {}
+      } catch { }
 
-      await blink.db.orders.delete(id).catch(() => {});
+      await blink.db.orders.delete(id).catch(() => { });
       setOrders((prev) => prev.filter((o) => o.id !== id));
       prevStatusMap.current.delete(id);
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
       showToast('Pickup request cancelled', {
         type: 'info',
@@ -281,7 +280,6 @@ export default function MyOrdersScreen() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* ─── Header Section ─── */}
       <View style={styles.headerContainer}>
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>
@@ -291,14 +289,12 @@ export default function MyOrdersScreen() {
             </Text>
           </View>
 
-          {/* Live Indicator Badge */}
           <View style={styles.liveBadge}>
             <View style={styles.livePulseDot} />
             <Text style={styles.liveBadgeText}>LIVE</Text>
           </View>
         </View>
 
-        {/* Search Bar + Filter Icon */}
         <View style={styles.searchRow}>
           <View style={styles.searchBar}>
             <MaterialIcons name="search" size={20} color="#8C90A1" />
@@ -314,7 +310,7 @@ export default function MyOrdersScreen() {
           <TouchableOpacity
             onPress={() => {
               if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
               }
               showToast('Showing all recent orders', { type: 'info' });
             }}
@@ -326,7 +322,6 @@ export default function MyOrdersScreen() {
         </View>
       </View>
 
-      {/* Orders List */}
       <FlatList
         data={filteredOrders}
         renderItem={renderItem}
@@ -356,7 +351,6 @@ export default function MyOrdersScreen() {
         }
       />
 
-      {/* Premium Reusable Cancel Confirmation Modal */}
       <CustomConfirmModal
         visible={!!cancelTargetOrder}
         variant="danger"

@@ -64,10 +64,10 @@ export default function SignInScreen() {
     password.length === 0
       ? 'default'
       : isSignUp
-      ? passwordCheck.isValid
-        ? 'success'
-        : 'error'
-      : 'default';
+        ? passwordCheck.isValid
+          ? 'success'
+          : 'error'
+        : 'default';
 
   const handleSubmit = async () => {
     const emailTrimmed = email.trim();
@@ -102,37 +102,16 @@ export default function SignInScreen() {
           password,
           metadata: { displayName: nameTrimmed },
         });
-        await saveDisplayName(nameTrimmed).catch(() => {});
-
-        // Auto-create Stripe Express account for driver (fire-and-forget)
-        const me = await blink.auth.me();
-        if (me) {
-          fetch('https://vljh4v3j.backend.blink.new/connect/auto-create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ driverUserId: me.id, driverEmail: emailTrimmed, driverName: nameTrimmed }),
-          }).catch(() => {});
-        }
+        await saveDisplayName(nameTrimmed).catch(() => { });
       } else {
         await blink.auth.signInWithEmail(emailTrimmed, password);
       }
 
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
 
-      // Check verification status before routing
-      const me = await blink.auth.me();
-      if (!me) { router.replace('/(tabs)'); return; }
-
-      const verRows = await blink.db.driverVerifications.list({ where: { user_id: me.id }, limit: 1 });
-      const verification = verRows[0] as any;
-
-      if (!verification || verification.status !== 'approved') {
-        router.replace('/driver-verification');
-      } else {
-        router.replace('/(tabs)');
-      }
+      router.replace('/(tabs)');
     } catch (err: any) {
       const msg: string = err?.message ?? '';
       if (msg.includes('already exists') || msg.includes('EMAIL_ALREADY_EXISTS')) {
@@ -159,8 +138,7 @@ export default function SignInScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.root}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
-        {/* Hero Glow Background — matching landing role-select */}
+        =
         <LinearGradient
           colors={gradients.heroGlow}
           locations={gradients.heroGlowLocations}
@@ -200,7 +178,6 @@ export default function SignInScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.innerContent}>
-              {/* Back button */}
               <Pressable
                 onPress={() => {
                   if (router.canGoBack()) {
@@ -215,7 +192,6 @@ export default function SignInScreen() {
                 <ChevronLeft size={24} color={colors.onSurface} />
               </Pressable>
 
-              {/* Hero Header */}
               <AuthHero
                 icon={<Truck size={42} color="#0F131C" />}
                 iconBgColor={colors.primaryContainer}
@@ -229,9 +205,7 @@ export default function SignInScreen() {
                 }
               />
 
-              {/* Form */}
               <View style={styles.formSection}>
-                {/* Name (sign-up only) */}
                 {isSignUp && (
                   <CustomInput
                     label="YOUR NAME"
@@ -245,7 +219,6 @@ export default function SignInScreen() {
                   />
                 )}
 
-                {/* Email */}
                 <CustomInput
                   label="EMAIL"
                   value={email}
@@ -259,7 +232,6 @@ export default function SignInScreen() {
                   status={emailStatus}
                 />
 
-                {/* Password */}
                 <PasswordInput
                   value={password}
                   onChangeText={(text) => {
@@ -278,7 +250,6 @@ export default function SignInScreen() {
                   }}
                 />
 
-                {/* Terms — sign-up only */}
                 {isSignUp && (
                   <TermsAgreement
                     agreed={agreedToTerms}
@@ -287,7 +258,6 @@ export default function SignInScreen() {
                   />
                 )}
 
-                {/* Submit CTA Button */}
                 <Pressable
                   onPress={handleSubmit}
                   disabled={loading}
@@ -306,7 +276,6 @@ export default function SignInScreen() {
                   )}
                 </Pressable>
 
-                {/* Mode switch */}
                 <View style={styles.switchRow}>
                   <Text style={styles.switchModePrompt}>
                     {isSignUp ? 'Already have an account?' : "Don't have an account?"}

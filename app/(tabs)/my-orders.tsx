@@ -31,7 +31,7 @@ import {
 
 function haptic() {
   if (Platform.OS !== 'web') {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
   }
 }
 
@@ -198,16 +198,13 @@ export default function MyOrdersScreen() {
     ? `${activeOrders.length} ACTIVE`
     : `${availableOrders.length} NEARBY`;
 
-  // ─── 4. List Header Component (Earnings Hero + Section Title) ───
   const listHeader = useMemo(
     () => (
       <View>
         <View style={{ height: headerHeight + 4 }} />
 
-        {/* Today's Earnings Hero Card */}
         <TodayEarningsCard stats={todayStats} />
 
-        {/* Section Header */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>{sectionTitle}</Text>
           <View style={[styles.sectionPill, hasActive && styles.sectionPillActive]}>
@@ -241,7 +238,6 @@ export default function MyOrdersScreen() {
 
   return (
     <View style={styles.root}>
-      {/* ─── Absolute Floating Animated Header ─── */}
       <Animated.View
         onLayout={onHeaderLayout}
         style={[
@@ -264,7 +260,6 @@ export default function MyOrdersScreen() {
         />
       </Animated.View>
 
-      {/* ─── Scrollable Orders List ─── */}
       <FlatList
         data={displayList}
         keyExtractor={(item) => item.id}

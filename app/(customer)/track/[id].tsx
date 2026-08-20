@@ -26,7 +26,7 @@ import { useOrderChat, getSavedDisplayName } from '@/lib/chat';
 
 function haptic() {
   if (Platform.OS !== 'web') {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
   }
 }
 
@@ -111,7 +111,6 @@ function CustomerOrderChat({ orderId, customerName }: { orderId: string; custome
 
   return (
     <View style={styles.chatCard}>
-      {/* Header */}
       <View style={styles.chatHeader}>
         <MaterialIcons name="chat" size={18} color="#FFE399" />
         <Text style={styles.chatHeaderTitle}>MESSAGE YOUR DRIVER</Text>
@@ -124,7 +123,6 @@ function CustomerOrderChat({ orderId, customerName }: { orderId: string; custome
         />
       </View>
 
-      {/* Messages */}
       {messages.length > 0 ? (
         <View style={styles.chatMessagesList}>
           {messages.slice(-4).map((msg) => {
@@ -162,7 +160,6 @@ function CustomerOrderChat({ orderId, customerName }: { orderId: string; custome
         </Text>
       )}
 
-      {/* Input Row */}
       <View style={styles.chatInputRow}>
         <TextInput
           value={inputText}
@@ -216,7 +213,7 @@ export default function TrackOrderScreen() {
           const found = list.find((o) => o.id === id);
           if (found) setOrder(found);
         }
-      } catch {}
+      } catch { }
 
       try {
         const result = (await blink.db.orders.get(id)) as TrackedOrder;
@@ -243,7 +240,7 @@ export default function TrackOrderScreen() {
         driver_name: driver.name,
         driver_photo_url: driver.photo,
         status: 'accepted',
-      }).catch(() => {});
+      }).catch(() => { });
 
       const updated: TrackedOrder = {
         ...order,
@@ -266,7 +263,7 @@ export default function TrackOrderScreen() {
             await AsyncStorage.setItem('customer_local_orders', JSON.stringify(list));
           }
         }
-      } catch {}
+      } catch { }
 
       showToast('Driver assigned!', {
         type: 'success',
@@ -286,7 +283,7 @@ export default function TrackOrderScreen() {
         status: 'delivered',
         delivery_photo_url:
           'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop',
-      }).catch(() => {});
+      }).catch(() => { });
 
       const updated: TrackedOrder = {
         ...order,
@@ -309,7 +306,7 @@ export default function TrackOrderScreen() {
             await AsyncStorage.setItem('customer_local_orders', JSON.stringify(list));
           }
         }
-      } catch {}
+      } catch { }
 
       showToast('Delivery completed!', {
         type: 'success',
@@ -354,7 +351,7 @@ export default function TrackOrderScreen() {
       if (channelRef.current) {
         try {
           channelRef.current.unsubscribe();
-        } catch {}
+        } catch { }
       }
     };
   }, [id, fetchOrder]);
@@ -379,7 +376,6 @@ export default function TrackOrderScreen() {
     return (
       <View style={styles.root}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        {/* Header Skeleton */}
         <View style={styles.header}>
           <CustomSkeleton width={42} height={42} borderRadius={12} />
           <View style={{ alignItems: 'center', gap: 6 }}>
@@ -390,7 +386,6 @@ export default function TrackOrderScreen() {
         </View>
 
         <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} showsVerticalScrollIndicator={false}>
-          {/* Hero Banner Skeleton */}
           <View style={[styles.heroCard, { backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: 'rgba(255, 255, 255, 0.06)' }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
               <CustomSkeleton width={48} height={48} circle />
@@ -401,7 +396,6 @@ export default function TrackOrderScreen() {
             </View>
           </View>
 
-          {/* Stepper Skeleton */}
           <View style={[styles.card, { gap: 16, backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: 'rgba(255, 255, 255, 0.06)' }]}>
             <CustomSkeleton width={120} height={14} borderRadius={4} />
             <View style={{ gap: 12 }}>
@@ -420,7 +414,6 @@ export default function TrackOrderScreen() {
             </View>
           </View>
 
-          {/* Details Card Skeleton */}
           <View style={[styles.card, { gap: 14, backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: 'rgba(255, 255, 255, 0.06)' }]}>
             <CustomSkeleton width={100} height={14} borderRadius={4} />
             <CustomSkeleton width="100%" height={40} borderRadius={10} />
@@ -450,7 +443,6 @@ export default function TrackOrderScreen() {
     );
   }
 
-  // Hero Status Theme Info
   const getHeroTheme = () => {
     if (isDelivered) {
       return {
@@ -502,7 +494,6 @@ export default function TrackOrderScreen() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* ── Top Header ── */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => {
@@ -520,7 +511,6 @@ export default function TrackOrderScreen() {
           <Text style={styles.headerOrderId}>#{shortId}</Text>
         </View>
 
-        {/* Live indicator badge */}
         <View style={styles.liveBadge}>
           <View
             style={[
@@ -550,7 +540,6 @@ export default function TrackOrderScreen() {
           />
         }
       >
-        {/* ── Status Hero Card ── */}
         <Animated.View entering={FadeInDown.springify()}>
           <View
             style={[
@@ -569,7 +558,6 @@ export default function TrackOrderScreen() {
               <Text style={styles.heroDesc}>{hero.desc}</Text>
             </View>
 
-            {/* Delivery Photo preview if delivered */}
             {isDelivered && deliveryPhoto && (
               <View style={styles.photoContainer}>
                 <View style={styles.photoHeader}>
@@ -586,13 +574,11 @@ export default function TrackOrderScreen() {
           </View>
         </Animated.View>
 
-        {/* ── Progress Timeline Steps ── */}
         <Animated.View entering={FadeInDown.delay(70).springify()}>
           <View style={styles.card}>
             <Text style={styles.cardHeaderLabel}>ORDER STATUS</Text>
 
             <View style={styles.timelineContainer}>
-              {/* Step 1: Placed */}
               <View style={styles.timelineStep}>
                 <View style={[styles.stepDot, styles.stepDotDone]}>
                   <MaterialIcons name="check" size={16} color="#00E297" />
@@ -603,16 +589,14 @@ export default function TrackOrderScreen() {
                 </View>
               </View>
 
-              {/* Line 1 */}
               <View
                 style={[
                   styles.timelineConnector,
                   (isAccepted || isPickedUp || isDelivered || driverName) &&
-                    styles.timelineConnectorActive,
+                  styles.timelineConnectorActive,
                 ]}
               />
 
-              {/* Step 2: Driver Assigned */}
               <View style={styles.timelineStep}>
                 <View
                   style={[
@@ -633,7 +617,7 @@ export default function TrackOrderScreen() {
                     style={[
                       styles.stepTitle,
                       !(isAccepted || isPickedUp || isDelivered || driverName) &&
-                        styles.stepTitleInactive,
+                      styles.stepTitleInactive,
                     ]}
                   >
                     Driver Assigned
@@ -644,7 +628,6 @@ export default function TrackOrderScreen() {
                 </View>
               </View>
 
-              {/* Line 2 */}
               <View
                 style={[
                   styles.timelineConnector,
@@ -652,7 +635,6 @@ export default function TrackOrderScreen() {
                 ]}
               />
 
-              {/* Step 3: Delivered */}
               <View style={styles.timelineStep}>
                 <View
                   style={[
@@ -684,7 +666,6 @@ export default function TrackOrderScreen() {
           </View>
         </Animated.View>
 
-        {/* ── Driver Profile Card (if assigned) ── */}
         {driverName && (
           <Animated.View entering={FadeInDown.delay(130).springify()}>
             <View style={styles.card}>
@@ -713,7 +694,6 @@ export default function TrackOrderScreen() {
           </Animated.View>
         )}
 
-        {/* ── Order Details Card ── */}
         <Animated.View entering={FadeInDown.delay(180).springify()}>
           <View style={styles.card}>
             <Text style={styles.cardHeaderLabel}>ORDER DETAILS</Text>
@@ -757,14 +737,12 @@ export default function TrackOrderScreen() {
           </View>
         </Animated.View>
 
-        {/* ── Chat with Driver ── */}
         {driverName && !isDelivered && (
           <Animated.View entering={FadeInDown.delay(220).springify()}>
             <CustomerOrderChat orderId={id!} customerName={customerName} />
           </Animated.View>
         )}
 
-        {/* ── Simulator / Test Controls (if pending/in testing) ── */}
         {!isDelivered && (
           <Animated.View entering={FadeInDown.delay(260).springify()}>
             <View style={styles.testControlsCard}>
@@ -803,7 +781,6 @@ export default function TrackOrderScreen() {
           </Animated.View>
         )}
 
-        {/* ── Footer Navigation Actions ── */}
         <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.footerButtons}>
           <TouchableOpacity
             onPress={() => {

@@ -67,10 +67,10 @@ export default function CustomerAuthScreen() {
     password.length === 0
       ? 'default'
       : isSignUp
-      ? passwordCheck.isValid
-        ? 'success'
-        : 'error'
-      : 'default';
+        ? passwordCheck.isValid
+          ? 'success'
+          : 'error'
+        : 'default';
 
   const handleSubmit = async () => {
     const emailTrimmed = email.trim();
@@ -105,12 +105,12 @@ export default function CustomerAuthScreen() {
           password,
           metadata: { displayName: nameTrimmed },
         });
-        await AsyncStorage.setItem(NAME_KEY, nameTrimmed).catch(() => {});
+        await AsyncStorage.setItem(NAME_KEY, nameTrimmed).catch(() => { });
       } else {
         await blink.auth.signInWithEmail(emailTrimmed, password);
         const me = await blink.auth.me();
         if (me?.displayName) {
-          await AsyncStorage.setItem(NAME_KEY, me.displayName).catch(() => {});
+          await AsyncStorage.setItem(NAME_KEY, me.displayName).catch(() => { });
         }
       }
 
@@ -120,7 +120,7 @@ export default function CustomerAuthScreen() {
       }
 
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
 
       router.replace('/(customer)/my-orders');
@@ -151,7 +151,6 @@ export default function CustomerAuthScreen() {
       <View style={styles.root}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-        {/* Hero Glow Background — matching landing role-select */}
         <LinearGradient
           colors={gradients.heroGlow}
           locations={gradients.heroGlowLocations}
@@ -191,7 +190,6 @@ export default function CustomerAuthScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.innerContent}>
-              {/* Back button */}
               <Pressable
                 onPress={() => {
                   if (router.canGoBack()) {
@@ -206,7 +204,6 @@ export default function CustomerAuthScreen() {
                 <ChevronLeft size={24} color={colors.onSurface} />
               </Pressable>
 
-              {/* Hero Header */}
               <AuthHero
                 icon={<ShoppingBag size={42} color="#0F131C" />}
                 iconBgColor={colors.secondaryContainer}
@@ -220,9 +217,7 @@ export default function CustomerAuthScreen() {
                 }
               />
 
-              {/* Form */}
               <View style={styles.formSection}>
-                {/* Name (sign-up only) */}
                 {isSignUp && (
                   <CustomInput
                     label="YOUR NAME"
@@ -236,7 +231,6 @@ export default function CustomerAuthScreen() {
                   />
                 )}
 
-                {/* Email */}
                 <CustomInput
                   label="EMAIL"
                   value={email}
@@ -250,7 +244,6 @@ export default function CustomerAuthScreen() {
                   status={emailStatus}
                 />
 
-                {/* Password */}
                 <PasswordInput
                   value={password}
                   onChangeText={(text) => {
@@ -269,7 +262,6 @@ export default function CustomerAuthScreen() {
                   }}
                 />
 
-                {/* Terms — sign-up only */}
                 {isSignUp && (
                   <TermsAgreement
                     agreed={agreedToTerms}
@@ -278,7 +270,6 @@ export default function CustomerAuthScreen() {
                   />
                 )}
 
-                {/* Submit CTA Button */}
                 <Pressable
                   onPress={handleSubmit}
                   disabled={loading}
@@ -297,7 +288,6 @@ export default function CustomerAuthScreen() {
                   )}
                 </Pressable>
 
-                {/* Mode switch */}
                 <View style={styles.switchRow}>
                   <Text style={styles.switchModePrompt}>
                     {isSignUp ? 'Already have an account?' : "Don't have an account?"}
@@ -309,7 +299,6 @@ export default function CustomerAuthScreen() {
                   </Pressable>
                 </View>
 
-                {/* Continue without account */}
                 <Pressable
                   onPress={() => router.replace('/(customer)/my-orders')}
                   style={({ pressed }) => [styles.guestBtn, pressed && { opacity: 0.7 }]}

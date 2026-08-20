@@ -39,7 +39,6 @@ export function DocUploadCard({
       ]}
     >
       <View style={styles.contentRow}>
-        {/* Icon circle */}
         <View
           style={[
             styles.iconCircle,
@@ -55,7 +54,6 @@ export function DocUploadCard({
           )}
         </View>
 
-        {/* Text info */}
         <View style={styles.textContainer}>
           <Text style={styles.label}>{label}</Text>
           {doc.uploading ? (
@@ -71,7 +69,6 @@ export function DocUploadCard({
           )}
         </View>
 
-        {/* Action hint / icon */}
         {!doc.uploading && (
           <View style={styles.actionContainer}>
             {hasDoc ? (
@@ -85,7 +82,6 @@ export function DocUploadCard({
         )}
       </View>
 
-      {/* Progress bar */}
       {doc.uploading && doc.progress > 0 && (
         <View style={styles.progressTrack}>
           <View

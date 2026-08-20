@@ -90,7 +90,7 @@ export default function BackgroundCheckScreen() {
         zip,
         existingId: existing?.id,
       });
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       setShowForm(false);
     } catch (err: any) {
       setSubmitError(err?.message ?? 'Submission failed. Please try again.');
@@ -99,7 +99,6 @@ export default function BackgroundCheckScreen() {
 
   return (
     <SafeArea>
-      {/* Header */}
       <XStack
         paddingHorizontal="$4"
         paddingVertical="$3"
@@ -125,9 +124,9 @@ export default function BackgroundCheckScreen() {
             borderRadius={999}
             backgroundColor={
               isApproved ? 'rgba(22,163,74,0.12)' :
-              isPending  ? 'rgba(59,130,246,0.12)' :
-              isRejected ? 'rgba(220,38,38,0.12)'  :
-                           'rgba(217,119,6,0.12)'
+                isPending ? 'rgba(59,130,246,0.12)' :
+                  isRejected ? 'rgba(220,38,38,0.12)' :
+                    'rgba(217,119,6,0.12)'
             }
           >
             <SizableText
@@ -149,7 +148,6 @@ export default function BackgroundCheckScreen() {
       >
         <YStack gap="$5">
 
-          {/* Intro */}
           <YStack gap="$2">
             <SizableText size="$6" fontWeight="800" color="$color12">
               Driver Background Check
@@ -159,7 +157,6 @@ export default function BackgroundCheckScreen() {
             </SizableText>
           </YStack>
 
-          {/* Status banner for existing submissions */}
           {hasExisting && !showForm && (
             <StatusBanner
               status={existing.status as any}
@@ -170,7 +167,6 @@ export default function BackgroundCheckScreen() {
             />
           )}
 
-          {/* What is checked info card */}
           {!hasExisting && (
             <YStack
               backgroundColor="$color2"
@@ -194,7 +190,6 @@ export default function BackgroundCheckScreen() {
                 </XStack>
               ))}
 
-              {/* FCRA notice */}
               <YStack
                 backgroundColor="$color3"
                 borderRadius="$3"
@@ -211,7 +206,6 @@ export default function BackgroundCheckScreen() {
             </YStack>
           )}
 
-          {/* Authorization form */}
           {showUploadForm && !isPending && !isApproved && (
             <YStack gap="$4">
               <XStack justifyContent="space-between" alignItems="center">
@@ -313,7 +307,6 @@ export default function BackgroundCheckScreen() {
                 </YStack>
               </XStack>
 
-              {/* Privacy notice */}
               <YStack
                 backgroundColor="$color3"
                 borderRadius="$3"
@@ -330,7 +323,6 @@ export default function BackgroundCheckScreen() {
                 </XStack>
               </YStack>
 
-              {/* Consent checkbox */}
               <Pressable
                 onPress={() => setAgreed((v) => !v)}
                 style={styles.consentRow}
@@ -343,7 +335,6 @@ export default function BackgroundCheckScreen() {
                 </SizableText>
               </Pressable>
 
-              {/* Error */}
               {!!submitError && (
                 <XStack
                   backgroundColor="$red2"
@@ -359,7 +350,6 @@ export default function BackgroundCheckScreen() {
                 </XStack>
               )}
 
-              {/* Submit */}
               <Pressable
                 onPress={handleSubmit}
                 disabled={submit.isPending}
@@ -386,7 +376,6 @@ export default function BackgroundCheckScreen() {
             </YStack>
           )}
 
-          {/* Submitted summary (pending / in_review) */}
           {isPending && existing && (
             <YStack
               backgroundColor="$color2"

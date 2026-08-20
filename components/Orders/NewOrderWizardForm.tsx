@@ -82,7 +82,7 @@ export function NewOrderWizardForm({
 
   const haptic = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
   };
 
@@ -115,7 +115,6 @@ export function NewOrderWizardForm({
 
   return (
     <View style={styles.container}>
-      {/* ── 1. Step Pagination Bar Styled Like the Bottom Tab Bar ── */}
       <View style={styles.tabBar}>
         {STEPS.map((step) => {
           const isActive = currentStep === step.id;
@@ -158,7 +157,6 @@ export function NewOrderWizardForm({
         })}
       </View>
 
-      {/* ── 2. Phase-wise Step Content ── */}
       <View style={styles.stepContent}>
         {currentStep === 1 && (
           <CustomerDetailsCard
@@ -194,7 +192,6 @@ export function NewOrderWizardForm({
         )}
       </View>
 
-      {/* ── 3. Step Navigation Buttons ── */}
       <View style={styles.navRow}>
         {currentStep > 1 && (
           <Pressable

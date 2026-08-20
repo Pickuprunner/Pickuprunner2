@@ -60,8 +60,8 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
       status === 'approved'
         ? `Approve background check for ${check.driver_name}? This grants full driver access.`
         : status === 'rejected'
-        ? `Reject background check for ${check.driver_name}?${note ? `\n\nReason: ${note}` : ''}`
-        : `Mark ${check.driver_name} as In Review?`;
+          ? `Reject background check for ${check.driver_name}?${note ? `\n\nReason: ${note}` : ''}`
+          : `Mark ${check.driver_name} as In Review?`;
 
     const run = async () => {
       setResolving(true);
@@ -72,7 +72,7 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
           adminNote: note.trim() || undefined,
           externalRef: ref.trim() || undefined,
         });
-        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
         setExpanded(false);
       } finally {
         setResolving(false);
@@ -96,14 +96,13 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
       borderWidth={1}
       borderColor={
         check.status === 'approved' ? 'rgba(22,163,74,0.3)' :
-        check.status === 'rejected' ? 'rgba(220,38,38,0.3)' :
-        '$borderColor'
+          check.status === 'rejected' ? 'rgba(220,38,38,0.3)' :
+            '$borderColor'
       }
       padding="$4"
       marginBottom="$3"
     >
       <YStack gap="$3">
-        {/* Header row */}
         <XStack justifyContent="space-between" alignItems="flex-start">
           <YStack flex={1}>
             <SizableText size="$4" fontWeight="700" color="$color12">{check.driver_name}</SizableText>
@@ -119,7 +118,6 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
           </XStack>
         </XStack>
 
-        {/* Submitted info */}
         <XStack gap="$4" flexWrap="wrap">
           <YStack gap="$0">
             <SizableText size="$1" color="$color9" fontWeight="600">DOB</SizableText>
@@ -137,7 +135,6 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
           </YStack>
         </XStack>
 
-        {/* Existing note / ref */}
         {check.admin_note && !expanded && (
           <XStack gap="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
             <AlertCircle size={14} color="$color9" />
@@ -151,7 +148,6 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
           </XStack>
         )}
 
-        {/* Expand toggle for approved/rejected */}
         {!isPending && (
           <Pressable onPress={() => setExpanded((v) => !v)} hitSlop={8}>
             <SizableText size="$2" color="$blue9" fontWeight="600">
@@ -160,10 +156,8 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
           </Pressable>
         )}
 
-        {/* Action area */}
         {(isPending || expanded) && (
           <YStack gap="$2">
-            {/* External reference field */}
             <YStack gap="$1">
               <SizableText size="$1" fontWeight="700" color="$color9">
                 SCREENING REFERENCE ID (optional)
@@ -189,7 +183,6 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
               </XStack>
             </YStack>
 
-            {/* Admin note */}
             <YStack gap="$1">
               <SizableText size="$1" fontWeight="700" color="$color9">ADMIN NOTE (shown to driver if rejected)</SizableText>
               <XStack
@@ -216,7 +209,6 @@ function BGCheckCard({ check }: { check: BackgroundCheck }) {
               </XStack>
             </YStack>
 
-            {/* Buttons */}
             <XStack gap="$2">
               {check.status !== 'in_review' && (
                 <Pressable

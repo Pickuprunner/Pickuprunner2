@@ -55,7 +55,7 @@ export default function NewOrderBanner({ alert, onDismiss }: Props) {
 
     // Haptic on native
     if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
     }
 
     // Auto-dismiss
@@ -111,7 +111,6 @@ export default function NewOrderBanner({ alert, onDismiss }: Props) {
           alignItems="center"
           gap="$3"
         >
-          {/* Icon */}
           <YStack
             width={40}
             height={40}
@@ -124,7 +123,6 @@ export default function NewOrderBanner({ alert, onDismiss }: Props) {
             <ShoppingBag size={20} color="#74C69D" />
           </YStack>
 
-          {/* Text */}
           <YStack flex={1} gap="$0.5">
             <SizableText size="$4" fontWeight="800" color="#D8F3DC">
               New Order #{shortId}
@@ -135,7 +133,6 @@ export default function NewOrderBanner({ alert, onDismiss }: Props) {
             </SizableText>
           </YStack>
 
-          {/* Dismiss */}
           <Pressable
             onPress={(e) => {
               e.stopPropagation?.();

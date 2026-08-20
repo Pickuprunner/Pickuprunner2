@@ -41,7 +41,7 @@ export default function DeleteAccountScreen() {
 
   const handleNext = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
     }
     setStep('confirm');
   };
@@ -56,7 +56,7 @@ export default function DeleteAccountScreen() {
     setStep('deleting');
 
     if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
     }
 
     try {
@@ -77,8 +77,8 @@ export default function DeleteAccountScreen() {
         await Promise.allSettled(cleanupOps);
 
         // Remove local photo reference
-        await AsyncStorage.removeItem('driver_photo_url').catch(() => {});
-        await AsyncStorage.removeItem('app_role').catch(() => {});
+        await AsyncStorage.removeItem('driver_photo_url').catch(() => { });
+        await AsyncStorage.removeItem('app_role').catch(() => { });
       }
 
       // Sign out
@@ -86,7 +86,7 @@ export default function DeleteAccountScreen() {
 
       setStep('done');
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
     } catch (err: any) {
       console.warn('[delete-account] error:', err?.message);
@@ -97,7 +97,6 @@ export default function DeleteAccountScreen() {
 
   return (
     <SafeArea edges={['top', 'bottom']}>
-      {/* Header */}
       <XStack
         alignItems="center"
         paddingHorizontal="$4"

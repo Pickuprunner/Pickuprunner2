@@ -9,15 +9,14 @@ import {
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import { ordersTable } from '@/lib/orders';
-import { APP_CONFIG, ORDER_SCOPE } from '@/lib/config';
-import { blinkDbCreate } from '@/lib/blinkApi';
+import { useCreateOrder } from '@/lib/orders';
+import { APP_CONFIG } from '@/lib/config';
 import { useToast } from '@/components/core';
 import {
   NewOrderHeader,
   NewOrderWizardForm,
 } from '@/components/Orders';
-import { colors,  spacing } from '@/constants/design';
+import { colors, spacing } from '@/constants/design';
 
 const DELIVERY_FEE = APP_CONFIG.DELIVERY_FEE_CENTS;
 const MILEAGE_RATE = APP_CONFIG.MILEAGE_RATE_CENTS;
@@ -31,6 +30,7 @@ function calcMileageCents(milesStr: string): number {
 
 export default function NewOrderScreen() {
   const { showToast } = useToast();
+  const createOrder = useCreateOrder();
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -61,35 +61,17 @@ export default function NewOrderScreen() {
 
     setLoading(true);
     try {
-      const orderData = {
-        customer_name: customerName.trim(),
-        customer_phone: customerPhone.trim(),
-        customer_email: customerEmail.trim(),
-        pickup_address: pickupAddress.trim(),
-        delivery_address: deliveryAddress.trim(),
+      await createOrder.mutateAsync({
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        customerEmail: customerEmail.trim(),
+        pickupAddress: pickupAddress.trim(),
+        deliveryAddress: deliveryAddress.trim(),
         items: items.trim(),
-        status: 'pending',
-        distance_miles: parseFloat(miles) || 0,
-        tip_amount: tipCents,
-        payment_status: 'unpaid',
-        city_id: APP_CONFIG.CITY_ID,
-        store_id: APP_CONFIG.STORE_ID,
-        order_scope: ORDER_SCOPE,
-      };
-
-      const snakeData: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(orderData)) {
-        snakeData[key] = value;
-      }
-      try {
-        await blinkDbCreate('orders', snakeData);
-      } catch (restErr: any) {
-        console.warn('[new-order] REST failed, trying SDK fallback:', restErr?.message);
-        await ordersTable.create(orderData as any);
-      }
+      });
 
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
 
       showToast('Order created', {
@@ -129,7 +111,6 @@ export default function NewOrderScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Top Header */}
       <NewOrderHeader onFillTest={fillTestData} />
 
       <KeyboardAvoidingView
