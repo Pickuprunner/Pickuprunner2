@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -19,16 +19,18 @@ import {
   ShoppingBag,
   Mail,
   Lock,
-  ArrowLeft,
+  ChevronLeft,
   User,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { blink } from '@/lib/blink';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
-import { AuthHero, TermsAgreement, PasswordRequirements } from '@/components/auth';
+import { AuthHero, TermsAgreement, PasswordInput } from '@/components/auth';
 import CustomInput from '@/components/core/CustomInput';
+import { useToast } from '@/components/core';
 import { isValidEmail, checkPasswordRequirements } from '@/lib/validation';
+import { subscribeTermsAgreed } from '@/components/legal';
 
 const SESSION_KEY = 'customer_session_id';
 const NAME_KEY = 'customer_display_name';
@@ -37,14 +39,20 @@ type Mode = 'signin' | 'signup';
 
 export default function CustomerAuthScreen() {
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  useEffect(() => {
+    return subscribeTermsAgreed((agreed) => {
+      if (agreed) setAgreedToTerms(true);
+    });
+  }, []);
 
   const isSignUp = mode === 'signup';
   const isNameValid = name.trim().length >= 2;
@@ -53,6 +61,7 @@ export default function CustomerAuthScreen() {
   const isEmailValid = isValidEmail(email);
   const emailStatus = email.length === 0 ? 'default' : isEmailValid ? 'success' : 'error';
 
+  const scrollViewRef = useRef<ScrollView>(null);
   const passwordCheck = checkPasswordRequirements(password);
   const passwordStatus =
     password.length === 0
@@ -64,32 +73,27 @@ export default function CustomerAuthScreen() {
       : 'default';
 
   const handleSubmit = async () => {
-    setError('');
     const emailTrimmed = email.trim();
     const nameTrimmed = name.trim();
 
     if (!emailTrimmed || !password) {
-      setError('Please fill in all fields.');
+      showToast('Please fill in all fields.', 'error');
       return;
     }
     if (isSignUp && !nameTrimmed) {
-      setError('Please enter your name.');
+      showToast('Please enter your name.', 'error');
       return;
     }
     if (isSignUp && !isEmailValid) {
-      setError('Please enter a valid email address (e.g. name@gmail.com).');
+      showToast('Please enter a valid email address (e.g. name@gmail.com).', 'error');
       return;
     }
     if (isSignUp && !passwordCheck.isValid) {
-      if (!passwordCheck.hasMinLength) setError('Password must be at least 8 characters.');
-      else if (!passwordCheck.hasUpper) setError('Password must contain at least 1 uppercase letter.');
-      else if (!passwordCheck.hasLower) setError('Password must contain at least 1 lowercase letter.');
-      else if (!passwordCheck.hasNumber) setError('Password must contain at least 1 number.');
-      else if (!passwordCheck.hasSpecial) setError('Password must contain at least 1 special character (!@#$...).');
+      showToast('Please meet all password requirements.', 'error');
       return;
     }
     if (isSignUp && !agreedToTerms) {
-      setError('Please agree to the Terms of Use to create an account.');
+      showToast('Please agree to the Terms of Use to create an account.', 'error');
       return;
     }
 
@@ -123,16 +127,13 @@ export default function CustomerAuthScreen() {
     } catch (err: any) {
       const msg: string = err?.message ?? '';
       if (msg.includes('already exists') || msg.includes('EMAIL_ALREADY_EXISTS')) {
-        setError('An account with this email already exists. Try signing in.');
+        showToast('An account with this email already exists. Try signing in.', 'error');
       } else if (msg.includes('INVALID_CREDENTIALS') || msg.includes('invalid')) {
-        setError('Incorrect email or password.');
+        showToast('Incorrect email or password.', 'error');
       } else if (msg.includes('WEAK_PASSWORD') || msg.includes('weak')) {
-        setError('Password must be at least 8 characters.');
+        showToast('Password must be at least 8 characters.', 'error');
       } else {
-        setError(msg || 'Something went wrong. Please try again.');
-      }
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+        showToast(msg || 'Something went wrong. Please try again.', 'error');
       }
     } finally {
       setLoading(false);
@@ -140,9 +141,9 @@ export default function CustomerAuthScreen() {
   };
 
   const switchMode = () => {
-    setError('');
     setAgreedToTerms(false);
     setMode((m) => (m === 'signin' ? 'signup' : 'signin'));
+    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
   };
 
   return (
@@ -154,20 +155,35 @@ export default function CustomerAuthScreen() {
         <LinearGradient
           colors={gradients.heroGlow}
           locations={gradients.heroGlowLocations}
-          style={[styles.heroGlow, { height: 320 + insets.top }]}
+          style={[
+            styles.heroGlow,
+            {
+              height:
+                320 +
+                Math.max(
+                  insets.top,
+                  Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0
+                ),
+            },
+          ]}
           pointerEvents="none"
         />
 
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
         >
           <ScrollView
+            ref={scrollViewRef}
             contentContainerStyle={[
               styles.scroll,
               {
-                paddingTop: insets.top > 0 ? insets.top + spacing.sm : spacing.lg,
-                paddingBottom: insets.bottom > 0 ? insets.bottom + spacing.lg : spacing.xxl,
+                paddingTop: Math.max(
+                  insets.top + spacing.sm,
+                  Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + spacing.sm : spacing.lg
+                ),
+                paddingBottom: Math.max(insets.bottom, 24) + (isSignUp ? 60 : spacing.lg),
               },
             ]}
             keyboardShouldPersistTaps="handled"
@@ -184,10 +200,10 @@ export default function CustomerAuthScreen() {
                     router.replace('/(landing)/role-select');
                   }
                 }}
-                style={styles.backBtn}
+                style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
                 hitSlop={12}
               >
-                <ArrowLeft size={22} color={colors.onSurfaceVariant} />
+                <ChevronLeft size={24} color={colors.onSurface} />
               </Pressable>
 
               {/* Hero Header */}
@@ -216,7 +232,6 @@ export default function CustomerAuthScreen() {
                     autoCapitalize="words"
                     returnKeyType="next"
                     leftIcon={<User size={18} color={colors.outline} />}
-                    error={!!error && !name.trim()}
                     status={nameStatus}
                   />
                 )}
@@ -236,28 +251,23 @@ export default function CustomerAuthScreen() {
                 />
 
                 {/* Password */}
-                <CustomInput
-                  label="PASSWORD"
+                <PasswordInput
                   value={password}
-                  onChangeText={setPassword}
-                  placeholder={isSignUp ? 'Min 8 chars, uppercase, number...' : '••••••••'}
-                  isPassword
-                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                  returnKeyType="done"
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (isSignUp && text.length === 1) {
+                      scrollViewRef.current?.scrollTo({ y: 130, animated: true });
+                    }
+                  }}
+                  showRequirements={isSignUp}
+                  accentColor={colors.secondaryContainer}
                   onSubmitEditing={handleSubmit}
-                  leftIcon={<Lock size={18} color={colors.outline} />}
-                  status={passwordStatus}
+                  onFocus={() => {
+                    if (isSignUp) {
+                      setTimeout(() => scrollViewRef.current?.scrollTo({ y: 130, animated: true }), 100);
+                    }
+                  }}
                 />
-
-                {/* Live Password Requirements (Sign-up only) */}
-                {isSignUp && <PasswordRequirements check={passwordCheck} />}
-
-                {/* Error */}
-                {!!error && (
-                  <View style={styles.errorBox}>
-                    <Text style={styles.errorText}>{error}</Text>
-                  </View>
-                )}
 
                 {/* Terms — sign-up only */}
                 {isSignUp && (
@@ -335,9 +345,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.marginMobile,
   },
   innerContent: {
-    flex: 1,
+    flexGrow: 1,
   },
   backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.gutter,
     alignSelf: 'flex-start',
   },

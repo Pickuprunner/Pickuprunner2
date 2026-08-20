@@ -107,6 +107,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(customer)" />
                 <Stack.Screen name="order/[id]" />
                 <Stack.Screen name="terms" />
+                <Stack.Screen name="privacy-policy" />
                 <Stack.Screen name="+not-found" />
               </Stack>
               <StatusBar style="auto" />

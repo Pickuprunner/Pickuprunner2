@@ -4,3 +4,4 @@ export * from './TermsAgreement';
 export * from './StatusBanner';
 export * from './DocUploadCard';
 export * from './PasswordRequirements';
+export * from './PasswordInput';

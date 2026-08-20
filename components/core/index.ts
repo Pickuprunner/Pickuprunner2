@@ -38,3 +38,10 @@ export {
   type CustomConfirmModalProps,
   type ConfirmModalVariant,
 } from './CustomConfirmModal';
+export {
+  CustomButton,
+  type CustomButtonProps,
+  type ButtonVariant,
+  type ButtonSize,
+  type ButtonShape,
+} from './CustomButton';

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { YStack, XStack, SizableText } from '@blinkdotnew/mobile-ui';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius } from '@/constants/design';
 
 interface TermsAgreementProps {
@@ -16,74 +16,75 @@ export function TermsAgreement({
   accentColor = colors.primaryContainer,
 }: TermsAgreementProps) {
   return (
-    <YStack gap="$2">
-      <XStack gap="$3">
-        <Pressable
-          onPress={() => router.push('/terms')}
-          style={({ pressed }) => [styles.linkBtn, pressed && { opacity: 0.6 }]}
+    <View style={styles.container}>
+      <Pressable
+        onPress={onToggle}
+        hitSlop={8}
+        style={styles.checkboxTouch}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: agreed }}
+      >
+        <View
+          style={[
+            styles.checkbox,
+            {
+              borderColor: agreed ? accentColor : 'rgba(255, 255, 255, 0.25)',
+              backgroundColor: agreed ? accentColor : 'transparent',
+            },
+          ]}
         >
-          <SizableText
-            size="$2"
-            fontWeight="700"
-            color={colors.secondaryContainer}
-            textDecorationLine="underline"
-          >
-            Terms of Use
-          </SizableText>
-        </Pressable>
-        <SizableText size="$2" color={colors.outline}>
-          ·
-        </SizableText>
-        <Pressable
-          onPress={() => router.push('/privacy-policy')}
-          style={({ pressed }) => [styles.linkBtn, pressed && { opacity: 0.6 }]}
-        >
-          <SizableText
-            size="$2"
-            fontWeight="700"
-            color={colors.secondaryContainer}
-            textDecorationLine="underline"
-          >
-            Privacy Policy
-          </SizableText>
-        </Pressable>
-      </XStack>
-      <Pressable onPress={onToggle} style={styles.termsRow}>
-        <YStack
-          width={22}
-          height={22}
-          borderRadius={borderRadius.xs}
-          borderWidth={1.5}
-          borderColor={agreed ? accentColor : colors.outlineVariant}
-          backgroundColor={agreed ? accentColor : 'transparent'}
-          alignItems="center"
-          justifyContent="center"
-          flexShrink={0}
-        >
-          {agreed && (
-            <SizableText size="$1" fontWeight="900" color="#FFFFFF">
-              ✓
-            </SizableText>
-          )}
-        </YStack>
-        <SizableText size="$2" color={colors.onSurfaceVariant} flex={1} lineHeight={20}>
-          I agree to the Terms of Use and Privacy Policy
-        </SizableText>
+          {agreed && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+        </View>
       </Pressable>
-    </YStack>
+
+      <Text style={styles.label}>
+        I agree to the{' '}
+        <Text
+          onPress={() => router.push('/terms')}
+          style={[styles.link, { color: accentColor }]}
+        >
+          Terms of Use
+        </Text>
+        {' '}&{' '}
+        <Text
+          onPress={() => router.push('/privacy-policy')}
+          style={[styles.link, { color: accentColor }]}
+        >
+          Privacy Policy
+        </Text>
+        .
+      </Text>
+    </View>
   );
 }
 
 export default TermsAgreement;
 
 const styles = StyleSheet.create({
-  termsRow: {
+  container: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
+    gap: 12,
     paddingVertical: 4,
   },
-  linkBtn: {
-    paddingVertical: 2,
+  checkboxTouch: {
+    padding: 2,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: borderRadius.xs,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  label: {
+    flex: 1,
+    fontSize: 13.5,
+    color: colors.onSurfaceVariant,
+    lineHeight: 19,
+  },
+  link: {
+    fontWeight: '600',
   },
 });

@@ -1,30 +1,60 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View, Pressable } from 'react-native';
-import { YStack, SizableText, SafeArea, XStack, ChevronLeft } from '@blinkdotnew/mobile-ui';
+import { View, Text, ScrollView, StyleSheet, Pressable, StatusBar, Platform } from 'react-native';
 import { router } from 'expo-router';
-import { colors, spacing, typography } from '@/constants/design';
-
-const LAST_UPDATED = 'May 9, 2025';
-const APP_NAME = 'Pickup Runner';
-const CONTACT_EMAIL = 'PickupRunner@gmail.com';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  YStack,
+  XStack,
+  SizableText,
+  ChevronLeft,
+} from '@blinkdotnew/mobile-ui';
+import { colors, spacing, gradients } from '@/constants/design';
+import { CustomButton } from '@/components/core';
+import { PRIVACY_METADATA, PRIVACY_SECTIONS, setGlobalTermsAgreed } from '@/components/legal';
 
 export default function PrivacyPolicyScreen() {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0
+  );
+
+  const handleAccept = () => {
+    setGlobalTermsAgreed(true);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/role-select');
+    }
+  };
+
   return (
-    <SafeArea edges={['top', 'bottom']}>
-      {/* Header */}
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      <LinearGradient
+        colors={gradients.heroGlow}
+        locations={gradients.heroGlowLocations}
+        style={[styles.heroGlow, { height: 320 + topInset }]}
+        pointerEvents="none"
+      />
+
       <XStack
-        alignItems="center"
         paddingHorizontal="$4"
         paddingVertical="$3"
-        borderBottomWidth={1}
-        borderBottomColor="rgba(255,255,255,0.08)"
+        style={{ paddingTop: topInset + 8 }}
+        alignItems="center"
         gap="$3"
+        borderBottomWidth={1}
+        borderBottomColor="rgba(255, 255, 255, 0.08)"
       >
         <Pressable
           onPress={() => router.back()}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+          hitSlop={12}
         >
-          <ChevronLeft size={24} color={colors.text} />
+          <ChevronLeft size={24} color={colors.onSurface} />
         </Pressable>
         <SizableText size="$6" fontWeight="700" color="$color12">
           Privacy Policy
@@ -36,93 +66,63 @@ export default function PrivacyPolicyScreen() {
         showsVerticalScrollIndicator={false}
       >
         <YStack gap="$2" marginBottom="$4">
-          <SizableText size="$2" color="$color9">
-            Last updated: {LAST_UPDATED}
+          <SizableText size="$3" fontWeight="600" color={colors.onSurface}>
+            Last updated: {PRIVACY_METADATA.lastUpdated}
           </SizableText>
           <SizableText size="$3" color="$color11" lineHeight={22}>
-            {APP_NAME} ("we", "our", or "us") is committed to protecting your privacy.
+            {PRIVACY_METADATA.appName} ("we", "our", or "us") is committed to protecting your privacy.
             This Privacy Policy explains how we collect, use, and share information
             about you when you use our mobile application and services.
           </SizableText>
         </YStack>
 
-        <Section title="1. Information We Collect">
-          <P>We collect information you provide directly to us, including:</P>
-          <Bullet><Bold>Account Information:</Bold> Name, email address, password, and account role (driver or customer).</Bullet>
-          <Bullet><Bold>Driver Verification Data:</Bold> Driver's license images, vehicle insurance documents, and background check details (full legal name, date of birth, SSN last 4, address).</Bullet>
-          <Bullet><Bold>Order Information:</Bold> Pickup and delivery addresses, customer phone numbers, item descriptions, and delivery notes.</Bullet>
-          <Bullet><Bold>Payment Information:</Bold> Stripe Connect account identifiers, payout request records, and payment receipts. We do not store full credit card numbers.</Bullet>
-          <Bullet><Bold>Location Data:</Bold> Precise or approximate geolocation when you use the app for delivery navigation or order tracking.</Bullet>
-          <Bullet><Bold>Communications:</Bold> In-app chat messages between drivers and customers, customer support requests.</Bullet>
-        </Section>
-
-        <Section title="2. How We Use Your Information">
-          <P>We use the information we collect to:</P>
-          <Bullet>Provide, maintain, and improve our delivery services.</Bullet>
-          <Bullet>Process driver verification and background checks.</Bullet>
-          <Bullet>Facilitate communication between customers and drivers.</Bullet>
-          <Bullet>Process payments and driver earnings payouts via Stripe.</Bullet>
-          <Bullet>Detect, prevent, and address fraud, security breaches, and illegal activities.</Bullet>
-          <Bullet>Comply with applicable legal requirements and industry standards.</Bullet>
-        </Section>
-
-        <Section title="3. Information Sharing">
-          <P>We do not sell your personal information. We may share your information:</P>
-          <Bullet><Bold>Between Users:</Bold> Basic driver info (name, vehicle, phone) is shared with customers for active deliveries. Customer name and address are shared with drivers.</Bullet>
-          <Bullet><Bold>Service Providers:</Bold> With Stripe for payment processing and identity verification services.</Bullet>
-          <Bullet><Bold>Legal Requirements:</Bold> When required by law, subpoena, or to protect the safety of any person.</Bullet>
-        </Section>
-
-        <Section title="4. Data Retention and Security">
-          <P>
-            We retain personal information for as long as necessary to provide services and comply with legal obligations.
-            Sensitive verification documents are stored securely using industry-standard encryption and access controls.
-          </P>
-        </Section>
-
-        <Section title="5. Your Rights & Account Deletion">
-          <P>
-            You may request deletion of your account and associated personal data at any time via the{' '}
-            <Bold>Delete Account</Bold> option in your profile settings.
-          </P>
-          <P>
-            Upon deletion, your verification records, background check submissions, payout history, and order associations
-            will be permanently purged from our systems, subject to legal retention obligations.
-          </P>
-        </Section>
-
-        <Section title="6. Children's Privacy">
-          <P>
-            Our services are not intended for individuals under 18 years of age. We do not knowingly collect personal
-            information from children under 18.
-          </P>
-        </Section>
-
-        <Section title="7. Changes to This Policy">
-          <P>
-            We may update this Privacy Policy from time to time. We will notify you of any changes by updating the
-            "Last updated" date at the top of this policy.
-          </P>
-        </Section>
-
-        <Section title="8. Contact Us">
-          <P>
-            If you have questions about this Privacy Policy or our privacy practices, contact us at:{' '}
-            <Bold>{CONTACT_EMAIL}</Bold>
-          </P>
-        </Section>
-
-        <View style={styles.footer}>
-          <SizableText size="$2" color="$color8" textAlign="center">
-            © {new Date().getFullYear()} {APP_NAME}. All rights reserved.
-          </SizableText>
-        </View>
+        {PRIVACY_SECTIONS.map((section) => (
+          <Section key={section.id} title={section.title}>
+            {section.paragraphs?.map((p, idx) => (
+              <P key={idx}>{p}</P>
+            ))}
+            {section.bullets && (
+              <YStack gap="$2">
+                {section.bullets.map((b, idx) => {
+                  if (typeof b === 'string') {
+                    return <Bullet key={idx}>{b}</Bullet>;
+                  }
+                  return (
+                    <Bullet key={idx}>
+                      {b.boldPrefix && <Bold>{b.boldPrefix} </Bold>}
+                      {b.text}
+                    </Bullet>
+                  );
+                })}
+              </YStack>
+            )}
+            {section.id === 'contact-us' && (
+              <SizableText size="$5" fontWeight="700" color="$color12" marginTop="$2">
+                {PRIVACY_METADATA.contactEmail}
+              </SizableText>
+            )}
+          </Section>
+        ))}
       </ScrollView>
-    </SafeArea>
+
+      {/* Sticky Bottom Bar */}
+      <View
+        style={[
+          styles.bottomBar,
+          { paddingBottom: Math.max(insets.bottom, 12) + 6 },
+        ]}
+      >
+        <CustomButton
+          title="I Understand"
+          onPress={handleAccept}
+        />
+        <Text style={styles.copyrightText}>
+          © {new Date().getFullYear()} {PRIVACY_METADATA.appName}. All rights reserved.
+        </Text>
+      </View>
+    </View>
   );
 }
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -146,7 +146,9 @@ function P({ children }: { children: React.ReactNode }) {
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
     <XStack gap="$2" alignItems="flex-start">
-      <SizableText size="$3" color="$color9" marginTop={2}>•</SizableText>
+      <SizableText size="$3" color="$color9" marginTop={2}>
+        •
+      </SizableText>
       <SizableText size="$3" color="$color11" lineHeight={22} flex={1}>
         {children}
       </SizableText>
@@ -163,9 +165,22 @@ function Bold({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+    position: 'relative',
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+  },
   scroll: {
     padding: spacing.lg,
-    paddingBottom: spacing.xxxl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   backBtn: {
     width: 40,
@@ -173,10 +188,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  footer: {
-    marginTop: spacing.xl,
-    paddingTop: spacing.lg,
+  bottomBar: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: 10,
+    gap: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(15, 19, 28, 0.96)',
+  },
+  copyrightText: {
+    fontSize: 11.5,
+    color: colors.outline,
+    textAlign: 'center',
   },
 });

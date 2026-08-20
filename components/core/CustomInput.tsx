@@ -141,11 +141,9 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
       if (backgroundColor) return backgroundColor;
       if (isFocused) {
         if (isError) return 'rgba(255, 77, 79, 0.08)';
-        if (isSuccess) return 'rgba(0, 226, 151, 0.04)';
         return '#181C28';
       }
       if (errorMessage) return 'rgba(255, 77, 79, 0.06)';
-      if (isSuccess) return 'rgba(0, 226, 151, 0.02)';
       return '#151821';
     };
 
@@ -157,17 +155,6 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
             ...(Platform.OS === 'web'
               ? ({
                   boxShadow: '0 0 12px rgba(255, 77, 79, 0.40)',
-                } as any)
-              : {}),
-          };
-        }
-
-        if (isSuccess) {
-          return {
-            borderColor: '#00E297',
-            ...(Platform.OS === 'web'
-              ? ({
-                  boxShadow: '0 0 12px rgba(0, 226, 151, 0.40)',
                 } as any)
               : {}),
           };
@@ -186,12 +173,6 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
       if (errorMessage) {
         return {
           borderColor: '#FF4D4F',
-        };
-      }
-
-      if (isSuccess) {
-        return {
-          borderColor: '#00E297',
         };
       }
 
@@ -281,22 +262,25 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
                 <Pressable
                   onPress={togglePasswordVisibility}
                   hitSlop={12}
-                  style={styles.rightAction}
+                  style={styles.toggleTextBtn}
                   accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
                 >
-                  <Ionicons
-                    name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
-                    size={20}
-                    color={
-                      !isFocused
-                        ? '#8C90A1'
-                        : isError
-                        ? '#FF4D4F'
-                        : isSuccess
-                        ? '#00E297'
-                        : focusBorderColor
-                    }
-                  />
+                  <Text
+                    style={[
+                      styles.toggleText,
+                      {
+                        color: !isFocused
+                          ? '#8C90A1'
+                          : isError
+                          ? '#FF4D4F'
+                          : isSuccess
+                          ? '#00E297'
+                          : focusBorderColor || '#DFE2EF',
+                      },
+                    ]}
+                  >
+                    {isPasswordVisible ? 'HIDE' : 'SHOW'}
+                  </Text>
                 </Pressable>
               )}
 
@@ -325,37 +309,35 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontSize: 11.5,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#8C90A1',
-    letterSpacing: 1.2,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
-    marginLeft: 2,
   },
   wrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 52,
-    borderWidth: 1.5,
+    borderWidth: 1,
     paddingHorizontal: 16,
+    height: 52,
+    minHeight: 52,
   },
   multilineWrapper: {
-    alignItems: 'flex-start',
+    height: 'auto',
+    minHeight: 96,
     paddingVertical: 12,
-    minHeight: 80,
+    alignItems: 'flex-start',
   },
   input: {
     flex: 1,
-    minHeight: 48,
-    color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '400',
-    paddingVertical: 0,
-    paddingHorizontal: 0,
+    color: '#DFE2EF',
+    height: '100%',
+    padding: 0,
     ...Platform.select({
-      android: {
-        textAlignVertical: 'center',
-        includeFontPadding: false,
+      web: {
+        outlineStyle: 'none',
       },
     }),
   },
@@ -386,6 +368,17 @@ const styles = StyleSheet.create({
     padding: 4,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  toggleTextBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
   },
   disabledWrapper: {
     opacity: 0.5,

@@ -85,15 +85,10 @@ export default function RoleSelectScreen() {
             ]}
           >
             <View style={styles.customerIconCircle}>
-              <ShoppingBag size={24} color={colors.secondaryContainer} />
+              <ShoppingBag size={24} color="#0F131C" />
             </View>
             <View style={styles.cardContent}>
-              <View style={styles.cardTitleRow}>
-                <Text style={styles.cardTitle}>I'm a Customer</Text>
-                <View style={styles.customerTag}>
-                  <Text style={styles.customerTagText}>ORDER</Text>
-                </View>
-              </View>
+              <Text style={styles.cardTitle}>I'm a Customer</Text>
               <Text style={styles.cardSubtitle}>Sign up or sign in to place orders</Text>
             </View>
             <ChevronRight size={20} color={colors.outline} />
@@ -108,15 +103,10 @@ export default function RoleSelectScreen() {
             ]}
           >
             <View style={styles.driverIconCircle}>
-              <Truck size={24} color={colors.primaryContainer} />
+              <Truck size={24} color="#0F131C" />
             </View>
             <View style={styles.cardContent}>
-              <View style={styles.cardTitleRow}>
-                <Text style={styles.cardTitle}>I'm a Driver</Text>
-                <View style={styles.driverTag}>
-                  <Text style={styles.driverTagText}>DRIVE</Text>
-                </View>
-              </View>
+              <Text style={styles.cardTitle}>I'm a Driver</Text>
               <Text style={styles.cardSubtitle}>View orders, navigate, mark delivered</Text>
             </View>
             <ChevronRight size={20} color={colors.outline} />
@@ -262,20 +252,16 @@ const styles = StyleSheet.create({
   customerIconCircle: {
     width: 48,
     height: 48,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(244, 195, 0, 0.3)',
-    backgroundColor: 'rgba(244, 195, 0, 0.1)',
+    borderRadius: 24,
+    backgroundColor: colors.secondaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
   driverIconCircle: {
     width: 48,
     height: 48,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 102, 255, 0.3)',
-    backgroundColor: 'rgba(0, 102, 255, 0.1)',
+    borderRadius: 24,
+    backgroundColor: colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -283,43 +269,10 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: colors.onSurface,
-  },
-  customerTag: {
-    backgroundColor: 'rgba(244, 195, 0, 0.2)',
-    borderColor: 'rgba(244, 195, 0, 0.35)',
-    borderWidth: 1,
-    borderRadius: borderRadius.xs,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  customerTagText: {
-    color: colors.secondaryContainer,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  driverTag: {
-    backgroundColor: 'rgba(0, 102, 255, 0.2)',
-    borderColor: 'rgba(0, 102, 255, 0.35)',
-    borderWidth: 1,
-    borderRadius: borderRadius.xs,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  driverTagText: {
-    color: colors.primaryContainer,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
   cardSubtitle: {
     fontSize: 13.5,

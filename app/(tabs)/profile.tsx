@@ -51,6 +51,7 @@ import { blink } from '@/lib/blink';
 import { APP_CONFIG } from '@/lib/config';
 import { useConnectStatus, useConnectOnboard } from '@/lib/stripeConnect';
 import { useDriverId } from '@/hooks/useDriverId';
+import { useToast } from '@/components/core';
 
 const BLUE = '#0066FF';
 const GOLD = '#F5C400';
@@ -84,16 +85,16 @@ function getStatusCfg(s: DocStatus): StatusCfg {
         label: 'Approved',
         color: GREEN,
         bg: 'rgba(0, 230, 118, 0.12)',
-        border: 'rgba(0, 230, 118, 0.35)',
+        border: 'rgba(0, 230, 118, 0.3)',
         icon: <CheckCircle size={16} color={GREEN} />,
       };
     case 'rejected':
       return {
-        label: 'Action Needed',
+        label: 'Rejected',
         color: RED,
         bg: 'rgba(239, 68, 68, 0.12)',
-        border: 'rgba(239, 68, 68, 0.35)',
-        icon: <ShieldAlert size={16} color={RED} />,
+        border: 'rgba(239, 68, 68, 0.3)',
+        icon: <X size={16} color={RED} />,
       };
     case 'in_review':
     case 'pending':
@@ -101,7 +102,7 @@ function getStatusCfg(s: DocStatus): StatusCfg {
         label: 'In Review',
         color: GOLD,
         bg: 'rgba(245, 196, 0, 0.12)',
-        border: 'rgba(245, 196, 0, 0.35)',
+        border: 'rgba(245, 196, 0, 0.3)',
         icon: <Clock size={16} color={GOLD} />,
       };
     default:
@@ -118,6 +119,7 @@ function getStatusCfg(s: DocStatus): StatusCfg {
 // ── Main Screen ────────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
+  const { showToast } = useToast();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const driverId = useDriverId();
   const { data: verification } = useMyVerification(user?.id);
@@ -242,13 +244,16 @@ export default function ProfileScreen() {
 
   const handleSwitchToCustomer = async () => {
     haptic();
+    showToast('Switched to Customer mode', { type: 'info' });
     await saveRole('customer');
     router.replace('/(customer)');
   };
 
   const handleChooseRole = async () => {
     haptic();
-    router.replace('/role-select');
+    showToast('Returning to role selection...', { type: 'info' });
+    await AsyncStorage.removeItem('app_role');
+    router.replace('/(landing)/role-select');
   };
 
   const docStatus: DocStatus = verification?.status;
@@ -609,8 +614,8 @@ export default function ProfileScreen() {
                   onPress={handleSwitchToCustomer}
                   style={({ pressed }) => [styles.actionRow, pressed && { opacity: 0.8 }]}
                 >
-                  <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(0,102,255,0.15)' }]}>
-                    <ShoppingBag size={18} color={BLUE} />
+                  <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(244,195,0,0.15)' }]}>
+                    <ShoppingBag size={18} color={GOLD} />
                   </View>
                   <View style={styles.actionTextCol}>
                     <Text style={styles.actionTitle}>Switch to Customer Mode</Text>
@@ -625,8 +630,8 @@ export default function ProfileScreen() {
                   onPress={handleChooseRole}
                   style={({ pressed }) => [styles.actionRow, pressed && { opacity: 0.8 }]}
                 >
-                  <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
-                    <RefreshCw size={18} color="rgba(255,255,255,0.75)" />
+                  <View style={[styles.actionIconWrap, { backgroundColor: 'rgba(244,195,0,0.12)' }]}>
+                    <RefreshCw size={18} color={GOLD} />
                   </View>
                   <View style={styles.actionTextCol}>
                     <Text style={styles.actionTitle}>Choose Role Again</Text>
