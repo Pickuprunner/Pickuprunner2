@@ -39,6 +39,7 @@ import { APP_CONFIG, IS_STORE_BUILD, ORDER_SCOPE } from '@/lib/config';
 import { calcDistanceMiles } from '@/lib/distance';
 import { isValidEmail } from '@/lib/validation';
 import CustomInput from '@/components/core/CustomInput';
+import { useToast } from '@/components/core';
 
 const SESSION_KEY = 'customer_session_id';
 const DELIVERY_FEE = APP_CONFIG.DELIVERY_FEE_CENTS;
@@ -861,6 +862,7 @@ function SuccessScreen({ orderId, totalCents, onReset }: SuccessProps) {
 const NAME_KEY = 'customer_display_name';
 
 export default function RequestPickupScreen() {
+  const { showToast } = useToast();
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
@@ -885,7 +887,9 @@ export default function RequestPickupScreen() {
     setError('');
     const { name, phone, address, deliveryAddress } = form;
     if (!name.trim() || !phone.trim() || !address.trim() || !deliveryAddress.trim()) {
-      setError('Please fill in Name, Phone, Pickup Address, and Delivery Address.');
+      const msg = 'Please fill in Name, Phone, Pickup Address, and Delivery Address.';
+      setError(msg);
+      showToast('Missing required fields', { type: 'warning', description: msg });
       return;
     }
     if (Platform.OS !== 'web') {
@@ -977,9 +981,19 @@ export default function RequestPickupScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
 
+      showToast('Order placed successfully!', {
+        type: 'success',
+        description: 'Searching for nearby drivers to fulfill your delivery.',
+      });
+
       setSuccess(true);
     } catch (err: any) {
-      setError(err?.message || 'Something went wrong. Please try again.');
+      const errMsg = err?.message || 'Something went wrong. Please try again.';
+      setError(errMsg);
+      showToast('Order placement failed', {
+        type: 'error',
+        description: errMsg,
+      });
     } finally {
       setLoading(false);
     }

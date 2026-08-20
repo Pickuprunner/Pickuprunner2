@@ -21,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { blink } from '@/lib/blink';
 import { APP_CONFIG } from '@/lib/config';
-import { CustomCard } from '@/components/core';
+import { CustomCard, useToast, CustomSkeleton } from '@/components/core';
 import { useOrderChat, getSavedDisplayName } from '@/lib/chat';
 
 function haptic() {
@@ -194,6 +194,7 @@ function CustomerOrderChat({ orderId, customerName }: { orderId: string; custome
 }
 
 export default function TrackOrderScreen() {
+  const { showToast } = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -266,6 +267,11 @@ export default function TrackOrderScreen() {
           }
         }
       } catch {}
+
+      showToast('Driver assigned!', {
+        type: 'success',
+        description: `${driver.name} is on the way to pick up your order.`,
+      });
     } finally {
       setTestBusy(false);
     }
@@ -304,6 +310,11 @@ export default function TrackOrderScreen() {
           }
         }
       } catch {}
+
+      showToast('Delivery completed!', {
+        type: 'success',
+        description: 'Package has been delivered to your address.',
+      });
     } finally {
       setTestBusy(false);
     }
@@ -366,10 +377,56 @@ export default function TrackOrderScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.root, styles.center]}>
+      <View style={styles.root}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        <ActivityIndicator size="large" color="#FFE399" />
-        <Text style={styles.loadingText}>Loading tracking status…</Text>
+        {/* Header Skeleton */}
+        <View style={styles.header}>
+          <CustomSkeleton width={42} height={42} borderRadius={12} />
+          <View style={{ alignItems: 'center', gap: 6 }}>
+            <CustomSkeleton width={130} height={18} borderRadius={6} />
+            <CustomSkeleton width={80} height={12} borderRadius={4} />
+          </View>
+          <CustomSkeleton width={42} height={42} borderRadius={12} />
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} showsVerticalScrollIndicator={false}>
+          {/* Hero Banner Skeleton */}
+          <View style={[styles.heroCard, { backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: 'rgba(255, 255, 255, 0.06)' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <CustomSkeleton width={48} height={48} circle />
+              <View style={{ flex: 1, gap: 6 }}>
+                <CustomSkeleton width={140} height={20} borderRadius={6} />
+                <CustomSkeleton width="90%" height={12} borderRadius={4} />
+              </View>
+            </View>
+          </View>
+
+          {/* Stepper Skeleton */}
+          <View style={[styles.card, { gap: 16, backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: 'rgba(255, 255, 255, 0.06)' }]}>
+            <CustomSkeleton width={120} height={14} borderRadius={4} />
+            <View style={{ gap: 12 }}>
+              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                <CustomSkeleton width={24} height={24} circle />
+                <CustomSkeleton width="70%" height={14} borderRadius={4} />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                <CustomSkeleton width={24} height={24} circle />
+                <CustomSkeleton width="85%" height={14} borderRadius={4} />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                <CustomSkeleton width={24} height={24} circle />
+                <CustomSkeleton width="60%" height={14} borderRadius={4} />
+              </View>
+            </View>
+          </View>
+
+          {/* Details Card Skeleton */}
+          <View style={[styles.card, { gap: 14, backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: 'rgba(255, 255, 255, 0.06)' }]}>
+            <CustomSkeleton width={100} height={14} borderRadius={4} />
+            <CustomSkeleton width="100%" height={40} borderRadius={10} />
+            <CustomSkeleton width="100%" height={40} borderRadius={10} />
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -938,6 +995,14 @@ const styles = StyleSheet.create({
     height: 220,
   },
   card: {
+    backgroundColor: '#151821',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 18,
+    gap: 14,
+  },
+  sectionCard: {
     backgroundColor: '#151821',
     borderRadius: 20,
     borderWidth: 1.5,

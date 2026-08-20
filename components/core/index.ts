@@ -33,3 +33,8 @@ export {
   SwipeSlider,
   type SwipeSliderProps,
 } from './SwipeSlider';
+export {
+  CustomConfirmModal,
+  type CustomConfirmModalProps,
+  type ConfirmModalVariant,
+} from './CustomConfirmModal';

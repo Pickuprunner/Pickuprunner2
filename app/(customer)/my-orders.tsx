@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { blink } from '@/lib/blink';
 import { CustomerOrderCard, CustomerOrderData } from '@/components/Orders';
+import { useToast, SkeletonList, CustomConfirmModal } from '@/components/core';
 
 const SESSION_KEY = 'customer_session_id';
 const CHANNEL_NAME = 'order-updates';
@@ -66,12 +67,15 @@ async function getOrCreateSessionId(): Promise<string> {
 }
 
 export default function MyOrdersScreen() {
+  const { showToast } = useToast();
   const [orders, setOrders] = useState<CustomerOrderData[]>(STATIC_SAMPLE_ORDERS);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(true);
+  const [cancelTargetOrder, setCancelTargetOrder] = useState<CustomerOrderData | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const prevStatusMap = useRef<Map<string, string>>(new Map());
   const channelRef = useRef<any>(null);
 
@@ -208,39 +212,47 @@ export default function MyOrdersScreen() {
     await fetchOrders();
   }, [fetchOrders]);
 
-  const handleCancel = useCallback(async (id: string) => {
-    const doCancel = async () => {
+  const handleCancel = useCallback((id: string) => {
+    const orderToCancel = orders.find((o) => o.id === id) || ({ id } as CustomerOrderData);
+    setCancelTargetOrder(orderToCancel);
+  }, [orders]);
+
+  const confirmCancel = useCallback(async () => {
+    if (!cancelTargetOrder) return;
+    const id = cancelTargetOrder.id;
+    setCancelling(true);
+    try {
+      // Remove locally from AsyncStorage
       try {
-        // Remove locally from AsyncStorage
-        try {
-          const raw = await AsyncStorage.getItem('customer_local_orders');
-          if (raw) {
-            const list = JSON.parse(raw);
-            const filtered = list.filter((o: any) => o.id !== id);
-            await AsyncStorage.setItem('customer_local_orders', JSON.stringify(filtered));
-          }
-        } catch {}
-
-        await blink.db.orders.delete(id).catch(() => {});
-        setOrders((prev) => prev.filter((o) => o.id !== id));
-        prevStatusMap.current.delete(id);
-        if (Platform.OS !== 'web') {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        const raw = await AsyncStorage.getItem('customer_local_orders');
+        if (raw) {
+          const list = JSON.parse(raw);
+          const filtered = list.filter((o: any) => o.id !== id);
+          await AsyncStorage.setItem('customer_local_orders', JSON.stringify(filtered));
         }
-      } catch (err) {
-        console.warn('[my-orders] cancel failed:', err);
-      }
-    };
+      } catch {}
 
-    if (Platform.OS === 'web') {
-      if (window.confirm('Cancel this pickup request?')) doCancel();
-    } else {
-      Alert.alert('Cancel Pickup?', 'This will cancel and remove your pickup request.', [
-        { text: 'Keep It', style: 'cancel' },
-        { text: 'Cancel Pickup', style: 'destructive', onPress: doCancel },
-      ]);
+      await blink.db.orders.delete(id).catch(() => {});
+      setOrders((prev) => prev.filter((o) => o.id !== id));
+      prevStatusMap.current.delete(id);
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+      showToast('Pickup request cancelled', {
+        type: 'info',
+        description: 'Your request has been removed.',
+      });
+      setCancelTargetOrder(null);
+    } catch (err) {
+      console.warn('[my-orders] cancel failed:', err);
+      showToast('Could not cancel order', {
+        type: 'error',
+        description: 'Please try again in a moment.',
+      });
+    } finally {
+      setCancelling(false);
     }
-  }, []);
+  }, [cancelTargetOrder, showToast]);
 
   const filteredOrders = useMemo(() => {
     if (!search.trim()) return orders;
@@ -304,6 +316,7 @@ export default function MyOrdersScreen() {
               if (Platform.OS !== 'web') {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
               }
+              showToast('Showing all recent orders', { type: 'info' });
             }}
             activeOpacity={0.8}
             style={styles.filterButton}
@@ -329,10 +342,7 @@ export default function MyOrdersScreen() {
         }
         ListEmptyComponent={
           loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#ffe399" />
-              <Text style={styles.loadingText}>Loading orders…</Text>
-            </View>
+            <SkeletonList count={3} />
           ) : (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyTitle}>No Matching Orders</Text>
@@ -344,6 +354,19 @@ export default function MyOrdersScreen() {
             </View>
           )
         }
+      />
+
+      {/* Premium Reusable Cancel Confirmation Modal */}
+      <CustomConfirmModal
+        visible={!!cancelTargetOrder}
+        variant="danger"
+        message="This will remove your order from the live dispatch."
+        confirmText="Cancel Pickup"
+        cancelText="Keep It"
+        orderId={cancelTargetOrder?.id}
+        loading={cancelling}
+        onClose={() => setCancelTargetOrder(null)}
+        onConfirm={confirmCancel}
       />
     </View>
   );

@@ -265,9 +265,9 @@ export function CustomerOrderCard({
         </View>
       )}
 
-      {/* Action Buttons (2 buttons per card: Live Tracking + Cancel for pending, Live Tracking + Support for active/delivered) */}
+      {/* Action Buttons: Live Tracking + Support + Cancel */}
       <View style={styles.actionsContainer}>
-        {/* Primary Action */}
+        {/* 1. Primary Tracking / Delivered Action */}
         {!isDelivered ? (
           <TouchableOpacity
             onPress={() => {
@@ -277,17 +277,43 @@ export function CustomerOrderCard({
             activeOpacity={0.85}
             style={styles.actionButton}
           >
-            <MaterialIcons name="near-me" size={18} color="#f8f7ff" />
-            <Text style={styles.actionButtonText}>Live Tracking</Text>
+            <MaterialIcons name="near-me" size={15} color="#f8f7ff" />
+            <Text style={styles.actionButtonText} numberOfLines={1}>
+              Track
+            </Text>
           </TouchableOpacity>
         ) : (
-          <View style={styles.deliveredBadgeButton}>
-            <MaterialIcons name="check-circle" size={18} color="#00e297" />
-            <Text style={styles.deliveredBadgeText}>Delivered ✓</Text>
-          </View>
+          <TouchableOpacity
+            onPress={() => {
+              haptic();
+              router.push(`/(customer)/track/${order.id}` as any);
+            }}
+            activeOpacity={0.85}
+            style={styles.deliveredBadgeButton}
+          >
+            <MaterialIcons name="check-circle" size={15} color="#00e297" />
+            <Text style={styles.deliveredBadgeText} numberOfLines={1}>
+              Delivered ✓
+            </Text>
+          </TouchableOpacity>
         )}
 
-        {/* Secondary Action: Cancel (for pending) OR Support (for active/delivered) */}
+        {/* 2. Support Action (Available on all orders) */}
+        <TouchableOpacity
+          onPress={() => {
+            haptic();
+            Linking.openURL(`mailto:${APP_CONFIG.STORE_EMAIL}`);
+          }}
+          activeOpacity={0.85}
+          style={styles.supportButton}
+        >
+          <MaterialIcons name="support-agent" size={15} color="#dfe2ef" />
+          <Text style={styles.supportButtonText} numberOfLines={1}>
+            Support
+          </Text>
+        </TouchableOpacity>
+
+        {/* 3. Cancel Action (Available for pending orders) */}
         {isPending && onCancel ? (
           <TouchableOpacity
             onPress={() => {
@@ -297,22 +323,12 @@ export function CustomerOrderCard({
             activeOpacity={0.85}
             style={styles.cancelButton}
           >
-            <MaterialIcons name="delete-outline" size={18} color="#FF6B6B" />
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <MaterialIcons name="delete-outline" size={15} color="#FF6B6B" />
+            <Text style={styles.cancelButtonText} numberOfLines={1}>
+              Cancel
+            </Text>
           </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            onPress={() => {
-              haptic();
-              Linking.openURL(`mailto:${APP_CONFIG.STORE_EMAIL}`);
-            }}
-            activeOpacity={0.85}
-            style={styles.supportButton}
-          >
-            <MaterialIcons name="mail-outline" size={18} color="#dfe2ef" />
-            <Text style={styles.supportButtonText}>Support</Text>
-          </TouchableOpacity>
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -614,77 +630,86 @@ const styles = StyleSheet.create({
   },
   actionsContainer: {
     flexDirection: 'row',
-    gap: 10,
+    alignItems: 'center',
+    gap: 6,
+    width: '100%',
   },
   actionButton: {
     flex: 1,
-    height: 48,
-    borderRadius: 24,
+    height: 38,
+    borderRadius: 10,
     backgroundColor: '#0066ff',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
+    paddingHorizontal: 4,
     shadowColor: 'rgba(0, 102, 255, 0.25)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 3,
   },
   actionButtonText: {
     color: '#f8f7ff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
   supportButton: {
-    paddingHorizontal: 20,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.10)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
+    paddingHorizontal: 4,
   },
   supportButtonText: {
     color: '#dfe2ef',
-    fontSize: 13.5,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
   cancelButton: {
-    paddingHorizontal: 18,
-    height: 48,
-    borderRadius: 24,
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
     backgroundColor: 'rgba(239, 68, 68, 0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    borderColor: 'rgba(239, 68, 68, 0.28)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
+    paddingHorizontal: 4,
   },
   cancelButtonText: {
     color: '#FF6B6B',
-    fontSize: 13.5,
+    fontSize: 12,
     fontWeight: '700',
+    letterSpacing: -0.2,
   },
   deliveredBadgeButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 24,
+    flex: 1.25,
+    height: 38,
+    borderRadius: 10,
     backgroundColor: 'rgba(0, 226, 151, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(0, 226, 151, 0.3)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 4,
+    paddingHorizontal: 6,
   },
   deliveredBadgeText: {
     color: '#00e297',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

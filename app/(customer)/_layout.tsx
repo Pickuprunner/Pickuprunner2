@@ -1,37 +1,37 @@
 import { Tabs } from 'expo-router';
-import { ShoppingBag, ClipboardList, MessageCircle, User } from '@blinkdotnew/mobile-ui';
 import { Platform } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '@/constants/design';
 
-const ACTIVE = colors.secondaryContainer; // Gold #F4C300
-const INACTIVE = '#8C90A1';
+const ACTIVE = '#FFE399';
+const INACTIVE = '#C2C6D8';
 const TAB_BG = '#0F131C';
-const TAB_BORDER = 'rgba(255, 255, 255, 0.08)';
+const TAB_BORDER = 'rgba(255, 255, 255, 0.05)';
 
 export default function CustomerTabLayout() {
   const insets = useSafeAreaInsets();
-  const bottomPad = Platform.OS === 'web' ? 10 : Math.max(insets.bottom, 12);
+  const androidBottomPad = Platform.OS === 'web' ? 10 : Math.max(insets.bottom, 12);
+  const hasHomeBar = insets.bottom > 0;
 
   return (
     <Tabs
       initialRouteName="my-orders"
       screenOptions={{
-        headerShown: false,
         tabBarActiveTintColor: ACTIVE,
         tabBarInactiveTintColor: INACTIVE,
+        headerShown: false,
         tabBarStyle: {
           backgroundColor: TAB_BG,
-          borderTopColor: TAB_BORDER,
           borderTopWidth: 1,
-          height: 60 + bottomPad,
-          paddingBottom: bottomPad,
-          paddingTop: 8,
+          borderTopColor: TAB_BORDER,
+          height: Platform.OS === 'ios' ? (hasHomeBar ? 52 + insets.bottom - 10 : 58) : 60 + androidBottomPad,
+          paddingBottom: Platform.OS === 'ios' ? (hasHomeBar ? insets.bottom - 14 : 8) : androidBottomPad,
+          paddingTop: Platform.OS === 'ios' ? 6 : 8,
           elevation: 12,
         },
         tabBarLabelStyle: {
-          fontSize: 10.5,
-          fontWeight: '700',
+          fontSize: 10,
+          fontWeight: '500',
           letterSpacing: 0.2,
         },
       }}
@@ -40,15 +40,19 @@ export default function CustomerTabLayout() {
         name="my-orders"
         options={{
           title: 'My Orders',
-          tabBarIcon: ({ color, size }) => <ClipboardList size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="inventory-2" size={size || 24} color={color} />
+          ),
         }}
       />
 
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Request',
-          tabBarIcon: ({ color, size }) => <ShoppingBag size={size} color={color} />,
+          title: 'New Order',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="add-circle-outline" size={size || 24} color={color} />
+          ),
         }}
       />
 
@@ -56,7 +60,9 @@ export default function CustomerTabLayout() {
         name="chat"
         options={{
           title: 'Chat',
-          tabBarIcon: ({ color, size }) => <MessageCircle size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="chat-bubble-outline" size={size || 22} color={color} />
+          ),
         }}
       />
 
@@ -64,11 +70,12 @@ export default function CustomerTabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="person-outline" size={size || 24} color={color} />
+          ),
         }}
       />
 
-     
       <Tabs.Screen
         name="track/[id]"
         options={{
@@ -79,3 +86,4 @@ export default function CustomerTabLayout() {
     </Tabs>
   );
 }
+

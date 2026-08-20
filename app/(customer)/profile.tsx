@@ -41,6 +41,7 @@ import { blink } from '@/lib/blink';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
 import { APP_CONFIG } from '@/lib/config';
 import CustomInput from '@/components/core/CustomInput';
+import { useToast, CustomConfirmModal } from '@/components/core';
 
 const NAME_KEY = 'customer_display_name';
 const SESSION_KEY = 'customer_session_id';
@@ -56,6 +57,7 @@ function initials(name: string) {
 }
 
 export default function CustomerProfileScreen() {
+  const { showToast } = useToast();
   const { user, isAuthenticated } = useAuth();
   const [displayName, setDisplayName] = useState('Customer');
   const [editing, setEditing] = useState(false);
@@ -91,6 +93,8 @@ export default function CustomerProfileScreen() {
     });
   }, [isAuthenticated, user?.displayName]);
 
+  const [showDriverSwitchModal, setShowDriverSwitchModal] = useState(false);
+
   const confirmEdit = async () => {
     const trimmed = editValue.trim();
     if (!trimmed) return;
@@ -100,28 +104,28 @@ export default function CustomerProfileScreen() {
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
+    showToast('Profile name updated!', {
+      type: 'success',
+      description: `Saved display name as "${trimmed}"`,
+    });
   };
 
-  const switchToDriver = async () => {
-    const doSwitch = async () => {
-      await saveRole('driver');
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      }
-      router.replace('/(tabs)');
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm("Switch to Driver mode? You'll need to sign in.")) doSwitch();
-    } else {
-      Alert.alert('Switch to Driver Mode?', "You'll need to sign in with your driver account.", [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Switch', onPress: doSwitch },
-      ]);
+  const handleConfirmDriverSwitch = async () => {
+    setShowDriverSwitchModal(false);
+    showToast('Switching to Driver mode...', { type: 'info' });
+    await saveRole('driver');
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
+    router.replace('/(tabs)');
+  };
+
+  const switchToDriver = () => {
+    setShowDriverSwitchModal(true);
   };
 
   const chooseRole = async () => {
+    showToast('Returning to role selection...', { type: 'info' });
     await AsyncStorage.removeItem('app_role');
     router.replace('/(landing)/role-select');
   };
@@ -136,8 +140,10 @@ export default function CustomerProfileScreen() {
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
+      showToast('Signed out successfully', { type: 'info' });
     } catch (err) {
       console.warn('[customer-profile] sign out failed:', err);
+      showToast('Could not sign out', { type: 'error' });
     }
   };
 
@@ -386,6 +392,19 @@ export default function CustomerProfileScreen() {
           <Text style={styles.footerVersion}>Version 1.0.0 · Midnight Tech Noir</Text>
         </View>
       </ScrollView>
+
+      {/* Premium Reusable Mode Switch Confirmation Modal */}
+      <CustomConfirmModal
+        visible={showDriverSwitchModal}
+        variant="info"
+        iconName="local-shipping"
+        title="Switch to Driver Mode?"
+        message="You will be redirected to the Driver portal to accept and deliver pickup orders."
+        confirmText="Switch to Driver"
+        cancelText="Cancel"
+        onClose={() => setShowDriverSwitchModal(false)}
+        onConfirm={handleConfirmDriverSwitch}
+      />
     </View>
   );
 }

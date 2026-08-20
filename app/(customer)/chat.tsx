@@ -22,6 +22,7 @@ import { router } from 'expo-router';
 import { blink } from '@/lib/blink';
 import { useOrderChat, ChatMessage } from '@/lib/chat';
 import { CustomerOrderData } from '@/components/Orders';
+import { useToast, CustomSkeleton } from '@/components/core';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -143,6 +144,7 @@ function CustomerOrderChatView({
   customerName: string;
   onBack: () => void;
 }) {
+  const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
@@ -164,6 +166,12 @@ function CustomerOrderChatView({
   const handleSend = useCallback(async (customText?: string) => {
     const text = (customText || inputText).trim();
     if (!text || sending) return;
+    if (!isConnected) {
+      showToast('Chat is currently offline', {
+        type: 'warning',
+        description: 'Reconnecting to live messaging...',
+      });
+    }
     setInputText('');
     setSending(true);
     haptic();
@@ -171,10 +179,14 @@ function CustomerOrderChatView({
       await sendMessage(text);
     } catch {
       setInputText(text);
+      showToast('Message delivery failed', {
+        type: 'error',
+        description: 'Please check your connection and retry.',
+      });
     } finally {
       setSending(false);
     }
-  }, [inputText, sending, sendMessage]);
+  }, [inputText, sending, sendMessage, isConnected, showToast]);
 
   const listItems = useMemo(() => {
     const items: (
@@ -479,9 +491,20 @@ export default function CustomerChatScreen() {
         }
         ListEmptyComponent={
           loading ? (
-            <View style={styles.emptyContainer}>
-              <ActivityIndicator size="large" color="#FFE399" />
-              <Text style={styles.loadingText}>Loading conversations...</Text>
+            <View style={{ gap: 12 }}>
+              {[1, 2, 3].map((i) => (
+                <View key={i} style={styles.skeletonConvoCard}>
+                  <CustomSkeleton width={48} height={48} circle />
+                  <View style={{ flex: 1, gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <CustomSkeleton width={120} height={16} borderRadius={6} />
+                      <CustomSkeleton width={74} height={20} borderRadius={999} />
+                    </View>
+                    <CustomSkeleton width="80%" height={12} borderRadius={4} />
+                    <CustomSkeleton width="45%" height={10} borderRadius={4} />
+                  </View>
+                </View>
+              ))}
             </View>
           ) : (
             <View style={styles.emptyContainer}>
@@ -565,6 +588,16 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   conversationCard: {
+    backgroundColor: '#151821',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  skeletonConvoCard: {
     backgroundColor: '#151821',
     borderRadius: 20,
     borderWidth: 1.5,
