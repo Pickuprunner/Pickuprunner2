@@ -278,7 +278,7 @@ export function CustomHeader({
         styles.container,
         {
           backgroundColor: getContainerBg(),
-          paddingTop: topInset + 8,
+          paddingTop: topInset + 12,
         },
         sticky && styles.stickyHeader,
         borderBottom && styles.borderBottom,
