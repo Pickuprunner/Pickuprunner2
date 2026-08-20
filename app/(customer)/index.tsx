@@ -12,6 +12,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Linking,
+  Animated,
 } from 'react-native';
 import {
   ShoppingBag,
@@ -27,7 +28,7 @@ import {
   Truck,
   Zap,
 } from '@blinkdotnew/mobile-ui';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -116,6 +117,19 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
 
   const [calculating, setCalculating] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Delivery Preference Animated Sliding Pill
+  const [toggleWidth, setToggleWidth] = useState(0);
+  const slideAnim = useRef(new Animated.Value(form.deliveryType === 'meet' ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: form.deliveryType === 'meet' ? 1 : 0,
+      friction: 9,
+      tension: 65,
+      useNativeDriver: false,
+    }).start();
+  }, [form.deliveryType]);
 
   // Auto-calculate distance when both addresses are filled
   useEffect(() => {
@@ -236,10 +250,45 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
 
           {/* Input Fields */}
           <View style={styles.formFields}>
-            {/* Delivery Preference Toggle */}
+            {/* Delivery Preference Single Toggle Box with Sliding Indicator */}
             <View style={styles.deliveryPrefSection}>
               <Text style={styles.fieldSectionLabel}>DELIVERY PREFERENCE</Text>
-              <View style={styles.prefRow}>
+              <View
+                style={styles.prefToggleContainer}
+                onLayout={(e) => setToggleWidth(e.nativeEvent.layout.width)}
+              >
+                {/* Smooth Animated Sliding Pill with Linear Gradient */}
+                {toggleWidth > 0 && (
+                  <Animated.View
+                    style={[
+                      styles.slidingPill,
+                      {
+                        width: (toggleWidth - 12) / 2,
+                        left: slideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [4, toggleWidth - 4 - (toggleWidth - 12) / 2],
+                        }),
+                        borderColor:
+                          form.deliveryType === 'door'
+                            ? 'rgba(255, 227, 153, 0.65)'
+                            : 'rgba(6, 182, 212, 0.65)',
+                      },
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={
+                        form.deliveryType === 'door'
+                          ? ['rgba(255, 227, 153, 0.18)', 'rgba(255, 227, 153, 0.04)']
+                          : ['rgba(6, 182, 212, 0.22)', 'rgba(6, 182, 212, 0.04)']
+                      }
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.slidingGradient}
+                    />
+                  </Animated.View>
+                )}
+
+                {/* Option 1: Leave at Door (Warm Gold #FFE399) */}
                 <Pressable
                   onPress={() => {
                     setDeliveryType('door');
@@ -247,28 +296,45 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
                       Haptics.selectionAsync().catch(() => {});
                     }
                   }}
-                  style={[
-                    styles.prefCard,
-                    form.deliveryType === 'door' && styles.prefCardActiveGreen,
-                  ]}
+                  style={styles.prefTab}
                 >
-                  <View style={styles.prefTopRow}>
-                    <Text style={styles.prefEmoji}>🚪</Text>
+                  <View
+                    style={[
+                      styles.prefIconBox,
+                      form.deliveryType === 'door'
+                        ? styles.prefIconBoxActiveDoor
+                        : styles.prefIconBoxInactive,
+                    ]}
+                  >
+                    <MaterialIcons
+                      name="door-front"
+                      size={20}
+                      color={form.deliveryType === 'door' ? '#FFE399' : '#6B7280'}
+                    />
+                  </View>
+                  <View style={styles.prefTextCol}>
                     <Text
                       style={[
                         styles.prefTitle,
-                        form.deliveryType === 'door' && { color: colors.tertiary },
+                        form.deliveryType === 'door' && styles.prefTitleActiveDoor,
                       ]}
                       numberOfLines={1}
                     >
                       Leave at Door
                     </Text>
+                    <Text
+                      style={[
+                        styles.prefDesc,
+                        form.deliveryType === 'door' && styles.prefDescActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      Photo on delivery
+                    </Text>
                   </View>
-                  <Text style={styles.prefDesc} numberOfLines={1}>
-                    Photo on delivery
-                  </Text>
                 </Pressable>
 
+                {/* Option 2: Meet at Door (Electric Cyan) */}
                 <Pressable
                   onPress={() => {
                     setDeliveryType('meet');
@@ -276,26 +342,42 @@ function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
                       Haptics.selectionAsync().catch(() => {});
                     }
                   }}
-                  style={[
-                    styles.prefCard,
-                    form.deliveryType === 'meet' && styles.prefCardActiveBlue,
-                  ]}
+                  style={styles.prefTab}
                 >
-                  <View style={styles.prefTopRow}>
-                    <Text style={styles.prefEmoji}>🤝</Text>
+                  <View
+                    style={[
+                      styles.prefIconBox,
+                      form.deliveryType === 'meet'
+                        ? styles.prefIconBoxActiveMeet
+                        : styles.prefIconBoxInactive,
+                    ]}
+                  >
+                    <Ionicons
+                      name="people-outline"
+                      size={20}
+                      color={form.deliveryType === 'meet' ? '#22D3EE' : '#6B7280'}
+                    />
+                  </View>
+                  <View style={styles.prefTextCol}>
                     <Text
                       style={[
                         styles.prefTitle,
-                        form.deliveryType === 'meet' && { color: colors.primary },
+                        form.deliveryType === 'meet' && styles.prefTitleActiveMeet,
                       ]}
                       numberOfLines={1}
                     >
                       Meet at Door
                     </Text>
+                    <Text
+                      style={[
+                        styles.prefDesc,
+                        form.deliveryType === 'meet' && styles.prefDescActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      Meet at your door
+                    </Text>
                   </View>
-                  <Text style={styles.prefDesc} numberOfLines={1}>
-                    Meet at your door
-                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -1277,60 +1359,89 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Delivery Preferences
+  // Delivery Preferences Single Toggle Box
   deliveryPrefSection: {
-    gap: 4,
-    marginBottom: 4,
+    gap: 6,
+    marginBottom: 6,
   },
-  prefRow: {
+  prefToggleContainer: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  prefCard: {
-    flex: 1,
-    borderRadius: 14,
+    backgroundColor: '#11141E',
+    borderRadius: 16,
+    padding: 4,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    backgroundColor: '#151821',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 2,
-    justifyContent: 'center',
+    position: 'relative',
+    height: 58,
   },
-  prefCardActiveGreen: {
-    borderColor: colors.tertiary,
-    backgroundColor: 'rgba(0, 226, 151, 0.10)',
-    shadowColor: colors.tertiary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
+  slidingPill: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 226, 151, 0.5)',
+    overflow: 'hidden',
   },
-  prefCardActiveBlue: {
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(0, 102, 255, 0.12)',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
+  slidingGradient: {
+    flex: 1,
+    borderRadius: 10,
   },
-  prefTopRow: {
+  prefTab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    zIndex: 1,
+    gap: 8,
+    height: '100%',
   },
-  prefEmoji: {
-    fontSize: 16,
+  prefIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  prefIconBoxActiveDoor: {
+    backgroundColor: 'rgba(255, 227, 153, 0.16)',
+    borderRadius: 10,
+  },
+  prefIconBoxActiveMeet: {
+    backgroundColor: 'rgba(6, 182, 212, 0.18)',
+    borderRadius: 10,
+  },
+  prefIconBoxInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 10,
+  },
+  prefTextCol: {
+    flex: 1,
+    gap: 1,
   },
   prefTitle: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: '#DFE2EF',
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#8C90A1',
     letterSpacing: -0.2,
   },
+  prefTitleActiveDoor: {
+    color: '#FFE399',
+    fontWeight: '800',
+  },
+  prefTitleActiveMeet: {
+    color: '#22D3EE',
+    fontWeight: '800',
+  },
   prefDesc: {
-    fontSize: 11,
-    color: '#8C90A1',
-    marginTop: 1,
+    fontSize: 10.5,
+    color: 'rgba(140, 144, 161, 0.6)',
+    fontWeight: '500',
+  },
+  prefDescActive: {
+    color: '#C2C6D8',
   },
 
   // Buttons
