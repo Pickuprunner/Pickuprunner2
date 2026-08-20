@@ -20,9 +20,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { blink } from '@/lib/blink';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOrderChat, ChatMessage } from '@/lib/chat';
 import { CustomerOrderData } from '@/components/Orders';
 import { useToast, CustomSkeleton } from '@/components/core';
+import { colors } from '@/constants/design';
+import {
+  ConversationCard,
+  ChatHeader,
+  MessageBubble,
+  DateSeparator,
+  ChatInputBar,
+  ChatEmptyState,
+  ChatSectionHeader,
+  LiveBadge,
+  ChatConversationItem,
+} from '@/components/chat';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -36,10 +49,10 @@ const STATIC_CONVERSATIONS: CustomerOrderData[] = [
     customerName: 'Jamie Test',
     customerPhone: '(520) 555-1234',
     pickupAddress: '5765 S Camino del Sol, Green Valley, AZ 85622',
-    deliveryAddress: '123 E Test Ave, Sahuarita, AZ 85629',
+    deliveryAddress: '1234 Sunset Blvd',
     items: '[LEAVE AT DOOR] #1042',
     status: 'pending',
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
     tipAmount: 500,
     distanceMiles: 4.2,
     driverName: 'Alex Rivera',
@@ -49,90 +62,21 @@ const STATIC_CONVERSATIONS: CustomerOrderData[] = [
     customerName: 'Jamie Test',
     customerPhone: '(520) 555-1234',
     pickupAddress: '5765 S Camino del Sol, Green Valley, AZ 85622',
-    deliveryAddress: '123 E Test Ave, Sahuarita, AZ 85629',
+    deliveryAddress: '88 Clementine Court',
     items: '[MEET AT DOOR] Hand off at door',
     status: 'delivered',
-    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
     tipAmount: 1000,
     distanceMiles: 6.8,
     driverName: 'Sarah Kim',
   },
 ];
 
-function formatTime(ts: number) {
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-}
-
-function formatDate(ts: number) {
-  const d = new Date(ts);
-  const today = new Date();
-  if (d.toDateString() === today.toDateString()) return 'Today';
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
-function MessageBubble({
-  msg,
-  isMine,
-}: {
-  msg: ChatMessage;
-  isMine: boolean;
-}) {
-  return (
-    <View
-      style={[
-        styles.messageBubbleContainer,
-        { alignItems: isMine ? 'flex-end' : 'flex-start' },
-      ]}
-    >
-      {!isMine && (
-        <Text style={styles.senderLabel}>
-          🚚 Driver · {msg.senderName || 'Driver'}
-        </Text>
-      )}
-
-      <View style={{ maxWidth: '80%' }}>
-        <View
-          style={[
-            styles.bubble,
-            isMine ? styles.bubbleMine : styles.bubbleOther,
-          ]}
-        >
-          <Text style={[styles.bubbleText, isMine ? styles.bubbleTextMine : styles.bubbleTextOther]}>
-            {msg.text}
-          </Text>
-        </View>
-
-        <Text
-          style={[
-            styles.bubbleTime,
-            { alignSelf: isMine ? 'flex-end' : 'flex-start' },
-          ]}
-        >
-          {formatTime(msg.timestamp)}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function DateSeparator({ ts }: { ts: number }) {
-  return (
-    <View style={styles.dateSeparatorRow}>
-      <View style={styles.dateDivider} />
-      <Text style={styles.dateText}>{formatDate(ts)}</Text>
-      <View style={styles.dateDivider} />
-    </View>
-  );
-}
-
 const QUICK_PROMPTS = [
-  'Please leave it by front door 🚪',
-  'Gate code is #1042 🔑',
-  'Please ring the doorbell 🔔',
-  'Thank you so much! 🙏',
+  'Please leave it by front door',
+  'Gate code is #1042',
+  'Please ring the doorbell',
+  'Thank you so much!',
 ];
 
 function CustomerOrderChatView({
@@ -210,34 +154,14 @@ function CustomerOrderChatView({
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Header */}
-      <View style={styles.chatHeaderBar}>
-        <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.backBtn}>
-          <MaterialIcons name="chevron-left" size={28} color="#DFE2EF" />
-        </TouchableOpacity>
-
-        <View style={styles.chatHeaderInfo}>
-          <Text style={styles.chatHeaderDriverName} numberOfLines={1}>
-            {driverDisplayName}
-          </Text>
-          <Text style={styles.chatHeaderSubtitle}>
-            Order #{shortId} · {order.status === 'delivered' ? 'Delivered' : 'Live Delivery'}
-          </Text>
-        </View>
-
-        {/* Live Indicator */}
-        <View style={styles.liveBadge}>
-          <View
-            style={[
-              styles.livePulseDot,
-              { backgroundColor: isConnected ? '#00E297' : '#8C90A1' },
-            ]}
-          />
-          <Text style={[styles.liveBadgeText, { color: isConnected ? '#00E297' : '#8C90A1' }]}>
-            {isConnected ? 'LIVE' : 'OFFLINE'}
-          </Text>
-        </View>
-      </View>
+      {/* Unified Chat Header */}
+      <ChatHeader
+        title={driverDisplayName}
+        orderNumber={shortId}
+        subtitle={order.status === 'delivered' ? 'Delivered' : 'Live Delivery'}
+        isLive={isConnected}
+        onBack={onBack}
+      />
 
       {/* Chat Messages */}
       <KeyboardAvoidingView
@@ -246,31 +170,10 @@ function CustomerOrderChatView({
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {messages.length === 0 ? (
-          <View style={styles.emptyChatContainer}>
-            <View style={styles.emptyChatIconBox}>
-              <MaterialIcons name="chat-bubble-outline" size={32} color="#FFE399" />
-            </View>
-            <Text style={styles.emptyChatTitle}>Direct Driver Chat</Text>
-            <Text style={styles.emptyChatSubtitle}>
-              Ask about pickup time, provide gate codes, or leave drop-off instructions.
-            </Text>
-
-            {/* Quick Prompts */}
-            <View style={styles.quickPromptsContainer}>
-              <Text style={styles.quickPromptsLabel}>QUICK REPLIES</Text>
-              <View style={styles.quickPromptsGrid}>
-                {QUICK_PROMPTS.map((prompt) => (
-                  <TouchableOpacity
-                    key={prompt}
-                    onPress={() => handleSend(prompt)}
-                    style={styles.quickPromptPill}
-                  >
-                    <Text style={styles.quickPromptText}>{prompt}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </View>
+          <ChatEmptyState
+            title="Direct Driver Chat"
+            subtitle="Ask about pickup time, provide gate codes, or leave drop-off instructions."
+          />
         ) : (
           <FlatList
             ref={flatListRef}
@@ -287,43 +190,25 @@ function CustomerOrderChatView({
           />
         )}
 
-        {/* Input Bar */}
-        <View style={styles.inputBar}>
-          <View style={styles.inputFieldContainer}>
-            <TextInput
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder={`Message ${driverDisplayName.split(' ')[0]}...`}
-              placeholderTextColor="#8C90A1"
-              multiline
-              maxLength={500}
-              returnKeyType="send"
-              onSubmitEditing={Platform.OS === 'web' ? () => handleSend() : undefined}
-              style={styles.textInput}
-            />
-          </View>
-
-          <TouchableOpacity
-            onPress={() => handleSend()}
-            disabled={!inputText.trim() || sending || !isConnected}
-            style={[
-              styles.sendButton,
-              (!inputText.trim() || sending || !isConnected) && styles.sendButtonDisabled,
-            ]}
-          >
-            {sending ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <MaterialIcons name="send" size={20} color="#FFFFFF" />
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Input Bar with Quick Prompts */}
+        <ChatInputBar
+          value={inputText}
+          onChangeText={setInputText}
+          onSend={() => handleSend()}
+          sending={sending}
+          disabled={!isConnected}
+          placeholder={`Message ${driverDisplayName.split(' ')[0]}...`}
+          accentColor={colors.primaryContainer}
+          quickPrompts={QUICK_PROMPTS}
+          onSelectPrompt={(p) => handleSend(p)}
+        />
       </KeyboardAvoidingView>
     </View>
   );
 }
 
 export default function CustomerChatScreen() {
+  const insets = useSafeAreaInsets();
   const [orders, setOrders] = useState<CustomerOrderData[]>(STATIC_CONVERSATIONS);
   const [activeChatOrder, setActiveChatOrder] = useState<CustomerOrderData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -390,64 +275,27 @@ export default function CustomerChatScreen() {
     );
   }
 
-  const renderConversationItem = ({ item, index }: { item: CustomerOrderData; index: number }) => {
+  const activeOrders = orders.filter((o) => o.status !== 'delivered');
+  const recentOrders = orders.filter((o) => o.status === 'delivered');
+
+  const mapToChatItem = (item: CustomerOrderData): ChatConversationItem => {
     const shortId = item.id ? item.id.slice(-6).toUpperCase() : '------';
     const driverName = item.driverName || item.driver_name || 'Driver';
     const isDelivered = item.status === 'delivered';
-    const initial = (driverName.trim() || 'D').charAt(0).toUpperCase();
 
-    return (
-      <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
-        <TouchableOpacity
-          onPress={() => {
-            haptic();
-            setActiveChatOrder(item);
-          }}
-          activeOpacity={0.8}
-          style={styles.conversationCard}
-        >
-          {/* Avatar */}
-          <View style={styles.convoAvatar}>
-            <Text style={styles.convoAvatarText}>{initial}</Text>
-          </View>
-
-          {/* Details */}
-          <View style={styles.convoDetails}>
-            <View style={styles.convoTitleRow}>
-              <Text style={styles.convoDriverName} numberOfLines={1}>
-                {driverName}
-              </Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  isDelivered ? styles.statusBadgeDelivered : styles.statusBadgeActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusBadgeText,
-                    { color: isDelivered ? '#00E297' : '#0066FF' },
-                  ]}
-                >
-                  {isDelivered ? 'DELIVERED' : 'ACTIVE ORDER'}
-                </Text>
-              </View>
-            </View>
-
-            <Text style={styles.convoSubtitle} numberOfLines={1}>
-              Order #{shortId} · {item.deliveryAddress || item.delivery_address || 'Sahuarita, AZ'}
-            </Text>
-
-            <View style={styles.convoFooterRow}>
-              <MaterialIcons name="chat" size={13} color="#FFE399" />
-              <Text style={styles.convoTapHint}>Tap to message your driver</Text>
-            </View>
-          </View>
-
-          <MaterialIcons name="chevron-right" size={22} color="#8C90A1" />
-        </TouchableOpacity>
-      </Animated.View>
-    );
+    return {
+      id: item.id,
+      name: driverName,
+      orderNumber: `#ORD-${shortId}`,
+      orderMetaText: isDelivered ? 'Delivered 12 min ago' : 'Started 8 min ago',
+      address: item.deliveryAddress || item.delivery_address || 'Sahuarita, AZ',
+      time: isDelivered ? '12m' : '8m',
+      status: item.status,
+      statusLabel: isDelivered ? 'Delivered' : 'Active order',
+      statusVariant: isDelivered ? 'gray' : 'emerald',
+      avatarVariant: isDelivered ? 'gray' : 'mint',
+      distanceMiles: item.distanceMiles,
+    };
   };
 
   return (
@@ -455,28 +303,22 @@ export default function CustomerChatScreen() {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Screen Header */}
-      <View style={styles.screenHeader}>
-        <View style={styles.headerTitleRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Driver Chat</Text>
-            <Text style={styles.headerSubtitle}>
-              Direct messages with your delivery driver
-            </Text>
-          </View>
-
-          {/* Live Badge */}
-          <View style={styles.liveBadge}>
-            <View style={styles.livePulseDot} />
-            <Text style={styles.liveBadgeText}>LIVE</Text>
-          </View>
+      <View style={[styles.screenHeader, { paddingTop: Math.max(insets.top, 16) }]}>
+        <Text style={styles.headerTitle}>Driver Chat</Text>
+        <View style={styles.headerSubtitleRow}>
+          <LiveBadge label="Live" isLive />
+          <Text style={styles.headerSubtitle}>
+            {activeOrders.length > 0
+              ? `${activeOrders.length} driver${activeOrders.length > 1 ? 's' : ''} on route`
+              : 'Direct messages with your delivery driver'}
+          </Text>
         </View>
       </View>
 
       {/* Conversations List */}
       <FlatList
-        data={orders}
-        keyExtractor={(item) => item.id}
-        renderItem={renderConversationItem}
+        data={[]}
+        renderItem={null}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContainer}
         refreshControl={
@@ -488,6 +330,49 @@ export default function CustomerChatScreen() {
             }}
             tintColor="#FFE399"
           />
+        }
+        ListHeaderComponent={
+          <>
+            {activeOrders.length > 0 && (
+              <>
+                <ChatSectionHeader title="On Active Order" count={activeOrders.length} />
+                {activeOrders.map((item, idx) => (
+                  <Animated.View key={item.id} entering={FadeInDown.delay(idx * 50).springify()}>
+                    <ConversationCard
+                      item={mapToChatItem(item)}
+                      role="customer"
+                      onPress={() => {
+                        haptic();
+                        setActiveChatOrder(item);
+                      }}
+                    />
+                  </Animated.View>
+                ))}
+              </>
+            )}
+
+            {recentOrders.length > 0 && (
+              <>
+                <ChatSectionHeader
+                  title="Recently Completed"
+                  count={recentOrders.length}
+                  marginTop={activeOrders.length > 0 ? 18 : 0}
+                />
+                {recentOrders.map((item, idx) => (
+                  <Animated.View key={item.id} entering={FadeInDown.delay((activeOrders.length + idx) * 50).springify()}>
+                    <ConversationCard
+                      item={mapToChatItem(item)}
+                      role="customer"
+                      onPress={() => {
+                        haptic();
+                        setActiveChatOrder(item);
+                      }}
+                    />
+                  </Animated.View>
+                ))}
+              </>
+            )}
+          </>
         }
         ListEmptyComponent={
           loading ? (
@@ -506,7 +391,7 @@ export default function CustomerChatScreen() {
                 </View>
               ))}
             </View>
-          ) : (
+          ) : activeOrders.length === 0 && recentOrders.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>
                 <MaterialIcons name="forum" size={36} color="#FFE399" />
@@ -522,7 +407,7 @@ export default function CustomerChatScreen() {
                 <Text style={styles.requestBtnText}>Request a Pickup</Text>
               </TouchableOpacity>
             </View>
-          )
+          ) : null
         }
       />
     </View>
@@ -536,7 +421,6 @@ const styles = StyleSheet.create({
   },
   screenHeader: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 64 : 56,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.06)',
@@ -552,10 +436,16 @@ const styles = StyleSheet.create({
     color: '#DFE2EF',
     letterSpacing: -0.5,
   },
+  headerSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
   headerSubtitle: {
     fontSize: 13,
-    color: '#8C90A1',
-    marginTop: 2,
+    color: 'rgba(194, 198, 216, 0.7)',
     fontWeight: '500',
   },
   liveBadge: {

@@ -7,6 +7,8 @@ import {
   Pressable,
   StyleSheet,
   View,
+  Text,
+  ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -24,84 +26,22 @@ import {
   ChevronLeft,
   Truck,
 } from '@blinkdotnew/mobile-ui';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useOrders, Order } from '@/lib/orders';
 import { useOrderChat, getSavedDisplayName, saveDisplayName, ChatMessage } from '@/lib/chat';
 import { useDriverId } from '@/hooks/useDriverId';
 import { colors, spacing, borderRadius } from '@/constants/design';
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
-function formatTime(ts: number) {
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-}
-
-function formatDate(ts: number) {
-  const d = new Date(ts);
-  const today = new Date();
-  if (d.toDateString() === today.toDateString()) return 'Today';
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
-// ── Message bubble ────────────────────────────────────────────────────────────
-
-function MessageBubble({
-  msg,
-  isMine,
-}: {
-  msg: ChatMessage;
-  isMine: boolean;
-}) {
-  const isCustomer = msg.role === 'customer';
-  return (
-    <YStack
-      alignItems={isMine ? 'flex-end' : 'flex-start'}
-      marginBottom="$2"
-      paddingHorizontal="$4"
-    >
-      {/* Sender label */}
-      {!isMine && (
-        <SizableText size="$1" fontWeight="700" color="$color10" paddingLeft="$1" marginBottom="$1">
-          {isCustomer ? '👤 Customer' : '🚚 Driver'} — {msg.senderName}
-        </SizableText>
-      )}
-
-      <YStack maxWidth="75%">
-        <YStack
-          backgroundColor={isMine ? '#2D6A4F' : '$color3'}
-          borderRadius={18}
-          borderBottomRightRadius={isMine ? 4 : 18}
-          borderBottomLeftRadius={isMine ? 18 : 4}
-          paddingHorizontal="$3"
-          paddingVertical="$2"
-        >
-          <SizableText size="$3" color={isMine ? 'white' : '$color12'} lineHeight={20}>
-            {msg.text}
-          </SizableText>
-        </YStack>
-
-        <SizableText size="$1" color="$color9" alignSelf={isMine ? 'flex-end' : 'flex-start'} paddingHorizontal="$1">
-          {formatTime(msg.timestamp)}
-        </SizableText>
-      </YStack>
-    </YStack>
-  );
-}
-
-// ── Date separator ────────────────────────────────────────────────────────────
-
-function DateSeparator({ ts }: { ts: number }) {
-  return (
-    <XStack alignItems="center" gap="$2" paddingHorizontal="$4" marginVertical="$3">
-      <YStack flex={1} height={1} backgroundColor="$color4" />
-      <SizableText size="$1" color="$color9" fontWeight="600">{formatDate(ts)}</SizableText>
-      <YStack flex={1} height={1} backgroundColor="$color4" />
-    </XStack>
-  );
-}
+import {
+  ConversationCard,
+  ChatHeader,
+  MessageBubble,
+  DateSeparator,
+  ChatInputBar,
+  ChatEmptyState,
+  ChatSectionHeader,
+  ChatConversationItem,
+} from '@/components/chat';
 
 // ── Name setup prompt ────────────────────────────────────────────────────────
 
@@ -122,7 +62,7 @@ function NameSetupPrompt({ onSet }: { onSet: (name: string) => void }) {
         value={value}
         onChangeText={setValue}
         placeholder="Your name (e.g. Alex)"
-        placeholderTextColor={colors.textTertiary}
+        placeholderTextColor="rgba(255, 255, 255, 0.4)"
         style={[styles.nameInput, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}]}
         autoFocus
         returnKeyType="done"
@@ -140,6 +80,13 @@ function NameSetupPrompt({ onSet }: { onSet: (name: string) => void }) {
 }
 
 // ── Per-order chat view ──────────────────────────────────────────────────────
+
+const DRIVER_QUICK_PROMPTS = [
+  'On my way',
+  'Arrived at pickup',
+  'Dropped off safely',
+  'Running 5 mins behind',
+];
 
 function OrderChatView({ order, displayName, onBack }: { order: Order; displayName: string; onBack: () => void }) {
   const [inputText, setInputText] = useState('');
@@ -159,8 +106,8 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
     }
   }, [messages.length]);
 
-  const handleSend = useCallback(async () => {
-    const text = inputText.trim();
+  const handleSend = useCallback(async (customText?: string) => {
+    const text = (customText || inputText).trim();
     if (!text || sending) return;
     setInputText('');
     setSending(true);
@@ -176,68 +123,45 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
 
   // Build list items with date separators
   const listItems = React.useMemo(() => {
-    const items: { type: 'date'; ts: number; key: string } | { type: 'message'; msg: ChatMessage; isMine: boolean; key: string }[] = [];
+    const items: ({ type: 'date'; ts: number; key: string } | { type: 'message'; msg: ChatMessage; isMine: boolean; key: string })[] = [];
     let lastDate = '';
     for (const msg of messages) {
       const dateStr = new Date(msg.timestamp).toDateString();
       if (dateStr !== lastDate) {
-        (items as any[]).push({ type: 'date', ts: msg.timestamp, key: `date-${msg.timestamp}` });
+        items.push({ type: 'date', ts: msg.timestamp, key: `date-${msg.timestamp}` });
         lastDate = dateStr;
       }
       const isMine = msg.role === 'driver';
-      (items as any[]).push({ type: 'message', msg, isMine, key: msg.id });
+      items.push({ type: 'message', msg, isMine, key: msg.id });
     }
     return items;
   }, [messages]);
 
   return (
-    <SafeArea>
+    <View style={styles.root}>
       {/* Header */}
-      <XStack
-        paddingHorizontal="$4" paddingTop="$3" paddingBottom="$3"
-        alignItems="center" gap="$3"
-        borderBottomWidth={1} borderBottomColor="$color4"
-      >
-        <Pressable onPress={onBack} hitSlop={8}>
-          <ChevronLeft size={24} color="$color10" />
-        </Pressable>
-        <YStack flex={1}>
-          <SizableText size="$5" fontWeight="800" color="$color12">
-            {order.customerName}
-          </SizableText>
-          <SizableText size="$2" color="$color9">
-            Order #{shortId} · {order.deliveryAddress?.slice(0, 30) || 'No address'}
-          </SizableText>
-        </YStack>
-        <XStack gap="$1" alignItems="center" paddingHorizontal="$2" paddingVertical="$1" borderRadius="$full"
-          backgroundColor={isConnected ? '$green3' : '$color3'} borderWidth={1}
-          borderColor={isConnected ? '$green6' : '$color6'}
-        >
-          {isConnected
-            ? <Wifi size={12} color="$green9" />
-            : <WifiOff size={12} color="$color9" />}
-          <SizableText size="$1" fontWeight="700" color={isConnected ? '$green9' : '$color10'}>
-            {isConnected ? 'LIVE' : 'OFFLINE'}
-          </SizableText>
-        </XStack>
-      </XStack>
+      <ChatHeader
+        title={order.customerName || 'Customer'}
+        orderNumber={shortId}
+        subtitle={order.deliveryAddress || 'No delivery address'}
+        isLive={isConnected}
+        onBack={onBack}
+      />
 
       {/* Messages */}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         {messages.length === 0 ? (
-          <YStack flex={1} alignItems="center" justifyContent="center" gap="$3" padding="$6">
-            <YStack width={56} height={56} borderRadius={28} backgroundColor="$color3" alignItems="center" justifyContent="center">
-              <MessageCircle size={28} color="$color8" />
-            </YStack>
-            <SizableText size="$4" fontWeight="700" color="$color12">No messages yet</SizableText>
-            <SizableText size="$3" color="$color10" textAlign="center">
-              Message your customer about this delivery.
-            </SizableText>
-          </YStack>
+          <ChatEmptyState
+            title="No messages yet"
+            subtitle="Message your customer about pickup time, drop-off updates, or gate codes."
+          />
         ) : (
           <FlatList
             ref={flatListRef}
-            data={listItems as any[]}
+            data={listItems}
             keyExtractor={(item) => item.key}
             renderItem={({ item }) => {
               if (item.type === 'date') return <DateSeparator ts={item.ts} />;
@@ -250,35 +174,20 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
           />
         )}
 
-        {/* Input bar */}
-        <XStack paddingHorizontal="$3" paddingVertical="$3" gap="$2" alignItems="flex-end"
-          borderTopWidth={1} borderTopColor="$color4" backgroundColor="$background"
-        >
-          <YStack flex={1} backgroundColor="$color3" borderRadius={22} paddingHorizontal="$4" paddingVertical="$2" minHeight={44} justifyContent="center">
-            <TextInput
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder={`Message ${order.customerName?.split(' ')[0] || 'customer'}…`}
-              placeholderTextColor={colors.textTertiary}
-              multiline maxLength={500} returnKeyType="send" blurOnSubmit={false}
-              onSubmitEditing={Platform.OS === 'web' ? handleSend : undefined}
-              style={[styles.input, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}]}
-            />
-          </YStack>
-          <Pressable
-            onPress={handleSend}
-            disabled={!inputText.trim() || sending || !isConnected}
-            style={({ pressed }) => [
-              styles.sendBtn,
-              (!inputText.trim() || sending || !isConnected) && styles.sendBtnDisabled,
-              pressed && styles.sendBtnPressed,
-            ]}
-          >
-            {sending ? <Spinner size="small" color="white" /> : <Send size={18} color="white" />}
-          </Pressable>
-        </XStack>
+        {/* Input bar with quick prompts */}
+        <ChatInputBar
+          value={inputText}
+          onChangeText={setInputText}
+          onSend={() => handleSend()}
+          sending={sending}
+          disabled={!isConnected}
+          placeholder={`Message ${order.customerName?.split(' ')[0] || 'customer'}…`}
+          accentColor={colors.primaryContainer}
+          quickPrompts={DRIVER_QUICK_PROMPTS}
+          onSelectPrompt={(p) => handleSend(p)}
+        />
       </KeyboardAvoidingView>
-    </SafeArea>
+    </View>
   );
 }
 
@@ -289,6 +198,7 @@ type ListItem =
   | { type: 'message'; msg: ChatMessage; isMine: boolean; key: string };
 
 export default function ChatScreen() {
+  const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [nameReady, setNameReady] = useState(false);
   const [activeChatOrder, setActiveChatOrder] = useState<Order | null>(null);
@@ -299,6 +209,10 @@ export default function ChatScreen() {
   // Active orders for this driver (accepted or picked_up)
   const activeOrders = orders.filter(
     (o) => o.driverUserId === driverId && (o.status === 'accepted' || o.status === 'picked_up')
+  );
+
+  const recentOrders = orders.filter(
+    (o) => o.driverUserId === driverId && o.status === 'delivered'
   );
 
   // Load saved name
@@ -335,172 +249,143 @@ export default function ChatScreen() {
     return <OrderChatView order={activeChatOrder} displayName={displayName} onBack={() => setActiveChatOrder(null)} />;
   }
 
+  const mapToChatItem = (item: Order): ChatConversationItem => {
+    const shortId = item?.id ? item.id.slice(-6).toUpperCase() : '------';
+    const isDelivered = item.status === 'delivered';
+    return {
+      id: item.id,
+      name: item.customerName || 'Customer',
+      orderNumber: `#${shortId}`,
+      address: item.deliveryAddress || 'No delivery address',
+      status: item.status,
+      statusLabel: item.status === 'accepted' ? 'Heading to pickup' : isDelivered ? 'Delivered' : 'Delivering',
+      statusVariant: isDelivered ? 'gray' : item.status === 'accepted' ? 'amber' : 'emerald',
+      avatarVariant: isDelivered ? 'gray' : 'amber',
+      distanceMiles: Number(item.distanceMiles ?? 0),
+    };
+  };
+
   // ── Order list ──────────────────────────────────────────────────────────
   return (
-    <SafeArea>
-      <XStack
-        paddingHorizontal="$4" paddingTop="$4" paddingBottom="$3"
-        alignItems="center" justifyContent="space-between"
-        borderBottomWidth={1} borderBottomColor="$color4"
-      >
-        <YStack>
-          <SizableText size="$6" fontWeight="800" color="$color12">Messages</SizableText>
-          <SizableText size="$2" color="$color10">
-            {activeOrders.length > 0 ? `${activeOrders.length} active conversation${activeOrders.length > 1 ? 's' : ''}` : 'No active deliveries'}
-          </SizableText>
-        </YStack>
-      </XStack>
+    <View style={styles.root}>
+      {/* Header */}
+      <View style={[styles.appHeader, { paddingTop: Math.max(insets.top, 16) }]}>
+        <Text style={styles.headerTitle}>Messages</Text>
+        <View style={styles.headerSubtitleRow}>
+          <Text style={styles.headerSubtitle}>
+            {activeOrders.length > 0
+              ? `${activeOrders.length} active conversation${activeOrders.length > 1 ? 's' : ''}`
+              : 'No active deliveries'}
+          </Text>
+          <Text style={styles.headerDot}>·</Text>
+          <Text style={styles.headerStatusText}>All read</Text>
+        </View>
+      </View>
 
       {isLoading ? (
         <YStack flex={1} alignItems="center" justifyContent="center">
           <Spinner size="large" color="$color9" />
         </YStack>
-      ) : activeOrders.length === 0 ? (
-        <YStack flex={1} alignItems="center" justifyContent="center" gap="$3" padding="$6">
-          <YStack width={64} height={64} borderRadius={32} backgroundColor="$color3" alignItems="center" justifyContent="center">
-            <MessageCircle size={32} color="$color8" />
-          </YStack>
-          <YStack alignItems="center" gap="$1">
-            <SizableText size="$5" fontWeight="700" color="$color12">No Active Deliveries</SizableText>
-            <SizableText size="$3" color="$color10" textAlign="center">
-              Accept an order to start messaging your customer.
-            </SizableText>
-          </YStack>
-          <Pressable
-            onPress={() => router.push('/(tabs)')}
-            style={({ pressed }) => [styles.gotoBtn, pressed && styles.gotoBtnPressed]}
-          >
-            <Truck size={16} color="white" />
-            <SizableText size="$3" fontWeight="700" color="white">Browse Orders</SizableText>
-          </Pressable>
-        </YStack>
-      ) : (
-        <FlatList
-          data={activeOrders}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16 }}
-          renderItem={({ item }) => {
-            const shortId = item?.id ? item.id.slice(-6).toUpperCase() : '------';
-            const miles = Number(item.distanceMiles ?? 0);
-            return (
-              <Pressable
-                onPress={() => setActiveChatOrder(item)}
-                style={({ pressed }) => [styles.orderCard, pressed && styles.orderCardPressed]}
-              >
-                <XStack alignItems="center" gap="$3">
-                  <YStack
-                    width={44} height={44} borderRadius={22}
-                    backgroundColor={item.status === 'accepted' ? 'rgba(0,102,255,0.15)' : 'rgba(249,115,22,0.15)'}
-                    alignItems="center" justifyContent="center"
-                  >
-                    <MessageCircle size={20} color={item.status === 'accepted' ? '#60A5FA' : '#FB923C'} />
-                  </YStack>
-                  <YStack flex={1}>
-                    <XStack justifyContent="space-between" alignItems="center">
-                      <SizableText size="$4" fontWeight="700" color="$color12">
-                        {item.customerName}
-                      </SizableText>
-                      <SizableText size="$1" color="$color9">#{shortId}</SizableText>
-                    </XStack>
-                    <SizableText size="$2" color="$color10" numberOfLines={1}>
-                      {item.deliveryAddress || 'No address'}
-                    </SizableText>
-                    <XStack gap="$2" alignItems="center" marginTop="$1">
-                      <YStack
-                        paddingHorizontal="$2" paddingVertical="$0.5"
-                        borderRadius="$full"
-                        backgroundColor={item.status === 'accepted' ? 'rgba(0,102,255,0.12)' : 'rgba(249,115,22,0.12)'}
-                      >
-                        <SizableText size="$1" fontWeight="700" color={item.status === 'accepted' ? '#60A5FA' : '#FB923C'}>
-                          {item.status === 'accepted' ? 'HEADING TO PICKUP' : 'DELIVERING'}
-                        </SizableText>
-                      </YStack>
-                      {miles > 0 && (
-                        <SizableText size="$1" color="$color9">{miles.toFixed(1)} mi</SizableText>
-                      )}
-                    </XStack>
-                  </YStack>
-                  <ChevronRight size={18} color="$color8" />
-                </XStack>
-              </Pressable>
-            );
-          }}
+      ) : activeOrders.length === 0 && recentOrders.length === 0 ? (
+        <ChatEmptyState
+          title="No Active Deliveries"
+          subtitle="Accept an order from the feed to start messaging your customer."
+          buttonText="Browse Orders"
+          buttonIcon={<Truck size={16} color="white" />}
+          onButtonPress={() => router.push('/(tabs)')}
         />
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+          {activeOrders.length > 0 && (
+            <>
+              <ChatSectionHeader title="Active Orders" count={activeOrders.length} />
+              {activeOrders.map((item) => (
+                <ConversationCard
+                  key={item.id}
+                  item={mapToChatItem(item)}
+                  role="driver"
+                  onPress={() => setActiveChatOrder(item)}
+                />
+              ))}
+            </>
+          )}
+
+          {recentOrders.length > 0 && (
+            <>
+              <ChatSectionHeader title="Recent" count={recentOrders.length} marginTop={activeOrders.length > 0 ? 14 : 0} />
+              {recentOrders.map((item) => (
+                <ConversationCard
+                  key={item.id}
+                  item={mapToChatItem(item)}
+                  role="driver"
+                  onPress={() => setActiveChatOrder(item)}
+                />
+              ))}
+            </>
+          )}
+        </ScrollView>
       )}
-    </SafeArea>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  input: {
-    fontSize: 15,
-    color: colors.text,
-    maxHeight: 120,
-    paddingTop: 0,
-    paddingBottom: 0,
+  root: {
+    flex: 1,
+    backgroundColor: '#0F131C',
   },
-  sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
+  appHeader: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#DFE2EF',
+    letterSpacing: -0.5,
+  },
+  headerSubtitleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+    gap: 8,
+    marginTop: 4,
   },
-  sendBtnDisabled: {
-    opacity: 0.4,
+  headerSubtitle: {
+    fontSize: 13,
+    color: 'rgba(194, 198, 216, 0.7)',
   },
-  sendBtnPressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.95 }],
+  headerDot: {
+    fontSize: 13,
+    color: 'rgba(194, 198, 216, 0.4)',
+  },
+  headerStatusText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#00E297',
+    opacity: 0.85,
   },
   nameInput: {
     width: '100%',
     height: 52,
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: borderRadius.xl,
-    paddingHorizontal: spacing.lg,
+    backgroundColor: '#181C28',
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.gutter,
     fontSize: 16,
-    color: colors.text,
+    color: colors.onSurface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   nameBtn: {
     width: '100%',
     height: 52,
-    borderRadius: borderRadius.xl,
-    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
   },
   nameBtnDisabled: {
     opacity: 0.4,
-  },
-  gotoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 48,
-    paddingHorizontal: 24,
-    borderRadius: 14,
-    backgroundColor: '#0066FF',
-  },
-  gotoBtnPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.97 }],
-  },
-  orderCard: {
-    backgroundColor: '#0F172A',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  orderCardPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
   },
 });
