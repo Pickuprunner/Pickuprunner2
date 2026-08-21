@@ -299,7 +299,7 @@ export function CustomerOrderCard({
           activeOpacity={0.85}
           style={styles.supportButton}
         >
-          <MaterialIcons name="support-agent" size={15} color="#dfe2ef" />
+          <Ionicons name="headset-outline" size={16} color="#B388FF" />
           <Text style={styles.supportButtonText} numberOfLines={1}>
             Support
           </Text>
@@ -314,7 +314,7 @@ export function CustomerOrderCard({
             activeOpacity={0.85}
             style={styles.cancelButton}
           >
-            <MaterialIcons name="delete-outline" size={15} color="#FF6B6B" />
+            <Ionicons name="trash-outline" size={16} color="#FF6B6B" />
             <Text style={styles.cancelButtonText} numberOfLines={1}>
               Cancel
             </Text>
@@ -362,10 +362,25 @@ export function CustomerOrderCard({
 
       {order.items ? (
         <View style={styles.itemsPill}>
-          <Ionicons name="information-circle-outline" size={15} color="#8C90A1" />
-          <Text style={styles.itemsPillText} numberOfLines={2}>
-            {order.items}
-          </Text>
+          <Ionicons name="information-circle-outline" size={16} color="#B3C5FF" />
+          <View style={styles.itemsTextCol}>
+            {(() => {
+              const bracketMatch = order.items.match(/^(\[[^\]]+\])\s*(.*)$/);
+              if (bracketMatch) {
+                return (
+                  <Text style={styles.itemsPillText} numberOfLines={2} ellipsizeMode="tail">
+                    <Text style={styles.itemsHighlightTag}>{bracketMatch[1]}</Text>
+                    {bracketMatch[2] ? ` ${bracketMatch[2]}` : ''}
+                  </Text>
+                );
+              }
+              return (
+                <Text style={styles.itemsPillText} numberOfLines={2} ellipsizeMode="tail">
+                  {order.items}
+                </Text>
+              );
+            })()}
+          </View>
         </View>
       ) : null}
     </CustomCard>
@@ -395,16 +410,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#31353f',
-    borderWidth: 1,
-    borderColor: '#424656',
+    backgroundColor: '#0F131C',
+    borderWidth: 1.5,
+    borderColor: '#FFE399',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: '#ffe399',
+    color: '#FFE399',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   userName: {
     color: '#dfe2ef',
@@ -485,18 +500,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: 'rgba(0, 102, 255, 0.08)',
     borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(0, 102, 255, 0.22)',
     marginTop: 12,
+    overflow: 'hidden',
+  },
+  itemsTextCol: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   itemsPillText: {
     fontSize: 12.5,
-    color: '#C2C6D8',
-    flex: 1,
+    lineHeight: 18,
+    color: '#DFE2EF',
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  itemsHighlightTag: {
+    color: '#B3C5FF',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   footer: {
     flexDirection: 'column',

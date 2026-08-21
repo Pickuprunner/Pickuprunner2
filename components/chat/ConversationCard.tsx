@@ -1,12 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronRight, MapPin } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import {
   ChatConversationItem,
   ConversationCardProps,
-  AvatarVariant,
   StatusVariant,
 } from './types';
 
@@ -17,15 +15,6 @@ function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function resolveAvatarVariant(item: ChatConversationItem): AvatarVariant {
-  if (item.avatarVariant) return item.avatarVariant;
-  const s = (item.status || '').toLowerCase();
-  if (s === 'delivered') return 'gray';
-  if (s === 'active' || s === 'active_order' || s === 'pending') return 'mint';
-  if (s === 'heading_to_pickup' || s === 'accepted') return 'amber';
-  return 'cobalt';
 }
 
 function resolveStatusVariant(item: ChatConversationItem): StatusVariant {
@@ -48,7 +37,6 @@ function resolveStatusLabel(item: ChatConversationItem): string {
 }
 
 export function ConversationCard({ item, role = 'driver', onPress, style }: ConversationCardProps) {
-  const avatarVar = resolveAvatarVariant(item);
   const statusVar = resolveStatusVariant(item);
   const statusLabel = resolveStatusLabel(item);
   const initials = item.avatarInitials || getInitials(item.name);
@@ -58,48 +46,6 @@ export function ConversationCard({ item, role = 'driver', onPress, style }: Conv
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     onPress();
-  };
-
-  const getAvatarGradient = (): [string, string] => {
-    switch (avatarVar) {
-      case 'amber':
-        return ['#F4C300', '#C79900'];
-      case 'mint':
-        return ['#008255', '#00623F'];
-      case 'cobalt':
-        return ['#0066FF', '#0054D6'];
-      case 'gray':
-      default:
-        return ['#31353F', '#262A34'];
-    }
-  };
-
-  const getAvatarTextColor = () => {
-    switch (avatarVar) {
-      case 'amber':
-        return '#0F131C';
-      case 'mint':
-        return '#E0FFEA';
-      case 'cobalt':
-        return '#F8F7FF';
-      case 'gray':
-      default:
-        return '#C2C6D8';
-    }
-  };
-
-  const getAvatarRingColor = () => {
-    switch (avatarVar) {
-      case 'amber':
-        return 'rgba(244, 195, 0, 0.6)';
-      case 'mint':
-        return 'rgba(0, 226, 151, 0.6)';
-      case 'cobalt':
-        return 'rgba(0, 102, 255, 0.6)';
-      case 'gray':
-      default:
-        return 'rgba(255, 255, 255, 0.08)';
-    }
   };
 
   const isDelivered = (item.status || '').toLowerCase() === 'delivered';
@@ -114,18 +60,11 @@ export function ConversationCard({ item, role = 'driver', onPress, style }: Conv
         style,
       ]}
     >
+      {/* Avatar */}
       <View style={styles.avatarWrap}>
-        <View style={[styles.statusRing, { borderColor: getAvatarRingColor() }]} />
-        <LinearGradient
-          colors={getAvatarGradient()}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.avatarGradient}
-        >
-          <Text style={[styles.avatarText, { color: getAvatarTextColor() }]}>
-            {initials}
-          </Text>
-        </LinearGradient>
+        <Text style={styles.avatarText}>
+          {initials}
+        </Text>
       </View>
 
       <View style={styles.content}>
@@ -233,29 +172,16 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
+    backgroundColor: '#0F131C',
+    borderWidth: 1.5,
+    borderColor: '#FFE399',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
     flexShrink: 0,
   },
-  statusRing: {
-    position: 'absolute',
-    top: -2,
-    left: -2,
-    right: -2,
-    bottom: -2,
-    borderRadius: 24,
-    borderWidth: 1.5,
-  },
-  avatarGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   avatarText: {
-    fontSize: 14,
+    color: '#FFE399',
+    fontSize: 15,
     fontWeight: '700',
     letterSpacing: -0.2,
   },

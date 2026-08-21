@@ -299,7 +299,7 @@ export default function CustomerChatScreen() {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       <View style={[styles.screenHeader, { paddingTop: Math.max(insets.top, 16) }]}>
-        <Text style={styles.headerTitle}>Driver Chat</Text>
+        <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerSubtitleRow}>
           <LiveBadge label="Live" isLive />
           <Text style={styles.headerSubtitle}>

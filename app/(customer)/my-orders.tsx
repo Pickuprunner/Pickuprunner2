@@ -75,7 +75,6 @@ export default function MyOrdersScreen() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(true);
   const [cancelTargetOrder, setCancelTargetOrder] = useState<CustomerOrderData | null>(null);
-  const [cancelling, setCancelling] = useState(false);
   const prevStatusMap = useRef<Map<string, string>>(new Map());
   const channelRef = useRef<any>(null);
 
@@ -217,11 +216,26 @@ export default function MyOrdersScreen() {
     setCancelTargetOrder(orderToCancel);
   }, [orders]);
 
-  const confirmCancel = useCallback(async () => {
+  const confirmCancel = useCallback(() => {
     if (!cancelTargetOrder) return;
     const id = cancelTargetOrder.id;
-    setCancelling(true);
-    try {
+
+    // 1. Instant Optimistic UI Update (0ms delay)
+    setCancelTargetOrder(null);
+    setOrders((prev) => prev.filter((o) => o.id !== id));
+    prevStatusMap.current.delete(id);
+
+    if (Platform.OS !== 'web') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
+
+    showToast('Pickup request cancelled', {
+      type: 'info',
+      description: 'Your request has been removed.',
+    });
+
+    // 2. Perform local storage & DB deletion in the background without blocking UI
+    (async () => {
       try {
         const raw = await AsyncStorage.getItem('customer_local_orders');
         if (raw) {
@@ -229,28 +243,16 @@ export default function MyOrdersScreen() {
           const filtered = list.filter((o: any) => o.id !== id);
           await AsyncStorage.setItem('customer_local_orders', JSON.stringify(filtered));
         }
-      } catch { }
-
-      await blink.db.orders.delete(id).catch(() => { });
-      setOrders((prev) => prev.filter((o) => o.id !== id));
-      prevStatusMap.current.delete(id);
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+      } catch (err) {
+        console.warn('[my-orders] AsyncStorage sync failed:', err);
       }
-      showToast('Pickup request cancelled', {
-        type: 'info',
-        description: 'Your request has been removed.',
-      });
-      setCancelTargetOrder(null);
-    } catch (err) {
-      console.warn('[my-orders] cancel failed:', err);
-      showToast('Could not cancel order', {
-        type: 'error',
-        description: 'Please try again in a moment.',
-      });
-    } finally {
-      setCancelling(false);
-    }
+
+      try {
+        await blink.db.orders.delete(id);
+      } catch (err) {
+        console.warn('[my-orders] background delete failed:', err);
+      }
+    })();
   }, [cancelTargetOrder, showToast]);
 
   const filteredOrders = useMemo(() => {
@@ -358,7 +360,6 @@ export default function MyOrdersScreen() {
         confirmText="Cancel Pickup"
         cancelText="Keep It"
         orderId={cancelTargetOrder?.id}
-        loading={cancelling}
         onClose={() => setCancelTargetOrder(null)}
         onConfirm={confirmCancel}
       />
