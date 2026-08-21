@@ -13,27 +13,69 @@ export interface DriverVerification {
   insurance_filename?: string;
   status: 'pending' | 'approved' | 'rejected';
   admin_note?: string;
+  rejection_reason?: string;
   order_scope: string;
   submitted_at: string;
   reviewed_at?: string;
 }
 
-const VERIF_STORAGE_KEY = '@pickuprunner_static_verifications_v1';
+const VERIF_STORAGE_KEY = '@pickuprunner_static_verifications_v2';
 
 const INITIAL_VERIFICATIONS: DriverVerification[] = [
   {
-    id: 'verif_sample_101',
-    user_id: 'usr_static_driver_101',
+    id: 'v1',
+    user_id: 'u1',
     driver_name: 'Alex Driver',
     driver_email: 'driver@pickuprunner.com',
-    license_url: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500',
-    license_filename: 'driver_license.jpg',
-    insurance_url: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=500',
-    insurance_filename: 'auto_insurance.pdf',
+    license_url: 'https://images.unsplash.com/photo-1519074069444-1ba4fff66d8c?w=500&q=70',
+    license_filename: "driver_license.jpg",
+    insurance_url: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=500&q=70',
+    insurance_filename: 'insurance_card.pdf',
     status: 'approved',
     order_scope: ORDER_SCOPE,
-    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
-    reviewed_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
+    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
+    reviewed_at: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
+  },
+  {
+    id: 'v2',
+    user_id: 'u2',
+    driver_name: 'Marcus Reyes',
+    driver_email: 'marcus.r@mailbox.io',
+    license_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994ba43?w=500&q=70',
+    license_filename: "driver_license.jpg",
+    insurance_url: 'https://images.unsplash.com/photo-1561655256-7295ab3b059f?w=500&q=70',
+    insurance_filename: 'insurance_card.pdf',
+    status: 'pending',
+    order_scope: ORDER_SCOPE,
+    submitted_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+  },
+  {
+    id: 'v3',
+    user_id: 'u3',
+    driver_name: 'Priya Sharma',
+    driver_email: 'priya.sharma@gmail.com',
+    license_url: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=500&q=70',
+    license_filename: "driver_license.jpg",
+    insurance_url: 'https://images.unsplash.com/photo-1554224154-22dec5ec8810?w=500&q=70',
+    insurance_filename: 'insurance_card.pdf',
+    status: 'rejected',
+    admin_note: 'Insurance document is expired. Please upload a current insurance card showing valid coverage dates.',
+    order_scope: ORDER_SCOPE,
+    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+    reviewed_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+  },
+  {
+    id: 'v4',
+    user_id: 'u4',
+    driver_name: 'Diego Martinez',
+    driver_email: 'diego.m@protonmail.com',
+    license_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&q=70',
+    license_filename: "driver_license.jpg",
+    insurance_url: 'https://images.unsplash.com/photo-1556742502-ec7c0e9f34b1?w=500&q=70',
+    insurance_filename: 'insurance_card.pdf',
+    status: 'pending',
+    order_scope: ORDER_SCOPE,
+    submitted_at: new Date(Date.now() - 1000 * 60 * 32).toISOString(),
   },
 ];
 
@@ -59,6 +101,33 @@ async function saveStoredVerifications(items: DriverVerification[]): Promise<voi
   }
 }
 
+const DRIVER_PROFILES: Record<string, { phone: string; role: string; registeredAt: string; stripeAccountId: string }> = {
+  u1: {
+    phone: '(555) 218-4471',
+    role: 'driver',
+    registeredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9).toISOString(),
+    stripeAccountId: 'acct_1Q8zXyPRowNr2K',
+  },
+  u2: {
+    phone: '(555) 902-1133',
+    role: 'driver',
+    registeredAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+    stripeAccountId: 'acct_1Q8zXyPR92Md0K',
+  },
+  u3: {
+    phone: '(555) 667-2298',
+    role: 'driver',
+    registeredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
+    stripeAccountId: 'acct_1Q8zXyPR73Bn2L',
+  },
+  u4: {
+    phone: '(555) 445-7781',
+    role: 'driver',
+    registeredAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+    stripeAccountId: 'acct_1Q8zXyPR55Xc9P',
+  },
+};
+
 export function useMyVerification(userId: string | undefined) {
   return useQuery({
     queryKey: ['driver_verification', userId],
@@ -76,15 +145,20 @@ export function useDriverProfile(userId: string | undefined) {
     queryKey: ['driver_profile', userId],
     enabled: !!userId,
     queryFn: async () => {
-      return {
-        id: userId || 'usr_static_driver_101',
-        email: 'driver@pickuprunner.com',
-        displayName: 'Alex Driver',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-        phone: '(555) 987-6543',
-        createdAt: new Date().toISOString(),
+      const p = (userId && DRIVER_PROFILES[userId]) || {
+        phone: '(555) 218-4471',
         role: 'driver',
-        stripeAccountId: 'acct_static_12345',
+        registeredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
+        stripeAccountId: 'acct_1Q8zXyPRowNr2K',
+      };
+      return {
+        id: userId || 'u1',
+        email: 'driver@pickuprunner.com',
+        displayName: 'Driver User',
+        phone: p.phone,
+        createdAt: p.registeredAt,
+        role: p.role,
+        stripeAccountId: p.stripeAccountId,
       };
     },
     staleTime: 60_000,
@@ -158,7 +232,7 @@ export function useReviewVerification() {
       adminNote,
     }: {
       id: string;
-      status: 'approved' | 'rejected';
+      status: 'pending' | 'approved' | 'rejected';
       adminNote?: string;
     }) => {
       const items = await getStoredVerifications();
@@ -166,8 +240,8 @@ export function useReviewVerification() {
       if (!target) throw new Error('Verification record not found');
 
       target.status = status;
-      target.admin_note = adminNote;
-      target.reviewed_at = new Date().toISOString();
+      target.admin_note = adminNote !== undefined ? adminNote : (status === 'pending' ? '' : target.admin_note);
+      target.reviewed_at = status === 'pending' ? undefined : new Date().toISOString();
 
       await saveStoredVerifications(items);
       return target;

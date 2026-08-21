@@ -15,6 +15,7 @@ import {
   Bell,
   CreditCard,
   DollarSign,
+  Shield,
 } from '@blinkdotnew/mobile-ui';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -368,6 +369,16 @@ export default function ProfileScreen() {
           currentRole="driver"
           onChooseRoleAgain={handleChooseRole}
         />
+
+        <ProfileSection title="ADMINISTRATION">
+          <ProfileActionRow
+            icon={<Shield size={18} color={GOLD} />}
+            iconBg="rgba(255, 227, 153, 0.15)"
+            title="Admin Review Panel"
+            subtitle="Driver license, insurance & background check approvals"
+            onPress={() => router.push('/(tabs)/admin')}
+          />
+        </ProfileSection>
 
         <ProfileSupportSection supportEmail={APP_CONFIG.STORE_EMAIL} />
 

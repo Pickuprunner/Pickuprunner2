@@ -4,252 +4,574 @@ import {
   StyleSheet,
   Pressable,
   ActivityIndicator,
-  Alert,
   TextInput,
+  View,
+  Text,
 } from 'react-native';
-import {
-  YStack,
-  XStack,
-  SizableText,
-  Card,
-  Badge,
-  XCircle,
-  CheckCircle,
-  AlertCircle,
-  User,
-  Phone,
-  CreditCard,
-  Clock,
-  DollarSign,
-} from '@blinkdotnew/mobile-ui';
+import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useReviewVerification, useDriverProfile, type DriverVerification } from '@/lib/verification';
 import { DocumentPreviewRow } from '@/components/DocumentViewer';
+import { CustomConfirmModal, type ConfirmModalVariant } from '@/components/core';
+import { AdminRejectReasonModal } from './AdminRejectReasonModal';
 import { colors, spacing, borderRadius } from '@/constants/design';
 
-function relDate(iso: string) {
+function relDate(iso?: string) {
+  if (!iso) return '';
   const d = Date.now() - new Date(iso).getTime();
   const m = Math.floor(d / 60000);
+  if (m < 1) return 'just now';
   if (m < 60) return `${m}m ago`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  const days = Math.floor(h / 24);
+  if (days < 7) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
 }
 
-function joinDate(iso?: string) {
-  if (!iso) return null;
+function fmtDate(iso?: string) {
+  if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   } catch {
-    return null;
+    return '—';
   }
-}
-
-/** Info pill for driver profile details */
-function InfoPill({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | null | undefined;
-}) {
-  if (!value) return null;
-  return (
-    <XStack
-      gap="$1"
-      alignItems="center"
-      backgroundColor="$color3"
-      borderRadius={8}
-      paddingHorizontal={8}
-      paddingVertical={4}
-      borderWidth={1}
-      borderColor="$color5"
-    >
-      {icon}
-      <SizableText size="$1" color="$color10">{label}:</SizableText>
-      <SizableText size="$1" fontWeight="600" color="$color12" numberOfLines={1}>
-        {value}
-      </SizableText>
-    </XStack>
-  );
 }
 
 export default function VerifCard({ v }: { v: DriverVerification }) {
   const review = useReviewVerification();
   const { data: profile } = useDriverProfile(v.user_id);
+  const [open, setOpen] = useState(v.status === 'pending');
   const [rejNote, setRejNote] = useState('');
   const [showReject, setShowReject] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
+
+  const [confirmConfig, setConfirmConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: ConfirmModalVariant;
+    iconName: keyof typeof MaterialIcons.glyphMap;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
 
   const isPending = v.status === 'pending';
+  const isApproved = v.status === 'approved';
+  const isRejected = v.status === 'rejected';
 
-  const doReview = async (action: 'approved' | 'rejected', note?: string) => {
-    const msg = action === 'approved'
-      ? `Approve docs for ${v.driver_name}?`
-      : `Reject docs for ${v.driver_name}?${note ? `\n\nReason: ${note}` : ''}`;
-    const run = async () => {
-      setBusy(true);
-      try {
-        await review.mutateAsync({ id: v.id, status: action, adminNote: note });
-        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
-        setShowReject(false); setRejNote('');
-      } finally { setBusy(false); }
-    };
-    if (Platform.OS === 'web') { if (window.confirm(msg)) run(); }
-    else Alert.alert(action === 'approved' ? 'Approve' : 'Reject', msg, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: action === 'approved' ? 'Approve' : 'Reject', style: action === 'rejected' ? 'destructive' : 'default', onPress: run },
-    ]);
+  const statusColor = isApproved ? '#00E297' : isRejected ? '#FFB4AB' : '#FFE399';
+  const statusBg = isApproved
+    ? 'rgba(0, 226, 151, 0.12)'
+    : isRejected
+    ? 'rgba(255, 180, 171, 0.12)'
+    : 'rgba(244, 195, 0, 0.12)';
+  const statusBorder = isApproved
+    ? 'rgba(0, 226, 151, 0.35)'
+    : isRejected
+    ? 'rgba(255, 180, 171, 0.35)'
+    : 'rgba(244, 195, 0, 0.35)';
+  const statusIcon: keyof typeof MaterialIcons.glyphMap = isApproved
+    ? 'check-circle'
+    : isRejected
+    ? 'cancel'
+    : 'hourglass-top';
+
+  const initials = (v.driver_name || 'D')
+    .split(' ')
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+  const doReview = (action: 'approved' | 'rejected' | 'pending', note?: string) => {
+    const isApprove = action === 'approved';
+    const isReject = action === 'rejected';
+
+    setConfirmConfig({
+      visible: true,
+      title: isApprove ? 'Approve Documents' : isReject ? 'Reject Documents' : 'Reopen Document Review',
+      message: isApprove
+        ? `Are you sure you want to approve driver documents for ${v.driver_name}?`
+        : isReject
+        ? `Are you sure you want to reject documents for ${v.driver_name}?`
+        : `Reopen document review process for ${v.driver_name}?`,
+      confirmText: isApprove ? 'Approve' : isReject ? 'Reject' : 'Reopen',
+      variant: isApprove ? 'success' : isReject ? 'danger' : 'info',
+      iconName: isApprove ? 'verified-user' : isReject ? 'cancel' : 'lock-open',
+      onConfirm: async () => {
+        setBusy(true);
+        try {
+          await review.mutateAsync({ id: v.id, status: action, adminNote: note });
+          if (Platform.OS !== 'web') {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          }
+          setShowReject(false);
+          setRejNote('');
+          setConfirmConfig(null);
+        } finally {
+          setBusy(false);
+        }
+      },
+    });
   };
 
   return (
-    <Card
-      backgroundColor="$color2" borderRadius="$4" borderWidth={1} padding="$4" marginBottom="$3"
-      borderColor={v.status === 'approved' ? 'rgba(22,163,74,0.3)' : v.status === 'rejected' ? 'rgba(220,38,38,0.3)' : '$borderColor'}
-    >
-      <YStack gap="$3">
-        <XStack justifyContent="space-between" alignItems="flex-start">
-          <YStack flex={1} marginRight="$2">
-            <SizableText size="$4" fontWeight="700" color="$color12">{v.driver_name}</SizableText>
-            <SizableText size="$2" color="$color9">{v.driver_email}</SizableText>
-          </YStack>
-          <XStack gap="$2" alignItems="center">
-            <Badge
-              variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'error' : 'warning'}
-            >
+    <View style={[styles.card, isPending ? styles.cardActionable : styles.cardResolved]}>
+      {/* Card Header */}
+      <Pressable
+        onPress={() => setOpen((prev) => !prev)}
+        style={styles.headerRow}
+      >
+        <View style={styles.headerLeft}>
+          <LinearGradient
+            colors={[colors.primaryContainer, '#262A34']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatar}
+          >
+            <Text style={styles.avatarText}>{initials}</Text>
+          </LinearGradient>
+
+          <View style={styles.titleCol}>
+            <Text style={styles.driverName} numberOfLines={1}>
+              {v.driver_name}
+            </Text>
+            <View style={styles.timeRow}>
+              <MaterialIcons name="schedule" size={13} color={colors.outline} />
+              <Text style={styles.timeText} numberOfLines={1}>
+                Submitted {relDate(v.submitted_at)} · {v.driver_email || '—'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.headerRight}>
+          <View style={[styles.statusTag, { backgroundColor: statusBg, borderColor: statusBorder }]}>
+            <MaterialIcons name={statusIcon} size={13} color={statusColor} />
+            <Text style={[styles.statusTagText, { color: statusColor }]}>
               {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
-            </Badge>
-            <SizableText size="$1" color="$color9">{relDate(v.submitted_at)}</SizableText>
-          </XStack>
-        </XStack>
+            </Text>
+          </View>
 
-        {profile && (
-          <Pressable onPress={() => setShowProfile((s) => !s)} hitSlop={6}>
-            <XStack gap="$1" alignItems="center">
-              <User size={12} color="$color9" />
-              <SizableText size="$1" color="$blue9" fontWeight="600">
-                {showProfile ? 'Hide profile' : 'View profile'}
-              </SizableText>
-            </XStack>
-          </Pressable>
-        )}
-        {profile && showProfile && (
-          <XStack gap="$2" flexWrap="wrap">
-            <InfoPill
-              icon={<Phone size={10} color="$color9" />}
-              label="Phone"
-              value={profile.phone || 'Not provided'}
-            />
-            <InfoPill
-              icon={<Clock size={10} color="$color9" />}
-              label="Joined"
-              value={joinDate(profile.createdAt)}
-            />
-            <InfoPill
-              icon={<User size={10} color="$color9" />}
-              label="Role"
-              value={profile.role || 'N/A'}
-            />
-            {profile.stripeAccountId && (
-              <InfoPill
-                icon={<CreditCard size={10} color="$green9" />}
-                label="Stripe"
-                value={profile.stripeAccountId.slice(0, 14) + '...'}
-              />
-            )}
-          </XStack>
-        )}
-
-        <YStack gap="$1">
-          <SizableText size="$1" fontWeight="700" color="$color9" letterSpacing={0.3}>
-            UPLOADED DOCUMENTS
-          </SizableText>
-          <DocumentPreviewRow
-            licenseUrl={v.license_url}
-            licenseFilename={v.license_filename}
-            insuranceUrl={v.insurance_url}
-            insuranceFilename={v.insurance_filename}
+          <MaterialIcons
+            name={open ? 'expand-less' : 'expand-more'}
+            size={20}
+            color={open ? colors.primary : colors.outline}
           />
-        </YStack>
+        </View>
+      </Pressable>
 
-        {v.admin_note && (
-          <XStack gap="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
-            <AlertCircle size={14} color="$color9" />
-            <SizableText size="$2" color="$color10" flex={1}>{v.admin_note}</SizableText>
-          </XStack>
-        )}
+      {/* Expanded Content */}
+      {open && (
+        <View style={styles.expandedContent}>
+          {/* Rejection Note if rejected */}
+          {isRejected && (v.admin_note || v.rejection_reason) && (
+            <View style={styles.rejectNoteBox}>
+              <View style={styles.rejectNoteTitleRow}>
+                <MaterialIcons name="block" size={14} color="#FFB4AB" />
+                <Text style={styles.rejectNoteTitle}>Rejection Reason</Text>
+              </View>
+              <Text style={styles.rejectNoteText}>{v.admin_note || v.rejection_reason}</Text>
+            </View>
+          )}
 
-        {isPending && (
-          <YStack gap="$2">
-            {showReject && (
-              <XStack backgroundColor="$color3" borderRadius={12} borderWidth={1} borderColor="$color5" paddingHorizontal="$3" alignItems="center">
-                <TextInput value={rejNote} onChangeText={setRejNote}
-                  placeholder="Rejection reason (optional)" placeholderTextColor={colors.textTertiary}
-                  style={[cardStyles.input, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}]} />
-              </XStack>
-            )}
-            <XStack gap="$2">
-              {showReject ? (
-                <>
-                  <Pressable onPress={() => setShowReject(false)}
-                    style={({ pressed }) => [cardStyles.btn, cardStyles.btnOutline, pressed && { opacity: 0.7 }]}>
-                    <SizableText size="$2" fontWeight="700" color="$color10">Cancel</SizableText>
-                  </Pressable>
-                  <Pressable onPress={() => doReview('rejected', rejNote.trim() || undefined)} disabled={busy}
-                    style={({ pressed }) => [cardStyles.btn, cardStyles.btnReject, pressed && { opacity: 0.7 }]}>
-                    {busy ? <ActivityIndicator size="small" color="white" /> : (
-                      <XStack gap="$1" alignItems="center">
-                        <XCircle size={14} color="white" />
-                        <SizableText size="$2" fontWeight="700" color="white">Confirm Reject</SizableText>
-                      </XStack>
-                    )}
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  <Pressable onPress={() => setShowReject(true)}
-                    style={({ pressed }) => [cardStyles.btn, cardStyles.btnRejectOutline, pressed && { opacity: 0.7 }]}>
-                    <XStack gap="$1" alignItems="center">
-                      <XCircle size={14} color="$red9" />
-                      <SizableText size="$2" fontWeight="700" color="$red9">Reject</SizableText>
-                    </XStack>
-                  </Pressable>
-                  <Pressable onPress={() => doReview('approved')} disabled={busy}
-                    style={({ pressed }) => [cardStyles.btn, cardStyles.btnApprove, pressed && { opacity: 0.7 }]}>
-                    {busy ? <ActivityIndicator size="small" color="white" /> : (
-                      <XStack gap="$1" alignItems="center">
-                        <CheckCircle size={14} color="white" />
-                        <SizableText size="$2" fontWeight="700" color="white">Approve</SizableText>
-                      </XStack>
-                    )}
-                  </Pressable>
-                </>
-              )}
-            </XStack>
-          </YStack>
-        )}
-      </YStack>
-    </Card>
+          {/* Reviewed timestamp banner */}
+          {v.reviewed_at && (
+            <View style={styles.reviewedBox}>
+              <View style={styles.reviewedTitleRow}>
+                <MaterialIcons name="history" size={14} color={colors.primary} />
+                <Text style={styles.reviewedTitle}>Reviewed {relDate(v.reviewed_at)}</Text>
+              </View>
+              <Text style={styles.reviewedText}>Decision recorded in compliance log.</Text>
+            </View>
+          )}
+
+          {/* Profile Detail Grid (2x2) */}
+          <View style={styles.detailGrid}>
+            <View style={styles.detailItem}>
+              <View style={styles.detailLabelRow}>
+                <MaterialIcons name="call" size={13} color={colors.outline} />
+                <Text style={styles.detailLabel}>PHONE</Text>
+              </View>
+              <Text style={styles.detailValue}>{profile?.phone || '—'}</Text>
+            </View>
+
+            <View style={styles.detailItem}>
+              <View style={styles.detailLabelRow}>
+                <MaterialIcons name="badge" size={13} color={colors.outline} />
+                <Text style={styles.detailLabel}>ROLE</Text>
+              </View>
+              <Text style={[styles.detailValue, { textTransform: 'capitalize' }]}>
+                {profile?.role || 'driver'}
+              </Text>
+            </View>
+
+            <View style={styles.detailItem}>
+              <View style={styles.detailLabelRow}>
+                <MaterialIcons name="event" size={13} color={colors.outline} />
+                <Text style={styles.detailLabel}>REGISTERED</Text>
+              </View>
+              <Text style={styles.detailValue}>{fmtDate(profile?.createdAt)}</Text>
+            </View>
+
+            <View style={styles.detailItem}>
+              <View style={styles.detailLabelRow}>
+                <MaterialIcons name="credit-card" size={13} color={colors.outline} />
+                <Text style={styles.detailLabel}>STRIPE ACCOUNT</Text>
+              </View>
+              <Text style={[styles.detailValue, styles.monospace]}>
+                {profile?.stripeAccountId || '—'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Submitted Documents Row */}
+          <View style={styles.docsSection}>
+            <View style={styles.docsSectionHeader}>
+              <MaterialIcons name="folder-open" size={15} color={colors.onSurfaceVariant} />
+              <Text style={styles.docsSectionTitle}>Submitted Documents</Text>
+            </View>
+
+            <DocumentPreviewRow
+              licenseUrl={v.license_url}
+              licenseFilename={v.license_filename}
+              insuranceUrl={v.insurance_url}
+              insuranceFilename={v.insurance_filename}
+            />
+          </View>
+
+          {/* Actions */}
+          {isPending ? (
+            <View style={styles.actionsRow}>
+              <Pressable
+                onPress={() => doReview('approved')}
+                disabled={busy}
+                style={({ pressed }) => [styles.btn, styles.btnApprove, pressed && { opacity: 0.85 }]}
+              >
+                {busy ? (
+                  <ActivityIndicator size="small" color="#00E297" />
+                ) : (
+                  <>
+                    <MaterialIcons name="check" size={17} color="#00E297" />
+                    <Text style={styles.btnApproveText}>Approve</Text>
+                  </>
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={() => setShowReject(true)}
+                disabled={busy}
+                style={({ pressed }) => [styles.btn, styles.btnReject, pressed && { opacity: 0.85 }]}
+              >
+                <MaterialIcons name="close" size={17} color="#FF6B6B" />
+                <Text style={styles.btnRejectText}>Reject</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.actionsRow}>
+              <Pressable
+                onPress={() => doReview('pending')}
+                disabled={busy}
+                style={({ pressed }) => [styles.btn, styles.btnGhost, pressed && { opacity: 0.7 }]}
+              >
+                <MaterialIcons name="lock-open" size={16} color={colors.onSurfaceVariant} />
+                <Text style={styles.btnGhostText}>Reopen Review</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Reject Reason Modal */}
+      <AdminRejectReasonModal
+        visible={showReject}
+        title="Reject Documents"
+        driverName={v.driver_name}
+        itemType="Driver License & Insurance"
+        loading={busy}
+        onClose={() => setShowReject(false)}
+        onConfirm={async (note) => {
+          setBusy(true);
+          try {
+            await review.mutateAsync({ id: v.id, status: 'rejected', adminNote: note || undefined });
+            if (Platform.OS !== 'web') {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+            }
+            setShowReject(false);
+          } catch (e: any) {
+            if (Platform.OS !== 'web') {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+            }
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+
+      {confirmConfig && (
+        <CustomConfirmModal
+          visible={confirmConfig.visible}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmText={confirmConfig.confirmText}
+          cancelText="Cancel"
+          variant={confirmConfig.variant}
+          iconName={confirmConfig.iconName}
+          loading={busy}
+          onClose={() => setConfirmConfig(null)}
+          onConfirm={confirmConfig.onConfirm}
+        />
+      )}
+    </View>
   );
 }
 
-const cardStyles = StyleSheet.create({
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 18,
+    marginBottom: 12,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  cardActionable: {
+    borderColor: 'rgba(244, 195, 0, 0.35)',
+  },
+  cardResolved: {
+    opacity: 0.85,
+  },
+  actionableIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: '15%',
+    bottom: '15%',
+    width: 3.5,
+    backgroundColor: '#FFE399',
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+    gap: 12,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  avatarText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.onPrimaryContainer,
+  },
+  titleCol: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  driverName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.onSurface,
+    letterSpacing: -0.2,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timeText: {
+    fontSize: 12,
+    color: colors.outline,
+    flexShrink: 1,
+  },
+  headerRight: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  statusTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    gap: 4,
+  },
+  statusTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  expandedContent: {
+    paddingTop: 16,
+    gap: 14,
+  },
+  rejectNoteBox: {
+    backgroundColor: 'rgba(255, 180, 171, 0.10)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 180, 171, 0.3)',
+    padding: 14,
+    gap: 6,
+  },
+  rejectNoteTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rejectNoteTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFB4AB',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  rejectNoteText: {
+    fontSize: 13,
+    color: colors.onSurfaceVariant,
+    lineHeight: 18,
+  },
+  reviewedBox: {
+    backgroundColor: 'rgba(0, 102, 255, 0.10)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 102, 255, 0.3)',
+    padding: 14,
+    gap: 4,
+  },
+  reviewedTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reviewedTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  reviewedText: {
+    fontSize: 12.5,
+    color: colors.onSurfaceVariant,
+  },
+  detailGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    backgroundColor: '#0A0E17',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    padding: 14,
+    gap: 12,
+  },
+  detailItem: {
+    width: '46%',
+    gap: 4,
+  },
+  detailLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  detailLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.outline,
+    letterSpacing: 0.5,
+  },
+  detailValue: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: colors.onSurface,
+  },
+  monospace: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11.5,
+  },
+  docsSection: {
+    gap: 10,
+  },
+  docsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  docsSectionTitle: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: colors.outline,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  actionsContainer: {
+    marginTop: 4,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
   btn: {
     flex: 1,
+    height: 44,
+    borderRadius: borderRadius.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1.5,
-    gap: 3,
+    gap: 6,
+    paddingHorizontal: 16,
+    borderWidth: 1,
   },
-  btnOutline: { borderColor: colors.border, backgroundColor: 'transparent' },
-  btnRejectOutline: { borderColor: colors.error, backgroundColor: 'transparent' },
-  btnReject: { borderColor: colors.error, backgroundColor: colors.error },
-  btnApprove: { borderColor: '#16a34a', backgroundColor: '#16a34a' },
-  input: { flex: 1, height: 44, fontSize: 14, color: colors.text },
+  btnApprove: {
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderColor: 'rgba(0, 226, 151, 0.30)',
+  },
+  btnApproveText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#00E297',
+  },
+  btnReject: {
+    backgroundColor: 'rgba(239, 68, 68, 0.10)',
+    borderColor: 'rgba(239, 68, 68, 0.28)',
+  },
+  btnRejectText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#FF6B6B',
+  },
+  btnGhost: {
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+  },
+  btnGhostText: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#dfe2ef',
+  },
 });

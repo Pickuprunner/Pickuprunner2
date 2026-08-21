@@ -1,95 +1,80 @@
-import React, { useState } from 'react';
-import { ScrollView, RefreshControl, View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
 import {
-  SafeArea,
-  YStack,
-  XStack,
-  SizableText,
-  Card,
-  Badge,
-  AppHeader,
-  BlinkToggleGroup,
-  Shield,
-  ShieldCheck,
-  Users,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  FileText,
-} from '@blinkdotnew/mobile-ui';
+  ScrollView,
+  RefreshControl,
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  Keyboard,
+} from 'react-native';
+import { router } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_CONFIG } from '@/lib/config';
 import { useAllVerifications } from '@/lib/verification';
 import { useAllBackgroundChecks } from '@/lib/backgroundCheck';
-import AdminVerificationPanel from '@/components/AdminVerificationPanel';
-import AdminBGCheckPanel from '@/components/AdminBGCheckPanel';
-import AdminDocReviewPanel from '@/components/admin/AdminDocReviewPanel';
-import AdminBGReviewPanel from '@/components/admin/AdminBGReviewPanel';
-
-type Tab = 'overview' | 'docs' | 'bgcheck';
-
-const BLUE = APP_CONFIG.PRIMARY_COLOR;
-const YELLOW = APP_CONFIG.SECONDARY_COLOR;
-
-function StatCard({
-  label,
-  value,
-  color,
-  icon,
-}: {
-  label: string;
-  value: number;
-  color: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <Card
-      flex={1}
-      padding="$3"
-      borderRadius="$4"
-      backgroundColor="$color2"
-      borderWidth={1}
-      borderColor="$color4"
-    >
-      <YStack gap="$1" alignItems="center">
-        {icon}
-        <SizableText size="$6" fontWeight="900" color="$color12">{value}</SizableText>
-        <SizableText size="$1" color="$color9" textAlign="center" fontWeight="600">{label}</SizableText>
-      </YStack>
-    </Card>
-  );
-}
+import { CustomHeader, CustomLoading } from '@/components/core';
+import { useToast } from '@/components/core/CustomToast';
+import {
+  AdminOverviewPanel,
+  AdminDocReviewPanel,
+  AdminBGReviewPanel,
+  AdminTabToggle,
+  type AdminTab,
+  type AdminDriverSummary,
+} from '@/components/admin';
+import { colors, gradients, spacing, borderRadius } from '@/constants/design';
 
 export default function AdminScreen() {
+  const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
   const { data: verifications = [], isLoading: loadingDocs, refetch: refetchDocs } = useAllVerifications();
   const { data: bgChecks = [], isLoading: loadingBG, refetch: refetchBG } = useAllBackgroundChecks();
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+  useEffect(() => {
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setIsSearchFocused(false);
+    });
+    return () => hideSub.remove();
+  }, []);
+
+  const isSearching = isSearchFocused || searchQuery.trim().length > 0;
 
   const isLoading = loadingDocs || loadingBG;
-  const refetch = () => { refetchDocs(); refetchBG(); };
+  const refetch = async () => {
+    await Promise.all([refetchDocs(), refetchBG()]);
+    showToast('Compliance data refreshed', { type: 'success' });
+  };
 
-  // Stats
+  // Document Stats (unfiltered for accurate overview indicators)
   const pendingDocs = verifications.filter((v) => v.status === 'pending').length;
   const approvedDocs = verifications.filter((v) => v.status === 'approved').length;
   const rejectedDocs = verifications.filter((v) => v.status === 'rejected').length;
 
+  // Background Check Stats (unfiltered for accurate overview indicators)
   const pendingBG = bgChecks.filter((c) => c.status === 'pending' || c.status === 'in_review').length;
   const approvedBG = bgChecks.filter((c) => c.status === 'approved').length;
   const rejectedBG = bgChecks.filter((c) => c.status === 'rejected').length;
 
   const totalPending = pendingDocs + pendingBG;
 
-  // Overview: unique drivers across both tables
+  // Aggregate Unique Drivers Roster
   const driverMap = new Map<string, {
     name: string;
     email?: string;
     docStatus?: string;
     bgStatus?: string;
   }>();
+
   verifications.forEach((v) => {
     driverMap.set(v.user_id, { name: v.driver_name, email: v.driver_email, docStatus: v.status });
   });
+
   bgChecks.forEach((c) => {
     const existing = driverMap.get(c.user_id);
     if (existing) {
@@ -98,273 +83,201 @@ export default function AdminScreen() {
       driverMap.set(c.user_id, { name: c.driver_name, email: c.driver_email, bgStatus: c.status });
     }
   });
-  const drivers = Array.from(driverMap.entries()).map(([uid, d]) => ({ uid, ...d }));
+
+  const drivers: AdminDriverSummary[] = Array.from(driverMap.entries()).map(([uid, d]) => ({
+    uid,
+    ...d,
+  }));
+
+  // Live Filtered Datasets
+  const q = searchQuery.trim().toLowerCase();
+  const filteredDrivers = q
+    ? drivers.filter(
+        (d) =>
+          d.name.toLowerCase().includes(q) ||
+          d.email?.toLowerCase().includes(q) ||
+          d.docStatus?.toLowerCase().includes(q) ||
+          d.bgStatus?.toLowerCase().includes(q)
+      )
+    : drivers;
+
+  const filteredVerifications = q
+    ? verifications.filter(
+        (v) =>
+          v.driver_name.toLowerCase().includes(q) ||
+          v.driver_email?.toLowerCase().includes(q) ||
+          v.status.toLowerCase().includes(q) ||
+          v.admin_note?.toLowerCase().includes(q)
+      )
+    : verifications;
+
+  const filteredBGChecks = q
+    ? bgChecks.filter(
+        (c) =>
+          c.driver_name.toLowerCase().includes(q) ||
+          c.driver_email?.toLowerCase().includes(q) ||
+          c.status.toLowerCase().includes(q) ||
+          c.admin_note?.toLowerCase().includes(q) ||
+          c.external_ref?.toLowerCase().includes(q) ||
+          c.city?.toLowerCase().includes(q) ||
+          c.state?.toLowerCase().includes(q)
+      )
+    : bgChecks;
+
+  const handleNavigateWithFilter = (tab: AdminTab, driverName: string) => {
+    setSearchQuery(driverName);
+    setActiveTab(tab);
+  };
 
   return (
-    <SafeArea>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {/* Ambient Hero Glow */}
       <LinearGradient
-        colors={[APP_CONFIG.GRADIENT_START, APP_CONFIG.GRADIENT_MID, APP_CONFIG.GRADIENT_END]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
-        <XStack justifyContent="space-between" alignItems="center">
-          <YStack>
-            <SizableText size="$7" fontWeight="900" color="white" letterSpacing={-0.5}>
-              Admin Panel
-            </SizableText>
-            <SizableText size="$2" color="rgba(255,255,255,0.65)" marginTop={2}>
-              Driver review &amp; approvals
-            </SizableText>
-          </YStack>
-          {totalPending > 0 && (
+        colors={gradients.heroGlow}
+        locations={gradients.heroGlowLocations}
+        style={[styles.heroGlow, { height: 320 + insets.top }]}
+        pointerEvents="none"
+      />
+
+      {/* ── Custom Header with Integrated Search ── */}
+      <CustomHeader
+        title="Admin Panel"
+        subtitle="Driver Review & Compliance"
+        subtitleHighlight={`${APP_CONFIG.APP_NAME} •`}
+        variant="transparent"
+        showBack
+        backBtnVariant="plain"
+        onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/orders'))}
+        backIcon={<MaterialIcons name="chevron-left" size={28} color={colors.onSurface} />}
+        showSearch
+        search={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchFocus={() => setIsSearchFocused(true)}
+        onSearchBlur={() => setIsSearchFocused(false)}
+        searchPlaceholder="Search drivers, emails, case IDs..."
+        showAvatar={false}
+        borderBottom
+        rightContent={
+          totalPending > 0 ? (
             <View style={styles.alertBadge}>
+              <MaterialIcons name="notifications-active" size={13} color={colors.primary} />
               <Text style={styles.alertBadgeText}>{totalPending} PENDING</Text>
             </View>
-          )}
-        </XStack>
-      </LinearGradient>
+          ) : undefined
+        }
+      />
 
+      {/* ── Main Content Scroll ── */}
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={BLUE} />
+          <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />
         }
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 16) + 32 },
+        ]}
       >
-        <YStack padding="$4" gap="$4">
-
-          <BlinkToggleGroup
-            options={[
-              { label: 'Overview', value: 'overview' },
-              { label: `Docs${pendingDocs > 0 ? ` (${pendingDocs})` : ''}`, value: 'docs' },
-              { label: `BG Check${pendingBG > 0 ? ` (${pendingBG})` : ''}`, value: 'bgcheck' },
-            ]}
+        {/* Tab Switcher */}
+        <View style={styles.tabContainer}>
+          <AdminTabToggle
             value={activeTab}
-            onValueChange={(v) => setActiveTab(v as Tab)}
+            onChange={setActiveTab}
+            pendingDocs={pendingDocs}
+            pendingBG={pendingBG}
           />
+        </View>
 
-          {activeTab === 'overview' && (
-            <YStack gap="$4">
+        {/* Tab Content */}
+        {isLoading && verifications.length === 0 && bgChecks.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <CustomLoading size="large" variant="card" text="Loading compliance data…" />
+          </View>
+        ) : (
+          <>
+            {activeTab === 'overview' && (
+              <AdminOverviewPanel
+                pendingDocs={pendingDocs}
+                approvedDocs={approvedDocs}
+                rejectedDocs={rejectedDocs}
+                pendingBG={pendingBG}
+                approvedBG={approvedBG}
+                rejectedBG={rejectedBG}
+                drivers={filteredDrivers}
+                onNavigateTab={setActiveTab}
+                onNavigateWithFilter={handleNavigateWithFilter}
+                isSearching={isSearching}
+                searchQuery={searchQuery}
+              />
+            )}
 
-              <YStack gap="$2">
-                <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
-                  DOCUMENT VERIFICATIONS
-                </SizableText>
-                <XStack gap="$2">
-                  <StatCard label="PENDING" value={pendingDocs} color={YELLOW}
-                    icon={<Clock size={18} color="$amber9" />} />
-                  <StatCard label="APPROVED" value={approvedDocs} color="#16a34a"
-                    icon={<CheckCircle size={18} color="$green9" />} />
-                  <StatCard label="REJECTED" value={rejectedDocs} color="#dc2626"
-                    icon={<XCircle size={18} color="$red9" />} />
-                </XStack>
-              </YStack>
+            {activeTab === 'docs' && (
+              <AdminDocReviewPanel
+                verifications={filteredVerifications}
+                isSearching={isSearching}
+                searchQuery={searchQuery}
+              />
+            )}
 
-              <YStack gap="$2">
-                <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
-                  BACKGROUND CHECKS
-                </SizableText>
-                <XStack gap="$2">
-                  <StatCard label="PENDING" value={pendingBG} color={YELLOW}
-                    icon={<Clock size={18} color="$amber9" />} />
-                  <StatCard label="APPROVED" value={approvedBG} color="#16a34a"
-                    icon={<ShieldCheck size={18} color="$green9" />} />
-                  <StatCard label="REJECTED" value={rejectedBG} color="#dc2626"
-                    icon={<XCircle size={18} color="$red9" />} />
-                </XStack>
-              </YStack>
-
-              <YStack gap="$2">
-                <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
-                  ALL DRIVERS ({drivers.length})
-                </SizableText>
-
-                {drivers.length === 0 && (
-                  <Card padding="$5" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-                    <YStack alignItems="center" gap="$2">
-                      <Users size={36} color="$color8" />
-                      <SizableText size="$3" color="$color10" textAlign="center">
-                        No drivers have submitted documents yet.
-                      </SizableText>
-                    </YStack>
-                  </Card>
-                )}
-
-                {drivers.map((d) => {
-                  const docOk = d.docStatus === 'approved';
-                  const bgOk = d.bgStatus === 'approved';
-                  const fullyCleared = docOk && bgOk;
-                  const anyRejected = d.docStatus === 'rejected' || d.bgStatus === 'rejected';
-                  const statusColor = fullyCleared ? '#16a34a' : anyRejected ? '#dc2626' : '#d97706';
-                  const statusLabel = fullyCleared ? 'Cleared' : anyRejected ? 'Action Needed' : 'Pending';
-                  const statusVariant = fullyCleared ? 'success' : anyRejected ? 'error' : 'warning';
-
-                  return (
-                    <Card
-                      key={d.uid}
-                      padding="$3"
-                      borderRadius="$4"
-                      backgroundColor="$color2"
-                      borderWidth={1}
-                      borderColor={
-                        fullyCleared ? 'rgba(22,163,74,0.25)' :
-                          anyRejected ? 'rgba(220,38,38,0.25)' :
-                            '$color4'
-                      }
-                    >
-                      <XStack justifyContent="space-between" alignItems="flex-start" marginBottom="$2">
-                        <YStack flex={1} marginRight="$2">
-                          <SizableText size="$4" fontWeight="700" color="$color12">{d.name}</SizableText>
-                          {d.email ? (
-                            <SizableText size="$2" color="$color9">{d.email}</SizableText>
-                          ) : null}
-                        </YStack>
-                        <Badge variant={statusVariant}>{statusLabel}</Badge>
-                      </XStack>
-
-                      <XStack gap="$3" flexWrap="wrap">
-                        <XStack
-                          gap="$1" alignItems="center"
-                          paddingHorizontal={8} paddingVertical={3}
-                          borderRadius={6}
-                          backgroundColor={
-                            d.docStatus === 'approved' ? 'rgba(22,163,74,0.1)' :
-                              d.docStatus === 'rejected' ? 'rgba(220,38,38,0.1)' :
-                                d.docStatus ? 'rgba(217,119,6,0.1)' :
-                                  'rgba(120,120,130,0.08)'
-                          }
-                          borderWidth={1}
-                          borderColor={
-                            d.docStatus === 'approved' ? 'rgba(22,163,74,0.3)' :
-                              d.docStatus === 'rejected' ? 'rgba(220,38,38,0.3)' :
-                                d.docStatus ? 'rgba(217,119,6,0.3)' :
-                                  'rgba(120,120,130,0.2)'
-                          }
-                        >
-                          <FileText size={11}
-                            color={
-                              d.docStatus === 'approved' ? '$green9' :
-                                d.docStatus === 'rejected' ? '$red9' :
-                                  d.docStatus ? '$amber9' : '$color8'
-                            }
-                          />
-                          <SizableText size="$1" fontWeight="700"
-                            color={
-                              d.docStatus === 'approved' ? '$green9' :
-                                d.docStatus === 'rejected' ? '$red9' :
-                                  d.docStatus ? '$amber9' : '$color8'
-                            }
-                          >
-                            {d.docStatus
-                              ? `Docs: ${d.docStatus.replace('_', ' ')}`
-                              : 'Docs: not submitted'}
-                          </SizableText>
-                        </XStack>
-
-                        <XStack
-                          gap="$1" alignItems="center"
-                          paddingHorizontal={8} paddingVertical={3}
-                          borderRadius={6}
-                          backgroundColor={
-                            d.bgStatus === 'approved' ? 'rgba(22,163,74,0.1)' :
-                              d.bgStatus === 'rejected' ? 'rgba(220,38,38,0.1)' :
-                                d.bgStatus ? 'rgba(217,119,6,0.1)' :
-                                  'rgba(120,120,130,0.08)'
-                          }
-                          borderWidth={1}
-                          borderColor={
-                            d.bgStatus === 'approved' ? 'rgba(22,163,74,0.3)' :
-                              d.bgStatus === 'rejected' ? 'rgba(220,38,38,0.3)' :
-                                d.bgStatus ? 'rgba(217,119,6,0.3)' :
-                                  'rgba(120,120,130,0.2)'
-                          }
-                        >
-                          <Shield size={11}
-                            color={
-                              d.bgStatus === 'approved' ? '$green9' :
-                                d.bgStatus === 'rejected' ? '$red9' :
-                                  d.bgStatus ? '$amber9' : '$color8'
-                            }
-                          />
-                          <SizableText size="$1" fontWeight="700"
-                            color={
-                              d.bgStatus === 'approved' ? '$green9' :
-                                d.bgStatus === 'rejected' ? '$red9' :
-                                  d.bgStatus ? '$amber9' : '$color8'
-                            }
-                          >
-                            {d.bgStatus
-                              ? `BG: ${d.bgStatus.replace('_', ' ')}`
-                              : 'BG: not submitted'}
-                          </SizableText>
-                        </XStack>
-                      </XStack>
-                    </Card>
-                  );
-                })}
-              </YStack>
-            </YStack>
-          )}
-
-          {activeTab === 'docs' && (
-            <YStack gap="$3">
-              {verifications.length === 0 ? (
-                <Card padding="$5" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-                  <YStack alignItems="center" gap="$2">
-                    <FileText size={36} color="$color8" />
-                    <SizableText size="$3" color="$color10" textAlign="center">
-                      No document submissions yet.
-                    </SizableText>
-                  </YStack>
-                </Card>
-              ) : (
-                <AdminDocReviewPanel verifications={verifications} />
-              )}
-            </YStack>
-          )}
-
-          {activeTab === 'bgcheck' && (
-            <YStack gap="$3">
-              {bgChecks.length === 0 ? (
-                <Card padding="$5" borderRadius="$4" backgroundColor="$color2" borderWidth={1} borderColor="$color4">
-                  <YStack alignItems="center" gap="$2">
-                    <Shield size={36} color="$color8" />
-                    <SizableText size="$3" color="$color10" textAlign="center">
-                      No background check submissions yet.
-                    </SizableText>
-                  </YStack>
-                </Card>
-              ) : (
-                <AdminBGReviewPanel bgChecks={bgChecks} />
-              )}
-            </YStack>
-          )}
-
-        </YStack>
+            {activeTab === 'bgcheck' && (
+              <AdminBGReviewPanel
+                bgChecks={filteredBGChecks}
+                isSearching={isSearching}
+                searchQuery={searchQuery}
+              />
+            )}
+          </>
+        )}
       </ScrollView>
-    </SafeArea>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 20,
+  root: {
+    flex: 1,
+    backgroundColor: '#0A0E17',
+    position: 'relative',
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+  },
+  scrollContent: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    gap: spacing.md,
+  },
+  tabContainer: {
+    marginBottom: spacing.xs,
+  },
+  loadingContainer: {
+    paddingVertical: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   alertBadge: {
-    backgroundColor: 'rgba(245,196,0,0.15)',
-    borderRadius: 999,
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0, 102, 255, 0.12)',
+    borderRadius: borderRadius.full,
+    paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 1,
-    borderColor: 'rgba(245,196,0,0.5)',
+    borderColor: 'rgba(0, 102, 255, 0.35)',
   },
   alertBadgeText: {
-    color: '#F5C400',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    color: colors.primary,
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
 });

@@ -7,7 +7,11 @@ import {
   Dimensions,
   ScrollView,
   ActivityIndicator,
+  View,
+  Text,
+  StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   YStack,
   XStack,
@@ -20,8 +24,6 @@ import {
 } from '@blinkdotnew/mobile-ui';
 import { Image } from 'expo-image';
 import { colors, spacing, borderRadius } from '@/constants/design';
-
-// ── Document Thumbnail ──────────────────────────────────────────────────────
 
 export function DocThumbnail({
   label,
@@ -46,65 +48,41 @@ export function DocThumbnail({
       onPress={onPress}
       style={({ pressed }) => [styles.thumbContainer, pressed && { opacity: 0.8 }]}
     >
-      <YStack gap="$1">
-        <YStack
-          width={140}
-          height={100}
-          borderRadius={borderRadius.md}
-          overflow="hidden"
-          backgroundColor="$color3"
-          borderWidth={1}
-          borderColor="$color5"
-        >
+      <View style={styles.thumbWrapper}>
+        <View style={styles.thumbBox}>
           {!error ? (
             <>
               <Image
                 source={{ uri: url }}
-                style={styles.thumbImage}
+                style={StyleSheet.absoluteFillObject}
                 contentFit="cover"
                 onLoad={() => setLoaded(true)}
                 onError={() => setError(true)}
               />
               {!loaded && (
-                <YStack
-                  position="absolute"
-                  top={0}
-                  left={0}
-                  right={0}
-                  bottom={0}
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  <ActivityIndicator size="small" color={colors.textTertiary} />
-                </YStack>
+                <View style={styles.loaderContainer}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                </View>
               )}
-              <YStack
-                position="absolute"
-                bottom={4}
-                right={4}
-                backgroundColor="rgba(0,0,0,0.6)"
-                borderRadius={6}
-                paddingHorizontal={6}
-                paddingVertical={2}
-              >
-                <ZoomIn size={12} color="white" />
-              </YStack>
+              <View style={styles.zoomBadge}>
+                <ZoomIn size={12} color="#FFFFFF" />
+              </View>
             </>
           ) : (
-            <YStack flex={1} alignItems="center" justifyContent="center" gap="$1">
+            <View style={styles.placeholderContainer}>
               {icon}
-              <SizableText size="$1" color="$color9">Tap to open</SizableText>
-            </YStack>
+              <Text style={styles.placeholderText}>Tap to preview</Text>
+            </View>
           )}
-        </YStack>
+        </View>
 
-        <XStack gap="$1" alignItems="center" maxWidth={140}>
+        <View style={styles.labelRow}>
           {icon}
-          <SizableText size="$1" fontWeight="600" color="$color11" numberOfLines={1} flex={1}>
+          <Text style={styles.labelText} numberOfLines={1}>
             {label}
-          </SizableText>
-        </XStack>
-      </YStack>
+          </Text>
+        </View>
+      </View>
     </Pressable>
   );
 }
@@ -129,6 +107,7 @@ export function DocumentLightbox({
 }) {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [loading, setLoading] = useState(true);
+  const insets = useSafeAreaInsets();
 
   React.useEffect(() => {
     if (visible) {
@@ -142,12 +121,16 @@ export function DocumentLightbox({
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const isWeb = Platform.OS === 'web';
+  const topOffset = isWeb ? 20 : Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0) + 14;
+  const bottomOffset = isWeb ? 30 : Math.max(insets.bottom, 16) + 24;
+  const filenameBottom = bottomOffset + 40;
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
+      statusBarTranslucent={true}
       onRequestClose={onClose}
     >
       <Pressable
@@ -156,7 +139,7 @@ export function DocumentLightbox({
       >
         <XStack
           position="absolute"
-          top={isWeb ? 20 : 50}
+          top={topOffset}
           right={16}
           zIndex={10}
         >
@@ -174,7 +157,7 @@ export function DocumentLightbox({
 
         <XStack
           position="absolute"
-          top={isWeb ? 20 : 50}
+          top={topOffset}
           left={16}
           zIndex={10}
           backgroundColor="rgba(0,0,0,0.7)"
@@ -236,7 +219,7 @@ export function DocumentLightbox({
         {documents.length > 1 && (
           <XStack
             position="absolute"
-            bottom={isWeb ? 30 : 50}
+            bottom={bottomOffset}
             left={0}
             right={0}
             justifyContent="center"
@@ -271,7 +254,7 @@ export function DocumentLightbox({
         {doc.filename && (
           <XStack
             position="absolute"
-            bottom={isWeb ? 70 : 90}
+            bottom={filenameBottom}
             left={0}
             right={0}
             justifyContent="center"
@@ -314,13 +297,13 @@ export function DocumentPreviewRow({
 
   return (
     <>
-      <XStack gap="$3" flexWrap="wrap">
+      <View style={styles.previewRow}>
         {licenseUrl && (
           <DocThumbnail
             label="Driver's License"
             url={licenseUrl}
             filename={licenseFilename}
-            icon={<Car size={12} color="$blue9" />}
+            icon={<Car size={13} color={colors.primary} />}
             onPress={() => openDoc(0)}
           />
         )}
@@ -329,11 +312,11 @@ export function DocumentPreviewRow({
             label="Insurance"
             url={insuranceUrl}
             filename={insuranceFilename}
-            icon={<FileText size={12} color="$blue9" />}
+            icon={<FileText size={13} color={colors.primary} />}
             onPress={() => openDoc(docs.length > 1 ? 1 : 0)}
           />
         )}
-      </XStack>
+      </View>
 
       <DocumentLightbox
         visible={lightboxVisible}
@@ -346,12 +329,69 @@ export function DocumentPreviewRow({
 }
 
 const styles = StyleSheet.create({
-  thumbContainer: {
-    cursor: 'pointer',
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
   },
-  thumbImage: {
-    width: 140,
-    height: 100,
+  thumbContainer: {
+    flex: 1,
+    minWidth: 0,
+  },
+  thumbWrapper: {
+    gap: 6,
+    width: '100%',
+  },
+  thumbBox: {
+    width: '100%',
+    height: 94,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderContainer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 19, 28, 0.6)',
+  },
+  zoomBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+  },
+  placeholderContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    padding: 8,
+  },
+  placeholderText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.outline,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 2,
+  },
+  labelText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.onSurfaceVariant,
+    flex: 1,
   },
   overlay: {
     flex: 1,

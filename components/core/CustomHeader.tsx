@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Animated,
   View,
@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   StatusBar,
   LayoutChangeEvent,
+  Keyboard,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -53,6 +54,10 @@ export interface CustomHeaderProps {
   onBack?: () => void;
   /** Custom back icon component */
   backIcon?: React.ReactNode;
+  /** Visual style for back button: 'box' with border or 'plain' without container */
+  backBtnVariant?: 'box' | 'plain';
+  /** Custom back button style override */
+  backBtnStyle?: StyleProp<ViewStyle>;
 
   /** Primary right action icon name from MaterialIcons */
   rightIconName?: keyof typeof MaterialIcons.glyphMap;
@@ -83,6 +88,10 @@ export interface CustomHeaderProps {
   search?: string;
   /** Search text change callback */
   onSearchChange?: (text: string) => void;
+  /** Search focus callback */
+  onSearchFocus?: () => void;
+  /** Search blur callback */
+  onSearchBlur?: () => void;
   /** Search input placeholder text */
   searchPlaceholder?: string;
 
@@ -166,6 +175,8 @@ export function CustomHeader({
   showBack = false,
   onBack,
   backIcon,
+  backBtnVariant = 'box',
+  backBtnStyle,
 
   rightIconName,
   rightAction,
@@ -183,6 +194,8 @@ export function CustomHeader({
   showSearch = false,
   search = '',
   onSearchChange,
+  onSearchFocus,
+  onSearchBlur,
   searchPlaceholder = 'Search...',
 
   showFilter = false,
@@ -200,6 +213,9 @@ export function CustomHeader({
   const insets = useSafeAreaInsets();
   const activeHighlight = subtitleHighlight ?? highlightText;
   const activeRightContent = rightContent ?? rightAction;
+
+  const searchInputRef = useRef<TextInput>(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const topInset = withSafeArea
     ? Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 16)
@@ -292,8 +308,9 @@ export function CustomHeader({
             onPress={handleBack}
             accessibilityLabel="Go back"
             style={({ pressed }) => [
-              styles.backBtn,
-              pressed && { backgroundColor: 'rgba(255, 255, 255, 0.12)' },
+              backBtnVariant === 'plain' ? styles.backBtnPlain : styles.backBtn,
+              backBtnStyle,
+              pressed && (backBtnVariant === 'plain' ? { opacity: 0.6 } : { backgroundColor: 'rgba(255, 255, 255, 0.12)' }),
             ]}
           >
             {backIcon || <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />}
@@ -358,22 +375,47 @@ export function CustomHeader({
       {pills ? <View style={styles.pillsRow}>{pills}</View> : null}
       {showSearch && (
         <View style={styles.searchRow}>
-          <View style={styles.searchBox}>
-            <MaterialIcons name="search" size={20} color={colors.onSurfaceVariant} />
+          <Pressable
+            onPress={() => searchInputRef.current?.focus()}
+            style={[
+              styles.searchBox,
+              isSearchFocused && styles.searchBoxFocused,
+            ]}
+          >
+            <MaterialIcons
+              name="search"
+              size={20}
+              color={isSearchFocused ? colors.primary : colors.onSurfaceVariant}
+            />
             <TextInput
+              ref={searchInputRef}
               value={search}
               onChangeText={onSearchChange}
+              onFocus={() => {
+                setIsSearchFocused(true);
+                onSearchFocus?.();
+              }}
+              onBlur={() => {
+                setIsSearchFocused(false);
+                onSearchBlur?.();
+              }}
               placeholder={searchPlaceholder}
               placeholderTextColor="rgba(194, 198, 216, 0.5)"
               style={styles.searchInput}
-              clearButtonMode="while-editing"
+              clearButtonMode="never"
             />
-            {search.length > 0 && Platform.OS === 'android' && (
-              <Pressable onPress={() => onSearchChange?.('')} hitSlop={8}>
+            {search.length > 0 && (
+              <Pressable
+                onPress={() => {
+                  onSearchChange?.('');
+                  Keyboard.dismiss();
+                }}
+                hitSlop={8}
+              >
                 <MaterialIcons name="close" size={18} color={colors.onSurfaceVariant} />
               </Pressable>
             )}
-          </View>
+          </Pressable>
 
           {showFilter && (
             <Pressable
@@ -427,6 +469,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  backBtnPlain: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   titleColumn: {
     flex: 1,
@@ -506,6 +554,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     gap: 8,
+  },
+  searchBoxFocused: {
+    backgroundColor: 'rgba(0, 102, 255, 0.08)',
+    borderColor: 'rgba(0, 102, 255, 0.5)',
   },
   searchInput: {
     flex: 1,

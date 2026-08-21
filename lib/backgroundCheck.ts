@@ -17,32 +17,89 @@ export interface BackgroundCheck {
   consent_at?: string;
   status: 'pending' | 'in_review' | 'approved' | 'rejected';
   admin_note?: string;
+  rejection_reason?: string;
   external_ref?: string;
   order_scope: string;
   submitted_at: string;
   reviewed_at?: string;
 }
 
-const BGC_STORAGE_KEY = '@pickuprunner_static_bgc_v1';
+const BGC_STORAGE_KEY = '@pickuprunner_static_bgc_v2';
 
 const INITIAL_BGC: BackgroundCheck[] = [
   {
-    id: 'bgc_sample_101',
-    user_id: 'usr_static_driver_101',
+    id: 'b1',
+    user_id: 'u1',
     driver_name: 'Alex Driver',
     driver_email: 'driver@pickuprunner.com',
     date_of_birth: '1992-05-15',
     ssn_last4: '4321',
     address: '742 Evergreen Terrace',
+    city: 'Springfield',
+    state: 'IL',
+    zip: '62704',
+    consent_given: 1,
+    consent_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    status: 'approved',
+    external_ref: 'chr_case_8x2K9pL3mN',
+    admin_note: 'Standard screening complete. No records found.',
+    order_scope: ORDER_SCOPE,
+    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    reviewed_at: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
+  },
+  {
+    id: 'b2',
+    user_id: 'u5',
+    driver_name: 'Sarah Chen',
+    driver_email: 'sarah.chen@outlook.com',
+    date_of_birth: '1995-11-03',
+    ssn_last4: '8821',
+    address: '1280 Mission St, Apt 4B',
     city: 'San Francisco',
     state: 'CA',
-    zip: '94102',
+    zip: '94103',
     consent_given: 1,
-    consent_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-    status: 'approved',
+    consent_at: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
+    status: 'in_review',
     order_scope: ORDER_SCOPE,
-    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-    reviewed_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
+    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
+  },
+  {
+    id: 'b3',
+    user_id: 'u2',
+    driver_name: 'Marcus Reyes',
+    driver_email: 'marcus.r@mailbox.io',
+    date_of_birth: '1989-07-22',
+    ssn_last4: '1156',
+    address: '88 Cedar Ave',
+    city: 'Austin',
+    state: 'TX',
+    zip: '78702',
+    consent_given: 1,
+    consent_at: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
+    status: 'pending',
+    order_scope: ORDER_SCOPE,
+    submitted_at: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
+  },
+  {
+    id: 'b4',
+    user_id: 'u6',
+    driver_name: "James O'Connor",
+    driver_email: 'j.oconnor@yahoo.com',
+    date_of_birth: '1987-02-14',
+    ssn_last4: '6677',
+    address: '404 Birchwood Lane',
+    city: 'Denver',
+    state: 'CO',
+    zip: '80205',
+    consent_given: 1,
+    consent_at: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
+    status: 'rejected',
+    admin_note: 'Discrepancy found between provided address and credit history records. Manual review required.',
+    external_ref: 'chr_case_3d7M1zX8qW',
+    order_scope: ORDER_SCOPE,
+    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
+    reviewed_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
   },
 ];
 
@@ -154,7 +211,7 @@ export function useReviewBackgroundCheck() {
       externalRef,
     }: {
       id: string;
-      status: 'approved' | 'rejected' | 'in_review';
+      status: 'pending' | 'in_review' | 'approved' | 'rejected';
       adminNote?: string;
       externalRef?: string;
     }) => {
@@ -163,9 +220,9 @@ export function useReviewBackgroundCheck() {
       if (!target) throw new Error('Background check record not found');
 
       target.status = status;
-      target.admin_note = adminNote;
+      if (adminNote !== undefined) target.admin_note = adminNote;
       if (externalRef !== undefined) target.external_ref = externalRef;
-      target.reviewed_at = new Date().toISOString();
+      target.reviewed_at = status === 'pending' ? undefined : new Date().toISOString();
 
       await saveStoredBGC(items);
       return target;
