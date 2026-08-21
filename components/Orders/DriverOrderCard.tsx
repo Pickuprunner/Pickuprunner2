@@ -274,7 +274,7 @@ export function DriverOrderCard({
         {currentStatus === 'delivered' && (
           <View style={styles.deliveredBadgeButton}>
             <MaterialIcons name="check-circle" size={20} color="#00e297" />
-            <Text style={styles.deliveredBadgeText}>Delivered ✓</Text>
+            <Text style={styles.deliveredBadgeText}>Delivered</Text>
           </View>
         )}
       </View>

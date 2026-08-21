@@ -306,7 +306,7 @@ export function CustomerOrderCard({
           >
             <MaterialIcons name="check-circle" size={15} color="#00e297" />
             <Text style={styles.deliveredBadgeText} numberOfLines={1}>
-              Delivered ✓
+              Delivered
             </Text>
           </TouchableOpacity>
         )}
@@ -739,8 +739,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 6,
+    gap: 7,
+    paddingHorizontal: 8,
   },
   deliveredBadgeText: {
     color: '#00e297',
