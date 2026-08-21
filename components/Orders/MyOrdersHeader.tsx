@@ -33,10 +33,10 @@ export function MyOrdersHeader({
         <View style={styles.rightPills}>
           {activeCount > 0 && (
             <View style={styles.activePill}>
+              <View style={[styles.statusDot, isConnected && styles.statusDotOnline]} />
               <Text style={styles.activePillText}>{activeCount} ACTIVE</Text>
             </View>
           )}
-          <View style={[styles.statusDot, isConnected && styles.statusDotOnline]} />
         </View>
       }
     />
@@ -50,6 +50,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   activePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 9999,
@@ -64,9 +67,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#8C90A1',
   },
   statusDotOnline: {

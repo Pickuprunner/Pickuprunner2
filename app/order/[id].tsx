@@ -1,11 +1,3 @@
-/**
- * Full-screen delivery wizard: Accept → Pickup → Deliver (with photo)
- *
- * STEP 1 (pending)   — Order summary + Slide to Accept
- * STEP 2 (accepted)  — Route navigation + Slide to Confirm Pickup
- * STEP 3 (picked_up) — Delivery route + photo capture + Slide to Complete Delivery
- * DONE  (delivered)  — Success celebration card with photo confirmation
- */
 import React, { useState, useEffect, useReducer } from 'react';
 import {
   ScrollView,
@@ -46,9 +38,9 @@ import {
 function haptic(type: 'medium' | 'success' = 'medium') {
   if (Platform.OS === 'web') return;
   if (type === 'success') {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
   } else {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
   }
 }
 
@@ -75,7 +67,6 @@ export default function OrderDetailScreen() {
   const [order, setOrder] = useState<Order | null>(getSelectedOrder);
   const [loading, setLoading] = useState(!getSelectedOrder());
 
-  // Finite State Machine
   const [fsm, dispatch] = useReducer(deliveryFSM, {
     status: (getSelectedOrder()?.status as DeliveryState) ?? 'pending',
     photoUri: null,
@@ -86,7 +77,6 @@ export default function OrderDetailScreen() {
 
   const { status, photoUri, photoUrl, uploadingPhoto } = fsm;
 
-  // Hydrate order from DB / Memory
   useEffect(() => {
     const fetchId = Array.isArray(id) ? id[0] : id;
     if (!fetchId) return;
@@ -144,7 +134,6 @@ export default function OrderDetailScreen() {
 
   const badge = getStatusBadge();
 
-  // Photo handlers
   async function pickPhoto(source: 'camera' | 'library') {
     try {
       let result: ImagePicker.ImagePickerResult;
@@ -208,7 +197,6 @@ export default function OrderDetailScreen() {
     }
   }
 
-  // Deterministic FSM State Transitions
   function doAccept() {
     if (atCapacity) {
       Alert.alert(
@@ -231,7 +219,7 @@ export default function OrderDetailScreen() {
         status: 'accepted',
         driverUserId: driverId,
         driverName: user?.displayName ?? user?.email ?? driverId?.slice(0, 8),
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }
 
@@ -244,7 +232,7 @@ export default function OrderDetailScreen() {
     });
 
     if (order) {
-      updateStatus.mutateAsync({ id: order.id, status: 'picked_up' }).catch(() => {});
+      updateStatus.mutateAsync({ id: order.id, status: 'picked_up' }).catch(() => { });
     }
   }
 
@@ -268,7 +256,7 @@ export default function OrderDetailScreen() {
         id: order.id,
         status: 'delivered',
         deliveryPhotoUrl: (photoUrl ?? photoUri ?? order?.deliveryPhotoUrl) || undefined,
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }
 
@@ -314,10 +302,8 @@ export default function OrderDetailScreen() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scroll}
           >
-            {/* Step Progress Wizard Stepper */}
             <StepBar status={status} />
 
-            {/* Earnings Card */}
             {earnings && (
               <CustomCard variant="glass" style={styles.earningsCard}>
                 <View style={styles.earningsRow}>
@@ -341,7 +327,6 @@ export default function OrderDetailScreen() {
               </CustomCard>
             )}
 
-            {/* Route Timeline Card */}
             <View style={styles.sectionHead}>
               <Text style={styles.sectionHeadText}>ROUTE & STOPS</Text>
             </View>
@@ -354,38 +339,13 @@ export default function OrderDetailScreen() {
               onNavigateDelivery={() => openMaps(order?.deliveryAddress ?? '')}
             />
 
-            {/* Customer Details */}
             <View style={styles.sectionHead}>
               <Text style={styles.sectionHeadText}>CUSTOMER DETAILS</Text>
             </View>
             <CustomerInfoCard order={order} />
 
-            {/* Step 2: Store pickup active action */}
-            {status === 'accepted' && (
-              <View style={{ marginHorizontal: 20, marginTop: 12 }}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  style={styles.primaryActionButton}
-                  onPress={() => openMaps(order?.pickupAddress ?? '')}
-                >
-                  <MaterialIcons name="near-me" size={20} color="#FFFFFF" />
-                  <Text style={styles.primaryActionText}>Navigate to Pickup Store</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Step 3: Customer delivery active action & photo card */}
             {status === 'picked_up' && (
               <View style={{ marginHorizontal: 20, marginTop: 12 }}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  style={styles.deliveryActionButton}
-                  onPress={() => openMaps(order?.deliveryAddress ?? '')}
-                >
-                  <MaterialIcons name="near-me" size={20} color={colors.background} />
-                  <Text style={styles.deliveryActionText}>Navigate to Customer</Text>
-                </TouchableOpacity>
-
                 <DeliveryPhotoCard
                   photoUri={photoUri}
                   photoUrl={photoUrl}
@@ -401,7 +361,6 @@ export default function OrderDetailScreen() {
               </View>
             )}
 
-            {/* Step 4: Delivered celebration receipt */}
             {status === 'delivered' && (
               <DeliveredSuccessCard
                 earningsTotalDisplay={earnings?.totalDisplay}
@@ -412,7 +371,6 @@ export default function OrderDetailScreen() {
             <View style={{ height: 110 }} />
           </ScrollView>
 
-          {/* Sticky Bottom Bar */}
           <StickyActionFooter
             status={status}
             hasPhoto={hasPhoto}
@@ -549,42 +507,5 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
-  primaryActionButton: {
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primaryContainer,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: colors.primaryContainer,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  primaryActionText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  deliveryActionButton: {
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.tertiary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: colors.tertiary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  deliveryActionText: {
-    color: colors.background,
-    fontSize: 14,
-    fontWeight: '700',
-  },
+
 });

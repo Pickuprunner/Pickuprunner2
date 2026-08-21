@@ -105,7 +105,6 @@ export function RouteTimelineCard({
         </View>
       </View>
 
-      {/* Point B: Drop-off */}
       <View
         style={[
           styles.timelineRow,
@@ -311,6 +310,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   miniMapBtnTextHighlighted: {
-    color: '#FFFFFF',
+    color: colors.background,
   },
 });
