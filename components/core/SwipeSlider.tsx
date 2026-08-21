@@ -41,6 +41,102 @@ const PADDING = 5;
 const THUMB_WIDTH = 76;
 const THUMB_HEIGHT = CONTAINER_HEIGHT - PADDING * 2; // 50px
 
+function ShimmerCharacter({
+  char,
+  index,
+  total,
+  shimmerAnim,
+  isLocked,
+}: {
+  char: string;
+  index: number;
+  total: number;
+  shimmerAnim: Animated.Value;
+  isLocked?: boolean;
+}) {
+  if (char === ' ') {
+    return <Text style={[styles.titleText, isLocked && styles.lockedText]}> </Text>;
+  }
+
+  const pos = total > 1 ? index / (total - 1) : 0;
+  const p = 0.08 + pos * 0.76;
+  const w = 0.12;
+  const p0 = Math.max(0, p - w);
+  const p1 = p;
+  const p2 = Math.min(1, p + w);
+
+  const baseOpacity = isLocked ? 0.3 : 0.38;
+  const peakOpacity = isLocked ? 0.85 : 1.0;
+
+  const inputRange: number[] = [];
+  const outputRange: number[] = [];
+
+  if (p0 > 0) {
+    inputRange.push(0, p0);
+    outputRange.push(baseOpacity, baseOpacity);
+  } else {
+    inputRange.push(0);
+    outputRange.push(baseOpacity);
+  }
+
+  inputRange.push(p1);
+  outputRange.push(peakOpacity);
+
+  if (p2 < 1) {
+    inputRange.push(p2, 1);
+    outputRange.push(baseOpacity, baseOpacity);
+  } else {
+    inputRange.push(1);
+    outputRange.push(baseOpacity);
+  }
+
+  const charOpacity = shimmerAnim.interpolate({
+    inputRange,
+    outputRange,
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <Animated.Text
+      style={[
+        styles.titleText,
+        isLocked && styles.lockedText,
+        {
+          opacity: charOpacity,
+        },
+      ]}
+    >
+      {char}
+    </Animated.Text>
+  );
+}
+
+function ShimmerText({
+  text,
+  shimmerAnim,
+  isLocked,
+}: {
+  text: string;
+  shimmerAnim: Animated.Value;
+  isLocked?: boolean;
+}) {
+  const chars = text.split('');
+  return (
+    <View style={styles.textRow}>
+      {chars.map((char, i) => (
+        <ShimmerCharacter
+          key={i}
+          char={char}
+          index={i}
+          total={chars.length}
+          shimmerAnim={shimmerAnim}
+          isLocked={isLocked}
+        />
+      ))}
+    </View>
+  );
+}
+
 export function SwipeSlider({
   title,
   completedTitle = 'Complete',
@@ -60,19 +156,58 @@ export function SwipeSlider({
 
   const pan = useRef(new Animated.Value(0)).current;
   const thumbScale = useRef(new Animated.Value(1)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
   const passedRef = useRef(false);
 
   const maxSlide = Math.max(0, containerWidth - THUMB_WIDTH - PADDING * 2);
 
   // Sync loading prop with slide position (keep thumb at the end during loading)
   const isBusy = loading || isProcessing;
+  const isLocked = disabled && !isBusy && !isCompleted;
+
+  // Mutable refs to prevent stale closure bugs in PanResponder
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
+
+  const isBusyRef = useRef(isBusy);
+  isBusyRef.current = isBusy;
+
+  const isCompletedRef = useRef(isCompleted);
+  isCompletedRef.current = isCompleted;
+
+  const maxSlideRef = useRef(maxSlide);
+  maxSlideRef.current = maxSlide;
+
+  const onSwipeCompleteRef = useRef(onSwipeComplete);
+  onSwipeCompleteRef.current = onSwipeComplete;
+
+  // Continuous left-to-right character-wave shimmer animation in all idle/before-sliding states
+  useEffect(() => {
+    if (isBusy || isCompleted) {
+      shimmerAnim.setValue(0);
+      return;
+    }
+
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.delay(500),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [isBusy, isCompleted, shimmerAnim]);
 
   useEffect(() => {
     if (isBusy || isCompleted) {
       if (maxSlide > 0) {
         Animated.timing(pan, {
           toValue: maxSlide,
-          duration: 180,
+          duration: 200,
           useNativeDriver: false,
         }).start();
       }
@@ -182,15 +317,15 @@ export function SwipeSlider({
     triggerHapticSuccess();
 
     Animated.timing(pan, {
-      toValue: maxSlide,
-      duration: 160,
+      toValue: maxSlideRef.current,
+      duration: 200,
       useNativeDriver: false,
     }).start();
 
     pulseThumb();
 
     try {
-      await onSwipeComplete();
+      await onSwipeCompleteRef.current();
       setIsCompleted(true);
     } catch {
       reset();
@@ -202,26 +337,28 @@ export function SwipeSlider({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () =>
-        !disabled && !isBusy && !isCompleted,
+        !disabledRef.current && !isBusyRef.current && !isCompletedRef.current,
       onMoveShouldSetPanResponder: (_, g) =>
-        !disabled && !isBusy && !isCompleted && Math.abs(g.dx) > 2,
+        !disabledRef.current && !isBusyRef.current && !isCompletedRef.current && Math.abs(g.dx) > 2,
       onPanResponderGrant: () => {
         triggerHapticLight();
       },
       onPanResponderMove: (_, g) => {
         pan.setValue(Math.max(0, g.dx));
-        if (maxSlide <= 0) return;
-        if (g.dx >= maxSlide * 0.75 && !passedRef.current) {
+        const currentMax = maxSlideRef.current;
+        if (currentMax <= 0) return;
+        if (g.dx >= currentMax * 0.75 && !passedRef.current) {
           passedRef.current = true;
           setPassedThreshold(true);
           triggerHapticMedium();
-        } else if (g.dx < maxSlide * 0.75 && passedRef.current) {
+        } else if (g.dx < currentMax * 0.75 && passedRef.current) {
           passedRef.current = false;
           setPassedThreshold(false);
         }
       },
       onPanResponderRelease: (_, g) => {
-        if (g.vx > 1.2 || g.dx >= maxSlide * 0.72) {
+        const currentMax = maxSlideRef.current;
+        if (g.vx > 1.2 || (currentMax > 0 && g.dx >= currentMax * 0.72)) {
           completeSwipe();
         } else {
           reset();
@@ -231,7 +368,6 @@ export function SwipeSlider({
     })
   ).current;
 
-  const isLocked = disabled && !isBusy && !isCompleted;
   const isFullTrail = isBusy || isCompleted || passedThreshold;
 
   return (
@@ -273,6 +409,7 @@ export function SwipeSlider({
         </Animated.View>
       )}
 
+      {/* 2. Text Label with Pure Letter Wave Shimmer */}
       <View style={styles.labelContainer} pointerEvents="none">
         {isBusy ? (
           <View style={styles.centerRow}>
@@ -281,28 +418,25 @@ export function SwipeSlider({
           </View>
         ) : isCompleted ? (
           <Text style={styles.completedText}>{completedTitle}</Text>
-        ) : isLocked ? (
-          <Text style={[styles.titleText, styles.lockedText]}>
-            {lockedTitle || title}
-          </Text>
         ) : (
-          <Animated.Text
-            style={[
-              styles.titleText,
-              {
-                opacity: textOpacity,
-                transform: [{ translateX: translateText }],
-              },
-            ]}
+          <Animated.View
+            style={{
+              opacity: textOpacity,
+              transform: [{ translateX: translateText }],
+            }}
           >
-            {title}
-          </Animated.Text>
+            <ShimmerText
+              text={isLocked ? lockedTitle || title : title}
+              shimmerAnim={shimmerAnim}
+              isLocked={isLocked}
+            />
+          </Animated.View>
         )}
       </View>
 
       {/* 3. Oval Capsule Thumb Knob (76px width x 50px height) */}
       <Animated.View
-        {...(!isLocked && !isBusy && !isCompleted ? panResponder.panHandlers : {})}
+        {...panResponder.panHandlers}
         style={[
           styles.thumb,
           {
@@ -390,6 +524,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 1,
   },
+  textRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   centerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -399,7 +538,7 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.onSurface,
+    color: '#FFFFFF',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },

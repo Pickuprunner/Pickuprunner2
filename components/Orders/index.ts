@@ -13,3 +13,6 @@ export { RouteItemsCard } from './RouteItemsCard';
 export { PricingSummaryCard } from './PricingSummaryCard';
 export { NewOrderSubmitButton } from './NewOrderSubmitButton';
 export { NewOrderWizardForm } from './NewOrderWizardForm';
+
+// Order Detail Screen Components
+export * from './detail';
