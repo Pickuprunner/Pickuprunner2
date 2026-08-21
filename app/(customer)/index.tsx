@@ -10,41 +10,60 @@ import {
   Text,
   StatusBar,
   Keyboard,
-  TouchableWithoutFeedback,
   Linking,
   Animated,
 } from 'react-native';
+import { Image } from 'expo-image';
 import {
-  ShoppingBag,
-  MapPin,
-  Phone,
-  User,
-  Package,
-  Mail,
-  CreditCard,
-  ChevronRight,
-  ChevronLeft,
-  Navigation,
-  Truck,
-  Zap,
-} from '@blinkdotnew/mobile-ui';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+  MaterialIcons,
+  Ionicons,
+} from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+
 import { blink } from '@/lib/blink';
-import { colors, gradients, borderRadius } from '@/constants/design';
+import { publishOrderChange } from '@/lib/realtime';
+import { colors, spacing, borderRadius, shadows } from '@/constants/design';
 import { APP_CONFIG, IS_STORE_BUILD, ORDER_SCOPE } from '@/lib/config';
 import { calcDistanceMiles } from '@/lib/distance';
 import { isValidEmail } from '@/lib/validation';
-import CustomInput from '@/components/core/CustomInput';
-import { useToast } from '@/components/core';
+import { CustomInput, CustomHeader, useToast } from '@/components/core';
 
 const SESSION_KEY = 'customer_session_id';
+const NAME_KEY = 'customer_display_name';
+
 const DELIVERY_FEE = APP_CONFIG.DELIVERY_FEE_CENTS;
 const MILEAGE_FREE_MILES = APP_CONFIG.FREE_MILES;
 const MILEAGE_RATE_CENTS = APP_CONFIG.MILEAGE_RATE_CENTS;
+
+const ACTIVE_COLOR = '#FFE399';
+const INACTIVE_COLOR = '#C2C6D8';
+const DONE_COLOR = '#00E297';
+const TAB_BG = '#0F131C';
+const TAB_BORDER = 'rgba(255, 255, 255, 0.06)';
+const GOLD = '#FFE399';
+const GOLD_ACCENT = '#F5C400';
+const GREEN = '#00E297';
+
+const TIP_OPTIONS = [
+  { label: '$5', cents: 500 },
+  { label: '$10', cents: 1000 },
+  { label: '$15', cents: 1500 },
+  { label: '$20', cents: 2000 },
+  { label: '$25', cents: 2500 },
+];
+
+function fmt(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function calcMileageCents(milesStr: string): number {
+  const miles = parseFloat(milesStr);
+  if (!isFinite(miles) || miles <= MILEAGE_FREE_MILES) return 0;
+  return Math.round((miles - MILEAGE_FREE_MILES) * MILEAGE_RATE_CENTS);
+}
 
 async function getOrCreateSessionId(): Promise<string> {
   try {
@@ -65,6 +84,7 @@ interface FormState {
   pickupNumber: string;
   address: string;
   deliveryAddress: string;
+  items: string;
   miles: string;
   deliveryType: 'door' | 'meet';
 }
@@ -77,834 +97,20 @@ const EMPTY_FORM: FormState = {
   pickupNumber: '',
   address: INITIAL_ADDRESS,
   deliveryAddress: '',
+  items: '',
   miles: '',
   deliveryType: 'door',
 };
 
-const TIP_OPTIONS = [
-  { label: '$5', cents: 5_00 },
-  { label: '$10', cents: 10_00 },
-  { label: '$15', cents: 15_00 },
-  { label: '$20', cents: 20_00 },
-  { label: '$25', cents: 25_00 },
+const WIZARD_STEPS = [
+  { id: 1, label: 'Customer', icon: 'person-outline' as const, activeIcon: 'person' as const },
+  { id: 2, label: 'Route & Items', icon: 'inventory-2' as const, activeIcon: 'inventory-2' as const },
+  { id: 3, label: 'Pricing & Review', icon: 'receipt-long' as const, activeIcon: 'receipt-long' as const },
 ];
 
-function fmt(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
-function calcMileageCents(milesStr: string): number {
-  const miles = parseFloat(milesStr);
-  if (!isFinite(miles) || miles <= MILEAGE_FREE_MILES) return 0;
-  return Math.round((miles - MILEAGE_FREE_MILES) * MILEAGE_RATE_CENTS);
-}
-
-// ─── Step 1: Pickup Details Form ────────────────────────────────────────────
-
-interface StepOneProps {
-  form: FormState;
-  set: (key: keyof FormState) => (val: string) => void;
-  onNext: () => void;
-  error: string;
-  setDeliveryType: (v: 'door' | 'meet') => void;
-}
-
-function StepOne({ form, set, onNext, error, setDeliveryType }: StepOneProps) {
-  const mileageCents = calcMileageCents(form.miles);
-  const miles = parseFloat(form.miles);
-  const hasValidMiles = isFinite(miles) && miles > 0;
-
-  const [calculating, setCalculating] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Delivery Preference Animated Sliding Pill
-  const [toggleWidth, setToggleWidth] = useState(0);
-  const slideAnim = useRef(new Animated.Value(form.deliveryType === 'meet' ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.spring(slideAnim, {
-      toValue: form.deliveryType === 'meet' ? 1 : 0,
-      friction: 9,
-      tension: 65,
-      useNativeDriver: false,
-    }).start();
-  }, [form.deliveryType]);
-
-  // Auto-calculate distance when both addresses are filled
-  useEffect(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    const pickup = form.address?.trim();
-    const delivery = form.deliveryAddress?.trim();
-    if (!pickup || !delivery) return;
-
-    timerRef.current = setTimeout(async () => {
-      setCalculating(true);
-      try {
-        const calculatedMiles = await calcDistanceMiles(pickup, delivery);
-        if (calculatedMiles !== null && calculatedMiles > 0) {
-          set('miles')(String(calculatedMiles));
-        }
-      } catch { }
-      setCalculating(false);
-    }, 1500);
-
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [form.address, form.deliveryAddress]);
-
-  const nameStatus =
-    form.name.length === 0 ? 'default' : form.name.trim().length >= 2 ? 'success' : 'default';
-
-  const phoneStatus =
-    form.phone.length === 0 ? 'default' : form.phone.trim().length >= 7 ? 'success' : 'default';
-
-  const isEmailValid = isValidEmail(form.email);
-  const emailStatus =
-    form.email.length === 0 ? 'default' : isEmailValid ? 'success' : 'error';
-
-  const isPickupLocked = APP_CONFIG.LOCK_PICKUP_ADDRESS && IS_STORE_BUILD;
-
-  return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <Pressable onPress={Keyboard.dismiss} style={styles.innerContent}>
-          {IS_STORE_BUILD && (
-            <View style={styles.storeBanner}>
-              <View style={styles.storeHeaderRow}>
-                <View style={styles.storeIconContainer}>
-                  <ShoppingBag size={22} color={colors.secondaryContainer} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.storeTitle}>{APP_CONFIG.STORE_NAME}</Text>
-                  <Text style={styles.storeSubtitle}>{APP_CONFIG.STORE_TYPE}</Text>
-                </View>
-              </View>
-              <View style={styles.storeDetailRow}>
-                <MapPin size={14} color={colors.outline} />
-                <Text style={styles.storeDetailText}>{APP_CONFIG.STORE_ADDRESS}</Text>
-              </View>
-              {APP_CONFIG.STORE_PHONE ? (
-                <View style={styles.storeDetailRow}>
-                  <Phone size={14} color={colors.outline} />
-                  <Text style={styles.storeDetailText}>{APP_CONFIG.STORE_PHONE}</Text>
-                </View>
-              ) : null}
-              <View style={styles.storeDetailRow}>
-                <Navigation size={14} color={colors.outline} />
-                <Text style={styles.storeDetailText}>{APP_CONFIG.STORE_HOURS}</Text>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.headerSection}>
-            <View style={styles.headerIconWrapper}>
-              <ShoppingBag size={24} color="#0F131C" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>
-                {IS_STORE_BUILD ? `Order from ${APP_CONFIG.STORE_NAME}` : 'Request a Pickup'}
-              </Text>
-              <Text style={styles.headerStepText}>Step 1 of 2 — Your details</Text>
-              <Text style={styles.headerDescText}>
-                Give us your phone number and delivery address
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: '50%' }]} />
-          </View>
-
-          <View style={styles.testDataRow}>
-            <Pressable
-              onPress={() => {
-                set('name')('Jamie Test');
-                set('phone')('(520) 555-1234');
-                set('pickupNumber')('#1042');
-                set('email')('test@example.com');
-                set('address')('5765 S Camino del Sol, Green Valley, AZ 85622');
-                set('deliveryAddress')('123 E Test Ave, Sahuarita, AZ 85629');
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
-                }
-              }}
-              style={({ pressed }) => [styles.testDataBadge, pressed && { opacity: 0.75 }]}
-            >
-              <Zap size={13} color={colors.secondaryContainer} />
-              <Text style={styles.testDataText}>Fill the form</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.formFields}>
-            <View style={styles.deliveryPrefSection}>
-              <Text style={styles.fieldSectionLabel}>DELIVERY PREFERENCE</Text>
-              <View
-                style={styles.prefToggleContainer}
-                onLayout={(e) => setToggleWidth(e.nativeEvent.layout.width)}
-              >
-                {toggleWidth > 0 && (
-                  <Animated.View
-                    style={[
-                      styles.slidingPill,
-                      {
-                        width: (toggleWidth - 12) / 2,
-                        left: slideAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [4, toggleWidth - 4 - (toggleWidth - 12) / 2],
-                        }),
-                        borderColor:
-                          form.deliveryType === 'door'
-                            ? 'rgba(255, 227, 153, 0.65)'
-                            : 'rgba(6, 182, 212, 0.65)',
-                      },
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={
-                        form.deliveryType === 'door'
-                          ? ['rgba(255, 227, 153, 0.18)', 'rgba(255, 227, 153, 0.04)']
-                          : ['rgba(6, 182, 212, 0.22)', 'rgba(6, 182, 212, 0.04)']
-                      }
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.slidingGradient}
-                    />
-                  </Animated.View>
-                )}
-
-                <Pressable
-                  onPress={() => {
-                    setDeliveryType('door');
-                    if (Platform.OS !== 'web') {
-                      Haptics.selectionAsync().catch(() => { });
-                    }
-                  }}
-                  style={styles.prefTab}
-                >
-                  <View
-                    style={[
-                      styles.prefIconBox,
-                      form.deliveryType === 'door'
-                        ? styles.prefIconBoxActiveDoor
-                        : styles.prefIconBoxInactive,
-                    ]}
-                  >
-                    <MaterialIcons
-                      name="door-front"
-                      size={20}
-                      color={form.deliveryType === 'door' ? '#FFE399' : '#6B7280'}
-                    />
-                  </View>
-                  <View style={styles.prefTextCol}>
-                    <Text
-                      style={[
-                        styles.prefTitle,
-                        form.deliveryType === 'door' && styles.prefTitleActiveDoor,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      Leave at Door
-                    </Text>
-                    <Text
-                      style={[
-                        styles.prefDesc,
-                        form.deliveryType === 'door' && styles.prefDescActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      Photo on delivery
-                    </Text>
-                  </View>
-                </Pressable>
-
-                <Pressable
-                  onPress={() => {
-                    setDeliveryType('meet');
-                    if (Platform.OS !== 'web') {
-                      Haptics.selectionAsync().catch(() => { });
-                    }
-                  }}
-                  style={styles.prefTab}
-                >
-                  <View
-                    style={[
-                      styles.prefIconBox,
-                      form.deliveryType === 'meet'
-                        ? styles.prefIconBoxActiveMeet
-                        : styles.prefIconBoxInactive,
-                    ]}
-                  >
-                    <Ionicons
-                      name="people-outline"
-                      size={20}
-                      color={form.deliveryType === 'meet' ? '#22D3EE' : '#6B7280'}
-                    />
-                  </View>
-                  <View style={styles.prefTextCol}>
-                    <Text
-                      style={[
-                        styles.prefTitle,
-                        form.deliveryType === 'meet' && styles.prefTitleActiveMeet,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      Meet at Door
-                    </Text>
-                    <Text
-                      style={[
-                        styles.prefDesc,
-                        form.deliveryType === 'meet' && styles.prefDescActive,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      Meet at your door
-                    </Text>
-                  </View>
-                </Pressable>
-              </View>
-            </View>
-
-            <CustomInput
-              label="YOUR NAME"
-              value={form.name}
-              onChangeText={set('name')}
-              placeholder="e.g. Alex Rivera"
-              autoCapitalize="words"
-              returnKeyType="next"
-              leftIcon={<User size={18} color={colors.outline} />}
-              status={nameStatus}
-            />
-
-            <CustomInput
-              label="PHONE NUMBER"
-              value={form.phone}
-              onChangeText={set('phone')}
-              placeholder="e.g. (555) 123-4567"
-              keyboardType="phone-pad"
-              autoCapitalize="none"
-              returnKeyType="next"
-              leftIcon={<Phone size={18} color={colors.outline} />}
-              status={phoneStatus}
-            />
-
-            <CustomInput
-              label="PICKUP INFO"
-              value={form.pickupNumber}
-              onChangeText={set('pickupNumber')}
-              placeholder="e.g. #1042 or 'Deli Counter'"
-              autoCapitalize="none"
-              returnKeyType="next"
-              leftIcon={<Package size={18} color={colors.outline} />}
-            />
-
-            <CustomInput
-              label="EMAIL (OPTIONAL)"
-              value={form.email}
-              onChangeText={set('email')}
-              placeholder="For order updates"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              returnKeyType="next"
-              leftIcon={<Mail size={18} color={colors.outline} />}
-              status={emailStatus}
-            />
-
-            <CustomInput
-              label={isPickupLocked ? 'PICKUP ADDRESS (STORE)' : 'PICKUP ADDRESS'}
-              value={form.address}
-              onChangeText={isPickupLocked ? undefined : set('address')}
-              editable={!isPickupLocked}
-              placeholder="123 Main St, City, State"
-              autoCapitalize="words"
-              returnKeyType="next"
-              leftIcon={<MapPin size={18} color={colors.outline} />}
-              status={form.address.trim().length >= 5 ? 'success' : 'default'}
-            />
-
-            <CustomInput
-              label="DELIVERY ADDRESS"
-              value={form.deliveryAddress}
-              onChangeText={set('deliveryAddress')}
-              placeholder="Where should we bring it?"
-              autoCapitalize="words"
-              returnKeyType="done"
-              leftIcon={<Navigation size={18} color={colors.outline} />}
-              status={form.deliveryAddress.trim().length >= 5 ? 'success' : 'default'}
-            />
-
-            <View style={styles.distanceSection}>
-              <Text style={styles.fieldSectionLabel}>ESTIMATED DISTANCE</Text>
-              {calculating ? (
-                <View style={styles.distanceBoxLoading}>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={styles.distanceTextLoading}>Calculating route distance…</Text>
-                </View>
-              ) : hasValidMiles ? (
-                <View style={styles.distanceBoxSuccess}>
-                  <Navigation size={18} color={colors.tertiary} />
-                  <Text style={styles.distanceValueText}>{miles.toFixed(1)} miles</Text>
-                  <Text style={styles.distanceDot}>·</Text>
-                  <Text
-                    style={[
-                      styles.distanceSurchargeText,
-                      mileageCents > 0
-                        ? { color: colors.secondaryContainer }
-                        : { color: colors.tertiary },
-                    ]}
-                  >
-                    {mileageCents > 0 ? `+${fmt(mileageCents)} mileage surcharge` : 'No surcharge'}
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.distanceBoxEmpty}>
-                  <Navigation size={18} color={colors.outline} />
-                  <Text style={styles.distanceTextEmpty}>
-                    {form.address?.trim() && form.deliveryAddress?.trim()
-                      ? 'Could not calculate distance — enter specific street address'
-                      : 'Enter pickup and delivery addresses to calculate distance'}
-                  </Text>
-                </View>
-              )}
-              <Text style={styles.distanceFootnote}>
-                $2.00/mile · distance calculated automatically
-              </Text>
-            </View>
-
-            {!!error && (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
-
-            <Pressable
-              onPress={onNext}
-              style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
-            >
-              <Text style={styles.primaryBtnText}>Next: Review Order</Text>
-              <ChevronRight size={20} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
-}
-
-interface StepTwoProps {
-  form: FormState;
-  tipCents: number;
-  setTipCents: (v: number) => void;
-  mileageCents: number;
-  onBack: () => void;
-  onSubmit: () => void;
-  loading: boolean;
-  error: string;
-  deliveryType: 'door' | 'meet';
-  showCustomTip: boolean;
-  setShowCustomTip: (v: boolean) => void;
-  customTipText: string;
-  setCustomTipText: (v: string) => void;
-}
-
-function StepTwo({
-  form,
-  tipCents,
-  setTipCents,
-  mileageCents,
-  onBack,
-  onSubmit,
-  loading,
-  error,
-  deliveryType,
-  showCustomTip,
-  setShowCustomTip,
-  customTipText,
-  setCustomTipText,
-}: StepTwoProps) {
-  const miles = parseFloat(form.miles);
-  const totalCents = DELIVERY_FEE + mileageCents + tipCents;
-  const [agreedToTerms, setAgreedToTerms] = React.useState(false);
-
-  return (
-    <ScrollView
-      contentContainerStyle={styles.scroll}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <Pressable onPress={Keyboard.dismiss} style={styles.innerContent}>
-        <View style={styles.headerSection}>
-          <View style={[styles.headerIconWrapper, { backgroundColor: colors.tertiary }]}>
-            <CreditCard size={24} color="#0F131C" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Review Order</Text>
-            <Text style={styles.headerStepText}>Step 2 of 2 — Confirm pickup request</Text>
-          </View>
-        </View>
-
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: '100%', backgroundColor: colors.tertiary },
-            ]}
-          />
-        </View>
-
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryCardTitle}>ORDER DETAILS</Text>
-
-          <View style={styles.summaryAddressBlock}>
-            <View style={styles.summaryAddressItem}>
-              <View style={styles.summaryDotGreen} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.summaryAddressLabel}>PICKUP FROM</Text>
-                <Text style={styles.summaryAddressValue}>{form.address}</Text>
-                {form.pickupNumber ? (
-                  <Text style={styles.summaryAddressNote}>Info: {form.pickupNumber}</Text>
-                ) : null}
-              </View>
-            </View>
-
-            <View style={styles.summaryAddressDivider} />
-
-            <View style={styles.summaryAddressItem}>
-              <View style={styles.summaryDotBlue} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.summaryAddressLabel}>DELIVER TO</Text>
-                <Text style={styles.summaryAddressValue}>{form.deliveryAddress}</Text>
-                <Text style={styles.summaryAddressNote}>
-                  {deliveryType === 'door' ? 'Leave at Door' : 'Meet at Door'}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.priceBreakdown}>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Base Delivery Fee</Text>
-              <Text style={styles.priceValue}>{fmt(DELIVERY_FEE)}</Text>
-            </View>
-
-            {mileageCents > 0 ? (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Mileage ({miles.toFixed(1)} mi)</Text>
-                <Text style={styles.priceValue}>{fmt(mileageCents)}</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.tipSection}>
-              <Text style={styles.priceLabel}>Driver Tip</Text>
-              <View style={styles.tipRow}>
-                {TIP_OPTIONS.map((opt) => {
-                  const isSelected = !showCustomTip && tipCents === opt.cents;
-                  return (
-                    <Pressable
-                      key={opt.cents}
-                      onPress={() => {
-                        setShowCustomTip(false);
-                        setCustomTipText('');
-                        setTipCents(opt.cents);
-                        if (Platform.OS !== 'web') {
-                          Haptics.selectionAsync().catch(() => { });
-                        }
-                      }}
-                      style={[styles.tipBtn, isSelected && styles.tipBtnActive]}
-                    >
-                      <Text style={[styles.tipBtnText, isSelected && styles.tipBtnTextActive]}>
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-
-                <Pressable
-                  onPress={() => {
-                    setShowCustomTip(true);
-                    if (Platform.OS !== 'web') {
-                      Haptics.selectionAsync().catch(() => { });
-                    }
-                  }}
-                  style={[styles.tipBtn, showCustomTip && styles.tipBtnActive]}
-                >
-                  <Text
-                    style={[styles.tipBtnText, showCustomTip && styles.tipBtnTextActive]}
-                  >
-                    Custom
-                  </Text>
-                </Pressable>
-              </View>
-
-              {showCustomTip && (
-                <View style={{ marginTop: 8 }}>
-                  <CustomInput
-                    placeholder="Enter tip amount ($)"
-                    value={customTipText}
-                    keyboardType="decimal-pad"
-                    returnKeyType="done"
-                    onChangeText={(text) => {
-                      const cleaned = text.replace(/[^0-9.]/g, '');
-                      setCustomTipText(cleaned);
-                      const dollars = parseFloat(cleaned);
-                      if (isFinite(dollars) && dollars >= 0) {
-                        setTipCents(Math.round(dollars * 100));
-                      } else if (cleaned === '') {
-                        setTipCents(0);
-                      }
-                    }}
-                  />
-                  {tipCents < 5_00 && tipCents > 0 && (
-                    <Text style={styles.tipWarningText}>Minimum tip is $5.00</Text>
-                  )}
-                </View>
-              )}
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Estimated Total</Text>
-              <Text style={styles.totalValue}>{fmt(totalCents)}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.expectCard}>
-          <Text style={styles.expectTitle}>WHAT TO EXPECT</Text>
-          <View style={styles.expectItem}>
-            <Text style={styles.expectNumber}>1.</Text>
-            <Text style={styles.expectText}>
-              A driver accepts and picks up your order from the store.
-            </Text>
-          </View>
-          <View style={styles.expectItem}>
-            <Text style={styles.expectNumber}>2.</Text>
-            <Text style={styles.expectText}>
-              They deliver directly to your address — usually within the hour.
-            </Text>
-          </View>
-          <View style={styles.expectItem}>
-            <Text style={styles.expectNumber}>3.</Text>
-            <Text style={styles.expectText}>
-              You'll receive a secure Stripe payment link once picked up.
-            </Text>
-          </View>
-          {APP_CONFIG.STORE_EMAIL ? (
-            <Pressable
-              onPress={() => Linking.openURL(`mailto:${APP_CONFIG.STORE_EMAIL}`)}
-              style={styles.expectItem}
-            >
-              <Text style={styles.expectNumber}>?</Text>
-              <Text style={[styles.expectText, { color: colors.primary }]}>
-                Questions? Email {APP_CONFIG.STORE_EMAIL}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        <View style={styles.paymentNotice}>
-          <CreditCard size={18} color={colors.tertiary} />
-          <Text style={styles.paymentNoticeText}>
-            No payment required right now. You'll receive a secure Stripe link when a driver
-            picks up your delivery.
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.termsCard,
-            agreedToTerms && { borderColor: colors.tertiary },
-          ]}
-        >
-          <Pressable
-            onPress={() => setAgreedToTerms((v) => !v)}
-            style={styles.termsPressable}
-          >
-            <View
-              style={[
-                styles.termsCheckbox,
-                agreedToTerms && {
-                  backgroundColor: colors.tertiary,
-                  borderColor: colors.tertiary,
-                },
-              ]}
-            >
-              {agreedToTerms && (
-                <Ionicons name="checkmark" size={18} color="#0F131C" />
-              )}
-            </View>
-            <Text style={styles.termsText}>
-              I agree to the{' '}
-              <Text
-                style={styles.termsLink}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  router.push('/terms');
-                }}
-              >
-                Terms of Use
-              </Text>{' '}
-              including delivery and payment policies.
-            </Text>
-          </Pressable>
-        </View>
-
-        {!!error && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        <View style={styles.actionButtonsRow}>
-          <Pressable
-            onPress={agreedToTerms ? onSubmit : undefined}
-            disabled={loading || !agreedToTerms}
-            style={({ pressed }) => [
-              styles.primaryBtn,
-              pressed && agreedToTerms && styles.primaryBtnPressed,
-              (!agreedToTerms || loading) && styles.btnDisabled,
-            ]}
-          >
-            {loading ? (
-              <View style={styles.btnRow}>
-                <ActivityIndicator color="#FFFFFF" size="small" />
-                <Text style={styles.primaryBtnText}>Placing order…</Text>
-              </View>
-            ) : (
-              <View style={styles.btnRow}>
-                <Truck size={20} color="#FFFFFF" />
-                <Text style={styles.primaryBtnText}>
-                  Place Order — {fmt(totalCents)}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-
-          <Pressable onPress={onBack} style={styles.backBtnOutline}>
-            <ChevronLeft size={18} color={colors.onSurfaceVariant} />
-            <Text style={styles.backBtnText}>Edit Details</Text>
-          </Pressable>
-        </View>
-      </Pressable>
-    </ScrollView>
-  );
-}
-
-
-interface SuccessProps {
-  orderId: string | null;
-  totalCents: number;
-  onReset: () => void;
-}
-
-function SuccessScreen({ orderId, totalCents, onReset }: SuccessProps) {
-  const formattedOrderId = orderId ? `#${orderId.slice(-6).toUpperCase()}` : '#CONFIRMED';
-
-  return (
-    <View style={styles.successRoot}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
-      <ScrollView
-        contentContainerStyle={styles.successScroll}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.successContent}>
-          <View style={styles.successIconHalo}>
-            <View style={styles.successIconCircle}>
-              <Truck size={42} color="#FFFFFF" />
-            </View>
-            <View style={styles.successBadgeCheck}>
-              <Ionicons name="checkmark-sharp" size={14} color="#0F131C" />
-            </View>
-          </View>
-
-          <Text style={styles.successTitle}>Order Placed!</Text>
-          <Text style={styles.successSubtitle}>
-            A driver will accept your order shortly. You'll receive a live tracking and payment link when your delivery is picked up.
-          </Text>
-
-          <View style={styles.orderIdBadge}>
-            <View style={styles.greenLiveDot} />
-            <Text style={styles.orderIdText}>Order {formattedOrderId}</Text>
-          </View>
-
-          <View style={styles.successCard}>
-            <View style={styles.statusPillRow}>
-              <View style={styles.statusPill}>
-                <Ionicons name="radio-button-on" size={12} color={colors.tertiary} />
-                <Text style={styles.statusPillText}>Driver matching in progress</Text>
-              </View>
-            </View>
-
-            <View style={styles.successAmountContainer}>
-              <Text style={styles.successTotalLabel}>ESTIMATED TOTAL</Text>
-              <Text style={styles.successTotalValue}>{fmt(totalCents)}</Text>
-            </View>
-
-            <View style={styles.successCardDivider} />
-
-            <View style={styles.successPaymentNotice}>
-              <CreditCard size={16} color={colors.tertiary} />
-              <Text style={styles.successPaymentNoticeText}>
-                No payment needed now · Stripe link sent upon pickup
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.successActionButtons}>
-            <Pressable
-              onPress={() => {
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
-                }
-                router.push('/(customer)/my-orders');
-              }}
-              style={({ pressed }) => [
-                styles.successPrimaryBtn,
-                pressed && styles.primaryBtnPressed,
-              ]}
-            >
-              <Ionicons name="receipt-outline" size={19} color="#FFFFFF" />
-              <Text style={styles.successPrimaryBtnText}>View in My Orders</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                if (Platform.OS !== 'web') {
-                  Haptics.selectionAsync().catch(() => { });
-                }
-                onReset();
-              }}
-              style={({ pressed }) => [
-                styles.successSecondaryBtn,
-                pressed && { opacity: 0.75 },
-              ]}
-            >
-              <Ionicons name="add-circle-outline" size={19} color="#DFE2EF" />
-              <Text style={styles.successSecondaryBtnText}>Request Another Pickup</Text>
-            </Pressable>
-          </View>
-        </View>
-      </ScrollView>
-    </View>
-  );
-}
-
-// ─── Root Screen ─────────────────────────────────────────────────────────────
-
-const NAME_KEY = 'customer_display_name';
-
-export default function RequestPickupScreen() {
+export default function CustomerNewOrderScreen() {
   const { showToast } = useToast();
-  const [step, setStep] = useState<1 | 2>(1);
+  const [currentStep, setCurrentStep] = useState<number>(1);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
 
   useEffect(() => {
@@ -913,91 +119,201 @@ export default function RequestPickupScreen() {
     });
   }, []);
 
-  const [tipCents, setTipCents] = useState(5_00);
+  const [tipCents, setTipCents] = useState(500);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [showCustomTip, setShowCustomTip] = useState(false);
   const [customTipText, setCustomTipText] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  // Auto-distance states
+  const [calculating, setCalculating] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Delivery preference sliding animation
+  const [toggleWidth, setToggleWidth] = useState(0);
+  const slideAnim = useRef(new Animated.Value(form.deliveryType === 'meet' ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: form.deliveryType === 'meet' ? 1 : 0,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 50,
+    }).start();
+  }, [form.deliveryType]);
+
+  // Auto-calculate distance when addresses change
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    const pickup = form.address?.trim();
+    const delivery = form.deliveryAddress?.trim();
+
+    if (!pickup || !delivery || pickup.length < 5 || delivery.length < 5) {
+      return;
+    }
+
+    timerRef.current = setTimeout(async () => {
+      setCalculating(true);
+      try {
+        const calculatedMiles = await calcDistanceMiles(pickup, delivery);
+        if (calculatedMiles !== null && calculatedMiles > 0) {
+          setForm((prev) => ({ ...prev, miles: String(calculatedMiles) }));
+        }
+      } catch {}
+      setCalculating(false);
+    }, 1200);
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [form.address, form.deliveryAddress]);
 
   const set = (key: keyof FormState) => (val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
 
-  const goToStep2 = () => {
-    setError('');
-    const { name, phone, address, deliveryAddress } = form;
-    if (!name.trim() || !phone.trim() || !address.trim() || !deliveryAddress.trim()) {
-      const msg = 'Please fill in Name, Phone, Pickup Address, and Delivery Address.';
-      setError(msg);
-      showToast('Missing required fields', { type: 'warning', description: msg });
-      return;
-    }
+  const haptic = (type: 'light' | 'medium' | 'success' = 'light') => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+      if (type === 'success') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      } else if (type === 'medium') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      } else {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
     }
-    setStep(2);
   };
 
-  const handleSubmit = async () => {
+  const handleNext = () => {
+    setError('');
+    if (currentStep === 1) {
+      if (!form.name.trim() || !form.phone.trim()) {
+        const msg = 'Customer name and phone number are required.';
+        setError(msg);
+        showToast('Missing details', { type: 'warning', description: msg });
+        return;
+      }
+      if (form.email.trim() && !isValidEmail(form.email.trim())) {
+        const msg = 'Please enter a valid email address.';
+        setError(msg);
+        showToast('Invalid Email', { type: 'warning', description: msg });
+        return;
+      }
+    } else if (currentStep === 2) {
+      if (!form.address.trim() || !form.deliveryAddress.trim() || !form.items.trim()) {
+        const msg = 'Pickup address, delivery address, and order items are required.';
+        setError(msg);
+        showToast('Missing route info', { type: 'warning', description: msg });
+        return;
+      }
+    }
+    haptic('light');
+    setCurrentStep((prev) => Math.min(prev + 1, 3));
+  };
+
+  const handleBack = () => {
+    setError('');
+    haptic('light');
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
+  };
+
+  const fillTestData = () => {
+    setForm({
+      name: 'Jamie Test',
+      phone: '(520) 555-1234',
+      pickupNumber: '#1042',
+      email: 'test@example.com',
+      address: '5765 S Camino del Sol, Green Valley, AZ 85622',
+      deliveryAddress: '123 E Test Ave, Sahuarita, AZ 85629',
+      items: '2 bags of groceries & deli counter order',
+      miles: '3.5',
+      deliveryType: 'door',
+    });
+    setTipCents(1000);
+    haptic('medium');
+    showToast('Customer test data filled', { type: 'info' });
+  };
+
+  const handleSubmitOrder = async () => {
+    if (!agreedToTerms) {
+      showToast('Terms Agreement Required', {
+        description: 'Please agree to the Terms of Use to place your order.',
+        type: 'warning',
+      });
+      return;
+    }
+
     setError('');
     setLoading(true);
 
     try {
       const sessionId = await getOrCreateSessionId();
-      const mileageCents = calcMileageCents(form.miles);
-      const finalTipCents = tipCents < 5_00 ? 5_00 : tipCents;
+      const finalTipCents = tipCents < 500 ? 500 : tipCents;
 
+      const orderItems = `${form.deliveryType === 'meet' ? '[MEET AT DOOR] ' : '[LEAVE AT DOOR] '}${
+        form.pickupNumber.trim() ? `Order: ${form.pickupNumber.trim()} · ` : ''
+      }${form.items.trim()}`.trim();
+
+      const orderId = `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       const orderData = {
+        id: orderId,
         customerName: form.name.trim(),
         customerPhone: form.phone.trim(),
         customerEmail: form.email.trim(),
         pickupAddress: form.address.trim(),
         deliveryAddress: form.deliveryAddress.trim(),
-        items: `${form.deliveryType === 'meet' ? '[MEET CUSTOMER] ' : '[LEAVE AT DOOR] '}${form.pickupNumber.trim() || 'N/A'
-          }`,
+        items: orderItems || '[LEAVE AT DOOR] Standard delivery items',
         distanceMiles: parseFloat(form.miles) || 0,
-        status: 'pending',
+        status: 'pending' as const,
         customerSessionId: sessionId,
         tipAmount: finalTipCents,
         paymentStatus: 'unpaid',
         cityId: APP_CONFIG.CITY_ID,
         storeId: APP_CONFIG.STORE_ID,
         orderScope: ORDER_SCOPE,
+        createdAt: new Date().toISOString(),
       };
 
-      const orderId = `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-      const result = { id: orderId, ...orderData };
-      setLastOrderId(orderId);
-
-      // Cache locally so it is immediately visible in My Orders
+      // Save locally in AsyncStorage so it appears instantly in My Orders
       try {
         const raw = await AsyncStorage.getItem('customer_local_orders');
         const list = raw ? JSON.parse(raw) : [];
-        const savedOrder = {
-          id: orderId,
-          ...orderData,
-          createdAt: new Date().toISOString(),
-        };
-        await AsyncStorage.setItem(
-          'customer_local_orders',
-          JSON.stringify([savedOrder, ...list.filter((o: any) => o.id !== orderId)])
-        );
+        await AsyncStorage.setItem('customer_local_orders', JSON.stringify([orderData, ...list]));
       } catch (storageErr) {
         console.warn('Failed to save to customer_local_orders', storageErr);
       }
 
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+      // Persist to Blink DB
+      try {
+        await blink.db.orders.create(orderData).catch(() => {});
+      } catch {}
+
+      // Broadcast order creation in realtime
+      publishOrderChange({
+        orderId,
+        type: 'created',
+        customerName: form.name.trim(),
+        deliveryAddress: form.deliveryAddress.trim(),
+        items: orderItems,
+      }).catch(() => {});
+
+      setLastOrderId(orderId);
+
+      // Save customer name preference
+      if (form.name.trim()) {
+        AsyncStorage.setItem(NAME_KEY, form.name.trim()).catch(() => {});
       }
 
-      showToast('Order placed successfully!', {
+      haptic('success');
+      showToast('Order Placed Successfully!', {
         type: 'success',
         description: 'Searching for nearby drivers to fulfill your delivery.',
       });
-
       setSuccess(true);
     } catch (err: any) {
+      console.error('[customer-new-order] Submit failed:', err);
       const errMsg = err?.message || 'Something went wrong. Please try again.';
       setError(errMsg);
       showToast('Order placement failed', {
@@ -1011,113 +327,966 @@ export default function RequestPickupScreen() {
 
   const handleReset = () => {
     setForm(EMPTY_FORM);
-    setTipCents(5_00);
-    setStep(1);
+    setTipCents(500);
+    setCurrentStep(1);
     setError('');
     setSuccess(false);
     setShowCustomTip(false);
     setCustomTipText('');
+    setAgreedToTerms(false);
     setLastOrderId(null);
   };
 
+  const mileageCents = calcMileageCents(form.miles);
+  const milesNum = parseFloat(form.miles);
+  const hasValidMiles = isFinite(milesNum) && milesNum > 0;
+  const totalCents = DELIVERY_FEE + mileageCents + tipCents;
+
+  const isPickupLocked = APP_CONFIG.LOCK_PICKUP_ADDRESS && IS_STORE_BUILD;
+
+  // ── Success State Screen ──────────────────────────────────────────────────
   if (success) {
+    const formattedOrderId = lastOrderId ? `#${lastOrderId.slice(-6).toUpperCase()}` : '#CONFIRMED';
+
     return (
-      <SuccessScreen
-        orderId={lastOrderId}
-        totalCents={DELIVERY_FEE + calcMileageCents(form.miles) + tipCents}
-        onReset={handleReset}
-      />
+      <View style={styles.successRoot}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+        <ScrollView
+          contentContainerStyle={styles.successScroll}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.successContent}>
+            {/* Glowing Icon Halo */}
+            <View style={styles.successIconHalo}>
+              <View style={styles.successIconCircle}>
+                <MaterialIcons name="local-shipping" size={40} color={GREEN} />
+              </View>
+              <View style={styles.successBadgeCheck}>
+                <Ionicons name="checkmark-sharp" size={14} color="#0F131C" />
+              </View>
+            </View>
+
+            {/* Title & Subtitle */}
+            <Text style={styles.successTitle}>Order Placed!</Text>
+            <Text style={styles.successSubtitle}>
+              A driver will accept your request shortly. You can track your delivery live in My Orders.
+            </Text>
+
+            {/* Golden Order Pill */}
+            <LinearGradient
+              colors={['rgba(244, 195, 0, 0.22)', 'rgba(255, 227, 153, 0.08)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.successOrderPill}
+            >
+              <View style={styles.successOrderPillDot} />
+              <Text style={styles.successOrderPillText}>ORDER {formattedOrderId}</Text>
+            </LinearGradient>
+
+            {/* Summary Card */}
+            <View style={styles.successCard}>
+              <View style={styles.successAmountRow}>
+                <Text style={styles.successTotalLabel}>ESTIMATED TOTAL</Text>
+                <Text style={styles.successTotalValue}>{fmt(totalCents)}</Text>
+              </View>
+
+              <View style={styles.successCardDivider} />
+
+              <View style={styles.successPaymentNotice}>
+                <MaterialIcons name="credit-card" size={16} color={GREEN} />
+                <Text style={styles.successPaymentNoticeText}>
+                  No payment needed now · Pay securely via Stripe on pickup
+                </Text>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.successActionButtons}>
+              <Pressable
+                onPress={() => {
+                  haptic('medium');
+                  router.push('/(customer)/my-orders');
+                }}
+                style={({ pressed }) => [
+                  styles.successPrimaryBtn,
+                  pressed && styles.btnPressed,
+                ]}
+              >
+                <LinearGradient
+                  colors={['#1E75FF', colors.primaryContainer]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.successPrimaryBtnGradient}
+                >
+                  <MaterialIcons name="receipt-long" size={19} color="#FFFFFF" />
+                  <Text style={styles.successPrimaryBtnText}>View in My Orders</Text>
+                </LinearGradient>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  haptic('light');
+                  handleReset();
+                }}
+                style={({ pressed }) => [
+                  styles.successSecondaryBtn,
+                  pressed && { opacity: 0.75 },
+                ]}
+              >
+                <MaterialIcons name="add-circle-outline" size={19} color="#DFE2EF" />
+                <Text style={styles.successSecondaryBtnText}>Request Another Pickup</Text>
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
     );
   }
 
-  return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={styles.root}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+  // ── Header Title Node (Matching Driver Wizard Style) ───────────────────────
+  const titleNode = (
+    <View style={styles.headerTitleRow}>
+      <Image
+        source={require('@/assets/images/icon.png')}
+        style={styles.headerLogo}
+        contentFit="contain"
+      />
+      <Text style={styles.headerTitleText}>
+        {IS_STORE_BUILD ? `Order from ${APP_CONFIG.STORE_NAME}` : 'Request Pickup'}
+      </Text>
+    </View>
+  );
 
-        {step === 1 ? (
-          <StepOne
-            form={form}
-            set={set}
-            onNext={goToStep2}
-            error={error}
-            setDeliveryType={(v) => setForm((f) => ({ ...f, deliveryType: v }))}
-          />
-        ) : (
-          <StepTwo
-            form={form}
-            tipCents={tipCents}
-            setTipCents={setTipCents}
-            mileageCents={calcMileageCents(form.miles)}
-            onBack={() => {
-              setError('');
-              setStep(1);
-            }}
-            onSubmit={handleSubmit}
-            loading={loading}
-            error={error}
-            deliveryType={form.deliveryType}
-            showCustomTip={showCustomTip}
-            setShowCustomTip={setShowCustomTip}
-            customTipText={customTipText}
-            setCustomTipText={setCustomTipText}
-          />
-        )}
-      </View>
-    </TouchableWithoutFeedback>
+  return (
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {/* Top Header */}
+      <CustomHeader
+        title={titleNode}
+        subtitle="Schedule a grocery or package pickup"
+        showAvatar={false}
+        rightContent={
+          <Pressable
+            onPress={fillTestData}
+            style={({ pressed }) => [styles.testBtn, pressed && styles.btnPressed]}
+          >
+            <MaterialIcons name="bolt" size={14} color={GOLD_ACCENT} />
+            <Text style={styles.testBtnText}>Fill Form</Text>
+          </Pressable>
+        }
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardContainer}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Pressable onPress={Keyboard.dismiss} style={styles.innerContent}>
+            {/* ── 1. 3-STEP TAB BAR (Matching Driver App Wizard Style) ── */}
+            <View style={styles.tabBar}>
+              {WIZARD_STEPS.map((s) => {
+                const isActive = currentStep === s.id;
+                const isDone = currentStep > s.id;
+                const iconColor = isActive ? ACTIVE_COLOR : isDone ? DONE_COLOR : INACTIVE_COLOR;
+                const iconName = isActive ? s.activeIcon : s.icon;
+
+                return (
+                  <Pressable
+                    key={s.id}
+                    onPress={() => {
+                      if (s.id < currentStep) {
+                        haptic('light');
+                        setCurrentStep(s.id);
+                      } else if (s.id === currentStep + 1) {
+                        handleNext();
+                      }
+                    }}
+                    style={[styles.tabItem, isActive && styles.tabItemActive]}
+                  >
+                    <View style={styles.iconWrapper}>
+                      <MaterialIcons name={iconName} size={20} color={iconColor} />
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.tabLabel,
+                        isActive && styles.tabLabelActive,
+                        isDone && styles.tabLabelDone,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {s.label}
+                    </Text>
+
+                    {isActive && <View style={styles.activeIndicator} />}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* ── STEP 1: Customer Details & Preferences ───────────────────── */}
+            {currentStep === 1 && (
+              <View style={styles.cardSection}>
+                <Text style={styles.sectionTitle}>CUSTOMER DETAILS & PREFERENCE</Text>
+
+                <View style={styles.fieldsGap}>
+                  {/* Delivery Preference Toggle */}
+                  <View style={styles.prefContainer}>
+                    <Text style={styles.inputSectionLabel}>DELIVERY PREFERENCE</Text>
+                    <View
+                      style={styles.prefToggleContainer}
+                      onLayout={(e) => setToggleWidth(e.nativeEvent.layout.width)}
+                    >
+                      {toggleWidth > 0 && (
+                        <Animated.View
+                          style={[
+                            styles.slidingPill,
+                            {
+                              width: (toggleWidth - 12) / 2,
+                              left: slideAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [4, toggleWidth - 4 - (toggleWidth - 12) / 2],
+                              }),
+                              borderColor:
+                                form.deliveryType === 'door'
+                                  ? 'rgba(255, 227, 153, 0.5)'
+                                  : 'rgba(0, 226, 151, 0.5)',
+                            },
+                          ]}
+                        >
+                          <LinearGradient
+                            colors={
+                              form.deliveryType === 'door'
+                                ? ['rgba(255, 227, 153, 0.18)', 'rgba(255, 227, 153, 0.04)']
+                                : ['rgba(0, 226, 151, 0.20)', 'rgba(0, 226, 151, 0.04)']
+                            }
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.slidingGradient}
+                          />
+                        </Animated.View>
+                      )}
+
+                      {/* Option 1: Leave at Door */}
+                      <Pressable
+                        onPress={() => {
+                          set('deliveryType')('door');
+                          haptic('light');
+                        }}
+                        style={styles.prefTab}
+                      >
+                        <MaterialIcons
+                          name="door-front"
+                          size={20}
+                          color={form.deliveryType === 'door' ? GOLD : '#8C90A1'}
+                        />
+                        <View style={styles.prefTextCol}>
+                          <Text
+                            style={[
+                              styles.prefTitle,
+                              form.deliveryType === 'door' && styles.prefTitleActiveDoor,
+                            ]}
+                          >
+                            Leave at Door
+                          </Text>
+                          <Text style={styles.prefDesc}>Photo on delivery</Text>
+                        </View>
+                      </Pressable>
+
+                      {/* Option 2: Meet at Door */}
+                      <Pressable
+                        onPress={() => {
+                          set('deliveryType')('meet');
+                          haptic('light');
+                        }}
+                        style={styles.prefTab}
+                      >
+                        <Ionicons
+                          name="people-outline"
+                          size={20}
+                          color={form.deliveryType === 'meet' ? GREEN : '#8C90A1'}
+                        />
+                        <View style={styles.prefTextCol}>
+                          <Text
+                            style={[
+                              styles.prefTitle,
+                              form.deliveryType === 'meet' && styles.prefTitleActiveMeet,
+                            ]}
+                          >
+                            Meet at Door
+                          </Text>
+                          <Text style={styles.prefDesc}>Hand off directly</Text>
+                        </View>
+                      </Pressable>
+                    </View>
+                  </View>
+
+                  {/* CUSTOMER NAME */}
+                  <CustomInput
+                    label="NAME *"
+                    value={form.name}
+                    onChangeText={set('name')}
+                    placeholder="e.g. Jamie Rivera"
+                    autoCapitalize="words"
+                    returnKeyType="next"
+                    leftIcon={<MaterialIcons name="person-outline" size={18} color={colors.outline} />}
+                    status={form.name.trim().length >= 2 ? 'success' : 'default'}
+                  />
+
+                  {/* PHONE NUMBER */}
+                  <CustomInput
+                    label="PHONE *"
+                    value={form.phone}
+                    onChangeText={set('phone')}
+                    placeholder="e.g. (520) 555-0101"
+                    keyboardType="phone-pad"
+                    autoCapitalize="none"
+                    returnKeyType="next"
+                    leftIcon={<MaterialIcons name="phone" size={18} color={colors.outline} />}
+                    status={form.phone.trim().length >= 7 ? 'success' : 'default'}
+                  />
+
+                  {/* PICKUP INFO / ORDER NUMBER */}
+                  <CustomInput
+                    label="PICKUP INFO / ORDER #"
+                    value={form.pickupNumber}
+                    onChangeText={set('pickupNumber')}
+                    placeholder="e.g. #1042 or 'Deli Counter'"
+                    autoCapitalize="none"
+                    returnKeyType="next"
+                    leftIcon={<MaterialIcons name="tag" size={18} color={colors.outline} />}
+                  />
+
+                  {/* EMAIL ADDRESS */}
+                  <CustomInput
+                    label="EMAIL (OPTIONAL)"
+                    value={form.email}
+                    onChangeText={set('email')}
+                    placeholder="For delivery notification email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    returnKeyType="next"
+                    leftIcon={<MaterialIcons name="mail-outline" size={18} color={colors.outline} />}
+                    status={form.email.length > 0 && isValidEmail(form.email) ? 'success' : 'default'}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* ── STEP 2: Route & Items ───────────────────────────────────── */}
+            {currentStep === 2 && (
+              <View style={styles.cardSection}>
+                <Text style={styles.sectionTitle}>ROUTE & ITEMS</Text>
+
+                <View style={styles.fieldsGap}>
+                  {/* Store Info Banner (If Store Build) */}
+                  {IS_STORE_BUILD && (
+                    <View style={styles.storeBanner}>
+                      <View style={styles.storeHeaderRow}>
+                        <View style={styles.storeIconCircle}>
+                          <MaterialIcons name="store" size={20} color={GOLD} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.storeTitle}>{APP_CONFIG.STORE_NAME}</Text>
+                          <Text style={styles.storeSubtitle}>{APP_CONFIG.STORE_TYPE}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.storeDetailRow}>
+                        <MaterialIcons name="place" size={14} color={colors.outline} />
+                        <Text style={styles.storeDetailText}>{APP_CONFIG.STORE_ADDRESS}</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* PICKUP ADDRESS */}
+                  <CustomInput
+                    label={isPickupLocked ? 'PICKUP ADDRESS (STORE DEFAULT)' : 'PICKUP ADDRESS'}
+                    value={form.address}
+                    onChangeText={isPickupLocked ? undefined : set('address')}
+                    editable={!isPickupLocked}
+                    placeholder="Where to pick up"
+                    autoCapitalize="words"
+                    returnKeyType="next"
+                    leftIcon={<MaterialIcons name="place" size={18} color={colors.secondaryContainer} />}
+                    rightIcon={
+                      isPickupLocked ? (
+                        <MaterialIcons name="lock-outline" size={16} color={colors.outline} />
+                      ) : undefined
+                    }
+                    status={form.address.trim().length >= 5 ? 'success' : 'default'}
+                  />
+
+                  {/* DELIVERY ADDRESS */}
+                  <CustomInput
+                    label="DELIVERY ADDRESS *"
+                    value={form.deliveryAddress}
+                    onChangeText={set('deliveryAddress')}
+                    placeholder="Where to drop off"
+                    autoCapitalize="words"
+                    returnKeyType="next"
+                    leftIcon={<MaterialIcons name="navigation" size={18} color={colors.primaryContainer} />}
+                    status={form.deliveryAddress.trim().length >= 5 ? 'success' : 'default'}
+                  />
+
+                  {/* ORDER ITEMS */}
+                  <CustomInput
+                    label="ORDER ITEMS *"
+                    value={form.items}
+                    onChangeText={set('items')}
+                    placeholder="e.g. 2 grocery bags, milk & bread, order #1042..."
+                    multiline
+                    numberOfLines={3}
+                    autoCapitalize="sentences"
+                    leftIcon={<MaterialIcons name="inventory-2" size={18} color={colors.outline} />}
+                    status={form.items.trim().length >= 3 ? 'success' : 'default'}
+                  />
+
+                  {/* Auto Distance Calculation Card */}
+                  <View style={styles.distanceSection}>
+                    <Text style={styles.inputSectionLabel}>ROUTE DISTANCE</Text>
+                    {calculating ? (
+                      <View style={styles.distanceBox}>
+                        <ActivityIndicator size="small" color={GOLD} />
+                        <Text style={styles.distanceTextMuted}>Calculating route distance…</Text>
+                      </View>
+                    ) : hasValidMiles ? (
+                      <View style={[styles.distanceBox, styles.distanceBoxSuccess]}>
+                        <MaterialIcons name="navigation" size={18} color={GREEN} />
+                        <Text style={styles.distanceValueText}>{milesNum.toFixed(1)} miles</Text>
+                        <Text style={styles.distanceDot}>·</Text>
+                        <Text
+                          style={[
+                            styles.distanceSurchargeText,
+                            mileageCents > 0 ? { color: GOLD } : { color: GREEN },
+                          ]}
+                        >
+                          {mileageCents > 0 ? `+${fmt(mileageCents)} mileage surcharge` : 'Free mileage'}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.distanceBox}>
+                        <MaterialIcons name="navigation" size={18} color={colors.outline} />
+                        <Text style={styles.distanceTextMuted}>
+                          {form.address?.trim() && form.deliveryAddress?.trim()
+                            ? 'Enter full street address to calculate route distance'
+                            : 'Enter pickup and delivery addresses to estimate distance'}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={styles.distanceFootnote}>
+                      First {APP_CONFIG.FREE_MILES} miles free · $2.00/mile thereafter
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* ── STEP 3: Pricing & Review ─────────────────────────────────── */}
+            {currentStep === 3 && (
+              <View style={styles.cardSection}>
+                <Text style={styles.sectionTitle}>PRICING & REVIEW</Text>
+
+                <View style={styles.fieldsGap}>
+                  {/* Route Summary Item */}
+                  <View style={styles.summaryCard}>
+                    <View style={styles.summaryAddressItem}>
+                      <View style={styles.summaryDotGreen} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.summaryAddressLabel}>PICKUP FROM</Text>
+                        <Text style={styles.summaryAddressValue}>{form.address}</Text>
+                        {form.pickupNumber ? (
+                          <Text style={styles.summaryAddressNote}>Order Info: {form.pickupNumber}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+
+                    <View style={styles.summaryAddressDivider} />
+
+                    <View style={styles.summaryAddressItem}>
+                      <View style={styles.summaryDotBlue} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.summaryAddressLabel}>DELIVER TO</Text>
+                        <Text style={styles.summaryAddressValue}>{form.deliveryAddress}</Text>
+                        <View style={styles.summaryDeliveryBadge}>
+                          <MaterialIcons
+                            name={form.deliveryType === 'door' ? 'door-front' : 'people'}
+                            size={13}
+                            color={form.deliveryType === 'door' ? GOLD : GREEN}
+                          />
+                          <Text style={styles.summaryDeliveryBadgeText}>
+                            {form.deliveryType === 'door' ? 'Leave at Door' : 'Meet at Door'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Distance Input */}
+                  <CustomInput
+                    label={`DISTANCE (MILES) · free up to ${APP_CONFIG.FREE_MILES} mi`}
+                    placeholder="e.g. 4.5"
+                    value={form.miles}
+                    onChangeText={set('miles')}
+                    keyboardType="decimal-pad"
+                    leftIcon={<MaterialIcons name="navigation" size={18} color={colors.outline} />}
+                    rightIcon={
+                      mileageCents > 0 ? (
+                        <View style={styles.mileagePill}>
+                          <Text style={styles.mileageText}>+{fmt(mileageCents)}</Text>
+                        </View>
+                      ) : undefined
+                    }
+                  />
+
+                  {/* Tip Selector */}
+                  <View style={styles.tipSection}>
+                    <View style={styles.tipHeaderRow}>
+                      <Text style={styles.inputSectionLabel}>DRIVER TIP</Text>
+                      <Text style={styles.tipCurrentAmount}>{fmt(tipCents)}</Text>
+                    </View>
+
+                    <View style={styles.tipPillsRow}>
+                      {TIP_OPTIONS.map((opt) => {
+                        const isSelected = !showCustomTip && tipCents === opt.cents;
+                        return (
+                          <Pressable
+                            key={opt.cents}
+                            onPress={() => {
+                              setShowCustomTip(false);
+                              setCustomTipText('');
+                              setTipCents(opt.cents);
+                              haptic('light');
+                            }}
+                            style={[styles.tipPill, isSelected && styles.tipPillActive]}
+                          >
+                            <Text style={[styles.tipPillText, isSelected && styles.tipPillTextActive]}>
+                              {opt.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+
+                      <Pressable
+                        onPress={() => {
+                          setShowCustomTip(true);
+                          haptic('light');
+                        }}
+                        style={[styles.tipPill, showCustomTip && styles.tipPillActive]}
+                      >
+                        <Text style={[styles.tipPillText, showCustomTip && styles.tipPillTextActive]}>
+                          Custom
+                        </Text>
+                      </Pressable>
+                    </View>
+
+                    {showCustomTip && (
+                      <View style={{ marginTop: 8 }}>
+                        <CustomInput
+                          placeholder="Enter custom tip ($)"
+                          value={customTipText}
+                          keyboardType="decimal-pad"
+                          onChangeText={(text) => {
+                            const cleaned = text.replace(/[^0-9.]/g, '');
+                            setCustomTipText(cleaned);
+                            const dollars = parseFloat(cleaned);
+                            if (isFinite(dollars) && dollars >= 0) {
+                              setTipCents(Math.round(dollars * 100));
+                            } else if (cleaned === '') {
+                              setTipCents(0);
+                            }
+                          }}
+                        />
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Price Breakdown Drawer */}
+                  <View style={styles.breakdownCard}>
+                    <Text style={styles.breakdownTitle}>PRICE BREAKDOWN</Text>
+
+                    <View style={styles.breakdownRow}>
+                      <Text style={styles.breakdownLabel}>Base delivery fee</Text>
+                      <Text style={styles.breakdownValue}>{fmt(DELIVERY_FEE)}</Text>
+                    </View>
+
+                    {mileageCents > 0 && (
+                      <View style={styles.breakdownRow}>
+                        <Text style={styles.breakdownLabel}>
+                          Mileage surcharge ({milesNum.toFixed(1)} mi)
+                        </Text>
+                        <Text style={[styles.breakdownValue, { color: GOLD }]}>
+                          {fmt(mileageCents)}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={styles.breakdownRow}>
+                      <Text style={styles.breakdownLabel}>Driver tip</Text>
+                      <Text style={[styles.breakdownValue, { color: GREEN }]}>
+                        {fmt(tipCents)}
+                      </Text>
+                    </View>
+
+                    <View style={styles.breakdownDivider} />
+
+                    <View style={styles.totalRow}>
+                      <Text style={styles.totalLabel}>Estimated Total</Text>
+                      <Text style={styles.totalAmount}>{fmt(totalCents)}</Text>
+                    </View>
+                  </View>
+
+                  {/* What to Expect Card */}
+                  <View style={styles.expectCard}>
+                    <Text style={styles.expectTitle}>WHAT TO EXPECT</Text>
+                    <View style={styles.expectItem}>
+                      <Text style={styles.expectNumber}>1.</Text>
+                      <Text style={styles.expectText}>
+                        A driver accepts and picks up your order from the store.
+                      </Text>
+                    </View>
+                    <View style={styles.expectItem}>
+                      <Text style={styles.expectNumber}>2.</Text>
+                      <Text style={styles.expectText}>
+                        They deliver directly to your address — usually within the hour.
+                      </Text>
+                    </View>
+                    <View style={styles.expectItem}>
+                      <Text style={styles.expectNumber}>3.</Text>
+                      <Text style={styles.expectText}>
+                        You'll receive a secure Stripe payment link once picked up.
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Payment Policy Notice */}
+                  <View style={styles.paymentNoticeBox}>
+                    <MaterialIcons name="credit-card" size={18} color={GREEN} />
+                    <Text style={styles.paymentNoticeText}>
+                      No payment required now. A secure Stripe link will be sent when your delivery is picked up.
+                    </Text>
+                  </View>
+
+                  {/* Terms Agreement Checkbox */}
+                  <Pressable
+                    onPress={() => {
+                      haptic('light');
+                      setAgreedToTerms((v) => !v);
+                    }}
+                    style={styles.termsRow}
+                  >
+                    <View style={[styles.checkbox, agreedToTerms && styles.checkboxActive]}>
+                      {agreedToTerms && (
+                        <Ionicons name="checkmark" size={14} color="#0F131C" />
+                      )}
+                    </View>
+                    <Text style={styles.termsText}>
+                      I agree to the{' '}
+                      <Text
+                        style={styles.termsLink}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          router.push('/terms');
+                        }}
+                      >
+                        Terms of Use
+                      </Text>{' '}
+                      and delivery policies.
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* Error Display */}
+            {!!error && (
+              <View style={styles.errorBox}>
+                <MaterialIcons name="error-outline" size={16} color="#FF6B6B" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            {/* ── 2. Bottom Wizard Navigation Buttons ── */}
+            <View style={styles.navRow}>
+              {currentStep > 1 && (
+                <Pressable
+                  onPress={handleBack}
+                  style={({ pressed }) => [styles.backNavBtn, pressed && styles.btnPressed]}
+                >
+                  <MaterialIcons name="arrow-back" size={18} color={colors.onSurfaceVariant} />
+                  <Text style={styles.backNavText}>Back</Text>
+                </Pressable>
+              )}
+
+              {currentStep < 3 ? (
+                <Pressable
+                  onPress={handleNext}
+                  style={({ pressed }) => [
+                    styles.nextNavBtn,
+                    currentStep === 1 && { flex: 1 },
+                    pressed && styles.btnPressed,
+                  ]}
+                >
+                  <LinearGradient
+                    colors={['#1E75FF', colors.primaryContainer]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.nextNavGradient}
+                  >
+                    <Text style={styles.nextNavText}>
+                      {currentStep === 1 ? 'Next: Route & Items' : 'Next: Pricing & Review'}
+                    </Text>
+                    <MaterialIcons name="arrow-forward" size={18} color={colors.onPrimaryContainer} />
+                  </LinearGradient>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={agreedToTerms ? handleSubmitOrder : undefined}
+                  disabled={loading || !agreedToTerms}
+                  style={({ pressed }) => [
+                    styles.nextNavBtn,
+                    pressed && agreedToTerms && styles.btnPressed,
+                    (loading || !agreedToTerms) && { opacity: 0.6 },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={['#1E75FF', colors.primaryContainer, '#004ECC']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.nextNavGradient}
+                  >
+                    {loading ? (
+                      <ActivityIndicator size="small" color={colors.onPrimaryContainer} />
+                    ) : (
+                      <>
+                        <MaterialIcons name="check-circle" size={18} color={colors.onPrimaryContainer} />
+                        <Text style={styles.nextNavText}>
+                          PLACE ORDER — {fmt(totalCents)}
+                        </Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </Pressable>
+              )}
+            </View>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
-
-// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#0F131C',
   },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 64 : 56,
-    paddingBottom: 40,
-  },
-  innerContent: {
+  keyboardContainer: {
     flex: 1,
   },
-
-  // Store Banner
-  storeBanner: {
-    backgroundColor: 'rgba(0, 102, 255, 0.08)',
+  scroll: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 110,
+  },
+  innerContent: {
+    gap: spacing.md,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerLogo: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0, 102, 255, 0.3)',
-    padding: 16,
-    marginBottom: 20,
+  },
+  headerTitleText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+  },
+  testBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(245, 196, 0, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 196, 0, 0.3)',
+  },
+  testBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: GOLD_ACCENT,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: TAB_BG,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: TAB_BORDER,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    marginBottom: spacing.xs,
+    elevation: 8,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: 14,
+    position: 'relative',
+    gap: 4,
+  },
+  tabItemActive: {
+    backgroundColor: 'rgba(255, 227, 153, 0.06)',
+  },
+  iconWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 26,
+  },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: INACTIVE_COLOR,
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+  tabLabelActive: {
+    color: ACTIVE_COLOR,
+    fontWeight: '600',
+  },
+  tabLabelDone: {
+    color: DONE_COLOR,
+    fontWeight: '500',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    width: 24,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: ACTIVE_COLOR,
+  },
+  cardSection: {
+    marginBottom: spacing.xs,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.outline,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
+    marginLeft: 2,
+  },
+  fieldsGap: {
+    gap: spacing.md,
+  },
+  prefContainer: {
     gap: 8,
+  },
+  inputSectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.outline,
+    letterSpacing: 0.8,
+  },
+  prefToggleContainer: {
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    paddingHorizontal: 4,
+  },
+  slidingPill: {
+    position: 'absolute',
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  slidingGradient: {
+    flex: 1,
+  },
+  prefTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    zIndex: 2,
+    height: '100%',
+  },
+  prefTextCol: {
+    flexDirection: 'column',
+  },
+  prefTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8C90A1',
+  },
+  prefTitleActiveDoor: {
+    color: GOLD,
+    fontWeight: '700',
+  },
+  prefTitleActiveMeet: {
+    color: GREEN,
+    fontWeight: '700',
+  },
+  prefDesc: {
+    fontSize: 10,
+    color: '#8C90A1',
+  },
+  storeBanner: {
+    backgroundColor: '#141824',
+    borderRadius: 18,
+    padding: 16,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   storeHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  storeIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(244, 195, 0, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(244, 195, 0, 0.35)',
+  storeIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 227, 153, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   storeTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#DFE2EF',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   storeSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#8C90A1',
+    marginTop: 1,
   },
   storeDetailRow: {
     flexDirection: 'row',
@@ -1125,562 +1294,370 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   storeDetailText: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#C2C6D8',
     flex: 1,
   },
-
-  // Header Section
-  headerSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 16,
-  },
-  headerIconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.secondaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.secondaryContainer,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#DFE2EF',
-    letterSpacing: -0.3,
-  },
-  headerStepText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.primary,
-    marginTop: 2,
-  },
-  headerDescText: {
-    fontSize: 12.5,
-    color: '#8C90A1',
-    marginTop: 2,
-  },
-
-  // Progress Bar
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginBottom: 18,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.secondaryContainer,
-  },
-
-  // Test Data Badge
-  testDataRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: 14,
-  },
-  testDataBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(244, 195, 0, 0.12)',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(244, 195, 0, 0.35)',
-  },
-  testDataText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.secondaryContainer,
-  },
-
-  // Form
-  formFields: {
-    gap: 16,
-  },
-  fieldSectionLabel: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#8C90A1',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    marginBottom: 6,
-    marginLeft: 2,
-  },
-
-  // Distance Section
   distanceSection: {
-    gap: 4,
-    marginTop: 4,
+    gap: 6,
   },
-  distanceBoxLoading: {
+  distanceBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 102, 255, 0.08)',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0, 102, 255, 0.3)',
-    paddingHorizontal: 16,
-    height: 52,
     gap: 10,
-  },
-  distanceTextLoading: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '500',
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   distanceBoxSuccess: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 226, 151, 0.08)',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0, 226, 151, 0.35)',
-    paddingHorizontal: 16,
-    height: 52,
-    gap: 8,
+    backgroundColor: 'rgba(0, 226, 151, 0.06)',
+    borderColor: 'rgba(0, 226, 151, 0.3)',
   },
   distanceValueText: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   distanceDot: {
-    fontSize: 14,
     color: '#8C90A1',
+    fontSize: 14,
   },
   distanceSurchargeText: {
-    fontSize: 13.5,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  distanceBoxEmpty: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#151821',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
-    paddingHorizontal: 16,
-    height: 52,
-    gap: 10,
-  },
-  distanceTextEmpty: {
-    fontSize: 13.5,
-    color: '#6B7280',
+  distanceTextMuted: {
+    fontSize: 12.5,
+    color: '#8C90A1',
     flex: 1,
   },
   distanceFootnote: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 4,
-    marginTop: 2,
-  },
-
-  // Delivery Preferences Single Toggle Box
-  deliveryPrefSection: {
-    gap: 6,
-    marginBottom: 6,
-  },
-  prefToggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#11141E',
-    borderRadius: 16,
-    padding: 4,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    position: 'relative',
-    height: 58,
-  },
-  slidingPill: {
-    position: 'absolute',
-    top: 4,
-    bottom: 4,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0, 226, 151, 0.5)',
-    overflow: 'hidden',
-  },
-  slidingGradient: {
-    flex: 1,
-    borderRadius: 10,
-  },
-  prefTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    zIndex: 1,
-    gap: 8,
-    height: '100%',
-  },
-  prefIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  prefIconBoxActiveDoor: {
-    backgroundColor: 'rgba(255, 227, 153, 0.16)',
-    borderRadius: 10,
-  },
-  prefIconBoxActiveMeet: {
-    backgroundColor: 'rgba(6, 182, 212, 0.18)',
-    borderRadius: 10,
-  },
-  prefIconBoxInactive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 10,
-  },
-  prefTextCol: {
-    flex: 1,
-    gap: 1,
-  },
-  prefTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 11,
     color: '#8C90A1',
-    letterSpacing: -0.2,
+    marginLeft: 4,
   },
-  prefTitleActiveDoor: {
-    color: '#FFE399',
-    fontWeight: '800',
+  mileagePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(244, 195, 0, 0.15)',
   },
-  prefTitleActiveMeet: {
-    color: '#22D3EE',
-    fontWeight: '800',
+  mileageText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: GOLD,
   },
-  prefDesc: {
-    fontSize: 10.5,
-    color: 'rgba(140, 144, 161, 0.6)',
-    fontWeight: '500',
+  tipSection: {
+    gap: spacing.sm,
   },
-  prefDescActive: {
-    color: '#C2C6D8',
-  },
-
-  // Buttons
-  primaryBtn: {
-    height: 54,
-    borderRadius: borderRadius.full,
-    backgroundColor: '#0066FF',
+  tipHeaderRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tipCurrentAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: GOLD,
+  },
+  tipPillsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  tipPill: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 10,
-    shadowColor: '#0066FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
   },
-  primaryBtnPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
+  tipPillActive: {
+    backgroundColor: 'rgba(255, 227, 153, 0.14)',
+    borderColor: GOLD,
   },
-  primaryBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  btnDisabled: {
-    opacity: 0.4,
-  },
-  backBtnOutline: {
-    height: 48,
-    borderRadius: borderRadius.full,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-  backBtnText: {
-    fontSize: 14.5,
+  tipPillText: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#C2C6D8',
   },
-
-  // Error
-  errorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.35)',
+  tipPillTextActive: {
+    color: GOLD,
+    fontWeight: '800',
   },
-  errorText: {
-    color: '#FF8B8B',
-    fontSize: 13.5,
-  },
-
-  // Step 2 Summary Card
-  summaryCard: {
-    backgroundColor: '#151821',
+  breakdownCard: {
+    backgroundColor: '#121622',
     borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 18,
-    gap: 14,
-    marginBottom: 16,
-  },
-  summaryCardTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#8C90A1',
-    letterSpacing: 1.2,
-  },
-  summaryAddressBlock: {
-    backgroundColor: '#12151E',
-    borderRadius: 14,
-    padding: 14,
+    padding: 16,
+    gap: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
-    gap: 10,
   },
-  summaryAddressItem: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-  },
-  summaryDotGreen: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.tertiary,
-    marginTop: 5,
-  },
-  summaryDotBlue: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
-    marginTop: 5,
-  },
-  summaryAddressDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    marginLeft: 20,
-  },
-  summaryAddressLabel: {
-    fontSize: 10.5,
+  breakdownTitle: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#8C90A1',
-    letterSpacing: 0.8,
+    color: colors.outline,
+    letterSpacing: 1,
+    marginBottom: 4,
   },
-  summaryAddressValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginTop: 2,
-  },
-  summaryAddressNote: {
-    fontSize: 12,
-    color: '#8C90A1',
-    marginTop: 2,
-  },
-  priceBreakdown: {
-    gap: 10,
-  },
-  priceRow: {
+  breakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  priceLabel: {
-    fontSize: 14,
+  breakdownLabel: {
+    fontSize: 13,
     color: '#C2C6D8',
   },
-  priceValue: {
-    fontSize: 14.5,
-    fontWeight: '700',
+  breakdownValue: {
+    fontSize: 13.5,
+    fontWeight: '600',
     color: '#FFFFFF',
   },
-  tipSection: {
-    gap: 8,
-    marginTop: 4,
-  },
-  tipRow: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  tipBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: '#12151E',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  tipBtnActive: {
-    backgroundColor: colors.secondaryContainer,
-    borderColor: colors.secondaryContainer,
-  },
-  tipBtnText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#DFE2EF',
-  },
-  tipBtnTextActive: {
-    color: '#0F131C',
-  },
-  tipWarningText: {
-    fontSize: 12,
-    color: '#FF8B8B',
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  divider: {
+  breakdownDivider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     marginVertical: 4,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 4,
+    paddingTop: 2,
   },
   totalLabel: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
-  totalValue: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: colors.secondaryContainer,
+  totalAmount: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: GOLD,
   },
-
-  // What to Expect
   expectCard: {
-    backgroundColor: '#151821',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 16,
-    gap: 10,
-    marginBottom: 16,
+    padding: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   expectTitle: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#8C90A1',
-    letterSpacing: 1.2,
+    color: colors.outline,
+    letterSpacing: 1,
+    marginBottom: 2,
   },
   expectItem: {
     flexDirection: 'row',
+    gap: 8,
     alignItems: 'flex-start',
-    gap: 10,
   },
   expectNumber: {
-    fontSize: 13.5,
+    fontSize: 12.5,
     fontWeight: '700',
     color: colors.primary,
-    width: 16,
   },
   expectText: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#C2C6D8',
     flex: 1,
     lineHeight: 18,
   },
-
-  // Payment Notice
-  paymentNotice: {
+  paymentNoticeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     backgroundColor: 'rgba(0, 226, 151, 0.08)',
     borderRadius: 14,
-    borderWidth: 1.5,
+    padding: 12,
+    borderWidth: 1,
     borderColor: 'rgba(0, 226, 151, 0.25)',
-    padding: 14,
-    marginBottom: 16,
   },
   paymentNoticeText: {
-    fontSize: 12.5,
-    color: colors.tertiary,
+    fontSize: 12,
+    color: '#DFE2EF',
     flex: 1,
     lineHeight: 17,
-    fontWeight: '500',
   },
-
-  // Terms Agreement
-  termsCard: {
-    backgroundColor: '#151821',
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
-    padding: 16,
-    marginBottom: 16,
-  },
-  termsPressable: {
+  termsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
   },
-  termsCheckbox: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  checkboxActive: {
+    backgroundColor: GREEN,
+    borderColor: GREEN,
   },
   termsText: {
-    fontSize: 13,
-    color: '#C2C6D8',
+    fontSize: 12.5,
+    color: '#8C90A1',
     flex: 1,
     lineHeight: 18,
   },
   termsLink: {
-    fontWeight: '700',
-    color: colors.secondaryContainer,
-    textDecorationLine: 'underline',
+    color: colors.primary,
+    fontWeight: '600',
   },
-  actionButtonsRow: {
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
+    backgroundColor: 'rgba(255, 107, 107, 0.12)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 107, 107, 0.3)',
+  },
+  errorText: {
+    color: '#FF8B8B',
+    fontSize: 13,
+    flex: 1,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: spacing.xs,
+  },
+  backNavBtn: {
+    height: 52,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  backNavText: {
+    color: '#DFE2EF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  nextNavBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: 'rgba(0, 102, 255, 0.35)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  nextNavGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  nextNavText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  btnPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.985 }],
   },
 
-  // Success Screen
+  // Summary Card in Step 3
+  summaryCard: {
+    backgroundColor: '#121622',
+    borderRadius: 18,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  summaryAddressItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  summaryDotGreen: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: GREEN,
+    marginTop: 4,
+  },
+  summaryDotBlue: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primaryContainer,
+    marginTop: 4,
+  },
+  summaryAddressLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.outline,
+    letterSpacing: 0.8,
+  },
+  summaryAddressValue: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginTop: 2,
+  },
+  summaryAddressNote: {
+    fontSize: 12,
+    color: GOLD,
+    marginTop: 2,
+  },
+  summaryAddressDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    marginVertical: 2,
+  },
+  summaryDeliveryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+  },
+  summaryDeliveryBadgeText: {
+    fontSize: 12,
+    color: '#C2C6D8',
+    fontWeight: '500',
+  },
+
+  // ── Success Screen Styles ──
   successRoot: {
     flex: 1,
     backgroundColor: '#0F131C',
   },
   successScroll: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 70 : 50,
-    paddingBottom: 40,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 48,
   },
   successContent: {
     width: '100%',
@@ -1692,26 +1669,21 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: 'rgba(0, 102, 255, 0.12)',
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
     borderWidth: 1.5,
-    borderColor: 'rgba(0, 102, 255, 0.25)',
+    borderColor: 'rgba(0, 226, 151, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
     position: 'relative',
+    marginBottom: 8,
   },
   successIconCircle: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#0066FF',
+    backgroundColor: 'rgba(0, 226, 151, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0066FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 14,
-    elevation: 6,
   },
   successBadgeCheck: {
     position: 'absolute',
@@ -1720,154 +1692,126 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: colors.tertiary,
-    borderWidth: 2.5,
-    borderColor: colors.background,
+    backgroundColor: GREEN,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#0F131C',
   },
   successTitle: {
     fontSize: 26,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.5,
     textAlign: 'center',
   },
   successSubtitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     color: '#8C90A1',
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 12,
   },
-  orderIdBadge: {
+  successOrderPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 999,
     paddingHorizontal: 16,
-    paddingVertical: 7,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 227, 153, 0.4)',
   },
-  greenLiveDot: {
+  successOrderPillDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.tertiary,
+    backgroundColor: GOLD,
   },
-  orderIdText: {
-    fontSize: 13.5,
+  successOrderPillText: {
+    fontSize: 13,
     fontWeight: '700',
-    color: colors.primary,
+    color: GOLD,
     letterSpacing: 0.5,
   },
   successCard: {
-    backgroundColor: '#151821',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 20,
     width: '100%',
-    alignItems: 'center',
-    gap: 14,
-    marginVertical: 4,
-  },
-  statusPillRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0, 226, 151, 0.08)',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    backgroundColor: '#121622',
+    borderRadius: 18,
+    padding: 18,
     borderWidth: 1,
-    borderColor: 'rgba(0, 226, 151, 0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 14,
+    marginTop: 8,
   },
-  statusPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.tertiary,
-  },
-  successAmountContainer: {
+  successAmountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 4,
   },
   successTotalLabel: {
-    fontSize: 11.5,
-    color: '#8C90A1',
+    fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    color: colors.outline,
+    letterSpacing: 0.8,
   },
   successTotalValue: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: colors.secondaryContainer,
+    fontSize: 22,
+    fontWeight: '800',
+    color: GOLD,
   },
   successCardDivider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   successPaymentNotice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   successPaymentNoticeText: {
     fontSize: 12,
     color: '#C2C6D8',
     flex: 1,
-    lineHeight: 16,
-    textAlign: 'center',
+    lineHeight: 17,
   },
   successActionButtons: {
     width: '100%',
-    gap: 10,
-    marginTop: 6,
+    gap: 12,
+    marginTop: 8,
   },
   successPrimaryBtn: {
-    height: 54,
-    borderRadius: borderRadius.full,
-    backgroundColor: '#0066FF',
+    height: 52,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  successPrimaryBtnGradient: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    width: '100%',
-    shadowColor: '#0066FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
   },
   successPrimaryBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 0.2,
+    fontSize: 15,
+    fontWeight: '700',
   },
   successSecondaryBtn: {
     height: 50,
-    borderRadius: borderRadius.full,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    width: '100%',
   },
   successSecondaryBtnText: {
-    fontSize: 14.5,
-    fontWeight: '700',
     color: '#DFE2EF',
+    fontSize: 14.5,
+    fontWeight: '600',
   },
 });

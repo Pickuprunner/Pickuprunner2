@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useToast } from '@/components/core';
 import { colors, spacing, borderRadius, shadows } from '@/constants/design';
+import { isValidEmail } from '@/lib/validation';
 
 import { CustomerDetailsCard } from './CustomerDetailsCard';
 import { RouteItemsCard } from './RouteItemsCard';
@@ -22,6 +23,10 @@ const INACTIVE_COLOR = '#C2C6D8';
 const DONE_COLOR = '#00E297';
 const TAB_BG = '#0F131C';
 const TAB_BORDER = 'rgba(255, 255, 255, 0.06)';
+
+function fmt(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
 
 interface NewOrderWizardFormProps {
   customerName: string;
@@ -44,6 +49,23 @@ interface NewOrderWizardFormProps {
   tipCents: number;
   onTipChange: (v: number) => void;
   totalCents: number;
+
+  deliveryType?: 'door' | 'meet';
+  onDeliveryTypeChange?: (v: 'door' | 'meet') => void;
+  pickupNumber?: string;
+  onPickupNumberChange?: (v: string) => void;
+
+  calculating?: boolean;
+  showCustomTip?: boolean;
+  setShowCustomTip?: (v: boolean) => void;
+  customTipText?: string;
+  setCustomTipText?: (v: string) => void;
+
+  agreedToTerms?: boolean;
+  onAgreedToTermsChange?: (v: boolean) => void;
+
+  currentStep?: number;
+  onCurrentStepChange?: (step: number) => void;
 
   onSubmit: () => void;
   loading: boolean;
@@ -74,10 +96,26 @@ export function NewOrderWizardForm({
   tipCents,
   onTipChange,
   totalCents,
+  deliveryType = 'door',
+  onDeliveryTypeChange,
+  pickupNumber = '',
+  onPickupNumberChange,
+  calculating = false,
+  showCustomTip,
+  setShowCustomTip,
+  customTipText,
+  setCustomTipText,
+  agreedToTerms = false,
+  onAgreedToTermsChange,
+  currentStep: externalCurrentStep,
+  onCurrentStepChange: externalOnCurrentStepChange,
   onSubmit,
   loading,
 }: NewOrderWizardFormProps) {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [internalCurrentStep, setInternalCurrentStep] = useState(1);
+  const currentStep = externalCurrentStep !== undefined ? externalCurrentStep : internalCurrentStep;
+  const setCurrentStep = externalOnCurrentStepChange || setInternalCurrentStep;
+
   const { showToast } = useToast();
 
   const haptic = () => {
@@ -89,29 +127,38 @@ export function NewOrderWizardForm({
   const handleNext = () => {
     if (currentStep === 1) {
       if (!customerName.trim() || !customerPhone.trim()) {
-        showToast('Missing Info', {
+        showToast('Missing Details', {
           description: 'Customer name and phone number are required',
-          type: 'error',
+          type: 'warning',
+        });
+        return;
+      }
+      if (customerEmail.trim() && !isValidEmail(customerEmail.trim())) {
+        showToast('Invalid Email', {
+          description: 'Please enter a valid email address',
+          type: 'warning',
         });
         return;
       }
     } else if (currentStep === 2) {
-      if (!deliveryAddress.trim() || !items.trim()) {
-        showToast('Missing Info', {
-          description: 'Delivery address and items description are required',
-          type: 'error',
+      if (!pickupAddress.trim() || !deliveryAddress.trim() || !items.trim()) {
+        showToast('Missing Route Info', {
+          description: 'Pickup address, delivery address, and items are required',
+          type: 'warning',
         });
         return;
       }
     }
     haptic();
-    setCurrentStep((prev) => Math.min(prev + 1, 3));
+    setCurrentStep(Math.min(currentStep + 1, 3));
   };
 
   const handleBack = () => {
     haptic();
-    setCurrentStep((prev) => Math.max(prev - 1, 1));
+    setCurrentStep(Math.max(currentStep - 1, 1));
   };
+
+  const isSubmitDisabled = loading || (onAgreedToTermsChange !== undefined && !agreedToTerms);
 
   return (
     <View style={styles.container}>
@@ -129,6 +176,8 @@ export function NewOrderWizardForm({
                 if (step.id < currentStep) {
                   haptic();
                   setCurrentStep(step.id);
+                } else if (step.id === currentStep + 1) {
+                  handleNext();
                 }
               }}
               style={[
@@ -137,7 +186,7 @@ export function NewOrderWizardForm({
               ]}
             >
               <View style={styles.iconWrapper}>
-                <MaterialIcons name={iconName} size={22} color={iconColor} />
+                <MaterialIcons name={iconName} size={20} color={iconColor} />
               </View>
 
               <Text
@@ -166,6 +215,10 @@ export function NewOrderWizardForm({
             onPhoneChange={onCustomerPhoneChange}
             email={customerEmail}
             onEmailChange={onCustomerEmailChange}
+            pickupNumber={pickupNumber}
+            onPickupNumberChange={onPickupNumberChange}
+            deliveryType={deliveryType}
+            onDeliveryTypeChange={onDeliveryTypeChange}
           />
         )}
 
@@ -177,6 +230,9 @@ export function NewOrderWizardForm({
             onDeliveryAddressChange={onDeliveryAddressChange}
             items={items}
             onItemsChange={onItemsChange}
+            miles={miles}
+            mileageCents={mileageCents}
+            calculating={calculating}
           />
         )}
 
@@ -188,6 +244,16 @@ export function NewOrderWizardForm({
             tipCents={tipCents}
             onTipChange={onTipChange}
             totalCents={totalCents}
+            pickupAddress={pickupAddress}
+            deliveryAddress={deliveryAddress}
+            pickupNumber={pickupNumber}
+            deliveryType={deliveryType}
+            showCustomTip={showCustomTip}
+            setShowCustomTip={setShowCustomTip}
+            customTipText={customTipText}
+            setCustomTipText={setCustomTipText}
+            agreedToTerms={agreedToTerms}
+            onAgreedToTermsChange={onAgreedToTermsChange}
           />
         )}
       </View>
@@ -229,12 +295,12 @@ export function NewOrderWizardForm({
           </Pressable>
         ) : (
           <Pressable
-            onPress={onSubmit}
-            disabled={loading}
+            onPress={isSubmitDisabled ? undefined : onSubmit}
+            disabled={isSubmitDisabled}
             style={({ pressed }) => [
               styles.nextNavBtn,
-              pressed && styles.btnPressed,
-              loading && { opacity: 0.6 },
+              pressed && !isSubmitDisabled && styles.btnPressed,
+              isSubmitDisabled && { opacity: 0.6 },
             ]}
           >
             <LinearGradient
@@ -248,7 +314,9 @@ export function NewOrderWizardForm({
               ) : (
                 <>
                   <MaterialIcons name="check-circle" size={18} color={colors.onPrimaryContainer} />
-                  <Text style={styles.nextNavText}>CREATE ORDER</Text>
+                  <Text style={styles.nextNavText}>
+                    CREATE ORDER — {fmt(totalCents)}
+                  </Text>
                 </>
               )}
             </LinearGradient>
@@ -296,7 +364,7 @@ const styles = StyleSheet.create({
     height: 26,
   },
   tabLabel: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '500',
     color: INACTIVE_COLOR,
     letterSpacing: 0.2,
@@ -319,57 +387,58 @@ const styles = StyleSheet.create({
     backgroundColor: ACTIVE_COLOR,
   },
   stepContent: {
-    // Clean adaptive layout with no fixed artificial minHeight
+    // Dynamic adaptive layout
   },
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.sm,
+    gap: 12,
+    marginTop: spacing.xs,
   },
   backNavBtn: {
-    flex: 1,
+    height: 52,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 15,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceContainerLow,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
   },
   backNavText: {
+    color: '#DFE2EF',
     fontSize: 14,
     fontWeight: '600',
-    color: colors.onSurfaceVariant,
   },
   nextNavBtn: {
-    flex: 2,
-    borderRadius: borderRadius.full,
+    flex: 1,
+    height: 52,
+    borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: shadows.cobaltGlow.shadowColor,
-    shadowOffset: shadows.cobaltGlow.shadowOffset,
-    shadowOpacity: shadows.cobaltGlow.shadowOpacity,
-    shadowRadius: shadows.cobaltGlow.shadowRadius,
-    elevation: 8,
+    shadowColor: 'rgba(0, 102, 255, 0.35)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 4,
   },
   nextNavGradient: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
   nextNavText: {
-    fontSize: 14,
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '700',
-    color: colors.onPrimaryContainer,
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   btnPressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.85,
+    transform: [{ scale: 0.985 }],
   },
 });

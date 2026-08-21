@@ -171,6 +171,8 @@ export function useCreateOrder() {
       pickupAddress: string;
       deliveryAddress: string;
       items: string;
+      tipAmount?: number;
+      distanceMiles?: number;
     }) => {
       const newOrder: Order = {
         id: `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
@@ -185,9 +187,9 @@ export function useCreateOrder() {
         cityId: APP_CONFIG.CITY_ID,
         storeId: APP_CONFIG.STORE_ID,
         orderScope: ORDER_SCOPE,
-        tipAmount: 10.0,
+        tipAmount: order.tipAmount !== undefined ? order.tipAmount : 10.0,
         paymentStatus: 'paid',
-        distanceMiles: 3.5,
+        distanceMiles: order.distanceMiles !== undefined ? order.distanceMiles : 3.5,
       };
 
       const existing = await getStoredOrders();
