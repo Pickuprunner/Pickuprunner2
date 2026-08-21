@@ -166,7 +166,7 @@ function CustomerOrderChatView({
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={0}
       >
         {messages.length === 0 ? (
           <ChatEmptyState

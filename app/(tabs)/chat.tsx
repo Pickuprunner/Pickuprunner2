@@ -149,7 +149,8 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
         {messages.length === 0 ? (
           <ChatEmptyState
@@ -222,16 +223,6 @@ export default function ChatScreen() {
     setDisplayName(name);
   }, []);
 
-  if (!nameReady) {
-    return (
-      <SafeArea>
-        <YStack flex={1} alignItems="center" justifyContent="center">
-          <Spinner size="large" color="$color9" />
-        </YStack>
-      </SafeArea>
-    );
-  }
-
   // Handle hardware/gesture back press when in individual chat view
   useEffect(() => {
     if (!activeChatOrder) return;
@@ -242,6 +233,16 @@ export default function ChatScreen() {
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
   }, [activeChatOrder]);
+
+  if (!nameReady) {
+    return (
+      <SafeArea>
+        <YStack flex={1} alignItems="center" justifyContent="center">
+          <Spinner size="large" color="$color9" />
+        </YStack>
+      </SafeArea>
+    );
+  }
 
   if (!displayName) {
     return <SafeArea><NameSetupPrompt onSet={handleSetName} /></SafeArea>;

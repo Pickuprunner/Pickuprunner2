@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Send } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/constants/design';
@@ -124,9 +125,10 @@ export default ChatInputBar;
 
 const styles = StyleSheet.create({
   outerContainer: {
-    backgroundColor: '#0F131C',
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    borderTopColor: colors.glassLevel2Border,
+    paddingBottom: 4,
   },
   promptsList: {
     paddingHorizontal: 12,
@@ -138,9 +140,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 9999,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: colors.glassLevel2Bg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: colors.glassLevel2Border,
   },
   promptPillPressed: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -148,7 +150,7 @@ const styles = StyleSheet.create({
   },
   promptText: {
     fontSize: 12,
-    color: '#DFE2EF',
+    color: colors.onSurface,
     fontWeight: '500',
   },
   container: {
@@ -156,30 +158,30 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   inputWrapper: {
     flex: 1,
-    backgroundColor: '#181C28',
+    backgroundColor: colors.surfaceContainer,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: colors.glassLevel2Border,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    minHeight: 44,
+    minHeight: 42,
     justifyContent: 'center',
   },
   input: {
-    fontSize: 15,
-    color: '#DFE2EF',
+    fontSize: 14.5,
+    color: colors.onSurface,
     maxHeight: 100,
     paddingTop: 0,
     paddingBottom: 0,
   },
   sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
   },
