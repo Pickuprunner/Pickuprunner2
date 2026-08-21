@@ -71,9 +71,34 @@ interface TrackedOrder {
 }
 
 export default function TrackOrderScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const [order, setOrder] = useState<TrackedOrder | null>(null);
-  const [loading, setLoading] = useState(true);
+  const params = useLocalSearchParams<{
+    id: string;
+    deliveryAddress?: string;
+    pickupAddress?: string;
+    customerName?: string;
+    customerPhone?: string;
+    items?: string;
+    status?: string;
+  }>();
+  const id = params.id;
+
+  const [order, setOrder] = useState<TrackedOrder | null>(() => {
+    if (params.id && (params.deliveryAddress || params.pickupAddress)) {
+      return {
+        id: params.id,
+        deliveryAddress: params.deliveryAddress,
+        delivery_address: params.deliveryAddress,
+        pickupAddress: params.pickupAddress || APP_CONFIG.STORE_ADDRESS,
+        pickup_address: params.pickupAddress || APP_CONFIG.STORE_ADDRESS,
+        customerName: params.customerName || 'Customer',
+        customerPhone: params.customerPhone,
+        items: params.items,
+        status: (params.status as any) || 'pending',
+      };
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(!order);
   const [refreshing, setRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
@@ -85,7 +110,7 @@ export default function TrackOrderScreen() {
     async (isManualRefresh = false) => {
       if (!id) return;
       if (isManualRefresh) setRefreshing(true);
-      else setLoading(true);
+      else if (!order) setLoading(true);
 
       try {
         let foundOrder: any = null;
@@ -99,23 +124,62 @@ export default function TrackOrderScreen() {
 
         if (!foundOrder) {
           try {
+            const raw = await AsyncStorage.getItem('@pickuprunner_static_orders_v1');
+            if (raw) {
+              const list: TrackedOrder[] = JSON.parse(raw);
+              foundOrder = list.find((o) => o.id === id);
+            }
+          } catch {}
+        }
+
+        if (!foundOrder) {
+          try {
             foundOrder = await blink.db.orders.get(id);
           } catch {}
         }
 
-        if (foundOrder) {
+        const resolvedDelivery =
+          foundOrder?.deliveryAddress ||
+          foundOrder?.delivery_address ||
+          foundOrder?.delivery ||
+          foundOrder?.dropoffAddress ||
+          foundOrder?.dropoff_address ||
+          foundOrder?.destination ||
+          foundOrder?.address ||
+          params.deliveryAddress ||
+          '123 E Test Ave, Sahuarita, AZ 85629';
+
+        const resolvedPickup =
+          foundOrder?.pickupAddress ||
+          foundOrder?.pickup_address ||
+          foundOrder?.pickup ||
+          params.pickupAddress ||
+          APP_CONFIG.STORE_ADDRESS;
+
+        if (foundOrder || params.id) {
           setOrder({
-            id: foundOrder.id,
-            status: foundOrder.status || 'pending',
-            customerName: foundOrder.customerName || foundOrder.customer_name || 'Customer',
-            customerPhone: foundOrder.customerPhone || foundOrder.customer_phone,
-            pickupAddress: foundOrder.pickupAddress || foundOrder.pickup_address,
-            deliveryAddress: foundOrder.deliveryAddress || foundOrder.delivery_address,
-            items: foundOrder.items,
-            createdAt: foundOrder.createdAt || foundOrder.created_at,
-            driverName: foundOrder.driverName || foundOrder.driver_name,
-            driverPhotoUrl: foundOrder.driverPhotoUrl || foundOrder.driver_photo_url,
-            deliveryPhotoUrl: foundOrder.deliveryPhotoUrl || foundOrder.delivery_photo_url,
+            id: foundOrder?.id || params.id,
+            status: foundOrder?.status || (params.status as any) || 'pending',
+            customerName:
+              foundOrder?.customerName ||
+              foundOrder?.customer_name ||
+              params.customerName ||
+              'Customer',
+            customerPhone:
+              foundOrder?.customerPhone ||
+              foundOrder?.customer_phone ||
+              params.customerPhone,
+            pickupAddress: resolvedPickup,
+            pickup_address: resolvedPickup,
+            deliveryAddress: resolvedDelivery,
+            delivery_address: resolvedDelivery,
+            items: foundOrder?.items || params.items,
+            createdAt: foundOrder?.createdAt || foundOrder?.created_at,
+            driverName: foundOrder?.driverName || foundOrder?.driver_name,
+            driverPhotoUrl:
+              foundOrder?.driverPhotoUrl || foundOrder?.driver_photo_url,
+            deliveryPhotoUrl:
+              foundOrder?.deliveryPhotoUrl || foundOrder?.delivery_photo_url,
           });
         }
       } catch (e: any) {
@@ -125,7 +189,7 @@ export default function TrackOrderScreen() {
         setRefreshing(false);
       }
     },
-    [id]
+    [id, params]
   );
 
   const handleAssignTestDriver = async () => {
@@ -257,8 +321,23 @@ export default function TrackOrderScreen() {
 
   const shortId = order?.id ? order.id.slice(-6).toUpperCase() : '------';
   const customerName = order?.customerName || order?.customer_name || 'Customer';
-  const pickupAddress = order?.pickupAddress || order?.pickup_address || APP_CONFIG.STORE_ADDRESS || 'Store Pickup';
-  const deliveryAddress = order?.deliveryAddress || order?.delivery_address || '—';
+  const pickupAddress =
+    order?.pickupAddress ||
+    order?.pickup_address ||
+    (order as any)?.pickup ||
+    params.pickupAddress ||
+    APP_CONFIG.STORE_ADDRESS ||
+    'Store Pickup';
+  const deliveryAddress =
+    order?.deliveryAddress ||
+    order?.delivery_address ||
+    (order as any)?.delivery ||
+    (order as any)?.dropoffAddress ||
+    (order as any)?.dropoff_address ||
+    (order as any)?.destination ||
+    (order as any)?.address ||
+    params.deliveryAddress ||
+    '123 E Test Ave, Sahuarita, AZ 85629';
   const createdAt = order?.createdAt || order?.created_at;
 
   const currentStatus = order?.status || 'pending';
@@ -448,7 +527,6 @@ export default function TrackOrderScreen() {
           <TrackRouteCard
             pickupAddress={pickupAddress}
             deliveryAddress={deliveryAddress}
-            items={order.items}
           />
         </Animated.View>
 

@@ -68,7 +68,10 @@ export default function RoleSelectScreen() {
               transition={200}
             />
           </View>
-          <Text style={styles.brandTitle}>{APP_CONFIG.APP_NAME}</Text>
+          <Text style={styles.brandTitle}>
+            <Text style={styles.brandTitleFirst}>Pickup</Text>
+            <Text style={styles.brandTitleSecond}>Runner</Text>
+          </Text>
           <Text style={styles.tagline}>{APP_CONFIG.TAGLINE}</Text>
         </View>
 
@@ -197,11 +200,18 @@ const styles = StyleSheet.create({
     borderRadius: 54,
   },
   brandTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.onSurface,
+    fontSize: 30,
+    fontWeight: '800',
     marginBottom: 6,
     letterSpacing: -0.5,
+  },
+  brandTitleFirst: {
+    color: '#3B82F6',
+    fontWeight: '800',
+  },
+  brandTitleSecond: {
+    color: '#FFD200',
+    fontWeight: '800',
   },
   tagline: {
     fontSize: 15,

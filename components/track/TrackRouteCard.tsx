@@ -1,18 +1,17 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '@/constants/design';
 
 export interface TrackRouteCardProps {
   pickupAddress: string;
   deliveryAddress: string;
-  items?: string | null;
 }
 
-export function TrackRouteCard({ pickupAddress, deliveryAddress, items }: TrackRouteCardProps) {
+export function TrackRouteCard({ pickupAddress, deliveryAddress }: TrackRouteCardProps) {
   return (
     <View style={styles.card}>
-      <Text style={styles.cardHeaderLabel}>ROUTE & ITEM DETAILS</Text>
+      <Text style={styles.cardHeaderLabel}>ORDER DETAILS</Text>
 
       {/* Pickup point */}
       <View style={styles.detailItem}>
@@ -37,22 +36,6 @@ export function TrackRouteCard({ pickupAddress, deliveryAddress, items }: TrackR
           <Text style={styles.detailValue}>{deliveryAddress}</Text>
         </View>
       </View>
-
-      {/* Items list if provided */}
-      {!!items && (
-        <>
-          <View style={styles.detailDivider} />
-          <View style={styles.detailItem}>
-            <View style={[styles.detailIconBox, { borderColor: colors.accentAlpha40 }]}>
-              <Ionicons name="information-circle-outline" size={14} color={colors.secondary} />
-            </View>
-            <View style={styles.detailTextCol}>
-              <Text style={[styles.detailLabel, { color: colors.secondary }]}>ITEMS / PREFERENCES</Text>
-              <Text style={styles.detailValue}>{items}</Text>
-            </View>
-          </View>
-        </>
-      )}
     </View>
   );
 }
@@ -98,12 +81,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   detailValue: {
-    fontSize: 13.5,
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.onSurface,
-    lineHeight: 19,
+    lineHeight: 20,
   },
   detailDivider: {
     height: 1,
-    backgroundColor: colors.glassLevel2Border,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
 });

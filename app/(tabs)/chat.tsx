@@ -9,6 +9,7 @@ import {
   View,
   Text,
   ScrollView,
+  BackHandler,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -230,6 +231,17 @@ export default function ChatScreen() {
       </SafeArea>
     );
   }
+
+  // Handle hardware/gesture back press when in individual chat view
+  useEffect(() => {
+    if (!activeChatOrder) return;
+    const onBackPress = () => {
+      setActiveChatOrder(null);
+      return true; // prevent navigating away from screen
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [activeChatOrder]);
 
   if (!displayName) {
     return <SafeArea><NameSetupPrompt onSet={handleSetName} /></SafeArea>;

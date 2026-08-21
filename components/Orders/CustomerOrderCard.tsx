@@ -265,7 +265,17 @@ export function CustomerOrderCard({
           <TouchableOpacity
             onPress={() => {
               haptic();
-              router.push(`/(customer)/track/${order.id}` as any);
+              router.push({
+                pathname: `/(customer)/track/${order.id}`,
+                params: {
+                  deliveryAddress: order.deliveryAddress || order.delivery_address || '123 E Test Ave, Sahuarita, AZ 85629',
+                  pickupAddress: order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS,
+                  customerName: customerName,
+                  customerPhone: customerPhone,
+                  items: order.items || '',
+                  status: currentStatus,
+                },
+              } as any);
             }}
             activeOpacity={0.85}
             style={styles.actionButton}
@@ -279,7 +289,17 @@ export function CustomerOrderCard({
           <TouchableOpacity
             onPress={() => {
               haptic();
-              router.push(`/(customer)/track/${order.id}` as any);
+              router.push({
+                pathname: `/(customer)/track/${order.id}`,
+                params: {
+                  deliveryAddress: order.deliveryAddress || order.delivery_address || '123 E Test Ave, Sahuarita, AZ 85629',
+                  pickupAddress: order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS,
+                  customerName: customerName,
+                  customerPhone: customerPhone,
+                  items: order.items || '',
+                  status: currentStatus,
+                },
+              } as any);
             }}
             activeOpacity={0.85}
             style={styles.deliveredBadgeButton}

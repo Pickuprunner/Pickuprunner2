@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  BackHandler,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
@@ -260,6 +261,17 @@ export default function CustomerChatScreen() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Handle hardware/gesture back press when in individual chat view
+  useEffect(() => {
+    if (!activeChatOrder) return;
+    const onBackPress = () => {
+      setActiveChatOrder(null);
+      return true; // prevent navigating away from screen
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [activeChatOrder]);
 
   if (activeChatOrder) {
     return (
