@@ -102,7 +102,6 @@ export default function AdminScreen() {
 
   return (
     <SafeArea>
-      {/* Header gradient */}
       <LinearGradient
         colors={[APP_CONFIG.GRADIENT_START, APP_CONFIG.GRADIENT_MID, APP_CONFIG.GRADIENT_END]}
         start={{ x: 0, y: 0 }}
@@ -135,7 +134,6 @@ export default function AdminScreen() {
       >
         <YStack padding="$4" gap="$4">
 
-          {/* Tab switcher */}
           <BlinkToggleGroup
             options={[
               { label: 'Overview', value: 'overview' },
@@ -146,11 +144,9 @@ export default function AdminScreen() {
             onValueChange={(v) => setActiveTab(v as Tab)}
           />
 
-          {/* ── OVERVIEW TAB ── */}
           {activeTab === 'overview' && (
             <YStack gap="$4">
 
-              {/* Stats row */}
               <YStack gap="$2">
                 <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
                   DOCUMENT VERIFICATIONS
@@ -179,7 +175,6 @@ export default function AdminScreen() {
                 </XStack>
               </YStack>
 
-              {/* Driver roster */}
               <YStack gap="$2">
                 <SizableText size="$2" fontWeight="700" color="$color10" letterSpacing={0.5}>
                   ALL DRIVERS ({drivers.length})
@@ -214,8 +209,8 @@ export default function AdminScreen() {
                       borderWidth={1}
                       borderColor={
                         fullyCleared ? 'rgba(22,163,74,0.25)' :
-                        anyRejected ? 'rgba(220,38,38,0.25)' :
-                        '$color4'
+                          anyRejected ? 'rgba(220,38,38,0.25)' :
+                            '$color4'
                       }
                     >
                       <XStack justifyContent="space-between" alignItems="flex-start" marginBottom="$2">
@@ -229,37 +224,36 @@ export default function AdminScreen() {
                       </XStack>
 
                       <XStack gap="$3" flexWrap="wrap">
-                        {/* Doc status chip */}
                         <XStack
                           gap="$1" alignItems="center"
                           paddingHorizontal={8} paddingVertical={3}
                           borderRadius={6}
                           backgroundColor={
                             d.docStatus === 'approved' ? 'rgba(22,163,74,0.1)' :
-                            d.docStatus === 'rejected' ? 'rgba(220,38,38,0.1)' :
-                            d.docStatus ? 'rgba(217,119,6,0.1)' :
-                            'rgba(120,120,130,0.08)'
+                              d.docStatus === 'rejected' ? 'rgba(220,38,38,0.1)' :
+                                d.docStatus ? 'rgba(217,119,6,0.1)' :
+                                  'rgba(120,120,130,0.08)'
                           }
                           borderWidth={1}
                           borderColor={
                             d.docStatus === 'approved' ? 'rgba(22,163,74,0.3)' :
-                            d.docStatus === 'rejected' ? 'rgba(220,38,38,0.3)' :
-                            d.docStatus ? 'rgba(217,119,6,0.3)' :
-                            'rgba(120,120,130,0.2)'
+                              d.docStatus === 'rejected' ? 'rgba(220,38,38,0.3)' :
+                                d.docStatus ? 'rgba(217,119,6,0.3)' :
+                                  'rgba(120,120,130,0.2)'
                           }
                         >
                           <FileText size={11}
                             color={
                               d.docStatus === 'approved' ? '$green9' :
-                              d.docStatus === 'rejected' ? '$red9' :
-                              d.docStatus ? '$amber9' : '$color8'
+                                d.docStatus === 'rejected' ? '$red9' :
+                                  d.docStatus ? '$amber9' : '$color8'
                             }
                           />
                           <SizableText size="$1" fontWeight="700"
                             color={
                               d.docStatus === 'approved' ? '$green9' :
-                              d.docStatus === 'rejected' ? '$red9' :
-                              d.docStatus ? '$amber9' : '$color8'
+                                d.docStatus === 'rejected' ? '$red9' :
+                                  d.docStatus ? '$amber9' : '$color8'
                             }
                           >
                             {d.docStatus
@@ -268,37 +262,36 @@ export default function AdminScreen() {
                           </SizableText>
                         </XStack>
 
-                        {/* BG status chip */}
                         <XStack
                           gap="$1" alignItems="center"
                           paddingHorizontal={8} paddingVertical={3}
                           borderRadius={6}
                           backgroundColor={
                             d.bgStatus === 'approved' ? 'rgba(22,163,74,0.1)' :
-                            d.bgStatus === 'rejected' ? 'rgba(220,38,38,0.1)' :
-                            d.bgStatus ? 'rgba(217,119,6,0.1)' :
-                            'rgba(120,120,130,0.08)'
+                              d.bgStatus === 'rejected' ? 'rgba(220,38,38,0.1)' :
+                                d.bgStatus ? 'rgba(217,119,6,0.1)' :
+                                  'rgba(120,120,130,0.08)'
                           }
                           borderWidth={1}
                           borderColor={
                             d.bgStatus === 'approved' ? 'rgba(22,163,74,0.3)' :
-                            d.bgStatus === 'rejected' ? 'rgba(220,38,38,0.3)' :
-                            d.bgStatus ? 'rgba(217,119,6,0.3)' :
-                            'rgba(120,120,130,0.2)'
+                              d.bgStatus === 'rejected' ? 'rgba(220,38,38,0.3)' :
+                                d.bgStatus ? 'rgba(217,119,6,0.3)' :
+                                  'rgba(120,120,130,0.2)'
                           }
                         >
                           <Shield size={11}
                             color={
                               d.bgStatus === 'approved' ? '$green9' :
-                              d.bgStatus === 'rejected' ? '$red9' :
-                              d.bgStatus ? '$amber9' : '$color8'
+                                d.bgStatus === 'rejected' ? '$red9' :
+                                  d.bgStatus ? '$amber9' : '$color8'
                             }
                           />
                           <SizableText size="$1" fontWeight="700"
                             color={
                               d.bgStatus === 'approved' ? '$green9' :
-                              d.bgStatus === 'rejected' ? '$red9' :
-                              d.bgStatus ? '$amber9' : '$color8'
+                                d.bgStatus === 'rejected' ? '$red9' :
+                                  d.bgStatus ? '$amber9' : '$color8'
                             }
                           >
                             {d.bgStatus
@@ -314,7 +307,6 @@ export default function AdminScreen() {
             </YStack>
           )}
 
-          {/* ── DOCS TAB ── */}
           {activeTab === 'docs' && (
             <YStack gap="$3">
               {verifications.length === 0 ? (
@@ -332,7 +324,6 @@ export default function AdminScreen() {
             </YStack>
           )}
 
-          {/* ── BG CHECK TAB ── */}
           {activeTab === 'bgcheck' && (
             <YStack gap="$3">
               {bgChecks.length === 0 ? (

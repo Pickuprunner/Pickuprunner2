@@ -31,7 +31,7 @@ export function useAuth(): AuthState {
       setState((prev) => prev.isLoading ? { ...prev, isLoading: false } : prev);
     }, 3000);
 
-    const unsubscribe = blink.auth.onAuthStateChanged((authState) => {
+    const unsubscribe = blink.auth.onAuthStateChanged((authState: any) => {
       if (!authState.isLoading) {
         clearTimeout(timeout);
         setState({

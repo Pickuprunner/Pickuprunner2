@@ -43,17 +43,17 @@ function triggerHaptic(type: ToastType) {
   if (Platform.OS === 'web') return;
   switch (type) {
     case 'success':
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       break;
     case 'error':
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => { });
       break;
     case 'warning':
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
       break;
     case 'info':
     default:
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
       break;
   }
 }
@@ -249,9 +249,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           ]}
           pointerEvents="box-none"
         >
-          {/* Border Beam Outer Container */}
           <View style={styles.borderBeamOuter}>
-            {/* Rotating Beam Laser */}
             <Animated.View
               style={[
                 styles.rotatingBeamWrapper,
@@ -275,7 +273,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               />
             </Animated.View>
 
-            {/* Inner Dark Surface */}
             <View style={[styles.innerCard, { backgroundColor: config.bg }]}>
               <TouchableOpacity
                 activeOpacity={0.9}

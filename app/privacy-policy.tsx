@@ -105,7 +105,6 @@ export default function PrivacyPolicyScreen() {
         ))}
       </ScrollView>
 
-      {/* Sticky Bottom Bar */}
       <View
         style={[
           styles.bottomBar,

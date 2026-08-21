@@ -18,7 +18,7 @@ import { APP_CONFIG } from '@/lib/config';
 
 function haptic() {
   if (Platform.OS !== 'web') {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
   }
 }
 
@@ -156,7 +156,6 @@ export function CustomerOrderCard({
 
   const badge = getStatusBadge();
 
-  // ─── Header Slot ───
   const headerNode = (
     <View style={styles.header}>
       <View style={styles.userInfo}>
@@ -184,10 +183,8 @@ export function CustomerOrderCard({
     </View>
   );
 
-  // ─── Footer Slot ───
   const footerNode = (
     <View style={styles.footer}>
-      {/* Driver banner if assigned */}
       {driverName && !isDelivered && (
         <View style={styles.driverBanner}>
           <View style={styles.driverAvatar}>
@@ -202,7 +199,6 @@ export function CustomerOrderCard({
         </View>
       )}
 
-      {/* Price Bar with breakdown toggle */}
       <Pressable
         onPress={() => {
           haptic();
@@ -233,7 +229,6 @@ export function CustomerOrderCard({
         </View>
       </Pressable>
 
-      {/* Expandable Price Breakdown */}
       {expanded && (
         <View style={styles.breakdownDrawer}>
           <Text style={styles.breakdownHeader}>PRICE BREAKDOWN</Text>
@@ -265,9 +260,7 @@ export function CustomerOrderCard({
         </View>
       )}
 
-      {/* Action Buttons: Live Tracking + Support + Cancel */}
       <View style={styles.actionsContainer}>
-        {/* 1. Primary Tracking / Delivered Action */}
         {!isDelivered ? (
           <TouchableOpacity
             onPress={() => {
@@ -298,7 +291,6 @@ export function CustomerOrderCard({
           </TouchableOpacity>
         )}
 
-        {/* 2. Support Action (Available on all orders) */}
         <TouchableOpacity
           onPress={() => {
             haptic();
@@ -313,7 +305,6 @@ export function CustomerOrderCard({
           </Text>
         </TouchableOpacity>
 
-        {/* 3. Cancel Action (Available for pending orders) */}
         {isPending && onCancel ? (
           <TouchableOpacity
             onPress={() => {
@@ -341,11 +332,9 @@ export function CustomerOrderCard({
       onPress={onPress}
       style={[styles.cardContainer, style]}
     >
-      {/* ─── Routes Timeline with Connecting Line ─── */}
       <View style={styles.routesContainer}>
         <View style={styles.connectingLine} />
 
-        {/* Pickup Step */}
         <View style={styles.routeItem}>
           <View style={[styles.routeIcon, { borderColor: '#b3c5ff' }]}>
             <MaterialIcons name="inventory-2" size={12} color="#b3c5ff" />
@@ -358,7 +347,6 @@ export function CustomerOrderCard({
           </View>
         </View>
 
-        {/* Dropoff Step */}
         <View style={styles.routeItem}>
           <View style={[styles.routeIcon, { borderColor: '#00e297' }]}>
             <MaterialIcons name="location-on" size={12} color="#00e297" />
@@ -372,7 +360,6 @@ export function CustomerOrderCard({
         </View>
       </View>
 
-      {/* Package Items & Preferences Note */}
       {order.items ? (
         <View style={styles.itemsPill}>
           <Ionicons name="information-circle-outline" size={15} color="#8C90A1" />

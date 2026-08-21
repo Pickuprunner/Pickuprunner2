@@ -34,7 +34,7 @@ import {
 } from '@/components/Orders';
 
 function haptic() {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
 }
 
 export default function OrdersScreen() {
@@ -219,7 +219,6 @@ export default function OrdersScreen() {
 
   return (
     <View style={styles.root}>
-      {/* ─── Absolute Floating Animated Header ─── */}
       <Animated.View
         onLayout={onHeaderLayout}
         style={[
@@ -249,7 +248,6 @@ export default function OrdersScreen() {
         />
       </Animated.View>
 
-      {/* ─── Scrollable Orders List ─── */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
@@ -287,7 +285,6 @@ export default function OrdersScreen() {
         keyboardShouldPersistTaps="handled"
       />
 
-      {/* Floating Active Deliveries Banner (navigates directly to My Orders) */}
       <ActiveDeliveriesBanner queueCount={queueCount} orders={myActiveOrders} />
     </View>
   );

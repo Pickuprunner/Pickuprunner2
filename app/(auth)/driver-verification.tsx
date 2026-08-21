@@ -80,7 +80,7 @@ export default function DriverVerificationScreen() {
       }
       queryClient.invalidateQueries({ queryKey: ['driver_verification', user?.id] });
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
       setTimeout(() => {
         router.replace('/(tabs)');
@@ -133,11 +133,11 @@ export default function DriverVerificationScreen() {
         try {
           const ext = file.name.split('.').pop() ?? 'jpg';
           const path = `driver-docs/${user.id}/${docType}-${Date.now()}.${ext}`;
-          const { publicUrl } = await blink.storage.upload(file, path, {
-            onProgress: (pct) => setter((s) => ({ ...s, progress: pct })),
+          const { publicUrl } = await blink.storage.upload(path, file, {
+            onProgress: (pct: number) => setter((s) => ({ ...s, progress: pct })),
           });
           setter({ uri: publicUrl, name: file.name, uploading: false, publicUrl, progress: 100 });
-          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
         } catch (err: any) {
           setter(EMPTY_DOC);
           Alert.alert('Upload failed', err?.message ?? 'Please try again.');
@@ -174,19 +174,17 @@ export default function DriverVerificationScreen() {
       const ext = filename.split('.').pop() ?? 'jpg';
       const path = `driver-docs/${user.id}/${docType}-${Date.now()}.${ext}`;
 
-      const { publicUrl } = await blink.storage.upload(file, path, {
-        onProgress: (pct) => setter((s) => ({ ...s, progress: pct })),
+      const { publicUrl } = await blink.storage.upload(path, file, {
+        onProgress: (pct: number) => setter((s) => ({ ...s, progress: pct })),
       });
 
       setter({ uri: publicUrl, name: filename, uploading: false, publicUrl, progress: 100 });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
     } catch (err: any) {
       setter(EMPTY_DOC);
       Alert.alert('Upload failed', err?.message ?? 'Please try again.');
     }
   };
-
-  // ── Submit ───────────────────────────────────────────────────────────────────
 
   const handleSubmit = async () => {
     setSubmitError('');
@@ -211,7 +209,7 @@ export default function DriverVerificationScreen() {
         insuranceFilename: insurance.name,
         existingId: existing?.id,
       });
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       setShowForm(false);
       setLicense(EMPTY_DOC);
       setInsurance(EMPTY_DOC);
@@ -230,7 +228,6 @@ export default function DriverVerificationScreen() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Hero glow gradient */}
       <LinearGradient
         colors={gradients.heroGlow}
         locations={gradients.heroGlowLocations}
@@ -238,7 +235,6 @@ export default function DriverVerificationScreen() {
         pointerEvents="none"
       />
 
-      {/* Top Header */}
       <View
         style={[
           styles.headerRow,
@@ -258,7 +254,6 @@ export default function DriverVerificationScreen() {
           <Text style={styles.headerTitle}>Driver Verification</Text>
         </View>
 
-        {/* Status pill badge */}
         {existing ? (
           <View
             style={[
@@ -266,8 +261,8 @@ export default function DriverVerificationScreen() {
               isVerified
                 ? styles.statusBadgeApproved
                 : isPending
-                ? styles.statusBadgePending
-                : styles.statusBadgeRejected,
+                  ? styles.statusBadgePending
+                  : styles.statusBadgeRejected,
             ]}
           >
             <Text
@@ -276,8 +271,8 @@ export default function DriverVerificationScreen() {
                 isVerified
                   ? { color: colors.tertiary }
                   : isPending
-                  ? { color: colors.secondary }
-                  : { color: colors.error },
+                    ? { color: colors.secondary }
+                    : { color: colors.error },
               ]}
             >
               {isVerified ? 'APPROVED' : isPending ? 'PENDING' : 'REJECTED'}
@@ -298,7 +293,6 @@ export default function DriverVerificationScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.mainContainer}>
-          {/* Intro Section */}
           <View style={styles.introSection}>
             <Text style={styles.mainHeading}>Verify Your Identity</Text>
             <Text style={styles.mainDescription}>
@@ -306,7 +300,6 @@ export default function DriverVerificationScreen() {
             </Text>
           </View>
 
-          {/* Status banner for existing submissions */}
           {hasExisting && !showForm && (
             <StatusBanner
               status={existing.status as any}
@@ -315,7 +308,6 @@ export default function DriverVerificationScreen() {
             />
           )}
 
-          {/* What we check card */}
           {!hasExisting && (
             <View style={styles.infoCard}>
               <Text style={styles.sectionHeader}>WHAT WE VERIFY</Text>
@@ -335,7 +327,6 @@ export default function DriverVerificationScreen() {
             </View>
           )}
 
-          {/* Upload form */}
           {showUploadForm && !isPending && !isVerified && (
             <View style={styles.formSection}>
               <View style={styles.uploadHeaderRow}>
@@ -383,7 +374,6 @@ export default function DriverVerificationScreen() {
                 onPick={() => pickAndUpload('insurance', setInsurance)}
               />
 
-              {/* Tips */}
               <View style={styles.tipsCard}>
                 <Text style={styles.tipsHeader}>TIPS FOR BEST RESULTS</Text>
                 <View style={styles.tipsList}>
@@ -401,7 +391,6 @@ export default function DriverVerificationScreen() {
                 </View>
               </View>
 
-              {/* Error */}
               {!!submitError && (
                 <View style={styles.errorBox}>
                   <AlertCircle size={16} color={colors.error} />
@@ -409,7 +398,6 @@ export default function DriverVerificationScreen() {
                 </View>
               )}
 
-              {/* Submit CTA */}
               <Pressable
                 onPress={handleSubmit}
                 disabled={!canSubmit || submitVerification.isPending}
@@ -434,7 +422,6 @@ export default function DriverVerificationScreen() {
             </View>
           )}
 
-          {/* Approved state */}
           {isVerified && (
             <View style={styles.approvedSection}>
               <Text style={styles.sectionHeader}>SUBMITTED DOCUMENTS</Text>
@@ -469,7 +456,6 @@ export default function DriverVerificationScreen() {
             </View>
           )}
 
-          {/* Pending state */}
           {isPending && (
             <View style={styles.pendingSection}>
               <Text style={styles.sectionHeader}>DOCUMENTS SUBMITTED</Text>

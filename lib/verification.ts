@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { blink } from './blink';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ORDER_SCOPE } from './config';
 
 export interface DriverVerification {
@@ -18,76 +18,89 @@ export interface DriverVerification {
   reviewed_at?: string;
 }
 
-/** Fetch the current driver's own verification record */
+const VERIF_STORAGE_KEY = '@pickuprunner_static_verifications_v1';
+
+const INITIAL_VERIFICATIONS: DriverVerification[] = [
+  {
+    id: 'verif_sample_101',
+    user_id: 'usr_static_driver_101',
+    driver_name: 'Alex Driver',
+    driver_email: 'driver@pickuprunner.com',
+    license_url: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=500',
+    license_filename: 'driver_license.jpg',
+    insurance_url: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=500',
+    insurance_filename: 'auto_insurance.pdf',
+    status: 'approved',
+    order_scope: ORDER_SCOPE,
+    submitted_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
+    reviewed_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
+  },
+];
+
+async function getStoredVerifications(): Promise<DriverVerification[]> {
+  try {
+    const raw = await AsyncStorage.getItem(VERIF_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (err) {
+    console.warn('[verification] AsyncStorage error:', err);
+  }
+  await AsyncStorage.setItem(VERIF_STORAGE_KEY, JSON.stringify(INITIAL_VERIFICATIONS));
+  return INITIAL_VERIFICATIONS;
+}
+
+async function saveStoredVerifications(items: DriverVerification[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(VERIF_STORAGE_KEY, JSON.stringify(items));
+  } catch (err) {
+    console.warn('[verification] AsyncStorage save error:', err);
+  }
+}
+
 export function useMyVerification(userId: string | undefined) {
   return useQuery({
     queryKey: ['driver_verification', userId],
     enabled: !!userId,
     queryFn: async () => {
-      const rows = await blink.db.driverVerifications.list({
-        where: { user_id: userId! },
-        limit: 1,
-      });
-      return (rows[0] as DriverVerification) ?? null;
+      const items = await getStoredVerifications();
+      return items.find((v) => v.user_id === userId) ?? null;
     },
     staleTime: 30_000,
   });
 }
 
-/** Fetch a driver's user profile (phone, avatar, join date) */
 export function useDriverProfile(userId: string | undefined) {
   return useQuery({
     queryKey: ['driver_profile', userId],
     enabled: !!userId,
     queryFn: async () => {
-      try {
-        const users = await blink.db.users.list({ where: { id: userId! }, limit: 1 });
-        const user = users[0] as any;
-        if (!user) return null;
-        let metadata: any = {};
-        try {
-          metadata = typeof user.metadata === 'string' ? JSON.parse(user.metadata) : (user.metadata || {});
-        } catch {}
-        return {
-          id: user.id,
-          email: user.email,
-          displayName: user.display_name,
-          avatarUrl: user.avatar_url,
-          phone: user.phone,
-          createdAt: user.created_at,
-          role: user.role,
-          stripeAccountId: metadata?.stripeAccountId ?? null,
-        };
-      } catch {
-        return null;
-      }
+      return {
+        id: userId || 'usr_static_driver_101',
+        email: 'driver@pickuprunner.com',
+        displayName: 'Alex Driver',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+        phone: '(555) 987-6543',
+        createdAt: new Date().toISOString(),
+        role: 'driver',
+        stripeAccountId: 'acct_static_12345',
+      };
     },
     staleTime: 60_000,
   });
 }
 
-/** Fetch ALL verifications for this scope (admin use) */
 export function useAllVerifications() {
   return useQuery({
     queryKey: ['all_driver_verifications'],
     queryFn: async () => {
-      try {
-        const rows = await blink.db.driverVerifications.list({
-          where: { order_scope: ORDER_SCOPE },
-          orderBy: { submitted_at: 'desc' },
-        });
-        return rows as DriverVerification[];
-      } catch (err) {
-        console.warn('[useAllVerifications] query failed:', err);
-        return [] as DriverVerification[];
-      }
+      return await getStoredVerifications();
     },
     staleTime: 15_000,
-    retry: false,
   });
 }
 
-/** Submit or update a verification */
 export function useSubmitVerification() {
   const qc = useQueryClient();
   return useMutation({
@@ -101,19 +114,11 @@ export function useSubmitVerification() {
       insuranceFilename: string;
       existingId?: string;
     }) => {
-      const id = data.existingId ?? `dv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      if (data.existingId) {
-        return blink.db.driverVerifications.update(id, {
-          license_url: data.licenseUrl,
-          license_filename: data.licenseFilename,
-          insurance_url: data.insuranceUrl,
-          insurance_filename: data.insuranceFilename,
-          status: 'pending',
-          admin_note: undefined,
-          submitted_at: new Date().toISOString(),
-        }) as Promise<DriverVerification>;
-      }
-      return blink.db.driverVerifications.create({
+      const items = await getStoredVerifications();
+      const now = new Date().toISOString();
+      const id = data.existingId ?? `verif-${Date.now()}`;
+
+      const newVerif: DriverVerification = {
         id,
         user_id: data.userId,
         driver_name: data.driverName,
@@ -124,16 +129,26 @@ export function useSubmitVerification() {
         insurance_filename: data.insuranceFilename,
         status: 'pending',
         order_scope: ORDER_SCOPE,
-      }) as Promise<DriverVerification>;
+        submitted_at: now,
+      };
+
+      const existingIndex = items.findIndex((v) => v.id === id || v.user_id === data.userId);
+      if (existingIndex >= 0) {
+        items[existingIndex] = newVerif;
+      } else {
+        items.unshift(newVerif);
+      }
+
+      await saveStoredVerifications(items);
+      return newVerif;
     },
-    onSuccess: (_result, vars) => {
+    onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['driver_verification', vars.userId] });
       qc.invalidateQueries({ queryKey: ['all_driver_verifications'] });
     },
   });
 }
 
-/** Admin: approve or reject a verification */
 export function useReviewVerification() {
   const qc = useQueryClient();
   return useMutation({
@@ -146,15 +161,20 @@ export function useReviewVerification() {
       status: 'approved' | 'rejected';
       adminNote?: string;
     }) => {
-      return blink.db.driverVerifications.update(id, {
-        status,
-        admin_note: adminNote ?? null,
-        reviewed_at: new Date().toISOString(),
-      });
+      const items = await getStoredVerifications();
+      const target = items.find((v) => v.id === id);
+      if (!target) throw new Error('Verification record not found');
+
+      target.status = status;
+      target.admin_note = adminNote;
+      target.reviewed_at = new Date().toISOString();
+
+      await saveStoredVerifications(items);
+      return target;
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['driver_verification', updated.user_id] });
       qc.invalidateQueries({ queryKey: ['all_driver_verifications'] });
-      qc.invalidateQueries({ queryKey: ['driver_verification'] });
     },
   });
 }

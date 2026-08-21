@@ -39,7 +39,7 @@ import {
 
 function haptic() {
   if (Platform.OS !== 'web') {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
   }
 }
 
@@ -154,7 +154,6 @@ function CustomerOrderChatView({
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Unified Chat Header */}
       <ChatHeader
         title={driverDisplayName}
         orderNumber={shortId}
@@ -163,7 +162,6 @@ function CustomerOrderChatView({
         onBack={onBack}
       />
 
-      {/* Chat Messages */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -190,7 +188,6 @@ function CustomerOrderChatView({
           />
         )}
 
-        {/* Input Bar with Quick Prompts */}
         <ChatInputBar
           value={inputText}
           onChangeText={setInputText}
@@ -216,12 +213,11 @@ export default function CustomerChatScreen() {
   const [customerName, setCustomerName] = useState('Customer');
 
   const fetchOrders = useCallback(async () => {
-    // 1. Read local cache
     let local: CustomerOrderData[] = [];
     try {
       const raw = await AsyncStorage.getItem('customer_local_orders');
       if (raw) local = JSON.parse(raw);
-    } catch {}
+    } catch { }
 
     const name = (await AsyncStorage.getItem('customer_display_name')) || 'Customer';
     setCustomerName(name);
@@ -302,7 +298,6 @@ export default function CustomerChatScreen() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Screen Header */}
       <View style={[styles.screenHeader, { paddingTop: Math.max(insets.top, 16) }]}>
         <Text style={styles.headerTitle}>Driver Chat</Text>
         <View style={styles.headerSubtitleRow}>
@@ -315,7 +310,6 @@ export default function CustomerChatScreen() {
         </View>
       </View>
 
-      {/* Conversations List */}
       <FlatList
         data={[]}
         renderItem={null}

@@ -215,7 +215,6 @@ export function DriverOrderCard({
         )}
       </View>
 
-      {/* Action Buttons */}
       <View style={styles.actionsContainer}>
         <TouchableOpacity
           onPress={() => {
@@ -296,11 +295,9 @@ export function DriverOrderCard({
       onPress={onPress}
       style={[styles.cardContainer, style]}
     >
-      {/* ─── Routes Timeline with Connecting Line ─── */}
       <View style={styles.routesContainer}>
         <View style={styles.connectingLine} />
 
-        {/* Pickup Step */}
         <View style={styles.routeItem}>
           <View style={[styles.routeIcon, { borderColor: '#b3c5ff' }]}>
             <MaterialIcons name="inventory-2" size={12} color="#b3c5ff" />
@@ -313,7 +310,6 @@ export function DriverOrderCard({
           </View>
         </View>
 
-        {/* Dropoff Step */}
         <View style={styles.routeItem}>
           <View style={[styles.routeIcon, { borderColor: '#00e297' }]}>
             <MaterialIcons name="location-on" size={12} color="#00e297" />

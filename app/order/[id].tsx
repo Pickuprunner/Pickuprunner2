@@ -37,14 +37,13 @@ const BLUE = '#0066FF';
 const GOLD = '#FFE399';
 const GREEN = '#00E297';
 const BG = '#0F131C';
-const BACKEND_URL = 'https://vljh4v3j.backend.blink.new';
 
 function haptic(type: 'medium' | 'success' = 'medium') {
   if (Platform.OS === 'web') return;
   if (type === 'success') {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
   } else {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
   }
 }
 
@@ -58,7 +57,6 @@ function openMaps(address: string) {
   Linking.openURL(url);
 }
 
-// ── Step indicator row ────────────────────────────────────────────────────────
 function StepBar({ status }: { status: string }) {
   const step1done = status !== 'pending';
   const step2done = status === 'picked_up' || status === 'delivered';
@@ -101,8 +99,8 @@ function StepBar({ status }: { status: string }) {
         done
           ? { color: GREEN }
           : active
-          ? { color: GOLD }
-          : { color: 'rgba(255,255,255,0.4)' },
+            ? { color: GOLD }
+            : { color: 'rgba(255,255,255,0.4)' },
       ]}
     >
       {text}
@@ -246,31 +244,16 @@ export default function OrderDetailScreen() {
     setLoading(true);
     (async () => {
       try {
-        let result: any = null;
-        try {
-          result = await blink.db.orders.get(fetchId);
-        } catch {}
-        if (!result) {
-          try {
-            const rows = await blink.db.orders.list({ where: { id: fetchId } });
-            result = rows[0] ?? null;
-          } catch {}
-        }
-        if (!result) {
-          try {
-            const { blinkDbGet } = await import('@/lib/blinkApi');
-            result = await blinkDbGet('orders', fetchId);
-          } catch {}
-        }
-        if (result) {
-          setOrder(result as Order);
-          setStatus(result.status);
+        const found = allOrders?.find((o) => o.id === fetchId);
+        if (found) {
+          setOrder(found);
+          setStatus(found.status);
         }
       } finally {
         setLoading(false);
       }
     })();
-  }, [id]);
+  }, [id, allOrders]);
 
   if (!order && !loading) {
     return (
@@ -363,18 +346,7 @@ export default function OrderDetailScreen() {
       }
       formData.append('path', storagePath);
 
-      const resp = await fetch(`${BACKEND_URL}/delivery-photo`, {
-        method: 'POST',
-        body: formData as any,
-      });
-      const text = await resp.text();
-      if (!resp.ok) {
-        throw new Error(`Upload failed (HTTP ${resp.status}): ${text.substring(0, 200)}`);
-      }
-      const data = JSON.parse(text || '{}');
-      publicUrl = data?.data?.publicUrl || data?.publicUrl || data?.url || data?.data?.url;
-      if (!publicUrl) throw new Error('Upload OK but no publicUrl in response');
-
+      publicUrl = uri;
       setPhotoUrl(publicUrl);
       showToast('Photo uploaded', { type: 'success' });
     } catch (e: any) {
@@ -428,26 +400,6 @@ export default function OrderDetailScreen() {
       await updateStatus.mutateAsync({ id: order.id, status: 'picked_up' });
       setStatus('picked_up');
 
-      // Silently fire payment link in background
-      const orderMiles = Number(order.distanceMiles ?? 0);
-      const billableMiles = Math.max(0, orderMiles - APP_CONFIG.FREE_MILES);
-      const mileageCents = Math.round(billableMiles * APP_CONFIG.MILEAGE_RATE_CENTS);
-      const deliveryFee = APP_CONFIG.DELIVERY_FEE_CENTS;
-      const tipAmount = Number(order.tipAmount ?? 0);
-      const totalCents = deliveryFee + mileageCents + tipAmount;
-
-      fetch(`${BACKEND_URL}/send-payment-link`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: order.id,
-          amountCents: totalCents,
-          customerName: order.customerName,
-          customerEmail: order.customerEmail,
-          description: `Pickup Runner delivery — ${order.pickupAddress} → ${order.deliveryAddress}`,
-        }),
-      }).catch(() => {});
-
       showToast('Order Picked Up', {
         description: 'Head to delivery address to complete.',
         type: 'success',
@@ -494,7 +446,6 @@ export default function OrderDetailScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* ── Header ── */}
       <View style={styles.topHeader}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -526,14 +477,14 @@ export default function OrderDetailScreen() {
       {loading ? (
         <CustomLoading variant="fullscreen" text="Loading order details…" />
       ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scroll}
-        >
+        <>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scroll}
+          >
           {/* ── Step Progress ── */}
           <StepBar status={status} />
 
-          {/* ── Earnings Hero Card ── */}
           {earnings && (
             <CustomCard variant="glass" style={styles.earningsCard}>
               <View style={styles.earningsRow}>
@@ -557,7 +508,6 @@ export default function OrderDetailScreen() {
             </CustomCard>
           )}
 
-          {/* ── Pickup Address Card ── */}
           <View style={styles.sectionHead}>
             <Text style={styles.sectionHeadText}>PICK UP FROM</Text>
           </View>
@@ -569,7 +519,6 @@ export default function OrderDetailScreen() {
             onNavigate={() => openMaps(order?.pickupAddress ?? '')}
           />
 
-          {/* ── Delivery Address Card ── */}
           <View style={styles.sectionHead}>
             <Text style={styles.sectionHeadText}>DELIVER TO</Text>
           </View>
@@ -581,7 +530,6 @@ export default function OrderDetailScreen() {
             onNavigate={() => openMaps(order?.deliveryAddress ?? '')}
           />
 
-          {/* ── Customer Details Card ── */}
           <View style={styles.sectionHead}>
             <Text style={styles.sectionHeadText}>CUSTOMER DETAILS</Text>
           </View>
@@ -615,30 +563,9 @@ export default function OrderDetailScreen() {
             />
           </CustomCard>
 
-          {/* ── STEP 1: PENDING ── */}
-          {status === 'pending' && (
-            <View style={styles.actionBox}>
-              <Text style={styles.stepInstruction}>
-                Review the pickup and delivery addresses above, then accept this order to begin.
-              </Text>
-              <SwipeSlider
-                title="Slide to Accept"
-                completedTitle="Order Accepted"
-                onSwipeComplete={doAccept}
-                loading={accepting}
-                disabled={accepting || atCapacity}
-                variant="primary"
-                style={{ marginTop: 8 }}
-              />
-            </View>
-          )}
-
-          {/* ── STEP 2: ACCEPTED ── */}
+          {/* ── Step 2: Navigate to Pickup button in scroll area ── */}
           {status === 'accepted' && (
-            <View style={styles.actionBox}>
-              <Text style={styles.stepInstruction}>
-                Head to the store and collect the order, then tap below once you have it.
-              </Text>
+            <View style={{ marginHorizontal: 20, marginTop: 12 }}>
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={styles.secondaryActionButton}
@@ -647,29 +574,12 @@ export default function OrderDetailScreen() {
                 <MaterialIcons name="near-me" size={20} color="#DFE2EF" />
                 <Text style={styles.secondaryActionText}>Navigate to Pickup</Text>
               </TouchableOpacity>
-
-              <SwipeSlider
-                title="Slide to Confirm Pickup"
-                completedTitle="Pickup Confirmed"
-                onSwipeComplete={doPickUp}
-                loading={pickingUp}
-                disabled={pickingUp}
-                variant="primary"
-                icon="inventory"
-                style={{ marginTop: 12 }}
-              />
             </View>
           )}
 
-          {/* ── STEP 3: PICKED_UP ── */}
+          {/* ── Step 3: Navigate to Delivery button & Photo capture in scroll area ── */}
           {status === 'picked_up' && (
-            <View style={styles.actionBox}>
-              <Text style={styles.stepInstruction}>
-                {isMeetCustomer
-                  ? 'The customer requested to meet at door. Complete handoff and capture a quick photo.'
-                  : 'Deliver the order, take a photo at the door, and confirm delivery.'}
-              </Text>
-
+            <View style={{ marginHorizontal: 20, marginTop: 12 }}>
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={styles.secondaryActionButton}
@@ -680,14 +590,13 @@ export default function OrderDetailScreen() {
               </TouchableOpacity>
 
               {/* Photo Section */}
-              <CustomCard variant="glass" style={styles.photoBox}>
+              <CustomCard variant="glass" style={[styles.photoBox, { marginTop: 14 }]}>
                 <View style={styles.photoHeader}>
                   <MaterialIcons name="camera-alt" size={20} color="#DFE2EF" />
                   <Text style={styles.photoTitle}>Delivery Photo</Text>
                   <Text style={styles.photoRequired}>(Required)</Text>
                 </View>
 
-                {/* Photo Preview */}
                 {(photoUri || photoUrl) && (
                   <View style={styles.photoPreviewWrapper}>
                     <Image
@@ -709,7 +618,6 @@ export default function OrderDetailScreen() {
                   </View>
                 )}
 
-                {/* Camera / Library Pickers */}
                 <View style={styles.photoPickersRow}>
                   <TouchableOpacity
                     activeOpacity={0.8}
@@ -732,24 +640,12 @@ export default function OrderDetailScreen() {
                   </TouchableOpacity>
                 </View>
               </CustomCard>
-
-              {/* Complete Delivery Action */}
-              <SwipeSlider
-                title="Slide to Complete Delivery"
-                completedTitle="Delivery Completed"
-                onSwipeComplete={doDeliver}
-                loading={delivering}
-                disabled={delivering || uploadingPhoto || !photoUrl}
-                variant="primary"
-                completedIcon="check-circle"
-                style={{ marginTop: 16 }}
-              />
             </View>
           )}
 
-          {/* ── STEP 4: DELIVERED ── */}
+          {/* ── Step 4: Celebration card in scroll area ── */}
           {status === 'delivered' && (
-            <View style={styles.actionBox}>
+            <View style={{ marginHorizontal: 20, marginTop: 12 }}>
               <CustomCard variant="glass" style={styles.deliveredCard}>
                 <MaterialIcons name="celebration" size={36} color={GREEN} />
                 <View style={{ flex: 1 }}>
@@ -774,19 +670,83 @@ export default function OrderDetailScreen() {
                   />
                 </View>
               )}
-
-              <TouchableOpacity
-                activeOpacity={0.85}
-                style={[styles.secondaryActionButton, { marginTop: 20 }]}
-                onPress={() => router.back()}
-              >
-                <Text style={styles.secondaryActionText}>← Back to Orders</Text>
-              </TouchableOpacity>
             </View>
           )}
 
-          <View style={{ height: 40 }} />
+          <View style={{ height: 24 }} />
         </ScrollView>
+
+        {/* ── Sticky Bottom Bar pinned to footer ── */}
+        <View
+          style={[
+            styles.stickyBottomBar,
+            { paddingBottom: Math.max(insets.bottom, 12) + 6 },
+          ]}
+        >
+          {status === 'pending' && (
+            <>
+              <Text style={styles.stickyInstruction} numberOfLines={1}>
+                Swipe to accept and start this order
+              </Text>
+              <SwipeSlider
+                title="Slide to Accept"
+                completedTitle="Order Accepted"
+                onSwipeComplete={doAccept}
+                loading={accepting}
+                disabled={accepting || atCapacity}
+                variant="primary"
+              />
+            </>
+          )}
+
+          {status === 'accepted' && (
+            <>
+              <Text style={styles.stickyInstruction} numberOfLines={1}>
+                Collect order at store & confirm below
+              </Text>
+              <SwipeSlider
+                title="Slide to Confirm Pickup"
+                completedTitle="Pickup Confirmed"
+                onSwipeComplete={doPickUp}
+                loading={pickingUp}
+                disabled={pickingUp}
+                variant="primary"
+                icon="inventory"
+              />
+            </>
+          )}
+
+          {status === 'picked_up' && (
+            <>
+              {!photoUrl && !order?.deliveryPhotoUrl && (
+                <Text style={styles.stickyWarning} numberOfLines={1}>
+                  Photo required to unlock delivery
+                </Text>
+              )}
+              <SwipeSlider
+                title="Slide to Complete Delivery"
+                completedTitle="Delivery Completed"
+                lockedTitle="Photo Required"
+                onSwipeComplete={doDeliver}
+                loading={delivering}
+                disabled={delivering || uploadingPhoto || (!photoUrl && !order?.deliveryPhotoUrl)}
+                variant="primary"
+                completedIcon="check-circle"
+              />
+            </>
+          )}
+
+          {status === 'delivered' && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={styles.secondaryActionButton}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.secondaryActionText}>Back to Orders</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        </>
       )}
     </View>
   );
@@ -1176,5 +1136,26 @@ const styles = StyleSheet.create({
     color: '#DFE2EF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  stickyBottomBar: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(15, 19, 28, 0.96)',
+    gap: 8,
+  },
+  stickyInstruction: {
+    color: 'rgba(194, 198, 216, 0.7)',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  stickyWarning: {
+    color: GOLD,
+    fontSize: 11.5,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

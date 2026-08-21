@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,14 +11,24 @@ import {
   ViewStyle,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { colors, borderRadius, spacing } from '@/constants/design';
+
+export type SwipeSliderVariant =
+  | 'primary'
+  | 'secondary'
+  | 'success'
+  | 'cobalt'
+  | 'amber'
+  | 'emerald';
 
 export interface SwipeSliderProps {
   title: string;
   completedTitle?: string;
+  lockedTitle?: string;
   onSwipeComplete: () => void | Promise<void>;
-  variant?: 'primary' | 'secondary' | 'success';
+  variant?: SwipeSliderVariant;
   icon?: keyof typeof MaterialIcons.glyphMap;
   completedIcon?: keyof typeof MaterialIcons.glyphMap;
   loading?: boolean;
@@ -26,67 +36,133 @@ export interface SwipeSliderProps {
   style?: StyleProp<ViewStyle>;
 }
 
+const CONTAINER_HEIGHT = 60;
+const PADDING = 5;
 const THUMB_WIDTH = 76;
-const CONTAINER_HEIGHT = 64;
-const PADDING = 6;
-const THUMB_HEIGHT = CONTAINER_HEIGHT - PADDING * 2; // 52px
+const THUMB_HEIGHT = CONTAINER_HEIGHT - PADDING * 2; // 50px
 
 export function SwipeSlider({
   title,
-  completedTitle = 'Order Accepted',
+  completedTitle = 'Complete',
+  lockedTitle,
   onSwipeComplete,
   variant = 'primary',
-  icon = 'chevron-right',
-  completedIcon = 'check-circle',
+  icon = 'arrow-forward',
+  completedIcon = 'check',
   loading = false,
   disabled = false,
   style,
 }: SwipeSliderProps) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [passedThreshold, setPassedThreshold] = useState(false);
 
-  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const pan = useRef(new Animated.Value(0)).current;
+  const thumbScale = useRef(new Animated.Value(1)).current;
   const passedRef = useRef(false);
 
   const maxSlide = Math.max(0, containerWidth - THUMB_WIDTH - PADDING * 2);
 
-  const translateBtn = pan.x.interpolate({
+  // Sync loading prop with slide position (keep thumb at the end during loading)
+  const isBusy = loading || isProcessing;
+
+  useEffect(() => {
+    if (isBusy || isCompleted) {
+      if (maxSlide > 0) {
+        Animated.timing(pan, {
+          toValue: maxSlide,
+          duration: 180,
+          useNativeDriver: false,
+        }).start();
+      }
+    }
+  }, [isBusy, isCompleted, maxSlide]);
+
+  // Determine variant theme colors
+  const isAmber = variant === 'secondary' || variant === 'amber';
+  const isEmerald = variant === 'success' || variant === 'emerald';
+
+  const fillGradient = isEmerald
+    ? (['rgba(0, 226, 151, 0.85)', 'rgba(0, 130, 85, 0.95)'] as const)
+    : isAmber
+    ? (['rgba(244, 195, 0, 0.85)', 'rgba(241, 193, 0, 0.95)'] as const)
+    : (['rgba(0, 102, 255, 0.85)', 'rgba(0, 84, 214, 0.95)'] as const);
+
+  const glowColor = isEmerald
+    ? colors.tertiary
+    : isAmber
+    ? colors.secondaryContainer
+    : colors.primaryContainer;
+
+  const accentColor = isEmerald
+    ? colors.tertiary
+    : isAmber
+    ? colors.secondary
+    : colors.primary;
+
+  const activeThumbBorder = isEmerald
+    ? 'rgba(0, 226, 151, 0.45)'
+    : isAmber
+    ? 'rgba(244, 195, 0, 0.45)'
+    : 'rgba(0, 102, 255, 0.45)';
+
+  // Animations
+  const translateBtn = pan.interpolate({
     inputRange: [0, Math.max(1, maxSlide)],
     outputRange: [0, Math.max(1, maxSlide)],
     extrapolate: 'clamp',
   });
 
-  const textOpacity = pan.x.interpolate({
-    inputRange: [0, Math.max(1, maxSlide / 2)],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  });
-
-  const translateText = pan.x.interpolate({
-    inputRange: [0, Math.max(1, maxSlide / 2)],
-    outputRange: [0, Math.max(1, maxSlide / 4)],
-    extrapolate: 'clamp',
-  });
-
-  const getProgressWidth = pan.x.interpolate({
+  const fillTranslateX = pan.interpolate({
     inputRange: [0, Math.max(1, maxSlide)],
-    outputRange: [0, maxSlide + THUMB_WIDTH + PADDING],
+    outputRange: [-maxSlide, 0],
     extrapolate: 'clamp',
   });
 
-  const [isProcessing, setIsProcessing] = useState(false);
+  const textOpacity = pan.interpolate({
+    inputRange: [0, Math.max(1, maxSlide * 0.45)],
+    outputRange: [0.75, 0],
+    extrapolate: 'clamp',
+  });
+
+  const translateText = pan.interpolate({
+    inputRange: [0, Math.max(1, maxSlide * 0.45)],
+    outputRange: [0, Math.max(1, maxSlide * 0.2)],
+    extrapolate: 'clamp',
+  });
 
   const triggerHapticLight = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+    }
+  };
+
+  const triggerHapticMedium = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
   };
 
   const triggerHapticSuccess = () => {
     if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
     }
+  };
+
+  const pulseThumb = () => {
+    Animated.sequence([
+      Animated.timing(thumbScale, {
+        toValue: 1.12,
+        duration: 160,
+        useNativeDriver: false,
+      }),
+      Animated.timing(thumbScale, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: false,
+      }),
+    ]).start();
   };
 
   const reset = () => {
@@ -95,21 +171,23 @@ export function SwipeSlider({
     setIsProcessing(false);
     setIsCompleted(false);
     Animated.spring(pan, {
-      toValue: { x: 0, y: 0 },
+      toValue: 0,
       useNativeDriver: false,
       bounciness: 0,
     }).start();
   };
 
-  const unlock = async () => {
+  const completeSwipe = async () => {
     setIsProcessing(true);
     triggerHapticSuccess();
 
-    Animated.timing(pan.x, {
+    Animated.timing(pan, {
       toValue: maxSlide,
-      duration: 100,
+      duration: 160,
       useNativeDriver: false,
     }).start();
+
+    pulseThumb();
 
     try {
       await onSwipeComplete();
@@ -123,27 +201,28 @@ export function SwipeSlider({
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => !disabled && !loading && !isProcessing && !isCompleted,
+      onStartShouldSetPanResponder: () =>
+        !disabled && !isBusy && !isCompleted,
       onMoveShouldSetPanResponder: (_, g) =>
-        !disabled && !loading && !isProcessing && !isCompleted && Math.abs(g.dx) > 2,
+        !disabled && !isBusy && !isCompleted && Math.abs(g.dx) > 2,
       onPanResponderGrant: () => {
         triggerHapticLight();
       },
-      onPanResponderMove: (_: any, g: any) => {
-        pan.setValue({ x: Math.max(0, g.dx), y: 0 });
+      onPanResponderMove: (_, g) => {
+        pan.setValue(Math.max(0, g.dx));
         if (maxSlide <= 0) return;
         if (g.dx >= maxSlide * 0.75 && !passedRef.current) {
           passedRef.current = true;
           setPassedThreshold(true);
-          triggerHapticLight();
+          triggerHapticMedium();
         } else if (g.dx < maxSlide * 0.75 && passedRef.current) {
           passedRef.current = false;
           setPassedThreshold(false);
         }
       },
-      onPanResponderRelease: (_: any, g: any) => {
-        if (g.vx > 1.5 || g.dx > maxSlide * 0.7) {
-          unlock();
+      onPanResponderRelease: (_, g) => {
+        if (g.vx > 1.2 || g.dx >= maxSlide * 0.72) {
+          completeSwipe();
         } else {
           reset();
         }
@@ -152,19 +231,15 @@ export function SwipeSlider({
     })
   ).current;
 
-  const getPrimaryColor = () => {
-    if (passedThreshold || isCompleted || isProcessing) return colors.tertiary; // #00E297
-    if (variant === 'secondary') return colors.secondaryContainer; // #F4C300
-    return colors.primaryContainer; // #0066FF
-  };
-
-  const showActiveLoading = loading || isProcessing;
+  const isLocked = disabled && !isBusy && !isCompleted;
+  const isFullTrail = isBusy || isCompleted || passedThreshold;
 
   return (
     <View
       style={[
         styles.container,
-        showActiveLoading && styles.containerLoading,
+        isLocked && styles.containerLocked,
+        isBusy && styles.containerLoading,
         isCompleted && styles.containerCompleted,
         style,
       ]}
@@ -175,33 +250,41 @@ export function SwipeSlider({
         }
       }}
     >
-      {/* 1. Progress Fill Behind Thumb (Active Drag Only) */}
-      {!isCompleted && !showActiveLoading && (
+      {/* 1. Glowing Trail Fill Behind Thumb */}
+      {!isLocked && containerWidth > 0 && (
         <Animated.View
           style={[
-            styles.progressFill,
+            styles.progressFillWrapper,
             {
-              width: getProgressWidth,
-              backgroundColor: passedThreshold
-                ? 'rgba(0, 226, 151, 0.22)'
-                : 'rgba(0, 102, 255, 0.22)',
+              width: containerWidth,
+              transform: [{ translateX: isBusy || isCompleted ? 0 : fillTranslateX }],
+              shadowColor: glowColor,
+              shadowOpacity: isFullTrail ? 0.75 : 0.45,
             },
           ]}
-        />
+          pointerEvents="none"
+        >
+          <LinearGradient
+            colors={fillGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientFill}
+          />
+        </Animated.View>
       )}
 
-      {/* 2. Center Background Label */}
       <View style={styles.labelContainer} pointerEvents="none">
-        {showActiveLoading ? (
+        {isBusy ? (
           <View style={styles.centerRow}>
-            <ActivityIndicator color={colors.tertiary} size="small" />
-            <Text style={styles.statusText}>Processing...</Text>
+            <ActivityIndicator color={colors.onPrimaryContainer} size="small" />
+            <Text style={styles.processingText}>PROCESSING</Text>
           </View>
         ) : isCompleted ? (
-          <View style={styles.centerRow}>
-            <MaterialIcons name={completedIcon} size={22} color={colors.tertiary} />
-            <Text style={styles.statusText}>{completedTitle}</Text>
-          </View>
+          <Text style={styles.completedText}>{completedTitle}</Text>
+        ) : isLocked ? (
+          <Text style={[styles.titleText, styles.lockedText]}>
+            {lockedTitle || title}
+          </Text>
         ) : (
           <Animated.Text
             style={[
@@ -217,26 +300,43 @@ export function SwipeSlider({
         )}
       </View>
 
-      {/* 3. Draggable Thumb */}
-      {!isCompleted && !showActiveLoading && (
-        <Animated.View
-          {...panResponder.panHandlers}
-          style={[
-            styles.thumb,
-            {
-              transform: [{ translateX: translateBtn }],
-              backgroundColor: getPrimaryColor(),
-              shadowColor: passedThreshold ? colors.tertiary : colors.primaryContainer,
-            },
-          ]}
-        >
-          <MaterialIcons
-            name={passedThreshold ? completedIcon : icon}
-            size={26}
-            color={passedThreshold ? colors.onTertiary : colors.onPrimaryContainer}
-          />
-        </Animated.View>
-      )}
+      {/* 3. Oval Capsule Thumb Knob (76px width x 50px height) */}
+      <Animated.View
+        {...(!isLocked && !isBusy && !isCompleted ? panResponder.panHandlers : {})}
+        style={[
+          styles.thumb,
+          {
+            transform: [
+              { translateX: isBusy || isCompleted ? maxSlide : translateBtn },
+              { scale: thumbScale },
+            ],
+            borderColor: isFullTrail
+              ? activeThumbBorder
+              : 'rgba(255, 255, 255, 0.12)',
+            backgroundColor: isLocked
+              ? colors.surfaceContainer
+              : colors.surfaceContainerHigh,
+          },
+        ]}
+      >
+        <MaterialIcons
+          name={
+            isLocked
+              ? 'lock'
+              : isBusy || isCompleted || passedThreshold
+              ? completedIcon
+              : icon
+          }
+          size={24}
+          color={
+            isLocked
+              ? colors.outline
+              : isBusy || isCompleted || passedThreshold
+              ? colors.onSurface
+              : accentColor
+          }
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -245,26 +345,39 @@ const styles = StyleSheet.create({
   container: {
     height: CONTAINER_HEIGHT,
     borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.025)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
     justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
   },
+  containerLocked: {
+    opacity: 0.55,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+  },
   containerLoading: {
-    backgroundColor: 'rgba(0, 226, 151, 0.08)',
-    borderColor: 'rgba(0, 226, 151, 0.3)',
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   containerCompleted: {
-    backgroundColor: 'rgba(0, 226, 151, 0.12)',
-    borderColor: 'rgba(0, 226, 151, 0.4)',
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
   },
-  progressFill: {
+  progressFillWrapper: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  gradientFill: {
+    flex: 1,
     borderRadius: borderRadius.full,
   },
   labelContainer: {
@@ -284,17 +397,28 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   titleText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
-    color: 'rgba(223, 226, 239, 0.55)',
-    letterSpacing: 0.8,
+    color: colors.onSurface,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
-  statusText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.tertiary,
-    letterSpacing: 0.6,
+  lockedText: {
+    color: colors.outline,
+  },
+  processingText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.onPrimaryContainer,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  completedText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.onPrimaryContainer,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
   },
   thumb: {
     position: 'absolute',
@@ -304,10 +428,12 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 2,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 8,
+    zIndex: 3,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });

@@ -92,7 +92,6 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
   const runScan = async (asset: ImagePicker.ImagePickerAsset) => {
     setPhase('uploading');
     try {
-      // Convert local URI to a blob for upload
       const response = await fetch(asset.uri);
       const blob = await response.blob();
       const ext = asset.uri.split('.').pop() ?? 'jpg';
@@ -120,7 +119,6 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <YStack flex={1} backgroundColor="$background">
 
-        {/* Header */}
         <XStack
           paddingHorizontal="$4"
           paddingTop="$5"
@@ -141,7 +139,6 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
 
         <YStack flex={1} padding="$4" gap="$4">
 
-          {/* ── IDLE: choose method ── */}
           {phase === 'idle' && (
             <YStack flex={1} gap="$5">
               <YStack
@@ -165,7 +162,6 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
               </YStack>
 
               <YStack gap="$3" flex={1} justifyContent="center">
-                {/* Camera button — native only */}
                 {Platform.OS !== 'web' && (
                   <Pressable
                     onPress={() => pickImage(true)}
@@ -188,7 +184,6 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                   </Pressable>
                 )}
 
-                {/* Gallery / file upload */}
                 <Pressable
                   onPress={() => pickImage(false)}
                   style={({ pressed }) => [styles.scanOption, pressed && styles.scanOptionPressed]}
@@ -219,7 +214,6 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
             </YStack>
           )}
 
-          {/* ── UPLOADING / SCANNING ── */}
           {(phase === 'uploading' || phase === 'scanning') && (
             <YStack flex={1} alignItems="center" justifyContent="center" gap="$4">
               <ActivityIndicator size="large" color={colors.primary} />
@@ -236,10 +230,8 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
             </YStack>
           )}
 
-          {/* ── RESULT ── */}
           {phase === 'result' && result?.success && (
             <YStack flex={1} gap="$4">
-              {/* Big pass / fail banner */}
               <YStack
                 borderRadius="$5"
                 borderWidth={1.5}
@@ -265,7 +257,6 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                 </SizableText>
               </YStack>
 
-              {/* ID details */}
               <YStack
                 backgroundColor="$color2"
                 borderRadius="$4"
@@ -314,7 +305,6 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
                 )}
               </YStack>
 
-              {/* Actions */}
               <YStack gap="$2" marginTop="auto">
                 {!passed && (
                   <Button
@@ -341,7 +331,6 @@ export default function AgeVerificationModal({ visible, onClose, onResult }: Pro
             </YStack>
           )}
 
-          {/* ── ERROR ── */}
           {phase === 'error' && (
             <YStack flex={1} alignItems="center" justifyContent="center" gap="$4">
               <YStack
@@ -396,7 +385,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: borderRadius.xl,
     padding: spacing.lg,
     borderWidth: 1,

@@ -207,7 +207,7 @@ export function CustomHeader({
 
   const handleBack = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     if (onBack) {
       onBack();
@@ -218,14 +218,14 @@ export function CustomHeader({
 
   const handleRightAction = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     onRightActionPress?.();
   };
 
   const handleAvatarPress = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     if (onAvatarPress) {
       onAvatarPress();
@@ -236,7 +236,7 @@ export function CustomHeader({
 
   const handleFilter = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     onFilterPress?.();
   };
@@ -286,7 +286,6 @@ export function CustomHeader({
         containerStyle,
       ]}
     >
-      {/* ─── Top Row: (Back Button) + Title/Subtitle + (Action / Avatar) ─── */}
       <View style={styles.topRow}>
         {showBack && (
           <Pressable
@@ -319,8 +318,6 @@ export function CustomHeader({
             </Text>
           ) : null}
         </View>
-
-        {/* Right Actions Group */}
         <View style={styles.rightActionsGroup}>
           {activeRightContent ? (
             activeRightContent
@@ -358,11 +355,7 @@ export function CustomHeader({
           )}
         </View>
       </View>
-
-      {/* ─── Row 2: Pills / Badges slot ─── */}
       {pills ? <View style={styles.pillsRow}>{pills}</View> : null}
-
-      {/* ─── Row 3: Search Bar + Filter Button ─── */}
       {showSearch && (
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
@@ -396,8 +389,6 @@ export function CustomHeader({
           )}
         </View>
       )}
-
-      {/* ─── Bottom Custom Children Slot ─── */}
       {children}
     </Animated.View>
   );

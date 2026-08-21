@@ -1,10 +1,3 @@
-/**
- * ChatMessageBanner
- *
- * Floating in-app alert that slides in when a chat message arrives from
- * another driver while the app is open (but the chat tab isn't active).
- * Tapping navigates to the Chat tab. Auto-dismisses after 5 seconds.
- */
 import React, { useEffect, useRef } from 'react';
 import { Platform, Pressable } from 'react-native';
 import Animated, {
@@ -42,7 +35,6 @@ export default function ChatMessageBanner({ message, onDismiss }: Props) {
   useEffect(() => {
     if (!message) return;
 
-    // Slide in from top
     translateY.value = withSpring(Platform.OS === 'web' ? 16 : 56, {
       damping: 18,
       stiffness: 200,
@@ -50,7 +42,7 @@ export default function ChatMessageBanner({ message, onDismiss }: Props) {
     opacity.value = withTiming(1, { duration: 200 });
 
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
 
     timerRef.current = setTimeout(dismiss, AUTO_DISMISS_MS);
@@ -58,7 +50,7 @@ export default function ChatMessageBanner({ message, onDismiss }: Props) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [message?.senderId, message?.text]); // re-trigger on each new message
+  }, [message?.senderId, message?.text]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
@@ -84,7 +76,7 @@ export default function ChatMessageBanner({ message, onDismiss }: Props) {
           top: 0,
           left: 16,
           right: 16,
-          zIndex: 9998, // just below the order banner (9999)
+          zIndex: 9998,
           borderRadius: 16,
           overflow: 'hidden',
           shadowColor: '#000',
@@ -106,7 +98,6 @@ export default function ChatMessageBanner({ message, onDismiss }: Props) {
           alignItems="center"
           gap="$3"
         >
-          {/* Icon */}
           <YStack
             width={40}
             height={40}
@@ -119,7 +110,6 @@ export default function ChatMessageBanner({ message, onDismiss }: Props) {
             <MessageCircle size={20} color="#93C5FD" />
           </YStack>
 
-          {/* Text */}
           <YStack flex={1} gap="$0.5">
             <SizableText size="$3" fontWeight="800" color="#DBEAFE">
               👤 {message.senderName}
@@ -129,7 +119,6 @@ export default function ChatMessageBanner({ message, onDismiss }: Props) {
             </SizableText>
           </YStack>
 
-          {/* Dismiss */}
           <Pressable
             onPress={(e) => {
               e.stopPropagation?.();

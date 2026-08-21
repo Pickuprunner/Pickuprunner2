@@ -41,14 +41,14 @@ export function ChatInputBar({
   const handleSend = () => {
     if (!canSend) return;
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
     }
     onSend();
   };
 
   const handlePromptPress = (prompt: string) => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     if (onSelectPrompt) {
       onSelectPrompt(prompt);
@@ -59,7 +59,6 @@ export function ChatInputBar({
 
   return (
     <View style={styles.outerContainer}>
-      {/* Quick Prompts */}
       {quickPrompts && quickPrompts.length > 0 && (
         <ScrollView
           horizontal

@@ -107,7 +107,6 @@ function VerificationCard({ v }: { v: DriverVerification }) {
       marginBottom="$3"
     >
       <YStack gap="$3">
-        {/* Driver info row */}
         <XStack justifyContent="space-between" alignItems="flex-start">
           <YStack>
             <SizableText size="$4" fontWeight="700" color="$color12">{v.driver_name}</SizableText>
@@ -123,7 +122,6 @@ function VerificationCard({ v }: { v: DriverVerification }) {
           </XStack>
         </XStack>
 
-        {/* Document links */}
         <XStack gap="$3" flexWrap="wrap">
           <DocLink
             label={v.license_filename || "Driver's License"}
@@ -137,7 +135,6 @@ function VerificationCard({ v }: { v: DriverVerification }) {
           />
         </XStack>
 
-        {/* Admin note (if any) */}
         {v.admin_note && !isPending && (
           <XStack gap="$2" alignItems="flex-start" backgroundColor="$color3" borderRadius="$3" padding="$3">
             <AlertCircle size={14} color="$color9" />
@@ -145,7 +142,6 @@ function VerificationCard({ v }: { v: DriverVerification }) {
           </XStack>
         )}
 
-        {/* Action buttons — only for pending */}
         {isPending && (
           <YStack gap="$2">
             {showRejectInput && (

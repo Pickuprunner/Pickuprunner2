@@ -42,7 +42,6 @@ export function OrdersHeader({
 }: Props) {
   const pills = (
     <>
-      {/* My Queue Pill */}
       <View style={[styles.pill, atCapacity && styles.pillCapacity]}>
         <MaterialIcons name="inventory-2" size={15} color={colors.onSurfaceVariant} />
         <Text style={styles.pillText}>
@@ -50,7 +49,6 @@ export function OrdersHeader({
         </Text>
       </View>
 
-      {/* Live Status Pill */}
       <View style={[styles.pill, isConnected ? styles.pillLive : styles.pillOffline]}>
         <View style={[styles.liveDot, !isConnected && styles.offlineDot]} />
         <Text style={[styles.pillText, isConnected ? styles.pillLiveText : styles.pillOfflineText]}>

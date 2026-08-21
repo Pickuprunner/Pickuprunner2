@@ -31,7 +31,7 @@ export function PricingSummaryCard({
 }: PricingSummaryCardProps) {
   const handleTipSelect = (amount: number) => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     onTipChange(amount);
   };
@@ -41,7 +41,6 @@ export function PricingSummaryCard({
       <Text style={styles.sectionTitle}>PRICING & DRIVER TIP</Text>
 
       <View style={styles.content}>
-        {/* Distance Input */}
         <CustomInput
           label={`DISTANCE (MILES) · free up to ${APP_CONFIG.FREE_MILES} mi`}
           placeholder="e.g. 4.5"
@@ -58,7 +57,6 @@ export function PricingSummaryCard({
           }
         />
 
-        {/* Tip Selector */}
         <View style={styles.tipSection}>
           <View style={styles.tipHeaderRow}>
             <Text style={styles.sectionLabel}>DRIVER TIP</Text>
@@ -83,7 +81,6 @@ export function PricingSummaryCard({
           </View>
         </View>
 
-        {/* Total Summary Row */}
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total Due on Pickup</Text>
           <Text style={styles.totalAmount}>{fmt(totalCents)}</Text>

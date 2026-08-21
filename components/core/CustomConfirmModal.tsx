@@ -104,7 +104,7 @@ export function CustomConfirmModal({
           variant === 'danger'
             ? Haptics.ImpactFeedbackStyle.Medium
             : Haptics.ImpactFeedbackStyle.Light
-        ).catch(() => {});
+        ).catch(() => { });
       }
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -138,7 +138,7 @@ export function CustomConfirmModal({
   const handleConfirm = () => {
     if (loading) return;
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => { });
     }
     onConfirm();
   };
@@ -146,7 +146,7 @@ export function CustomConfirmModal({
   const handleCancel = () => {
     if (loading) return;
     if (Platform.OS !== 'web') {
-      Haptics.selectionAsync().catch(() => {});
+      Haptics.selectionAsync().catch(() => { });
     }
     onClose();
   };
@@ -173,16 +173,13 @@ export function CustomConfirmModal({
                 },
               ]}
             >
-              {/* Unified Content Row: Large Left Icon + Right Column (Order Tag at top-right & Text) */}
               <View style={styles.mainRow}>
-                {/* Large Glowing Icon on Left */}
                 <View style={[styles.iconHalo, { backgroundColor: config.glowBg }]}>
                   <View style={[styles.iconCircle, { borderColor: config.borderColor }]}>
                     <MaterialIcons name={activeIcon} size={32} color={config.accentColor} />
                   </View>
                 </View>
 
-                {/* Right Side Column */}
                 <View style={styles.rightCol}>
                   {orderId && (
                     <View style={styles.orderBadgeRow}>
@@ -203,8 +200,6 @@ export function CustomConfirmModal({
                   </View>
                 </View>
               </View>
-
-              {/* Action Buttons */}
               <View style={styles.buttonRow}>
                 <TouchableOpacity
                   onPress={handleCancel}

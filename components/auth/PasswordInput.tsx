@@ -77,7 +77,6 @@ function CircularMeter({ metCount, total = 5 }: { metCount: number; total?: numb
       ]}
     >
       <Svg width={RING_SIZE} height={RING_SIZE}>
-        {/* Background Track */}
         <Circle
           cx={RING_SIZE / 2}
           cy={RING_SIZE / 2}
@@ -86,7 +85,6 @@ function CircularMeter({ metCount, total = 5 }: { metCount: number; total?: numb
           strokeWidth={STROKE_WIDTH}
           fill={isComplete ? '#00E297' : 'none'}
         />
-        {/* Animated Progress Arc */}
         {!isComplete && (
           <Circle
             cx={RING_SIZE / 2}
@@ -149,7 +147,7 @@ export function PasswordInput({
 
   const handleChangeText = (text: string) => {
     if (Platform.OS !== 'web' && text.length > value.length) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     onChangeText(text);
   };

@@ -64,8 +64,8 @@ export function CustomSkeleton({
     ? typeof width === 'number'
       ? width / 2
       : typeof height === 'number'
-      ? height / 2
-      : 9999
+        ? height / 2
+        : 9999
     : borderRadius;
 
   return (
@@ -87,13 +87,10 @@ export function CustomSkeleton({
   );
 }
 
-/**
- * Reusable Order Card Skeleton matching DriverOrderCard layout
- */
+
 export function OrderCardSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[styles.cardContainer, style]}>
-      {/* Header: Avatar + Customer Name/ID + Status Badge */}
       <View style={styles.cardHeader}>
         <View style={styles.headerUser}>
           <CustomSkeleton width={40} height={40} circle />
@@ -105,7 +102,6 @@ export function OrderCardSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
         <CustomSkeleton width={80} height={24} borderRadius={9999} />
       </View>
 
-      {/* Routes Section */}
       <View style={styles.routesSection}>
         <View style={styles.routeStep}>
           <CustomSkeleton width={20} height={20} circle />
@@ -124,7 +120,6 @@ export function OrderCardSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
         </View>
       </View>
 
-      {/* Footer Section */}
       <View style={styles.footerSection}>
         <View style={styles.footerPricing}>
           <CustomSkeleton width={70} height={26} borderRadius={6} />
@@ -139,9 +134,7 @@ export function OrderCardSkeleton({ style }: { style?: StyleProp<ViewStyle> }) {
   );
 }
 
-/**
- * Renders multiple skeleton cards
- */
+
 export function SkeletonList({
   count = 3,
   renderSkeleton,

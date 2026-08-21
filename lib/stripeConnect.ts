@@ -1,11 +1,7 @@
 /**
- * Stripe Connect helpers for driver bank account onboarding and payouts.
- * All calls go through the Blink Backend at vljh4v3j.backend.blink.new
+ * Stripe Connect mock helpers for static UI rendering.
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-
-const BACKEND = 'https://vljh4v3j.backend.blink.new';
-const RETURN_URL = 'https://pickup-runner-app-vljh4v3j.blinkpowered.com';
 
 export interface ConnectStatus {
   connected: boolean;
@@ -20,10 +16,12 @@ export function useConnectStatus(driverUserId?: string) {
     enabled: !!driverUserId,
     staleTime: 30_000,
     queryFn: async () => {
-      const res = await fetch(`${BACKEND}/connect/status?driverUserId=${encodeURIComponent(driverUserId!)}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch connect status');
-      return data as ConnectStatus;
+      return {
+        connected: true,
+        payoutsEnabled: true,
+        detailsSubmitted: true,
+        stripeAccountId: 'acct_static_driver_101',
+      };
     },
   });
 }
@@ -31,19 +29,11 @@ export function useConnectStatus(driverUserId?: string) {
 export function useConnectOnboard() {
   return useMutation({
     mutationFn: async ({ driverUserId, driverEmail }: { driverUserId: string; driverEmail?: string }) => {
-      const res = await fetch(`${BACKEND}/connect/onboard`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          driverUserId,
-          driverEmail,
-          returnUrl: RETURN_URL,
-          refreshUrl: RETURN_URL,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to start onboarding');
-      return data as { url: string; stripeAccountId: string };
+      console.log('[Stripe Connect Mock] Onboarding initiated for:', driverUserId, driverEmail);
+      return {
+        url: 'https://connect.stripe.com/express/oauth/static_demo',
+        stripeAccountId: 'acct_static_driver_101',
+      };
     },
   });
 }
@@ -60,14 +50,12 @@ export function useConnectPayout() {
       amountCents: number;
       description?: string;
     }) => {
-      const res = await fetch(`${BACKEND}/connect/payout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ driverUserId, amountCents, description }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Payout failed');
-      return data as { success: boolean; transferId: string; amount: number };
+      console.log('[Stripe Connect Mock] Payout triggered:', driverUserId, amountCents, description);
+      return {
+        success: true,
+        transferId: `tr_static_${Date.now()}`,
+        amount: amountCents,
+      };
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['stripe_connect_status', vars.driverUserId] });
@@ -86,22 +74,18 @@ export interface TransferResult {
   tipCents?: number;
 }
 
-/** Transfer driver earnings (mileage + tip) when accepting a paid order. Idempotent. */
 export function useTransferOnAccept() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ orderId, driverUserId }: { orderId: string; driverUserId: string }) => {
-      const res = await fetch(`${BACKEND}/connect/transfer-earnings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, driverUserId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Transfer failed');
-      return data as TransferResult;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['orders'] });
+      console.log('[Stripe Connect Mock] Transfer on accept:', orderId, driverUserId);
+      return {
+        success: true,
+        transferId: `tr_static_${Date.now()}`,
+        driverEarningsCents: 1500,
+        mileageCents: 500,
+        tipCents: 1000,
+      };
     },
   });
 }

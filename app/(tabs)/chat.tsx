@@ -111,7 +111,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
     if (!text || sending) return;
     setInputText('');
     setSending(true);
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     try {
       await sendMessage(text);
     } catch {
@@ -121,7 +121,6 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
     }
   }, [inputText, sending, sendMessage]);
 
-  // Build list items with date separators
   const listItems = React.useMemo(() => {
     const items: ({ type: 'date'; ts: number; key: string } | { type: 'message'; msg: ChatMessage; isMine: boolean; key: string })[] = [];
     let lastDate = '';
@@ -139,7 +138,6 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
 
   return (
     <View style={styles.root}>
-      {/* Header */}
       <ChatHeader
         title={order.customerName || 'Customer'}
         orderNumber={shortId}
@@ -148,7 +146,6 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
         onBack={onBack}
       />
 
-      {/* Messages */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -174,7 +171,6 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
           />
         )}
 
-        {/* Input bar with quick prompts */}
         <ChatInputBar
           value={inputText}
           onChangeText={setInputText}
@@ -191,7 +187,6 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
   );
 }
 
-// ── Order list view ──────────────────────────────────────────────────────────
 
 type ListItem =
   | { type: 'date'; ts: number; key: string }
@@ -206,7 +201,6 @@ export default function ChatScreen() {
   const { data: orders = [], isLoading } = useOrders();
   const driverId = useDriverId();
 
-  // Active orders for this driver (accepted or picked_up)
   const activeOrders = orders.filter(
     (o) => o.driverUserId === driverId && (o.status === 'accepted' || o.status === 'picked_up')
   );
@@ -215,7 +209,6 @@ export default function ChatScreen() {
     (o) => o.driverUserId === driverId && o.status === 'delivered'
   );
 
-  // Load saved name
   useEffect(() => {
     getSavedDisplayName().then((name) => {
       setDisplayName(name || null);
@@ -228,7 +221,6 @@ export default function ChatScreen() {
     setDisplayName(name);
   }, []);
 
-  // Loading
   if (!nameReady) {
     return (
       <SafeArea>
@@ -239,12 +231,9 @@ export default function ChatScreen() {
     );
   }
 
-  // Name setup
   if (!displayName) {
     return <SafeArea><NameSetupPrompt onSet={handleSetName} /></SafeArea>;
   }
-
-  // Show per-order chat
   if (activeChatOrder) {
     return <OrderChatView order={activeChatOrder} displayName={displayName} onBack={() => setActiveChatOrder(null)} />;
   }
@@ -265,10 +254,8 @@ export default function ChatScreen() {
     };
   };
 
-  // ── Order list ──────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
-      {/* Header */}
       <View style={[styles.appHeader, { paddingTop: Math.max(insets.top, 16) }]}>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerSubtitleRow}>
