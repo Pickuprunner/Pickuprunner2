@@ -231,7 +231,7 @@ export default function CustomerNewOrderScreen() {
       miles: '3.5',
       deliveryType: 'door',
     });
-    setTipCents(1000);
+    setTipCents(500);
     haptic('medium');
     showToast('Customer test data filled', { type: 'info' });
   };

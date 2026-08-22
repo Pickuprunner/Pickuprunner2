@@ -183,7 +183,7 @@ export default function NewOrderScreen() {
     setDeliveryAddress('123 E Test Ave, Sahuarita, AZ 85629');
     setItems('2 bags of groceries & deli counter order');
     setMiles('3.5');
-    setTipCents(1000);
+    setTipCents(500);
     setAgreedToTerms(false);
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
