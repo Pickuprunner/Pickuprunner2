@@ -34,7 +34,7 @@ import { APP_CONFIG } from '@/lib/config';
 type Step = 'review' | 'confirm' | 'deleting' | 'done';
 
 export default function DeleteAccountScreen() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, logout } = useAuth();
   const [step, setStep] = useState<Step>('review');
   const [confirmText, setConfirmText] = useState('');
   const [error, setError] = useState('');
@@ -81,8 +81,8 @@ export default function DeleteAccountScreen() {
         await AsyncStorage.removeItem('app_role').catch(() => { });
       }
 
-      // Sign out
-      await blink.auth.signOut();
+      // Sign out via useAuth
+      await logout();
 
       setStep('done');
       if (Platform.OS !== 'web') {

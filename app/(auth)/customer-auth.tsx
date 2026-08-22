@@ -24,7 +24,7 @@ import {
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { blink } from '@/lib/blink';
+import { useAuth } from '@/hooks/useAuth';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
 import { AuthHero, TermsAgreement, PasswordInput } from '@/components/auth';
 import CustomInput from '@/components/core/CustomInput';
@@ -40,6 +40,7 @@ type Mode = 'signin' | 'signup';
 export default function CustomerAuthScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
+  const { login, register, logout } = useAuth();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -100,17 +101,24 @@ export default function CustomerAuthScreen() {
     setLoading(true);
     try {
       if (isSignUp) {
-        await blink.auth.signUp({
+        await register({
           email: emailTrimmed,
           password,
-          metadata: { displayName: nameTrimmed },
+          displayName: nameTrimmed,
+          role: 'customer',
         });
-        await AsyncStorage.setItem(NAME_KEY, nameTrimmed).catch(() => { });
+        if (nameTrimmed) {
+          await AsyncStorage.setItem(NAME_KEY, nameTrimmed).catch(() => {});
+        }
       } else {
-        await blink.auth.signInWithEmail(emailTrimmed, password);
-        const me = await blink.auth.me();
-        if (me?.displayName) {
-          await AsyncStorage.setItem(NAME_KEY, me.displayName).catch(() => { });
+        const loggedUser = await login(emailTrimmed, password);
+        if (loggedUser.role !== 'customer' && loggedUser.role !== 'admin') {
+          await logout();
+          showToast('This account is registered as a driver. Please use Driver login.', 'error');
+          return;
+        }
+        if (loggedUser?.displayName) {
+          await AsyncStorage.setItem(NAME_KEY, loggedUser.displayName).catch(() => {});
         }
       }
 
@@ -120,17 +128,17 @@ export default function CustomerAuthScreen() {
       }
 
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
 
       router.replace('/(customer)/my-orders');
     } catch (err: any) {
       const msg: string = err?.message ?? '';
-      if (msg.includes('already exists') || msg.includes('EMAIL_ALREADY_EXISTS')) {
+      if (msg.includes('already exists') || msg.includes('EMAIL_ALREADY_EXISTS') || msg.includes('duplicate')) {
         showToast('An account with this email already exists. Try signing in.', 'error');
-      } else if (msg.includes('INVALID_CREDENTIALS') || msg.includes('invalid')) {
+      } else if (msg.includes('INVALID_CREDENTIALS') || msg.includes('invalid') || msg.includes('Invalid credentials')) {
         showToast('Incorrect email or password.', 'error');
-      } else if (msg.includes('WEAK_PASSWORD') || msg.includes('weak')) {
+      } else if (msg.includes('WEAK_PASSWORD') || msg.includes('weak') || msg.includes('at least 8')) {
         showToast('Password must be at least 8 characters.', 'error');
       } else {
         showToast(msg || 'Something went wrong. Please try again.', 'error');

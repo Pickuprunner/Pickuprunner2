@@ -101,11 +101,11 @@ export default function RootLayout() {
               >
                 <Stack.Screen name="index" />
                 <Stack.Screen name="(landing)" />
-                <Stack.Screen name="role-select" />
                 <Stack.Screen name="(auth)" />
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="(customer)" />
                 <Stack.Screen name="order/[id]" />
+                <Stack.Screen name="delete-account" />
                 <Stack.Screen name="terms" />
                 <Stack.Screen name="privacy-policy" />
                 <Stack.Screen name="+not-found" />

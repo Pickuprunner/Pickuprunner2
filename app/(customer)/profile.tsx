@@ -53,7 +53,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 export default function CustomerProfileScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const [displayName, setDisplayName] = useState('Customer');
   const [orderStats, setOrderStats] = useState({ pending: 0, delivered: 0 });
 
@@ -161,8 +161,8 @@ export default function CustomerProfileScreen() {
   const handleSignOut = async () => {
     try {
       haptic('heavy');
-      await blink.auth.signOut();
-      router.replace('/sign-in');
+      await logout();
+      router.replace('/(auth)/customer-auth');
     } catch (err) {
       console.warn('[auth] sign out failed:', err);
     }

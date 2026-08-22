@@ -65,7 +65,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const driverId = useDriverId();
   const { data: verification } = useMyVerification(user?.id);
   const { data: bgCheck } = useMyBackgroundCheck(user?.id);
@@ -159,8 +159,8 @@ export default function ProfileScreen() {
   const handleSignOut = async () => {
     try {
       haptic('heavy');
-      await blink.auth.signOut();
-      router.replace('/sign-in');
+      await logout();
+      router.replace('/(auth)/sign-in');
     } catch (err) {
       console.warn('[auth] sign out failed:', err);
     }
@@ -370,15 +370,17 @@ export default function ProfileScreen() {
           onChooseRoleAgain={handleChooseRole}
         />
 
-        <ProfileSection title="ADMINISTRATION">
-          <ProfileActionRow
-            icon={<Shield size={18} color={GOLD} />}
-            iconBg="rgba(255, 227, 153, 0.15)"
-            title="Admin Review Panel"
-            subtitle="Driver license, insurance & background check approvals"
-            onPress={() => router.push('/(tabs)/admin')}
-          />
-        </ProfileSection>
+        {user?.role === 'admin' && (
+          <ProfileSection title="ADMINISTRATION">
+            <ProfileActionRow
+              icon={<Shield size={18} color={GOLD} />}
+              iconBg="rgba(255, 227, 153, 0.15)"
+              title="Admin Review Panel"
+              subtitle="Driver license, insurance & background check approvals"
+              onPress={() => router.push('/(tabs)/admin')}
+            />
+          </ProfileSection>
+        )}
 
         <ProfileSupportSection supportEmail={APP_CONFIG.STORE_EMAIL} />
 

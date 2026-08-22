@@ -23,7 +23,7 @@ import {
   User,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
-import { blink } from '@/lib/blink';
+import { useAuth } from '@/hooks/useAuth';
 import { saveDisplayName } from '@/lib/chat';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
 import { AuthHero, TermsAgreement, PasswordInput } from '@/components/auth';
@@ -37,6 +37,7 @@ type Mode = 'signin' | 'signup';
 export default function SignInScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
+  const { login, register, logout } = useAuth();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -97,28 +98,34 @@ export default function SignInScreen() {
     setLoading(true);
     try {
       if (isSignUp) {
-        await blink.auth.signUp({
+        await register({
           email: emailTrimmed,
           password,
-          metadata: { displayName: nameTrimmed },
+          displayName: nameTrimmed,
+          role: 'driver',
         });
-        await saveDisplayName(nameTrimmed).catch(() => { });
+        await saveDisplayName(nameTrimmed).catch(() => {});
       } else {
-        await blink.auth.signInWithEmail(emailTrimmed, password);
+        const loggedUser = await login(emailTrimmed, password);
+        if (loggedUser.role !== 'driver' && loggedUser.role !== 'admin') {
+          await logout();
+          showToast('This account is registered as a customer. Please use Customer login.', 'error');
+          return;
+        }
       }
 
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
 
       router.replace('/(tabs)');
     } catch (err: any) {
       const msg: string = err?.message ?? '';
-      if (msg.includes('already exists') || msg.includes('EMAIL_ALREADY_EXISTS')) {
+      if (msg.includes('already exists') || msg.includes('EMAIL_ALREADY_EXISTS') || msg.includes('duplicate')) {
         showToast('An account with this email already exists. Try signing in.', 'error');
-      } else if (msg.includes('INVALID_CREDENTIALS') || msg.includes('invalid')) {
+      } else if (msg.includes('INVALID_CREDENTIALS') || msg.includes('invalid') || msg.includes('Invalid credentials')) {
         showToast('Incorrect email or password.', 'error');
-      } else if (msg.includes('WEAK_PASSWORD') || msg.includes('weak')) {
+      } else if (msg.includes('WEAK_PASSWORD') || msg.includes('weak') || msg.includes('at least 8')) {
         showToast('Password must be at least 8 characters.', 'error');
       } else {
         showToast(msg || 'Something went wrong. Please try again.', 'error');
@@ -138,7 +145,6 @@ export default function SignInScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.root}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        =
         <LinearGradient
           colors={gradients.heroGlow}
           locations={gradients.heroGlowLocations}

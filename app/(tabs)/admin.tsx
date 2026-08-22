@@ -26,10 +26,12 @@ import {
   type AdminDriverSummary,
 } from '@/components/admin';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function AdminScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const { data: verifications = [], isLoading: loadingDocs, refetch: refetchDocs } = useAllVerifications();
   const { data: bgChecks = [], isLoading: loadingBG, refetch: refetchBG } = useAllBackgroundChecks();
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
@@ -42,6 +44,22 @@ export default function AdminScreen() {
     });
     return () => hideSub.remove();
   }, []);
+
+  if (user?.role !== 'admin') {
+    return (
+      <View style={styles.root}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <CustomHeader title="Admin Access" borderBottom onBack={() => router.back()} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <MaterialIcons name="lock" size={48} color="#EF4444" />
+          <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginTop: 16 }}>Access Denied</Text>
+          <Text style={{ color: '#94A3B8', fontSize: 14, textAlign: 'center', marginTop: 8 }}>
+            This panel is restricted to administrative accounts only.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   const isSearching = isSearchFocused || searchQuery.trim().length > 0;
 
