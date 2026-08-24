@@ -31,6 +31,7 @@ export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [devResetData, setDevResetData] = useState<{ userId?: string; token?: string } | null>(null);
 
   const isEmailValid = isValidEmail(email);
   const emailStatus = email.length === 0 ? 'default' : isEmailValid ? 'success' : 'error';
@@ -49,8 +50,13 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     console.log('[Auth:ForgotPassword] Submitting reset request for email:', emailTrimmed);
     try {
-      const res = await forgotPassword(emailTrimmed);
+      const res: any = await forgotPassword(emailTrimmed);
       console.log('[Auth:ForgotPassword] Server response:', res);
+      if (res?.data?.token) {
+        console.log('[Auth:ForgotPassword] TOKEN:', res.data.token);
+        console.log('[Auth:ForgotPassword] USER_ID:', res.data.userId);
+        setDevResetData({ userId: res.data.userId, token: res.data.token });
+      }
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
@@ -138,10 +144,13 @@ export default function ForgotPasswordScreen() {
                   </Text>
                   <Pressable
                     onPress={() => {
-                      if (router.canGoBack()) {
-                        router.back();
+                      if (devResetData?.token && devResetData?.userId) {
+                        router.push({
+                          pathname: '/(auth)/reset-password',
+                          params: { userId: devResetData.userId, token: devResetData.token },
+                        } as any);
                       } else {
-                        router.replace('/(landing)/role-select');
+                        router.push('/(auth)/reset-password' as any);
                       }
                     }}
                     style={({ pressed }) => [
@@ -150,7 +159,24 @@ export default function ForgotPasswordScreen() {
                       pressed && styles.submitBtnPressed,
                     ]}
                   >
-                    <Text style={styles.submitBtnText}>Return to Sign In</Text>
+                    <Text style={styles.submitBtnText}>Reset Password Now</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => {
+                      if (router.canGoBack()) {
+                        router.back();
+                      } else {
+                        router.replace('/(landing)/role-select');
+                      }
+                    }}
+                    style={({ pressed }) => [
+                      styles.cancelBtn,
+                      { marginTop: 12 },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Text style={styles.cancelBtnText}>Return to Sign In</Text>
                   </Pressable>
                 </View>
               ) : (

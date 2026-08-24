@@ -24,19 +24,62 @@ import CustomInput from '@/components/core/CustomInput';
 import { useToast } from '@/components/core';
 import { checkPasswordRequirements } from '@/lib/validation';
 
+function parseTokenOrUrl(input: string): { userId?: string; token?: string } {
+  const trimmed = input.trim();
+  if (!trimmed) return {};
+
+  const pathMatch = trimmed.match(/\/auth\/reset-password\/([^/?#]+)\/([^/?#]+)/);
+  if (pathMatch) {
+    return { userId: pathMatch[1], token: pathMatch[2] };
+  }
+
+  if (trimmed.includes('userId=') && trimmed.includes('token=')) {
+    const userIdMatch = trimmed.match(/[?&]userId=([^&#]+)/);
+    const tokenMatch = trimmed.match(/[?&]token=([^&#]+)/);
+    if (userIdMatch && tokenMatch) {
+      return { userId: decodeURIComponent(userIdMatch[1]), token: decodeURIComponent(tokenMatch[1]) };
+    }
+  }
+
+  const parts = trimmed.split('.');
+  if (parts.length === 3) {
+    try {
+      const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const json = atob(payloadBase64);
+      const parsed = JSON.parse(json);
+      if (parsed.id) {
+        return { userId: parsed.id, token: trimmed };
+      }
+    } catch {}
+    return { token: trimmed };
+  }
+
+  return { token: trimmed };
+}
+
 export default function ResetPasswordScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ userId?: string; token?: string }>();
   const { showToast } = useToast();
   const { resetPassword } = useAuth();
 
+  const [rawTokenInput, setRawTokenInput] = useState('');
+  const [manualUserId, setManualUserId] = useState('');
+  const [manualToken, setManualToken] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const userId = params.userId || '';
-  const token = params.token || '';
+  const userId = params.userId || manualUserId;
+  const token = params.token || manualToken;
+
+  const handleTokenChange = (text: string) => {
+    setRawTokenInput(text);
+    const parsed = parseTokenOrUrl(text);
+    if (parsed.userId) setManualUserId(parsed.userId);
+    if (parsed.token) setManualToken(parsed.token);
+  };
 
   const passwordCheck = checkPasswordRequirements(password);
   const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
@@ -44,7 +87,7 @@ export default function ResetPasswordScreen() {
   const handleSubmit = async () => {
     console.log('[Auth:ResetPassword] Attempting password reset with params:', { userId, hasToken: !!token });
     if (!userId || !token) {
-      showToast('Invalid or missing reset token. Please request a new link.', 'error');
+      showToast('Please paste your reset link or token.', 'error');
       return;
     }
     if (!passwordCheck.isValid) {
@@ -158,6 +201,17 @@ export default function ResetPasswordScreen() {
                 </View>
               ) : (
                 <View style={styles.formSection}>
+                  {(!params.userId || !params.token) && (
+                    <CustomInput
+                      label="RESET LINK OR TOKEN"
+                      value={rawTokenInput}
+                      onChangeText={handleTokenChange}
+                      placeholder="Paste reset link or token here"
+                      autoCapitalize="none"
+                      status={token ? 'success' : 'default'}
+                    />
+                  )}
+
                   <PasswordInput
                     value={password}
                     onChangeText={setPassword}
