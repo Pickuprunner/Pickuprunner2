@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useAuthStore, User } from '@/store/useAuthStore';
-import { apiClient } from '@/lib/apiClient';
+import { authApi, usersApi, UpdateProfilePayload } from '@/apis';
 
 export interface AuthUser extends User {}
 
@@ -19,6 +19,9 @@ export interface AuthState {
   }) => Promise<AuthUser>;
   logout: () => Promise<void>;
   fetchProfile: () => Promise<AuthUser | null>;
+  updateProfile: (payload: UpdateProfilePayload) => Promise<AuthUser>;
+  forgotPassword: (email: string) => Promise<{ success: boolean; message: string }>;
+  resetPassword: (userId: string, token: string, password: string) => Promise<{ success: boolean; message: string }>;
 }
 
 export function useAuth(): AuthState {
@@ -34,13 +37,13 @@ export function useAuth(): AuthState {
 
   const login = useCallback(
     async (email: string, password: string): Promise<AuthUser> => {
-      const res = await apiClient.post<any>('/auth/login', {
+      const res = await authApi.login({
         email: email.trim().toLowerCase(),
         password,
       });
 
       const session = res?.data || res;
-      const authToken = session.token || session.accessToken || '';
+      const authToken = (session as any).token || (session as any).accessToken || '';
       setSession(session.user, authToken, session.refreshToken);
       return session.user;
     },
@@ -55,13 +58,13 @@ export function useAuth(): AuthState {
       displayName?: string;
       phone?: string;
     }): Promise<AuthUser> => {
-      const res = await apiClient.post<any>('/auth/register', {
+      const res = await authApi.register({
         ...payload,
         email: payload.email.trim().toLowerCase(),
       });
 
       const session = res?.data || res;
-      const authToken = session.token || session.accessToken || '';
+      const authToken = (session as any).token || (session as any).accessToken || '';
       setSession(session.user, authToken, session.refreshToken);
       return session.user;
     },
@@ -72,7 +75,7 @@ export function useAuth(): AuthState {
     try {
       const refreshToken = useAuthStore.getState().refreshToken;
       if (refreshToken) {
-        await apiClient.post('/auth/logout', { refreshToken }).catch(() => {});
+        await authApi.logout(refreshToken).catch(() => {});
       }
     } finally {
       clearSession();
@@ -82,14 +85,30 @@ export function useAuth(): AuthState {
   const fetchProfile = useCallback(async (): Promise<AuthUser | null> => {
     if (!token) return null;
     try {
-      const res = await apiClient.get<any>('/users/me');
-      const profile = res?.data || res;
+      const profile = await usersApi.getMe();
       updateUser(profile);
       return profile;
     } catch {
       return null;
     }
   }, [token, updateUser]);
+
+  const updateProfile = useCallback(
+    async (payload: UpdateProfilePayload): Promise<AuthUser> => {
+      const updated = await usersApi.updateMe(payload);
+      updateUser(updated);
+      return updated;
+    },
+    [updateUser]
+  );
+
+  const forgotPassword = useCallback(async (email: string) => {
+    return authApi.forgotPassword(email.trim().toLowerCase());
+  }, []);
+
+  const resetPassword = useCallback(async (userId: string, token: string, password: string) => {
+    return authApi.resetPassword(userId, token, password);
+  }, []);
 
   return {
     user,
@@ -100,5 +119,8 @@ export function useAuth(): AuthState {
     register,
     logout,
     fetchProfile,
+    updateProfile,
+    forgotPassword,
+    resetPassword,
   };
 }

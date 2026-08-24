@@ -17,13 +17,23 @@ export default function Index() {
 
         const proceed = (state: ReturnType<typeof useAuthStore.getState>) => {
           if (unmounted) return;
+          console.log('[App:Startup] Auth State:', {
+            isHydrated: state.isHydrated,
+            isAuthenticated: state.isAuthenticated,
+            role: state.user?.role,
+            email: state.user?.email,
+          });
+
           if (state.isAuthenticated && state.user && state.token) {
             if (state.user.role === 'customer') {
+              console.log('[App:Startup] Routing customer to /(customer)/my-orders');
               router.replace('/(customer)/my-orders');
             } else {
+              console.log('[App:Startup] Routing driver/admin to /(tabs)');
               router.replace('/(tabs)');
             }
           } else {
+            console.log('[App:Startup] Routing unauthenticated user to /(landing)/role-select');
             router.replace('/(landing)/role-select');
           }
         };

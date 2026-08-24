@@ -278,6 +278,15 @@ export default function CustomerAuthScreen() {
                   />
                 )}
 
+                {!isSignUp && (
+                  <Pressable
+                    onPress={() => router.push('/(auth)/forgot-password' as any)}
+                    style={styles.forgotBtn}
+                  >
+                    <Text style={styles.forgotBtnText}>Forgot Password?</Text>
+                  </Pressable>
+                )}
+
                 <Pressable
                   onPress={handleSubmit}
                   disabled={loading}
@@ -403,6 +412,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: colors.primary,
+  },
+  forgotBtn: {
+    alignSelf: 'flex-end',
+    paddingVertical: 4,
+    marginTop: -4,
+  },
+  forgotBtnText: {
+    fontSize: 13.5,
+    color: colors.primary,
+    fontWeight: '600',
   },
   guestBtn: {
     paddingVertical: spacing.sm,

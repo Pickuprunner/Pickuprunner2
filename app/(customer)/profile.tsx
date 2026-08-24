@@ -53,7 +53,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 export default function CustomerProfileScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, updateProfile } = useAuth();
   const [displayName, setDisplayName] = useState('Customer');
   const [orderStats, setOrderStats] = useState({ pending: 0, delivered: 0 });
 
@@ -144,8 +144,17 @@ export default function CustomerProfileScreen() {
   }, [isAuthenticated, user?.displayName]);
 
   const handleSaveDisplayName = async (newName: string) => {
-    await AsyncStorage.setItem(NAME_KEY, newName);
-    setDisplayName(newName);
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    await AsyncStorage.setItem(NAME_KEY, trimmed);
+    setDisplayName(trimmed);
+    if (isAuthenticated) {
+      try {
+        await updateProfile({ displayName: trimmed });
+      } catch (e) {
+        console.warn('Profile sync failed:', e);
+      }
+    }
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
     }

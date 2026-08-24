@@ -65,7 +65,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, logout, updateProfile } = useAuth();
   const driverId = useDriverId();
   const { data: verification } = useMyVerification(user?.id);
   const { data: bgCheck } = useMyBackgroundCheck(user?.id);
@@ -149,8 +149,17 @@ export default function ProfileScreen() {
   };
 
   const handleSaveDisplayName = async (newName: string) => {
-    await saveDisplayName(newName);
-    setDisplayName(newName);
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    await saveDisplayName(trimmed);
+    setDisplayName(trimmed);
+    if (isAuthenticated) {
+      try {
+        await updateProfile({ displayName: trimmed });
+      } catch (e) {
+        console.warn('Profile sync failed:', e);
+      }
+    }
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
     }
