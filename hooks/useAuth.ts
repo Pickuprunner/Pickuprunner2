@@ -20,7 +20,10 @@ export interface AuthState {
   logout: () => Promise<void>;
   fetchProfile: () => Promise<AuthUser | null>;
   updateProfile: (payload: UpdateProfilePayload) => Promise<AuthUser>;
-  forgotPassword: (email: string) => Promise<{ success: boolean; message: string }>;
+  forgotPassword: (
+    email: string,
+    role?: string
+  ) => Promise<{ success: boolean; message: string; data?: { userId: string; token: string; resetLink: string } }>;
   resetPassword: (userId: string, token: string, password: string) => Promise<{ success: boolean; message: string }>;
 }
 
@@ -102,8 +105,8 @@ export function useAuth(): AuthState {
     [updateUser]
   );
 
-  const forgotPassword = useCallback(async (email: string) => {
-    return authApi.forgotPassword(email.trim().toLowerCase());
+  const forgotPassword = useCallback(async (email: string, role?: string) => {
+    return authApi.forgotPassword(email.trim().toLowerCase(), role);
   }, []);
 
   const resetPassword = useCallback(async (userId: string, token: string, password: string) => {

@@ -37,8 +37,12 @@ export const authApi = {
   refresh: (refreshToken: string) =>
     apiClient.post<AuthResponse>('/auth/refresh', { refreshToken }, { skipAuth: true }),
 
-  forgotPassword: (email: string) =>
-    apiClient.post<{ success: boolean; message: string }>('/auth/forgot-password', { email }, { skipAuth: true }),
+  forgotPassword: (email: string, role?: string) =>
+    apiClient.post<{
+      success: boolean;
+      message: string;
+      data?: { userId: string; token: string; resetLink: string };
+    }>('/auth/forgot-password', { email, role }, { skipAuth: true }),
 
   resetPassword: (userId: string, token: string, password: string) =>
     apiClient.post<{ success: boolean; message: string }>(

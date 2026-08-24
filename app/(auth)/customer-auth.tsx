@@ -280,7 +280,12 @@ export default function CustomerAuthScreen() {
 
                 {!isSignUp && (
                   <Pressable
-                    onPress={() => router.push('/(auth)/forgot-password' as any)}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(auth)/forgot-password',
+                        params: { role: 'customer' },
+                      } as any)
+                    }
                     style={styles.forgotBtn}
                   >
                     <Text style={styles.forgotBtnText}>Forgot Password?</Text>

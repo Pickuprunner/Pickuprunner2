@@ -53,7 +53,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 export default function CustomerProfileScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { user, isAuthenticated, logout, updateProfile } = useAuth();
+  const { user, isAuthenticated, logout, updateProfile, forgotPassword } = useAuth();
   const [displayName, setDisplayName] = useState('Customer');
   const [orderStats, setOrderStats] = useState({ pending: 0, delivered: 0 });
 
@@ -167,6 +167,33 @@ export default function CustomerProfileScreen() {
     router.replace('/(landing)/role-select');
   };
 
+  const handleResetPassword = async () => {
+    if (!user?.email) {
+      showToast('No email associated with this account.', 'error');
+      return;
+    }
+    try {
+      haptic('medium');
+      const res: any = await forgotPassword(user.email, user.role || 'customer');
+      if (res?.data?.token) {
+        showToast('[DEV] Reset token ready!', 'info');
+        router.push({
+          pathname: '/(auth)/reset-password',
+          params: {
+            userId: res.data.userId,
+            token: res.data.token,
+            role: user.role || 'customer',
+          },
+        } as any);
+      } else {
+        showToast(`Password reset link sent to ${user.email}`, 'success');
+      }
+    } catch (err: any) {
+      console.warn('[customer profile] reset password failed:', err);
+      showToast(err?.message || 'Could not send reset link. Please try again.', 'error');
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       haptic('heavy');
@@ -235,7 +262,11 @@ export default function CustomerProfileScreen() {
 
         <ProfileSupportSection supportEmail={SUPPORT_EMAIL} isCustomer />
 
-        <ProfileAccountSection isAuthenticated={isAuthenticated} onSignOut={handleSignOut} />
+        <ProfileAccountSection
+          isAuthenticated={isAuthenticated}
+          onSignOut={handleSignOut}
+          onResetPassword={handleResetPassword}
+        />
 
         <Text style={styles.versionTag}>
           {APP_CONFIG.APP_NAME} v1.0.0 • Customer Portal

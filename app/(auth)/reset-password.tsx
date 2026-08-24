@@ -59,7 +59,7 @@ function parseTokenOrUrl(input: string): { userId?: string; token?: string } {
 
 export default function ResetPasswordScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ userId?: string; token?: string }>();
+  const params = useLocalSearchParams<{ userId?: string; token?: string; role?: string }>();
   const { showToast } = useToast();
   const { resetPassword } = useAuth();
 
@@ -103,12 +103,13 @@ export default function ResetPasswordScreen() {
     try {
       const res = await resetPassword(userId, token, password);
       console.log('[Auth:ResetPassword] Server response:', res);
+      showToast('Password reset successfully! Please sign in.', 'success');
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
       setSuccess(true);
     } catch (err: any) {
-      console.error('[Auth:ResetPassword] Error:', err);
+      console.warn('[Auth:ResetPassword] Handled error:', err?.message);
       showToast(err?.message || 'Failed to reset password. The link may have expired.', 'error');
     } finally {
       setLoading(false);
@@ -160,7 +161,11 @@ export default function ResetPasswordScreen() {
             <View style={styles.innerContent}>
               <Pressable
                 onPress={() => {
-                  if (router.canGoBack()) {
+                  if (params.role === 'driver') {
+                    router.replace('/(auth)/sign-in' as any);
+                  } else if (params.role === 'customer') {
+                    router.replace('/(auth)/customer-auth' as any);
+                  } else if (router.canGoBack()) {
                     router.back();
                   } else {
                     router.replace('/(landing)/role-select');
@@ -189,7 +194,15 @@ export default function ResetPasswordScreen() {
                     Your password has been successfully reset. You can now log in with your new credentials.
                   </Text>
                   <Pressable
-                    onPress={() => router.replace('/(landing)/role-select')}
+                    onPress={() => {
+                      if (params.role === 'driver') {
+                        router.replace('/(auth)/sign-in' as any);
+                      } else if (params.role === 'customer') {
+                        router.replace('/(auth)/customer-auth' as any);
+                      } else {
+                        router.replace('/(landing)/role-select');
+                      }
+                    }}
                     style={({ pressed }) => [
                       styles.submitBtn,
                       styles.backToSignBtn,

@@ -1,27 +1,46 @@
 import React from 'react';
-import { LogOut, LogIn, Trash2 } from '@blinkdotnew/mobile-ui';
+import { LogOut, LogIn, Trash2, KeyRound } from '@blinkdotnew/mobile-ui';
 import { router } from 'expo-router';
 import { ProfileSection, ItemDivider } from './ProfileSection';
 import { ProfileActionRow } from './ProfileActionRow';
 
 const GREEN = '#22C55E';
 const RED = '#EF4444';
+const GOLD = '#FBBF24';
 
 export interface ProfileAccountSectionProps {
   isAuthenticated: boolean;
   onSignOut: () => void;
+  onResetPassword?: () => void;
   isDriver?: boolean;
 }
 
 export function ProfileAccountSection({
   isAuthenticated,
   onSignOut,
+  onResetPassword,
   isDriver = false,
 }: ProfileAccountSectionProps) {
   return (
     <ProfileSection title="ACCOUNT">
       {isAuthenticated ? (
         <>
+          {onResetPassword && (
+            <>
+              {/* Option 1: Trigger Password Reset Flow (Option 2 would open in-app current-password modal) */}
+              <ProfileActionRow
+                icon={<KeyRound size={18} color={GOLD} />}
+                iconBg="rgba(251, 191, 36, 0.12)"
+                title="Reset Password"
+                subtitle="Request a password reset link for this account"
+                onPress={onResetPassword}
+                showChevron={true}
+                hapticStyle="medium"
+              />
+              <ItemDivider />
+            </>
+          )}
+
           <ProfileActionRow
             icon={<LogOut size={18} color={RED} />}
             iconBg="rgba(239, 68, 68, 0.12)"

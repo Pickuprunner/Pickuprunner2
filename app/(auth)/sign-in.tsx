@@ -266,7 +266,12 @@ export default function SignInScreen() {
 
                 {!isSignUp && (
                   <Pressable
-                    onPress={() => router.push('/(auth)/forgot-password' as any)}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(auth)/forgot-password',
+                        params: { role: 'driver' },
+                      } as any)
+                    }
                     style={styles.forgotBtn}
                   >
                     <Text style={styles.forgotBtnText}>Forgot Password?</Text>

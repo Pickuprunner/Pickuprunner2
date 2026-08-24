@@ -12,7 +12,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Mail, ChevronLeft, Lock, CheckCircle2 } from '@blinkdotnew/mobile-ui';
@@ -26,6 +26,7 @@ import { isValidEmail } from '@/lib/validation';
 
 export default function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ role?: string }>();
   const { showToast } = useToast();
   const { forgotPassword } = useAuth();
   const [email, setEmail] = useState('');
@@ -48,21 +49,24 @@ export default function ForgotPasswordScreen() {
     }
 
     setLoading(true);
-    console.log('[Auth:ForgotPassword] Submitting reset request for email:', emailTrimmed);
+    console.log('[Auth:ForgotPassword] Submitting reset request for email:', emailTrimmed, 'role:', params.role);
     try {
-      const res: any = await forgotPassword(emailTrimmed);
+      const res: any = await forgotPassword(emailTrimmed, params.role);
       console.log('[Auth:ForgotPassword] Server response:', res);
       if (res?.data?.token) {
         console.log('[Auth:ForgotPassword] TOKEN:', res.data.token);
         console.log('[Auth:ForgotPassword] USER_ID:', res.data.userId);
         setDevResetData({ userId: res.data.userId, token: res.data.token });
+        showToast('[DEV] Token captured! Tap Reset Password Now.', 'info');
+      } else {
+        showToast('Password reset link sent to your email.', 'success');
       }
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
       setSent(true);
     } catch (err: any) {
-      console.error('[Auth:ForgotPassword] Error:', err);
+      console.warn('[Auth:ForgotPassword] Handled error:', err?.message);
       showToast(err?.message || 'Could not send reset link. Please try again.', 'error');
     } finally {
       setLoading(false);
@@ -147,10 +151,17 @@ export default function ForgotPasswordScreen() {
                       if (devResetData?.token && devResetData?.userId) {
                         router.push({
                           pathname: '/(auth)/reset-password',
-                          params: { userId: devResetData.userId, token: devResetData.token },
+                          params: {
+                            userId: devResetData.userId,
+                            token: devResetData.token,
+                            role: params.role || 'customer',
+                          },
                         } as any);
                       } else {
-                        router.push('/(auth)/reset-password' as any);
+                        router.push({
+                          pathname: '/(auth)/reset-password',
+                          params: { role: params.role || 'customer' },
+                        } as any);
                       }
                     }}
                     style={({ pressed }) => [
@@ -164,7 +175,11 @@ export default function ForgotPasswordScreen() {
 
                   <Pressable
                     onPress={() => {
-                      if (router.canGoBack()) {
+                      if (params.role === 'driver') {
+                        router.replace('/(auth)/sign-in' as any);
+                      } else if (params.role === 'customer') {
+                        router.replace('/(auth)/customer-auth' as any);
+                      } else if (router.canGoBack()) {
                         router.back();
                       } else {
                         router.replace('/(landing)/role-select');

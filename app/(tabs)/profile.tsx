@@ -65,7 +65,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { user, isAuthenticated, isLoading: authLoading, logout, updateProfile } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, logout, updateProfile, forgotPassword } = useAuth();
   const driverId = useDriverId();
   const { data: verification } = useMyVerification(user?.id);
   const { data: bgCheck } = useMyBackgroundCheck(user?.id);
@@ -162,6 +162,33 @@ export default function ProfileScreen() {
     }
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!user?.email) {
+      showToast('No email associated with this driver account.', 'error');
+      return;
+    }
+    try {
+      haptic('medium');
+      const res: any = await forgotPassword(user.email, user.role || 'driver');
+      if (res?.data?.token) {
+        showToast('[DEV] Reset token ready!', 'info');
+        router.push({
+          pathname: '/(auth)/reset-password',
+          params: {
+            userId: res.data.userId,
+            token: res.data.token,
+            role: user.role || 'driver',
+          },
+        } as any);
+      } else {
+        showToast(`Password reset link sent to ${user.email}`, 'success');
+      }
+    } catch (err: any) {
+      console.warn('[driver profile] reset password failed:', err);
+      showToast(err?.message || 'Could not send reset link. Please try again.', 'error');
     }
   };
 
@@ -396,6 +423,7 @@ export default function ProfileScreen() {
         <ProfileAccountSection
           isAuthenticated={isAuthenticated}
           onSignOut={handleSignOut}
+          onResetPassword={handleResetPassword}
           isDriver
         />
 
