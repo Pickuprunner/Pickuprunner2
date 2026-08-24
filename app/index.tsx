@@ -1,44 +1,54 @@
 import { useEffect } from 'react';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { blink } from '@/lib/blink';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function Index() {
   useEffect(() => {
-    Promise.all([
-      AsyncStorage.getItem('app_role'),
-      AsyncStorage.getItem('driver_test_mode'),
-    ]).then(async ([role, testMode]) => {
-      if (role === 'customer') {
-        router.replace('/(customer)/my-orders');
-      } else if (role === 'driver') {
-        
-        if (testMode === 'true') {
-          router.replace('/(tabs)');
-          return;
-        }
-       
-        const me = await blink.auth.me().catch(() => null);
-        if (!me) {
-          router.replace('/sign-in');
-          return;
-        }
-        const [verRows] = await Promise.all([
-          blink.db.driverVerifications.list({ where: { user_id: me.id }, limit: 1 }),
-        ]);
-        const verification = verRows[0] as any;
+    let unmounted = false;
 
-        if (!verification || verification.status !== 'approved') {
-          router.replace('/driver-verification');
-        } else {
-          router.replace('/(tabs)');
+    const checkAuthAndNavigate = async () => {
+      try {
+        const testMode = await AsyncStorage.getItem('driver_test_mode');
+        if (testMode === 'true') {
+          if (!unmounted) router.replace('/(tabs)');
+          return;
         }
-      } else {
-        router.replace('/role-select');
+
+        const proceed = (state: ReturnType<typeof useAuthStore.getState>) => {
+          if (unmounted) return;
+          if (state.isAuthenticated && state.user && state.token) {
+            if (state.user.role === 'customer') {
+              router.replace('/(customer)/my-orders');
+            } else {
+              router.replace('/(tabs)');
+            }
+          } else {
+            router.replace('/(landing)/role-select');
+          }
+        };
+
+        const state = useAuthStore.getState();
+        if (state.isHydrated) {
+          proceed(state);
+        } else {
+          const unsubscribe = useAuthStore.subscribe((nextState) => {
+            if (nextState.isHydrated) {
+              unsubscribe();
+              proceed(nextState);
+            }
+          });
+        }
+      } catch {
+        if (!unmounted) router.replace('/(landing)/role-select');
       }
-    }).catch(() => {
-      router.replace('/role-select');
-    });
+    };
+
+    checkAuthAndNavigate();
+
+    return () => {
+      unmounted = true;
+    };
   }, []);
 
   return null;
