@@ -11,36 +11,7 @@ export interface ChatMessage {
   role?: string;
 }
 
-const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
-  ord_sample_101: [
-    {
-      id: 'msg_1',
-      text: 'Hi John, I will be picking up your lumber and screws shortly!',
-      senderId: 'usr_static_driver_101',
-      senderName: 'Alex Driver',
-      timestamp: Date.now() - 1000 * 60 * 10,
-      role: 'driver',
-    },
-    {
-      id: 'msg_2',
-      text: 'Sounds great Alex! Please leave it near the side gate.',
-      senderId: 'usr_customer_101',
-      senderName: 'John Doe',
-      timestamp: Date.now() - 1000 * 60 * 8,
-      role: 'customer',
-    },
-  ],
-  ord_sample_102: [
-    {
-      id: 'msg_3',
-      text: 'Order accepted! Heading to the pickup location now.',
-      senderId: 'usr_static_driver_101',
-      senderName: 'Alex Driver',
-      timestamp: Date.now() - 1000 * 60 * 30,
-      role: 'driver',
-    },
-  ],
-};
+const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {};
 
 interface ChatStoreState {
   conversations: Record<string, ChatMessage[]>;

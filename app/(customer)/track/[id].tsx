@@ -16,6 +16,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 
 import { blink } from '@/lib/blink';
+import { ordersApi } from '@/apis/orders';
+import { useOrderStore } from '@/store/useOrderStore';
+import { useOrdersRealtime } from '@/lib/realtime';
 import { APP_CONFIG } from '@/lib/config';
 import { useToast, CustomSkeleton } from '@/components/core';
 import { colors } from '@/constants/design';
@@ -81,13 +84,30 @@ export default function TrackOrderScreen() {
     status?: string;
   }>();
   const id = params.id;
+  const storeOrder = useOrderStore((state) => state.orders.find((o) => o.id === id));
 
   const [order, setOrder] = useState<TrackedOrder | null>(() => {
-    if (params.id && (params.deliveryAddress || params.pickupAddress)) {
+    if (storeOrder) {
+      return {
+        id: storeOrder.id,
+        status: (storeOrder.status as any) || (params.status as any) || 'pending',
+        customerName: storeOrder.customerName || params.customerName || 'Customer',
+        customerPhone: storeOrder.customerPhone || params.customerPhone,
+        pickupAddress: storeOrder.pickupAddress || params.pickupAddress || APP_CONFIG.STORE_ADDRESS,
+        pickup_address: storeOrder.pickupAddress || params.pickupAddress || APP_CONFIG.STORE_ADDRESS,
+        deliveryAddress: storeOrder.deliveryAddress || params.deliveryAddress || '123 E Test Ave, Sahuarita, AZ 85629',
+        delivery_address: storeOrder.deliveryAddress || params.deliveryAddress || '123 E Test Ave, Sahuarita, AZ 85629',
+        items: storeOrder.items || params.items,
+        driverName: storeOrder.driverName,
+        driver_name: storeOrder.driverName,
+        deliveryPhotoUrl: storeOrder.deliveryPhotoUrl,
+      };
+    }
+    if (params.id && (params.deliveryAddress || params.pickupAddress || params.status)) {
       return {
         id: params.id,
-        deliveryAddress: params.deliveryAddress,
-        delivery_address: params.deliveryAddress,
+        deliveryAddress: params.deliveryAddress || '123 E Test Ave, Sahuarita, AZ 85629',
+        delivery_address: params.deliveryAddress || '123 E Test Ave, Sahuarita, AZ 85629',
         pickupAddress: params.pickupAddress || APP_CONFIG.STORE_ADDRESS,
         pickup_address: params.pickupAddress || APP_CONFIG.STORE_ADDRESS,
         customerName: params.customerName || 'Customer',
@@ -106,6 +126,31 @@ export default function TrackOrderScreen() {
   const channelRef = useRef<any>(null);
   const { showToast } = useToast();
 
+  // Instant reactive update whenever driver changes status in store
+  useEffect(() => {
+    if (storeOrder) {
+      setOrder((prev) => ({
+        ...(prev || {}),
+        id: storeOrder.id,
+        status: (storeOrder.status as any) || prev?.status || 'pending',
+        customerName: storeOrder.customerName || prev?.customerName || 'Customer',
+        customerPhone: storeOrder.customerPhone || prev?.customerPhone,
+        pickupAddress: storeOrder.pickupAddress || prev?.pickupAddress || APP_CONFIG.STORE_ADDRESS,
+        pickup_address: storeOrder.pickupAddress || prev?.pickup_address || APP_CONFIG.STORE_ADDRESS,
+        deliveryAddress: storeOrder.deliveryAddress || prev?.deliveryAddress || '123 E Test Ave, Sahuarita, AZ 85629',
+        delivery_address: storeOrder.deliveryAddress || prev?.delivery_address || '123 E Test Ave, Sahuarita, AZ 85629',
+        items: storeOrder.items || prev?.items,
+        createdAt: storeOrder.createdAt || prev?.createdAt,
+        driverName: storeOrder.driverName || prev?.driverName,
+        driver_name: storeOrder.driverName || prev?.driver_name,
+        driverPhotoUrl: storeOrder.deliveryPhotoUrl || prev?.driverPhotoUrl,
+        driver_photo_url: storeOrder.deliveryPhotoUrl || prev?.driver_photo_url,
+        deliveryPhotoUrl: storeOrder.deliveryPhotoUrl || prev?.deliveryPhotoUrl,
+        delivery_photo_url: storeOrder.deliveryPhotoUrl || prev?.delivery_photo_url,
+      }));
+    }
+  }, [storeOrder]);
+
   const fetchOrder = useCallback(
     async (isManualRefresh = false) => {
       if (!id) return;
@@ -113,25 +158,40 @@ export default function TrackOrderScreen() {
       else if (!order) setLoading(true);
 
       try {
+        const storeCurrent = useOrderStore.getState().orders.find((o) => o.id === id);
         let foundOrder: any = null;
-        try {
-          const raw = await AsyncStorage.getItem('customer_local_orders');
-          if (raw) {
-            const list: TrackedOrder[] = JSON.parse(raw);
-            foundOrder = list.find((o) => o.id === id);
-          }
-        } catch {}
 
+        // 1. Fetch from backend API GET /orders/:id
+        try {
+          const remote = await ordersApi.getById(id);
+          if (remote && remote.id) {
+            foundOrder = remote;
+            useOrderStore.getState().upsertOrder(remote);
+          }
+        } catch (apiErr) {
+          console.warn(`[TrackOrder] GET /orders/${id} failed, trying local:`, apiErr);
+        }
+
+        // 2. Fallback to Zustand store
+        if (!foundOrder && storeCurrent) {
+          foundOrder = storeCurrent;
+        }
+
+        // 3. Fallback to AsyncStorage
         if (!foundOrder) {
           try {
-            const raw = await AsyncStorage.getItem('@pickuprunner_static_orders_v1');
+            const raw = await AsyncStorage.getItem('customer_local_orders');
             if (raw) {
               const list: TrackedOrder[] = JSON.parse(raw);
-              foundOrder = list.find((o) => o.id === id);
+              const fromLocal = list.find((o) => o.id === id);
+              if (fromLocal) {
+                foundOrder = fromLocal;
+              }
             }
           } catch {}
         }
 
+        // 4. Fallback to Blink DB
         if (!foundOrder) {
           try {
             foundOrder = await blink.db.orders.get(id);
@@ -146,6 +206,7 @@ export default function TrackOrderScreen() {
           foundOrder?.dropoff_address ||
           foundOrder?.destination ||
           foundOrder?.address ||
+          storeCurrent?.deliveryAddress ||
           params.deliveryAddress ||
           '123 E Test Ave, Sahuarita, AZ 85629';
 
@@ -153,34 +214,66 @@ export default function TrackOrderScreen() {
           foundOrder?.pickupAddress ||
           foundOrder?.pickup_address ||
           foundOrder?.pickup ||
+          storeCurrent?.pickupAddress ||
           params.pickupAddress ||
           APP_CONFIG.STORE_ADDRESS;
 
-        if (foundOrder || params.id) {
+        if (foundOrder || storeCurrent || params.id) {
+          const candidateStatus =
+            foundOrder?.status ||
+            storeCurrent?.status ||
+            (params.status as any);
+
+          const effectiveStatus =
+            candidateStatus && candidateStatus !== 'pending'
+              ? candidateStatus
+              : (storeCurrent?.status || foundOrder?.status || (params.status as any) || 'pending');
+
           setOrder({
-            id: foundOrder?.id || params.id,
-            status: foundOrder?.status || (params.status as any) || 'pending',
+            id: foundOrder?.id || storeCurrent?.id || params.id,
+            status: effectiveStatus as any,
             customerName:
               foundOrder?.customerName ||
               foundOrder?.customer_name ||
+              storeCurrent?.customerName ||
               params.customerName ||
               'Customer',
             customerPhone:
               foundOrder?.customerPhone ||
               foundOrder?.customer_phone ||
+              storeCurrent?.customerPhone ||
               params.customerPhone,
             pickupAddress: resolvedPickup,
             pickup_address: resolvedPickup,
             deliveryAddress: resolvedDelivery,
             delivery_address: resolvedDelivery,
-            items: foundOrder?.items || params.items,
-            createdAt: foundOrder?.createdAt || foundOrder?.created_at,
-            driverName: foundOrder?.driverName || foundOrder?.driver_name,
+            items: foundOrder?.items || storeCurrent?.items || params.items,
+            createdAt: foundOrder?.createdAt || foundOrder?.created_at || storeCurrent?.createdAt,
+            driverName: foundOrder?.driverName || foundOrder?.driver_name || storeCurrent?.driverName,
             driverPhotoUrl:
-              foundOrder?.driverPhotoUrl || foundOrder?.driver_photo_url,
+              foundOrder?.driverPhotoUrl || foundOrder?.driver_photo_url || storeCurrent?.deliveryPhotoUrl,
             deliveryPhotoUrl:
-              foundOrder?.deliveryPhotoUrl || foundOrder?.delivery_photo_url,
+              foundOrder?.deliveryPhotoUrl || foundOrder?.delivery_photo_url || storeCurrent?.deliveryPhotoUrl,
           });
+
+          // Sync fresh status to customer_local_orders in AsyncStorage
+          try {
+            const raw = await AsyncStorage.getItem('customer_local_orders');
+            if (raw) {
+              const list = JSON.parse(raw);
+              const index = list.findIndex((o: any) => o.id === (foundOrder?.id || id));
+              if (index !== -1) {
+                list[index] = {
+                  ...list[index],
+                  status: effectiveStatus,
+                  driverName: foundOrder?.driverName || foundOrder?.driver_name || storeCurrent?.driverName,
+                  driver_name: foundOrder?.driverName || foundOrder?.driver_name || storeCurrent?.driverName,
+                  deliveryPhotoUrl: foundOrder?.deliveryPhotoUrl || storeCurrent?.deliveryPhotoUrl,
+                };
+                await AsyncStorage.setItem('customer_local_orders', JSON.stringify(list));
+              }
+            }
+          } catch {}
         }
       } catch (e: any) {
         console.error('[TrackOrder] Fetch error:', e?.message || e);
@@ -198,6 +291,17 @@ export default function TrackOrderScreen() {
     haptic();
     try {
       const driver = TEST_DRIVERS[Math.floor(Math.random() * TEST_DRIVERS.length)];
+      
+      // Update backend via PATCH /orders/:id
+      try {
+        await ordersApi.update(id, {
+          driverName: driver.name,
+          status: 'accepted',
+        });
+      } catch (err) {
+        console.warn('[TrackOrder] ordersApi.update failed:', err);
+      }
+
       await blink.db.orders
         .update(id, {
           driver_name: driver.name,
@@ -215,6 +319,7 @@ export default function TrackOrderScreen() {
         status: 'accepted',
       };
       setOrder(updated);
+      useOrderStore.getState().updateOrder(id, { status: 'accepted', driverName: driver.name });
 
       try {
         const raw = await AsyncStorage.getItem('customer_local_orders');
@@ -244,6 +349,17 @@ export default function TrackOrderScreen() {
     try {
       const samplePhoto =
         'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop';
+
+      // Update backend via PATCH /orders/:id
+      try {
+        await ordersApi.update(id, {
+          status: 'delivered',
+          deliveryPhotoUrl: samplePhoto,
+        });
+      } catch (err) {
+        console.warn('[TrackOrder] ordersApi.update deliver failed:', err);
+      }
+
       await blink.db.orders
         .update(id, {
           status: 'delivered',
@@ -258,6 +374,7 @@ export default function TrackOrderScreen() {
         deliveryPhotoUrl: samplePhoto,
       };
       setOrder(updated);
+      useOrderStore.getState().updateOrder(id, { status: 'delivered', deliveryPhotoUrl: samplePhoto });
 
       try {
         const raw = await AsyncStorage.getItem('customer_local_orders');

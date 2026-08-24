@@ -18,41 +18,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { blink } from '@/lib/blink';
+import { ordersApi } from '@/apis/orders';
+import { useOrderStore } from '@/store/useOrderStore';
+import { useOrdersRealtime } from '@/lib/realtime';
 import { CustomerOrderCard, CustomerOrderData } from '@/components/Orders';
 import { useToast, SkeletonList, CustomConfirmModal } from '@/components/core';
 
 const SESSION_KEY = 'customer_session_id';
 const CHANNEL_NAME = 'order-updates';
-
-const STATIC_SAMPLE_ORDERS: CustomerOrderData[] = [
-  {
-    id: 'ord-6ef6bf-sample',
-    customerName: 'Jamie Test',
-    customerPhone: '(520) 555-1234',
-    pickupAddress: '5765 S Camino del Sol, Green Valley, AZ 85622',
-    deliveryAddress: '123 E Test Ave, Sahuarita, AZ 85629',
-    items: '[LEAVE AT DOOR] #1042',
-    status: 'pending',
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    tipAmount: 500,
-    distanceMiles: 4.2,
-    paymentStatus: 'unpaid',
-  },
-  {
-    id: 'ord-jqspfm-sample',
-    customerName: 'Jamie Test',
-    customerPhone: '(520) 555-1234',
-    pickupAddress: '5765 S Camino del Sol, Green Valley, AZ 85622',
-    deliveryAddress: '123 E Test Ave, Sahuarita, AZ 85629',
-    items: '[MEET AT DOOR] Hand off at door',
-    status: 'delivered',
-    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-    tipAmount: 1000,
-    distanceMiles: 6.8,
-    paymentStatus: 'paid',
-    driverName: 'Alex Miller',
-  },
-];
 
 async function getOrCreateSessionId(): Promise<string> {
   try {
@@ -68,9 +41,10 @@ async function getOrCreateSessionId(): Promise<string> {
 
 export default function MyOrdersScreen() {
   const { showToast } = useToast();
-  const [orders, setOrders] = useState<CustomerOrderData[]>(STATIC_SAMPLE_ORDERS);
+  const storeOrders = useOrderStore((state) => state.orders);
+  const [orders, setOrders] = useState<CustomerOrderData[]>([]);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(true);
@@ -133,12 +107,40 @@ export default function MyOrdersScreen() {
           timeoutPromise,
         ])) as [CustomerOrderData[], CustomerOrderData[], CustomerOrderData[]];
 
+        const storeList = useOrderStore.getState().orders;
         const orderMap = new Map<string, CustomerOrderData>();
-        (STATIC_SAMPLE_ORDERS || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+
         (localOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (sessionOrders1 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (sessionOrders2 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (emailOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+
+        // Merge latest store state (e.g. driver accepted / updated status)
+        (storeList || []).forEach((so) => {
+          if (so?.id) {
+            const existing = orderMap.get(so.id);
+            if (existing || so.customerSessionId === id) {
+              orderMap.set(so.id, {
+                ...(existing || {}),
+                id: so.id,
+                status: so.status as any,
+                driverName: so.driverName || existing?.driverName,
+                driver_name: so.driverName || existing?.driver_name,
+                driverUserId: so.driverUserId || (existing as any)?.driverUserId,
+                deliveryPhotoUrl: so.deliveryPhotoUrl || existing?.deliveryPhotoUrl,
+                delivery_photo_url: so.deliveryPhotoUrl || existing?.delivery_photo_url,
+                customerName: so.customerName || existing?.customerName,
+                customerPhone: so.customerPhone || existing?.customerPhone,
+                pickupAddress: so.pickupAddress || existing?.pickupAddress,
+                deliveryAddress: so.deliveryAddress || existing?.deliveryAddress,
+                items: so.items || existing?.items,
+                tipAmount: so.tipAmount ?? existing?.tipAmount,
+                distanceMiles: so.distanceMiles ?? existing?.distanceMiles,
+                createdAt: so.createdAt || existing?.createdAt,
+              } as any);
+            }
+          }
+        });
 
         const result = Array.from(orderMap.values()).sort(
           (a, b) =>
@@ -147,10 +149,14 @@ export default function MyOrdersScreen() {
         );
 
         setOrders(result);
+
+        // Keep local cache fresh
+        try {
+          await AsyncStorage.setItem('customer_local_orders', JSON.stringify(result));
+        } catch {}
       } catch (err) {
         console.warn('[my-orders] fetch failed or timed out:', err);
         const orderMap = new Map<string, CustomerOrderData>();
-        (STATIC_SAMPLE_ORDERS || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (localOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         setOrders(Array.from(orderMap.values()));
       } finally {
@@ -160,6 +166,49 @@ export default function MyOrdersScreen() {
     },
     [sessionId]
   );
+
+  // Instant reactive update whenever Zustand store updates
+  useEffect(() => {
+    if (storeOrders && storeOrders.length > 0) {
+      setOrders((prev) => {
+        const orderMap = new Map<string, CustomerOrderData>();
+        (prev || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+        storeOrders.forEach((so) => {
+          if (so?.id) {
+            const existing = orderMap.get(so.id);
+            orderMap.set(so.id, {
+              ...(existing || {}),
+              id: so.id,
+              status: so.status as any,
+              customerName: so.customerName || existing?.customerName || 'Customer',
+              customerPhone: so.customerPhone || existing?.customerPhone,
+              pickupAddress: so.pickupAddress || existing?.pickupAddress || '',
+              deliveryAddress: so.deliveryAddress || existing?.deliveryAddress || '',
+              items: so.items || existing?.items || '',
+              driverName: so.driverName || existing?.driverName,
+              driver_name: so.driverName || existing?.driver_name,
+              driverUserId: so.driverUserId,
+              deliveryPhotoUrl: so.deliveryPhotoUrl || existing?.deliveryPhotoUrl,
+              delivery_photo_url: so.deliveryPhotoUrl || existing?.delivery_photo_url,
+              tipAmount: so.tipAmount ?? existing?.tipAmount,
+              distanceMiles: so.distanceMiles ?? existing?.distanceMiles,
+              createdAt: so.createdAt || existing?.createdAt,
+            } as any);
+          }
+        });
+        return Array.from(orderMap.values()).sort(
+          (a, b) =>
+            new Date(b.createdAt || b.created_at || 0).getTime() -
+            new Date(a.createdAt || a.created_at || 0).getTime()
+        );
+      });
+    }
+  }, [storeOrders]);
+
+  // Hook into shared realtime order updates
+  useOrdersRealtime(useCallback(() => {
+    fetchOrders();
+  }, [fetchOrders]));
 
   useEffect(() => {
     let mounted = true;
@@ -177,14 +226,7 @@ export default function MyOrdersScreen() {
         await channel.subscribe({ userId: sid });
         channel.onMessage((msg: any) => {
           if (!mounted) return;
-          const data = msg.data || msg;
-          if (
-            data?.type === 'order:status_change' ||
-            data?.type === 'order:created' ||
-            data?.type === 'order-changed'
-          ) {
-            fetchOrders(sid);
-          }
+          fetchOrders(sid);
         });
 
         if (mounted) setIsConnected(true);
@@ -234,8 +276,16 @@ export default function MyOrdersScreen() {
       description: 'Your request has been removed.',
     });
 
-    // 2. Perform local storage & DB deletion in the background without blocking UI
+    // 2. Call backend PATCH /orders/:id with status: 'cancelled' and update local store
     (async () => {
+      try {
+        await ordersApi.update(id, { status: 'cancelled' });
+      } catch (apiErr) {
+        console.warn('[my-orders] ordersApi.update cancel failed:', apiErr);
+      }
+
+      useOrderStore.getState().updateOrder(id, { status: 'cancelled' });
+
       try {
         const raw = await AsyncStorage.getItem('customer_local_orders');
         if (raw) {

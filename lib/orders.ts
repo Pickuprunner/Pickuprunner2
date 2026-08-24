@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useOrderStore, Order } from '@/store/useOrderStore';
+import { useOrderStore, Order, OrderStatus } from '@/store/useOrderStore';
+import { ordersApi, CreateOrderPayload, UpdateOrderPayload } from '@/apis/orders';
 import { publishOrderChange } from './realtime';
 import { APP_CONFIG } from './config';
 
-export type { Order };
+export type { Order, OrderStatus };
 
 /**
  * Hook to query the full list of active/all orders.
@@ -22,7 +23,7 @@ export function useOrders() {
 }
 
 /**
- * Hook to query a single order by ID.
+ * Hook to query a single order by ID using GET /orders/:id
  */
 export function useOrder(id: string | undefined) {
   const storeOrders = useOrderStore((state) => state.orders);
@@ -31,10 +32,22 @@ export function useOrder(id: string | undefined) {
     queryKey: ['order', id],
     enabled: !!id,
     queryFn: async () => {
-      const orders = useOrderStore.getState().orders;
-      const match = orders.find((o) => o.id === id);
-      if (!match) throw new Error(`Order ${id} not found`);
-      return match;
+      if (!id) throw new Error('Order ID is required');
+
+      try {
+        const remoteOrder = await ordersApi.getById(id);
+        if (remoteOrder && remoteOrder.id) {
+          const synced = useOrderStore.getState().upsertOrder(remoteOrder);
+          return synced;
+        }
+      } catch (err) {
+        console.warn(`[useOrder] GET /orders/${id} failed, checking local store:`, err);
+      }
+
+      const localMatch = useOrderStore.getState().orders.find((o) => o.id === id);
+      if (localMatch) return localMatch;
+
+      throw new Error(`Order ${id} not found`);
     },
     initialData: id ? storeOrders.find((o) => o.id === id) : undefined,
     staleTime: 1000 * 5,
@@ -42,27 +55,64 @@ export function useOrder(id: string | undefined) {
 }
 
 /**
- * Hook to place a new delivery order.
+ * Hook to place a new delivery order using POST /orders
  */
 export function useCreateOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (orderData: {
+      id?: string;
       customerName: string;
       customerPhone: string;
       customerEmail?: string;
       pickupAddress: string;
       deliveryAddress: string;
       items: string;
-      tipAmount?: number;
+      tipAmount?: number; // In cents or dollars
       distanceMiles?: number;
-    }) => {
-      const newOrder = useOrderStore.getState().addOrder(orderData);
-      return newOrder;
+      cityId?: string;
+      storeId?: string;
+      orderScope?: string;
+      customerSessionId?: string;
+    }): Promise<Order> => {
+      // Ensure tip amount is integer cents for backend validation
+      const rawTip = Number(orderData.tipAmount ?? 500);
+      const tipCents = rawTip > 0 && rawTip < 100 ? Math.round(rawTip * 100) : Math.round(rawTip);
+
+      const payload: CreateOrderPayload = {
+        id: orderData.id,
+        customerName: orderData.customerName.trim(),
+        customerPhone: orderData.customerPhone.trim(),
+        customerEmail: orderData.customerEmail?.trim() || undefined,
+        pickupAddress: orderData.pickupAddress.trim(),
+        deliveryAddress: orderData.deliveryAddress.trim(),
+        items: orderData.items?.trim() || '[LEAVE AT DOOR] Standard delivery items',
+        tipAmount: tipCents,
+        distanceMiles: Math.max(0, Number(orderData.distanceMiles ?? 0)),
+        cityId: orderData.cityId || APP_CONFIG.CITY_ID,
+        storeId: orderData.storeId || APP_CONFIG.STORE_ID,
+        orderScope: orderData.orderScope,
+        customerSessionId: orderData.customerSessionId,
+      };
+
+      try {
+        const created = await ordersApi.create(payload);
+        const saved = useOrderStore.getState().upsertOrder(created);
+        return saved;
+      } catch (err: any) {
+        console.warn('[useCreateOrder] Backend POST /orders failed, saving locally as fallback:', err);
+        // Fallback to local store if offline / guest mode without token
+        const localSaved = useOrderStore.getState().addOrder({
+          ...orderData,
+          tipAmount: tipCents,
+        });
+        return localSaved;
+      }
     },
     onSuccess: async (newOrder) => {
       queryClient.invalidateQueries({ queryKey: ['orders', APP_CONFIG.CITY_ID] });
+      queryClient.invalidateQueries({ queryKey: ['order', newOrder.id] });
       await publishOrderChange({
         orderId: newOrder.id,
         type: 'created',
@@ -75,16 +125,31 @@ export function useCreateOrder() {
 }
 
 /**
- * Hook for drivers to claim an available order.
+ * Hook for drivers to claim an available order using POST /orders/:id/claim
  */
 export function useClaimOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ orderId, driverUserId, driverName }: { orderId: string; driverUserId: string; driverName?: string }) => {
-      const updated = useOrderStore.getState().claimOrder(orderId, driverUserId, driverName);
-      if (!updated) throw new Error('Could not claim order');
-      return updated;
+    mutationFn: async ({
+      orderId,
+      driverUserId,
+      driverName,
+    }: {
+      orderId: string;
+      driverUserId: string;
+      driverName?: string;
+    }): Promise<Order> => {
+      try {
+        const claimed = await ordersApi.claim(orderId, { driverUserId, driverName });
+        const saved = useOrderStore.getState().upsertOrder(claimed);
+        return saved;
+      } catch (err) {
+        console.warn(`[useClaimOrder] POST /orders/${orderId}/claim failed, fallback local:`, err);
+        const updated = useOrderStore.getState().claimOrder(orderId, driverUserId, driverName);
+        if (!updated) throw new Error('Could not claim order');
+        return updated;
+      }
     },
     onSuccess: async (updatedOrder) => {
       queryClient.invalidateQueries({ queryKey: ['orders', APP_CONFIG.CITY_ID] });
@@ -99,7 +164,7 @@ export function useClaimOrder() {
 }
 
 /**
- * Hook to transition order status through the delivery lifecycle.
+ * Hook to update order fields and transition lifecycle status using PATCH /orders/:id
  */
 export function useUpdateOrderStatus() {
   const queryClient = useQueryClient();
@@ -113,33 +178,67 @@ export function useUpdateOrderStatus() {
       deliveryPhotoUrl,
       driverUserId,
       driverName,
+      tipAmount,
+      distanceMiles,
+      pickupAddress,
+      deliveryAddress,
+      items,
+      customerName,
+      customerPhone,
+      customerEmail,
     }: {
       id: string;
-      status: 'delivered' | 'accepted' | 'picked_up' | 'pending';
-      ageVerified?: number;
+      status?: OrderStatus;
+      ageVerified?: number | boolean;
       ageVerifiedAt?: string;
       deliveryPhotoUrl?: string;
       driverUserId?: string;
       driverName?: string;
-    }) => {
-      const updated = useOrderStore.getState().updateOrder(id, {
-        status,
+      tipAmount?: number;
+      distanceMiles?: number;
+      pickupAddress?: string;
+      deliveryAddress?: string;
+      items?: string;
+      customerName?: string;
+      customerPhone?: string;
+      customerEmail?: string;
+    }): Promise<Order> => {
+      const payload: UpdateOrderPayload = {
+        ...(status ? { status } : {}),
         ...(ageVerified !== undefined ? { ageVerified } : {}),
         ...(ageVerifiedAt ? { ageVerifiedAt } : {}),
         ...(deliveryPhotoUrl ? { deliveryPhotoUrl } : {}),
         ...(driverUserId ? { driverUserId } : {}),
         ...(driverName ? { driverName } : {}),
-      });
+        ...(tipAmount !== undefined ? { tipAmount: Math.round(tipAmount) } : {}),
+        ...(distanceMiles !== undefined ? { distanceMiles } : {}),
+        ...(pickupAddress ? { pickupAddress } : {}),
+        ...(deliveryAddress ? { deliveryAddress } : {}),
+        ...(items ? { items } : {}),
+        ...(customerName ? { customerName } : {}),
+        ...(customerPhone ? { customerPhone } : {}),
+        ...(customerEmail ? { customerEmail } : {}),
+      };
 
-      if (!updated) throw new Error(`Order ${id} not found`);
-      return updated;
+      try {
+        const remoteUpdated = await ordersApi.update(id, payload);
+        const saved = useOrderStore.getState().upsertOrder(remoteUpdated);
+        return saved;
+      } catch (err) {
+        console.warn(`[useUpdateOrderStatus] PATCH /orders/${id} failed, fallback local:`, err);
+        const updated = useOrderStore.getState().updateOrder(id, payload as Partial<Order>);
+        if (!updated) throw new Error(`Order ${id} not found`);
+        return updated;
+      }
     },
     onMutate: async ({ id, status }) => {
       await queryClient.cancelQueries({ queryKey: ['orders', APP_CONFIG.CITY_ID] });
       const previousOrders = queryClient.getQueryData<Order[]>(['orders', APP_CONFIG.CITY_ID]);
-      queryClient.setQueryData<Order[]>(['orders', APP_CONFIG.CITY_ID], (old = []) =>
-        old.map((o) => (o.id === id ? { ...o, status } : o))
-      );
+      if (status) {
+        queryClient.setQueryData<Order[]>(['orders', APP_CONFIG.CITY_ID], (old = []) =>
+          old.map((o) => (o.id === id ? { ...o, status } : o))
+        );
+      }
       return { previousOrders };
     },
     onError: (_err, _vars, context) => {

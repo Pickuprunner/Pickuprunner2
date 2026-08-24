@@ -24,6 +24,8 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 
 import { blink } from '@/lib/blink';
+import { ordersApi } from '@/apis/orders';
+import { useOrderStore } from '@/store/useOrderStore';
 import { publishOrderChange } from '@/lib/realtime';
 import { colors, spacing, borderRadius, shadows } from '@/constants/design';
 import { APP_CONFIG, IS_STORE_BUILD, ORDER_SCOPE } from '@/lib/config';
@@ -256,9 +258,30 @@ export default function CustomerNewOrderScreen() {
         form.pickupNumber.trim() ? `Order: ${form.pickupNumber.trim()} · ` : ''
       }${form.items.trim()}`.trim();
 
-      const orderId = `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-      const orderData = {
-        id: orderId,
+      const fallbackOrderId = `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      let serverOrder: any = null;
+
+      try {
+        serverOrder = await ordersApi.create({
+          customerName: form.name.trim(),
+          customerPhone: form.phone.trim(),
+          customerEmail: form.email.trim() || undefined,
+          pickupAddress: form.address.trim(),
+          deliveryAddress: form.deliveryAddress.trim(),
+          items: orderItems || '[LEAVE AT DOOR] Standard delivery items',
+          distanceMiles: parseFloat(form.miles) || 0,
+          tipAmount: finalTipCents,
+          customerSessionId: sessionId,
+          cityId: APP_CONFIG.CITY_ID,
+          storeId: APP_CONFIG.STORE_ID,
+          orderScope: ORDER_SCOPE,
+        });
+      } catch (apiErr: any) {
+        console.warn('[customer-new-order] ordersApi.create failed, fallback local:', apiErr);
+      }
+
+      const finalOrder = serverOrder || {
+        id: fallbackOrderId,
         customerName: form.name.trim(),
         customerPhone: form.phone.trim(),
         customerEmail: form.email.trim(),
@@ -276,18 +299,23 @@ export default function CustomerNewOrderScreen() {
         createdAt: new Date().toISOString(),
       };
 
+      const orderId = finalOrder.id;
+
+      // Sync into Zustand store
+      useOrderStore.getState().upsertOrder(finalOrder);
+
       // Save locally in AsyncStorage so it appears instantly in My Orders
       try {
         const raw = await AsyncStorage.getItem('customer_local_orders');
         const list = raw ? JSON.parse(raw) : [];
-        await AsyncStorage.setItem('customer_local_orders', JSON.stringify([orderData, ...list]));
+        await AsyncStorage.setItem('customer_local_orders', JSON.stringify([finalOrder, ...list.filter((o: any) => o.id !== orderId)]));
       } catch (storageErr) {
         console.warn('Failed to save to customer_local_orders', storageErr);
       }
 
       // Persist to Blink DB
       try {
-        await blink.db.orders.create(orderData).catch(() => {});
+        await blink.db.orders.create(finalOrder).catch(() => {});
       } catch {}
 
       // Broadcast order creation in realtime

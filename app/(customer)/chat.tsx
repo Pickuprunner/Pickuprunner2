@@ -24,6 +24,8 @@ import { blink } from '@/lib/blink';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOrderChat, ChatMessage } from '@/lib/chat';
 import { CustomerOrderData } from '@/components/Orders';
+import { useOrderStore } from '@/store/useOrderStore';
+import { useOrdersRealtime } from '@/lib/realtime';
 import { useToast, CustomSkeleton } from '@/components/core';
 import { colors } from '@/constants/design';
 import {
@@ -43,35 +45,6 @@ function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
   }
 }
-
-const STATIC_CONVERSATIONS: CustomerOrderData[] = [
-  {
-    id: 'ord-6ef6bf-sample',
-    customerName: 'Jamie Test',
-    customerPhone: '(520) 555-1234',
-    pickupAddress: '5765 S Camino del Sol, Green Valley, AZ 85622',
-    deliveryAddress: '1234 Sunset Blvd',
-    items: '[LEAVE AT DOOR] #1042',
-    status: 'pending',
-    createdAt: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-    tipAmount: 500,
-    distanceMiles: 4.2,
-    driverName: 'Alex Rivera',
-  },
-  {
-    id: 'ord-jqspfm-sample',
-    customerName: 'Jamie Test',
-    customerPhone: '(520) 555-1234',
-    pickupAddress: '5765 S Camino del Sol, Green Valley, AZ 85622',
-    deliveryAddress: '88 Clementine Court',
-    items: '[MEET AT DOOR] Hand off at door',
-    status: 'delivered',
-    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    tipAmount: 1000,
-    distanceMiles: 6.8,
-    driverName: 'Sarah Kim',
-  },
-];
 
 const QUICK_PROMPTS = [
   'Please leave it by front door',
@@ -207,9 +180,10 @@ function CustomerOrderChatView({
 
 export default function CustomerChatScreen() {
   const insets = useSafeAreaInsets();
-  const [orders, setOrders] = useState<CustomerOrderData[]>(STATIC_CONVERSATIONS);
+  const storeOrders = useOrderStore((state) => state.orders);
+  const [orders, setOrders] = useState<CustomerOrderData[]>([]);
   const [activeChatOrder, setActiveChatOrder] = useState<CustomerOrderData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerName, setCustomerName] = useState('Customer');
 
@@ -221,7 +195,6 @@ export default function CustomerChatScreen() {
     } catch { }
 
     const name = (await AsyncStorage.getItem('customer_display_name')) || 'Customer';
-    setCustomerName(name);
 
     try {
       const authUser = await blink.auth.me().catch(() => null);
@@ -240,23 +213,92 @@ export default function CustomerChatScreen() {
       const timeoutPromise = new Promise((res) => setTimeout(() => res([]), 3000));
       const [res1, res2] = (await Promise.race([fetchPromise, timeoutPromise])) as any[];
 
+      const storeList = useOrderStore.getState().orders;
       const map = new Map<string, CustomerOrderData>();
-      (STATIC_CONVERSATIONS || []).forEach((o) => o?.id && map.set(o.id, o));
       (local || []).forEach((o) => o?.id && map.set(o.id, o));
       (res1 || []).forEach((o: any) => o?.id && map.set(o.id, o));
       (res2 || []).forEach((o: any) => o?.id && map.set(o.id, o));
 
+      // Merge latest store state (e.g. driver assigned / active delivery)
+      (storeList || []).forEach((so) => {
+        if (so?.id && (map.has(so.id) || so.customerSessionId === sid)) {
+          const existing = map.get(so.id);
+          map.set(so.id, {
+            ...(existing || {}),
+            id: so.id,
+            status: so.status as any,
+            driverName: so.driverName || existing?.driverName,
+            driver_name: so.driverName || existing?.driver_name,
+            driverUserId: so.driverUserId || (existing as any)?.driverUserId,
+            deliveryPhotoUrl: so.deliveryPhotoUrl || existing?.deliveryPhotoUrl,
+            customerName: so.customerName || existing?.customerName,
+            deliveryAddress: so.deliveryAddress || existing?.deliveryAddress,
+            pickupAddress: so.pickupAddress || existing?.pickupAddress,
+            items: so.items || existing?.items,
+            createdAt: so.createdAt || existing?.createdAt,
+          } as any);
+        }
+      });
+
       setOrders(Array.from(map.values()));
     } catch {
+      const storeList = useOrderStore.getState().orders;
       const map = new Map<string, CustomerOrderData>();
-      (STATIC_CONVERSATIONS || []).forEach((o) => o?.id && map.set(o.id, o));
       (local || []).forEach((o) => o?.id && map.set(o.id, o));
+      (storeList || []).forEach((so) => {
+        if (so?.id && map.has(so.id)) {
+          const existing = map.get(so.id);
+          map.set(so.id, { ...(existing || {}), ...so } as any);
+        }
+      });
       setOrders(Array.from(map.values()));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
+
+  // Instant reactive update when driver accepts/updates order
+  useEffect(() => {
+    if (storeOrders && storeOrders.length > 0) {
+      setOrders((prev) => {
+        const map = new Map<string, CustomerOrderData>();
+        (prev || []).forEach((o) => o?.id && map.set(o.id, o));
+        storeOrders.forEach((so) => {
+          if (so?.id) {
+            const existing = map.get(so.id);
+            map.set(so.id, {
+              ...(existing || {}),
+              id: so.id,
+              status: so.status as any,
+              customerName: so.customerName || existing?.customerName || 'Customer',
+              customerPhone: so.customerPhone || existing?.customerPhone,
+              pickupAddress: so.pickupAddress || existing?.pickupAddress || '',
+              deliveryAddress: so.deliveryAddress || existing?.deliveryAddress || '',
+              items: so.items || existing?.items || '',
+              driverName: so.driverName || existing?.driverName,
+              driver_name: so.driverName || existing?.driver_name,
+              driverUserId: so.driverUserId,
+              deliveryPhotoUrl: so.deliveryPhotoUrl || existing?.deliveryPhotoUrl,
+              delivery_photo_url: so.deliveryPhotoUrl || existing?.delivery_photo_url,
+              tipAmount: so.tipAmount ?? existing?.tipAmount,
+              distanceMiles: so.distanceMiles ?? existing?.distanceMiles,
+              createdAt: so.createdAt || existing?.createdAt,
+            } as any);
+          }
+        });
+        return Array.from(map.values()).sort(
+          (a, b) =>
+            new Date(b.createdAt || b.created_at || 0).getTime() -
+            new Date(a.createdAt || a.created_at || 0).getTime()
+        );
+      });
+    }
+  }, [storeOrders]);
+
+  useOrdersRealtime(useCallback(() => {
+    fetchOrders();
+  }, [fetchOrders]));
 
   useEffect(() => {
     fetchOrders();

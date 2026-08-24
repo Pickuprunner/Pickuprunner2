@@ -146,7 +146,7 @@ export default function NewOrderScreen() {
         pickupAddress: pickupAddress.trim(),
         deliveryAddress: deliveryAddress.trim(),
         items: formattedItems || '[LEAVE AT DOOR] Standard delivery items',
-        tipAmount: tipCents / 100,
+        tipAmount: tipCents,
         distanceMiles: parseFloat(miles) || 0,
       });
 

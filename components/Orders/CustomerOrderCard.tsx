@@ -51,7 +51,15 @@ function formatRelativeTime(dateStr?: string): string {
   return `${days}d ago`;
 }
 
-export type OrderStatusVariant = 'pending' | 'accepted' | 'picked_up' | 'delivered';
+export type OrderStatusVariant =
+  | 'pending'
+  | 'assigned'
+  | 'accepted'
+  | 'shopping'
+  | 'picked_up'
+  | 'en_route'
+  | 'delivered'
+  | 'cancelled';
 
 export interface CustomerOrderData {
   id: string;
@@ -78,6 +86,8 @@ export interface CustomerOrderData {
   driver_name?: string;
   driverName?: string;
   driver_photo_url?: string;
+  deliveryPhotoUrl?: string;
+  delivery_photo_url?: string;
 }
 
 export interface CustomerOrderCardProps {
@@ -113,8 +123,8 @@ export function CustomerOrderCard({
   const hasMileageSurcharge = mileageCents > 0;
 
   const isPending = currentStatus === 'pending';
-  const isAccepted = currentStatus === 'accepted';
-  const isPickedUp = currentStatus === 'picked_up';
+  const isAccepted = currentStatus === 'accepted' || currentStatus === 'assigned';
+  const isPickedUp = currentStatus === 'picked_up' || currentStatus === 'en_route' || currentStatus === 'shopping';
   const isDelivered = currentStatus === 'delivered';
   const driverName = order.driverName || order.driver_name;
 
@@ -122,6 +132,7 @@ export function CustomerOrderCard({
 
   const getStatusBadge = () => {
     switch (currentStatus) {
+      case 'assigned':
       case 'accepted':
         return {
           label: 'DRIVER ON THE WAY',
@@ -129,7 +140,15 @@ export function CustomerOrderCard({
           bg: 'rgba(0, 102, 255, 0.15)',
           border: 'rgba(0, 102, 255, 0.35)',
         };
+      case 'shopping':
+        return {
+          label: 'SHOPPING',
+          color: '#FFE399',
+          bg: 'rgba(255, 227, 153, 0.15)',
+          border: 'rgba(255, 227, 153, 0.35)',
+        };
       case 'picked_up':
+      case 'en_route':
         return {
           label: 'OUT FOR DELIVERY',
           color: '#F4C300',
@@ -142,6 +161,13 @@ export function CustomerOrderCard({
           color: '#00E297',
           bg: 'rgba(0, 226, 151, 0.12)',
           border: 'rgba(0, 226, 151, 0.35)',
+        };
+      case 'cancelled':
+        return {
+          label: 'CANCELLED',
+          color: '#FF6B6B',
+          bg: 'rgba(255, 107, 107, 0.15)',
+          border: 'rgba(255, 107, 107, 0.35)',
         };
       case 'pending':
       default:

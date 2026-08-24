@@ -16,7 +16,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 
 import { useOrders, useUpdateOrderStatus, type Order } from '@/lib/orders';
-import { getSelectedOrder } from '@/lib/selectedOrder';
+import { ordersApi } from '@/apis/orders';
+import { getSelectedOrder, setSelectedOrder } from '@/lib/selectedOrder';
 import { calcDriverEarnings } from '@/lib/config';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue, MAX_QUEUE } from '@/lib/driverQueue';
@@ -81,22 +82,44 @@ export default function OrderDetailScreen() {
     const fetchId = Array.isArray(id) ? id[0] : id;
     if (!fetchId) return;
 
-    const stored = getSelectedOrder();
-    if (stored && stored.id === fetchId) {
-      setOrder(stored);
-      dispatch({ type: 'HYDRATE', status: stored.status as DeliveryState, photoUrl: stored.deliveryPhotoUrl });
-      setLoading(false);
-      return;
-    }
+    let mounted = true;
 
-    const found = allOrders?.find((o) => o.id === fetchId);
-    if (found) {
-      setOrder(found);
-      dispatch({ type: 'HYDRATE', status: found.status as DeliveryState, photoUrl: found.deliveryPhotoUrl });
-      setLoading(false);
-    } else {
-      setLoading(false);
-    }
+    const loadOrder = async () => {
+      const stored = getSelectedOrder();
+      if (stored && stored.id === fetchId) {
+        setOrder(stored);
+        dispatch({ type: 'HYDRATE', status: stored.status as DeliveryState, photoUrl: stored.deliveryPhotoUrl });
+      }
+
+      const found = allOrders?.find((o) => o.id === fetchId);
+      if (found) {
+        setOrder(found);
+        dispatch({ type: 'HYDRATE', status: found.status as DeliveryState, photoUrl: found.deliveryPhotoUrl });
+      }
+
+      try {
+        const remote = await ordersApi.getById(fetchId);
+        if (remote && remote.id && mounted) {
+          setOrder(remote as Order);
+          setSelectedOrder(remote as Order);
+          dispatch({
+            type: 'HYDRATE',
+            status: (remote.status as DeliveryState) || 'pending',
+            photoUrl: remote.deliveryPhotoUrl || remote.delivery_photo_url,
+          });
+        }
+      } catch (err) {
+        console.warn(`[OrderDetailScreen] GET /orders/${fetchId} failed:`, err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    loadOrder();
+
+    return () => {
+      mounted = false;
+    };
   }, [id, allOrders]);
 
   if (!order && !loading) {
