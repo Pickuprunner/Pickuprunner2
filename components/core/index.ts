@@ -45,3 +45,7 @@ export {
   type ButtonSize,
   type ButtonShape,
 } from './CustomButton';
+export {
+  StripeSetupBanner,
+  type StripeSetupBannerProps,
+} from './StripeSetupBanner';

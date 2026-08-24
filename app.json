@@ -40,6 +40,11 @@
       },
       "package": "com.pickuprunner.app",
       "minSdkVersion": 26,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCGboNsbOQDX-ocETLgbZ6impbXaSSkVvY"
+        }
+      },
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_FINE_LOCATION",

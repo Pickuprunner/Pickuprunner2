@@ -5,6 +5,23 @@ export interface ConnectAccountResponse {
   stripeAccountId?: string;
   url?: string;
   message?: string;
+  data?: {
+    stripeAccountId?: string;
+    url?: string;
+    accountLink?: string;
+  };
+}
+
+export interface ConnectOnboardResponse {
+  url?: string;
+  success?: boolean;
+  message?: string;
+  stripeAccountId?: string;
+  data?: {
+    url?: string;
+    accountLink?: string;
+    stripeAccountId?: string;
+  };
 }
 
 export interface ConnectStatusResponse {
@@ -13,12 +30,24 @@ export interface ConnectStatusResponse {
   chargesEnabled?: boolean;
   detailsSubmitted?: boolean;
   stripeAccountId?: string | null;
+  data?: {
+    connected: boolean;
+    payoutsEnabled: boolean;
+    chargesEnabled?: boolean;
+    detailsSubmitted?: boolean;
+    stripeAccountId?: string | null;
+  };
 }
 
 export interface BalanceResponse {
   available: number;
   pending: number;
   currency: string;
+  data?: {
+    available: number;
+    pending: number;
+    currency: string;
+  };
 }
 
 export const connectApi = {
@@ -26,7 +55,7 @@ export const connectApi = {
     apiClient.post<ConnectAccountResponse>('/connect/auto-create', payload),
 
   createOnboardingLink: (payload?: { returnUrl?: string; refreshUrl?: string }) =>
-    apiClient.post<{ url: string }>('/connect/onboard', payload),
+    apiClient.post<ConnectOnboardResponse>('/connect/onboard', payload),
 
   getStatus: () =>
     apiClient.get<ConnectStatusResponse>('/connect/status'),

@@ -28,7 +28,7 @@ import { useMyVerification } from '@/lib/verification';
 import { useMyBackgroundCheck } from '@/lib/backgroundCheck';
 import { blink } from '@/lib/blink';
 import { APP_CONFIG } from '@/lib/config';
-import { useConnectStatus, useConnectOnboard } from '@/lib/stripeConnect';
+import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { useDriverId } from '@/hooks/useDriverId';
 import { CustomHeader, useToast } from '@/components/core';
 
@@ -69,7 +69,7 @@ export default function ProfileScreen() {
   const driverId = useDriverId();
   const { data: verification } = useMyVerification(user?.id);
   const { data: bgCheck } = useMyBackgroundCheck(user?.id);
-  const { data: connectStatus, refetch: refetchConnect } = useConnectStatus(driverId);
+  const { data: connectStatus, isLoading: isConnectStatusLoading, refetch: refetchConnect } = useConnectStatus(driverId);
   const connectOnboard = useConnectOnboard();
   const [connectLoading, setConnectLoading] = useState(false);
 
@@ -212,25 +212,25 @@ export default function ProfileScreen() {
   const docStatus: DocStatus = verification?.status;
   const bgStatus: DocStatus = bgCheck?.status as DocStatus;
   const allApproved = docStatus === 'approved' && bgStatus === 'approved';
-  const isStripeConnected = connectStatus?.connected && connectStatus?.payoutsEnabled;
-  const isStripePending = connectStatus?.connected && !connectStatus?.payoutsEnabled;
+
+  const isStatusLoading = isConnectStatusLoading && !connectStatus;
+  const hasStripeAccount = Boolean(connectStatus?.stripeAccountId || connectStatus?.connected);
+  const isStripeConnected = Boolean(connectStatus?.connected && connectStatus?.payoutsEnabled);
+  const isStripePending = hasStripeAccount && !isStripeConnected;
 
   const handleConnectStripe = async () => {
     if (!driverId) return;
     haptic('medium');
     setConnectLoading(true);
     try {
-      const { url } = await connectOnboard.mutateAsync({
+      const res = await connectOnboard.mutateAsync({
         driverUserId: driverId,
         driverEmail: user?.email,
       });
-      if (Platform.OS === 'web') {
-        window.open(url, '_blank');
-      } else {
-        const { Linking } = require('react-native');
-        await Linking.openURL(url);
+      if (res?.url) {
+        await openStripeOnboardingSession(res.url);
       }
-      setTimeout(() => refetchConnect(), 3000);
+      await refetchConnect();
     } catch (e: any) {
       const msg = e?.message || 'Could not start bank onboarding';
       Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
@@ -275,7 +275,11 @@ export default function ProfileScreen() {
           metrics={[
             { label: 'STATUS', value: 'Ready', color: GREEN },
             { label: 'RATING', value: '4.9 ★', color: GOLD },
-            { label: 'PAYOUTS', value: isStripeConnected ? 'Active' : 'Setup', color: isStripeConnected ? GREEN : '#94A3B8' },
+            {
+              label: 'PAYOUTS',
+              value: isStatusLoading ? '...' : isStripeConnected ? 'Active' : isStripePending ? 'Pending' : 'Setup',
+              color: isStatusLoading ? '#94A3B8' : isStripeConnected ? GREEN : isStripePending ? GOLD_ACCENT : '#94A3B8',
+            },
           ]}
         />
 
@@ -353,17 +357,29 @@ export default function ProfileScreen() {
           <ProfileActionRow
             icon={<CreditCard size={18} color={isStripeConnected ? GREEN : BLUE} />}
             iconBg={isStripeConnected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(0, 102, 255, 0.15)'}
-            title={isStripeConnected ? 'Bank Account Connected' : isStripePending ? 'Finish Bank Setup' : 'Connect Bank via Stripe'}
-            subtitle={
-              isStripeConnected
-                ? 'Direct deposit enabled for daily payouts'
-                : 'Link checking account for automatic transfers'
+            title={
+              isStatusLoading
+                ? 'Checking Bank Status...'
+                : isStripeConnected
+                  ? 'Bank Account Connected'
+                  : isStripePending
+                    ? 'Finish Bank Setup'
+                    : 'Connect Bank via Stripe'
             }
-            onPress={isStripeConnected ? undefined : handleConnectStripe}
-            disabled={connectLoading || !!isStripeConnected}
-            showChevron={!isStripeConnected}
+            subtitle={
+              isStatusLoading
+                ? 'Fetching account details'
+                : isStripeConnected
+                  ? 'Direct deposit enabled for daily payouts'
+                  : isStripePending
+                    ? 'Information required to enable payouts'
+                    : 'Link checking account for automatic transfers'
+            }
+            onPress={handleConnectStripe}
+            disabled={connectLoading || isStatusLoading}
+            showChevron={!isStatusLoading}
             rightControl={
-              !isStripeConnected && connectLoading ? (
+              (connectLoading || isStatusLoading) ? (
                 <ActivityIndicator size="small" color={BLUE} />
               ) : undefined
             }

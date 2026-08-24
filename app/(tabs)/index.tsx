@@ -24,7 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
 import { colors } from '@/constants/design';
-import { SkeletonList } from '@/components/core';
+import { SkeletonList, StripeSetupBanner } from '@/components/core';
 
 import {
   OrdersHeader,
@@ -176,11 +176,12 @@ export default function OrdersScreen() {
     }).start();
   }, [search, headerTranslateY]);
 
-  // ─── 5. List Header Spacer ───
+  // ─── 5. List Header Spacer & Reusable Stripe Banner ───
   const listHeader = useMemo(
     () => (
       <View>
-        <View style={{ height: headerHeight + 8 }} />
+        <View style={{ height: headerHeight + 4 }} />
+        <StripeSetupBanner />
         {isLoading && <SkeletonList count={3} />}
       </View>
     ),

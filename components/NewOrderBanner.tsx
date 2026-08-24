@@ -1,13 +1,3 @@
-/**
- * NewOrderBanner
- *
- * Floating in-app alert that slides in from the top when a new order
- * arrives via realtime. Used on web (where local push is unavailable)
- * and also shown on native while the app is foregrounded so drivers
- * always see it even if they miss the system notification.
- *
- * Auto-dismisses after 6 seconds. Tapping navigates to the order.
- */
 import React, { useEffect, useRef } from 'react';
 import { Platform, Pressable } from 'react-native';
 import Animated, {
