@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   User,
 } from '@blinkdotnew/mobile-ui';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,7 +30,13 @@ import { colors, gradients, spacing, borderRadius } from '@/constants/design';
 import { AuthHero, TermsAgreement, PasswordInput } from '@/components/auth';
 import CustomInput from '@/components/core/CustomInput';
 import { useToast } from '@/components/core';
-import { isValidEmail, checkPasswordRequirements } from '@/lib/validation';
+import {
+  isValidEmail,
+  checkPasswordRequirements,
+  isValidPhoneNumber,
+  formatPhoneNumber,
+  normalizePhoneNumber,
+} from '@/lib/validation';
 import { subscribeTermsAgreed } from '@/components/legal';
 
 const SESSION_KEY = 'customer_session_id';
@@ -45,6 +52,7 @@ export default function CustomerAuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -62,6 +70,9 @@ export default function CustomerAuthScreen() {
   const isEmailValid = isValidEmail(email);
   const emailStatus = email.length === 0 ? 'default' : isEmailValid ? 'success' : 'error';
 
+  const isPhoneValid = isValidPhoneNumber(phone);
+  const phoneStatus = phone.length === 0 ? 'default' : isPhoneValid ? 'success' : 'error';
+
   const scrollViewRef = useRef<ScrollView>(null);
   const passwordCheck = checkPasswordRequirements(password);
   const passwordStatus =
@@ -76,6 +87,7 @@ export default function CustomerAuthScreen() {
   const handleSubmit = async () => {
     const emailTrimmed = email.trim();
     const nameTrimmed = name.trim();
+    const phoneTrimmed = phone.trim();
 
     if (!emailTrimmed || !password) {
       showToast('Please fill in all fields.', 'error');
@@ -83,6 +95,14 @@ export default function CustomerAuthScreen() {
     }
     if (isSignUp && !nameTrimmed) {
       showToast('Please enter your name.', 'error');
+      return;
+    }
+    if (isSignUp && !phoneTrimmed) {
+      showToast('Please enter your phone number.', 'error');
+      return;
+    }
+    if (isSignUp && !isPhoneValid) {
+      showToast('Please enter a valid 10-digit US phone number.', 'error');
       return;
     }
     if (isSignUp && !isEmailValid) {
@@ -105,6 +125,7 @@ export default function CustomerAuthScreen() {
           email: emailTrimmed,
           password,
           displayName: nameTrimmed,
+          phone: normalizePhoneNumber(phoneTrimmed),
           role: 'customer',
         });
         if (nameTrimmed) {
@@ -179,18 +200,20 @@ export default function CustomerAuthScreen() {
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+          keyboardVerticalOffset={0}
         >
           <ScrollView
             ref={scrollViewRef}
             contentContainerStyle={[
               styles.scroll,
               {
-                paddingTop: Math.max(
-                  insets.top + spacing.sm,
-                  Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + spacing.sm : spacing.lg
-                ),
-                paddingBottom: Math.max(insets.bottom, 24) + (isSignUp ? 60 : spacing.lg),
+                paddingTop: isSignUp
+                  ? Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 20) : 10)
+                  : Math.max(
+                      insets.top + spacing.sm,
+                      Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + spacing.sm : spacing.lg
+                    ),
+                paddingBottom: Math.max(insets.bottom, 16),
               },
             ]}
             keyboardShouldPersistTaps="handled"
@@ -206,17 +229,18 @@ export default function CustomerAuthScreen() {
                     router.replace('/(landing)/role-select');
                   }
                 }}
-                style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+                style={({ pressed }) => [styles.backBtn, isSignUp && styles.backBtnCompact, pressed && { opacity: 0.6 }]}
                 hitSlop={12}
               >
                 <ChevronLeft size={24} color={colors.onSurface} />
               </Pressable>
 
               <AuthHero
-                icon={<ShoppingBag size={42} color="#0F131C" />}
+                icon={<ShoppingBag size={isSignUp ? 30 : 42} color="#0F131C" />}
                 iconBgColor={colors.secondaryContainer}
                 iconBorderColor={colors.secondaryContainer}
                 glowType="gold"
+                compact={isSignUp}
                 title={isSignUp ? 'Create Account' : 'Welcome Back'}
                 subtitle={
                   isSignUp
@@ -225,18 +249,32 @@ export default function CustomerAuthScreen() {
                 }
               />
 
-              <View style={styles.formSection}>
+              <View style={[styles.formSection, isSignUp && styles.formSectionCompact]}>
                 {isSignUp && (
-                  <CustomInput
-                    label="YOUR NAME"
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="e.g. Alex Rivera"
-                    autoCapitalize="words"
-                    returnKeyType="next"
-                    leftIcon={<User size={18} color={colors.outline} />}
-                    status={nameStatus}
-                  />
+                  <>
+                    <CustomInput
+                      label="YOUR NAME"
+                      value={name}
+                      onChangeText={setName}
+                      placeholder="e.g. Alex Rivera"
+                      autoCapitalize="words"
+                      returnKeyType="next"
+                      leftIcon={<User size={18} color={colors.outline} />}
+                      status={nameStatus}
+                    />
+
+                    <CustomInput
+                      label="PHONE NUMBER"
+                      value={phone}
+                      onChangeText={(val) => setPhone(formatPhoneNumber(val))}
+                      placeholder="(555) 000-0000"
+                      keyboardType="phone-pad"
+                      autoComplete="tel"
+                      returnKeyType="next"
+                      leftIcon={<MaterialIcons name="phone" size={18} color={colors.outline} />}
+                      status={phoneStatus}
+                    />
+                  </>
                 )}
 
                 <CustomInput
@@ -254,20 +292,10 @@ export default function CustomerAuthScreen() {
 
                 <PasswordInput
                   value={password}
-                  onChangeText={(text) => {
-                    setPassword(text);
-                    if (isSignUp && text.length === 1) {
-                      scrollViewRef.current?.scrollTo({ y: 130, animated: true });
-                    }
-                  }}
+                  onChangeText={setPassword}
                   showRequirements={isSignUp}
                   accentColor={colors.secondaryContainer}
                   onSubmitEditing={handleSubmit}
-                  onFocus={() => {
-                    if (isSignUp) {
-                      setTimeout(() => scrollViewRef.current?.scrollTo({ y: 130, animated: true }), 100);
-                    }
-                  }}
                 />
 
                 {isSignUp && (
@@ -366,8 +394,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.gutter,
     alignSelf: 'flex-start',
   },
+  backBtnCompact: {
+    marginBottom: 4,
+  },
   formSection: {
     gap: 16,
+  },
+  formSectionCompact: {
+    gap: 12,
   },
   errorBox: {
     backgroundColor: 'rgba(239, 68, 68, 0.12)',

@@ -15,7 +15,7 @@ export default function Index() {
           return;
         }
 
-        const proceed = (state: ReturnType<typeof useAuthStore.getState>) => {
+        const proceed = async (state: ReturnType<typeof useAuthStore.getState>) => {
           if (unmounted) return;
           console.log('[App:Startup] Auth State:', {
             isHydrated: state.isHydrated,
@@ -28,9 +28,19 @@ export default function Index() {
             if (state.user.role === 'customer') {
               console.log('[App:Startup] Routing customer to /(customer)/my-orders');
               router.replace('/(customer)/my-orders');
-            } else {
-              console.log('[App:Startup] Routing driver/admin to /(tabs)');
+            } else if (state.user.role === 'admin') {
+              console.log('[App:Startup] Routing admin to /(tabs)');
               router.replace('/(tabs)');
+            } else {
+              const { getDriverVerificationStatus } = await import('@/lib/verification');
+              const verifStatus = await getDriverVerificationStatus(state.user.id);
+              if (verifStatus !== 'approved') {
+                console.log('[App:Startup] Routing unapproved/pending driver to /(auth)/driver-verification');
+                router.replace('/(auth)/driver-verification');
+              } else {
+                console.log('[App:Startup] Routing approved driver to /(tabs)');
+                router.replace('/(tabs)');
+              }
             }
           } else {
             console.log('[App:Startup] Routing unauthenticated user to /(landing)/role-select');

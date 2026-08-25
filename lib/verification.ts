@@ -9,6 +9,8 @@ export interface DriverVerification {
   driver_email?: string;
   license_url?: string;
   license_filename?: string;
+  license_back_url?: string;
+  license_back_filename?: string;
   insurance_url?: string;
   insurance_filename?: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -17,6 +19,35 @@ export interface DriverVerification {
   order_scope: string;
   submitted_at: string;
   reviewed_at?: string;
+
+  vehicle_make?: string;
+  vehicle_model?: string;
+  vehicle_year?: string;
+  vehicle_color?: string;
+  license_plate?: string;
+
+  address?: string;
+  apt?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+
+  license_state?: string;
+  license_number?: string;
+  license_fullname?: string;
+  license_dob?: string;
+  license_exp_date?: string;
+
+  ssn_last4?: string;
+  fcra_agreed?: boolean;
+
+
+  insurance_company?: string;
+  naic_number?: string;
+  policy_number?: string;
+  effective_date?: string;
+  expiration_date?: string;
+  vin_number?: string;
 }
 
 const VERIF_STORAGE_KEY = '@pickuprunner_static_verifications_v2';
@@ -101,6 +132,13 @@ async function saveStoredVerifications(items: DriverVerification[]): Promise<voi
   }
 }
 
+export async function getDriverVerificationStatus(userId?: string): Promise<'none' | 'pending' | 'approved' | 'rejected'> {
+  if (!userId) return 'none';
+  const items = await getStoredVerifications();
+  const found = items.find((v) => v.user_id === userId);
+  return found?.status || 'none';
+}
+
 const DRIVER_PROFILES: Record<string, { phone: string; role: string; registeredAt: string; stripeAccountId: string }> = {
   u1: {
     phone: '(555) 218-4471',
@@ -178,14 +216,14 @@ export function useAllVerifications() {
 export function useSubmitVerification() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: {
+    mutationFn: async (data: Partial<DriverVerification> & {
       userId: string;
       driverName: string;
       driverEmail?: string;
-      licenseUrl: string;
-      licenseFilename: string;
-      insuranceUrl: string;
-      insuranceFilename: string;
+      licenseUrl?: string;
+      licenseFilename?: string;
+      insuranceUrl?: string;
+      insuranceFilename?: string;
       existingId?: string;
     }) => {
       const items = await getStoredVerifications();
@@ -197,18 +235,49 @@ export function useSubmitVerification() {
         user_id: data.userId,
         driver_name: data.driverName,
         driver_email: data.driverEmail,
-        license_url: data.licenseUrl,
-        license_filename: data.licenseFilename,
-        insurance_url: data.insuranceUrl,
-        insurance_filename: data.insuranceFilename,
-        status: 'pending',
-        order_scope: ORDER_SCOPE,
+        license_url: data.licenseUrl || data.license_url,
+        license_filename: data.licenseFilename || data.license_filename,
+        license_back_url: data.license_back_url,
+        license_back_filename: data.license_back_filename,
+        insurance_url: data.insuranceUrl || data.insurance_url,
+        insurance_filename: data.insuranceFilename || data.insurance_filename,
+        status: data.status || 'pending',
+        order_scope: data.order_scope || ORDER_SCOPE,
         submitted_at: now,
+
+        vehicle_make: data.vehicle_make,
+        vehicle_model: data.vehicle_model,
+        vehicle_year: data.vehicle_year,
+        vehicle_color: data.vehicle_color,
+        license_plate: data.license_plate,
+
+        address: data.address,
+        apt: data.apt,
+        city: data.city,
+        state: data.state,
+        zip: data.zip,
+
+        license_state: data.license_state,
+        license_number: data.license_number,
+        license_fullname: data.license_fullname,
+        license_dob: data.license_dob,
+        license_exp_date: data.license_exp_date,
+
+        ssn_last4: data.ssn_last4,
+        fcra_agreed: data.fcra_agreed,
+
+   
+        insurance_company: data.insurance_company,
+        naic_number: data.naic_number,
+        policy_number: data.policy_number,
+        effective_date: data.effective_date,
+        expiration_date: data.expiration_date,
+        vin_number: data.vin_number,
       };
 
       const existingIndex = items.findIndex((v) => v.id === id || v.user_id === data.userId);
       if (existingIndex >= 0) {
-        items[existingIndex] = newVerif;
+        items[existingIndex] = { ...items[existingIndex], ...newVerif };
       } else {
         items.unshift(newVerif);
       }

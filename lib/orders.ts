@@ -1,11 +1,39 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOrderStore, Order, OrderStatus } from '@/store/useOrderStore';
-import { ordersApi, CreateOrderPayload, UpdateOrderPayload } from '@/apis/orders';
+import { ordersApi, CreateOrderPayload, UpdateOrderPayload, AvailableOrdersParams } from '@/apis/orders';
 import { createCheckoutForOrder } from '@/apis/checkout';
 import { publishOrderChange } from './realtime';
 import { APP_CONFIG } from './config';
 
 export type { Order, OrderStatus };
+
+/**
+ * Hook for drivers to query open/unassigned available orders from GET /orders/available
+ */
+export function useAvailableOrders(params?: AvailableOrdersParams) {
+  const storeOrders = useOrderStore((state) => state.orders);
+
+  return useQuery({
+    queryKey: ['orders', 'available', params?.lat, params?.lng, params?.radiusMiles, params?.cityId],
+    queryFn: async () => {
+      try {
+        const availableItems = await ordersApi.getAvailable(params);
+        if (Array.isArray(availableItems) && availableItems.length > 0) {
+          availableItems.forEach((item) => {
+            useOrderStore.getState().upsertOrder(item as Order);
+          });
+          return availableItems as Order[];
+        }
+      } catch (err) {
+        console.warn('[useAvailableOrders] GET /orders/available failed, fallback to local store:', err);
+      }
+
+      return useOrderStore.getState().orders.filter((o) => o.status === 'pending');
+    },
+    initialData: () => storeOrders.filter((o) => o.status === 'pending'),
+    staleTime: 1000 * 5,
+  });
+}
 
 /**
  * Hook to query the full list of active/all orders.
@@ -135,6 +163,7 @@ export function useCreateOrder() {
     },
     onSuccess: async (newOrder) => {
       queryClient.invalidateQueries({ queryKey: ['orders', APP_CONFIG.CITY_ID] });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'available'] });
       queryClient.invalidateQueries({ queryKey: ['order', newOrder.id] });
       await publishOrderChange({
         orderId: newOrder.id,
@@ -174,6 +203,7 @@ export function useClaimOrder() {
     },
     onSuccess: async (updatedOrder) => {
       queryClient.invalidateQueries({ queryKey: ['orders', APP_CONFIG.CITY_ID] });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'available'] });
       queryClient.invalidateQueries({ queryKey: ['order', updatedOrder.id] });
       await publishOrderChange({
         orderId: updatedOrder.id,
@@ -276,6 +306,7 @@ export function useUpdateOrderStatus() {
     },
     onSettled: (_data, _err, vars) => {
       queryClient.invalidateQueries({ queryKey: ['orders', APP_CONFIG.CITY_ID] });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'available'] });
       queryClient.invalidateQueries({ queryKey: ['order', vars.id] });
     },
   });

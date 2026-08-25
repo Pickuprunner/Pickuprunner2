@@ -9,6 +9,7 @@ interface AuthHeroProps {
   glowType?: 'gold' | 'cobalt';
   title: string;
   subtitle: string;
+  compact?: boolean;
 }
 
 export function AuthHero({
@@ -18,14 +19,16 @@ export function AuthHero({
   glowType = 'gold',
   title,
   subtitle,
+  compact = false,
 }: AuthHeroProps) {
   const glowStyle = glowType === 'gold' ? shadows.goldGlow : shadows.cobaltGlow;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compact && styles.containerCompact]}>
       <View
         style={[
           styles.badge,
+          compact && styles.badgeCompact,
           {
             backgroundColor: iconBgColor,
             borderColor: iconBorderColor,
@@ -39,9 +42,9 @@ export function AuthHero({
       >
         {icon}
       </View>
-      <View style={styles.textContainer}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
+      <View style={[styles.textContainer, compact && styles.textContainerCompact]}>
+        <Text style={[styles.title, compact && styles.titleCompact]}>{title}</Text>
+        <Text style={[styles.subtitle, compact && styles.subtitleCompact]}>{subtitle}</Text>
       </View>
     </View>
   );
@@ -55,6 +58,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     gap: spacing.gutter,
   },
+  containerCompact: {
+    marginBottom: spacing.sm,
+    gap: 8,
+  },
   badge: {
     width: 88,
     height: 88,
@@ -63,10 +70,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  badgeCompact: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
   textContainer: {
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: spacing.gutter,
+  },
+  textContainerCompact: {
+    gap: 2,
   },
   title: {
     fontSize: 28,
@@ -75,11 +90,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: -0.5,
   },
+  titleCompact: {
+    fontSize: 22,
+  },
   subtitle: {
     fontSize: 14.5,
     fontWeight: '400',
     color: colors.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  subtitleCompact: {
+    fontSize: 13,
+    lineHeight: 17,
   },
 });

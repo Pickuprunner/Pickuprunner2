@@ -349,7 +349,7 @@ export default function ProfileScreen() {
                     : 'FCRA authorization needed'
             }
             status={bgStatus}
-            onPress={() => router.push('/background-check')}
+            onPress={() => router.push('/driver-verification')}
           />
         </ProfileSection>
 

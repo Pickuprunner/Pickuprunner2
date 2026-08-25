@@ -9,20 +9,24 @@ import {
   Text,
   Platform,
   LayoutChangeEvent,
+  TouchableOpacity,
 } from 'react-native';
 import {
   Button,
   Package,
 } from '@blinkdotnew/mobile-ui';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 
-import { useOrders } from '@/lib/orders';
+import { useOrders, useAvailableOrders } from '@/lib/orders';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
+import { useMyVerification } from '@/lib/verification';
+import { calcDriverEarnings } from '@/lib/config';
 import { colors } from '@/constants/design';
 import { SkeletonList, StripeSetupBanner } from '@/components/core';
 
@@ -31,6 +35,8 @@ import {
   OrdersSearchBar,
   DriverOrderCard,
   ActiveDeliveriesBanner,
+  DriverOrderFilterModal,
+  DriverFilterState,
 } from '@/components/Orders';
 
 function haptic() {
@@ -40,7 +46,13 @@ function haptic() {
 export default function OrdersScreen() {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const [filters, setFilters] = useState<DriverFilterState>({
+    scope: 'all',
+    distance: 'all',
+    tip: 'all',
+    sortBy: 'newest',
+  });
 
   const [headerHeight, setHeaderHeight] = useState(200);
   const headerTranslateY = useRef(new Animated.Value(0)).current;
@@ -49,10 +61,33 @@ export default function OrdersScreen() {
   const lastDirectionChangeTime = useRef(0);
   const isHeaderVisible = useRef(true);
 
-  const { data: orders = [], isLoading, refetch } = useOrders();
-  const { isConnected } = useOrdersRealtime();
   const { user } = useAuth();
   const driverId = useDriverId();
+  const { data: verification, isLoading: isLoadingVerif } = useMyVerification(user?.id);
+
+  useEffect(() => {
+    if (user?.role === 'driver' && !isLoadingVerif && verification?.status !== 'approved') {
+      router.replace('/(auth)/driver-verification');
+    }
+  }, [user?.role, verification?.status, isLoadingVerif]);
+
+  const { data: availableOrders = [], isLoading: isLoadingAvailable, refetch: refetchAvailable } = useAvailableOrders();
+  const { data: allOrders = [], isLoading: isLoadingAll, refetch: refetchAll } = useOrders();
+  const { isConnected } = useOrdersRealtime();
+
+  const orders = useMemo(() => {
+    const orderMap = new Map<string, any>();
+    (availableOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+    (allOrders || []).forEach((o) => {
+      if (o?.id && ((o.driverUserId === driverId) || o.status !== 'delivered')) {
+        orderMap.set(o.id, { ...(orderMap.get(o.id) || {}), ...o });
+      }
+    });
+    return Array.from(orderMap.values());
+  }, [availableOrders, allOrders, driverId]);
+
+  const isLoading = isLoadingAvailable && isLoadingAll && orders.length === 0;
+
   const { queueCount, atCapacity, isMyOrder } = useDriverQueue(orders, driverId);
 
   const avatarInitial = useMemo(() => {
@@ -65,8 +100,41 @@ export default function OrdersScreen() {
     [orders, isMyOrder]
   );
 
+  const filterCounts = useMemo(() => {
+    return {
+      all: orders.length,
+      available: orders.filter((o) => o.status === 'pending').length,
+      high_payout: orders.filter((o) => {
+        const miles = Number(o.distanceMiles || 0);
+        const tip = Number(o.tipAmount || 0);
+        return calcDriverEarnings(miles, tip).totalCents >= 1500;
+      }).length,
+    };
+  }, [orders]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.scope !== 'all') count++;
+    if (filters.distance !== 'all') count++;
+    if (filters.tip !== 'all') count++;
+    if (filters.sortBy !== 'newest') count++;
+    return count;
+  }, [filters]);
+
   const filtered = useMemo(() => {
-    let result = orders.filter((o) => o.status === 'pending' || isMyOrder(o.id));
+    let result = orders;
+
+    if (filters.scope === 'available') {
+      result = result.filter((o) => o.status === 'pending');
+    } else if (filters.scope === 'high_payout') {
+      result = result.filter((o) => {
+        const miles = Number(o.distanceMiles || 0);
+        const tip = Number(o.tipAmount || 0);
+        return calcDriverEarnings(miles, tip).totalCents >= 1500;
+      });
+    } else {
+      result = result.filter((o) => o.status === 'pending' || isMyOrder(o.id));
+    }
 
     if (search.trim()) {
       const q = search.toLowerCase().trim();
@@ -89,16 +157,35 @@ export default function OrdersScreen() {
       });
     }
 
+    if (filters.distance !== 'all') {
+      result = result.filter((o) => {
+        const m = Number(o.distanceMiles || 0);
+        if (filters.distance === 'under_3') return m <= 3;
+        if (filters.distance === '3_to_7') return m > 3 && m <= 7;
+        if (filters.distance === 'over_7') return m > 7;
+        return true;
+      });
+    }
+
+    if (filters.tip !== 'all') {
+      result = result.filter((o) => {
+        const tip = Number(o.tipAmount || 0);
+        if (filters.tip === 'with_tip') return tip > 0;
+        if (filters.tip === 'high_tip') return tip >= 500;
+        return true;
+      });
+    }
+
     result = [...result].sort((a, b) => {
       const timeA = new Date(a.createdAt || 0).getTime();
       const timeB = new Date(b.createdAt || 0).getTime();
 
-      if (sortBy === 'oldest') return timeA - timeB;
+      if (filters.sortBy === 'oldest') return timeA - timeB;
       return timeB - timeA;
     });
 
     return result;
-  }, [orders, search, sortBy, isMyOrder]);
+  }, [orders, search, filters, isMyOrder]);
 
   const pendingCount = useMemo(
     () => orders.filter((o) => o.status === 'pending').length,
@@ -107,9 +194,15 @@ export default function OrdersScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
+    haptic();
+    try {
+      await Promise.all([refetchAvailable(), refetchAll()]);
+    } catch {
+      // Ignore network errors on refresh
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchAvailable, refetchAll]);
 
   const onHeaderLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -206,17 +299,20 @@ export default function OrdersScreen() {
         <Package size={36} color="rgba(244, 195, 0, 0.4)" />
       </View>
       <Text style={styles.emptyTitle}>
-        {search.trim() ? 'No matching orders' : 'No available orders'}
+        {search.trim() || activeFilterCount > 0 ? 'No matching orders' : 'No available orders'}
       </Text>
       <Text style={styles.emptySubtitle}>
-        {search.trim()
-          ? 'Try adjusting your search query.'
+        {search.trim() || activeFilterCount > 0
+          ? 'Try adjusting your search query or reset filters.'
           : 'New incoming deliveries will appear here in real time.'}
       </Text>
-      {search.trim() ? (
+      {activeFilterCount > 0 ? (
         <Button
           marginTop="$4"
-          onPress={() => setSearch('')}
+          onPress={() => {
+            setSearch('');
+            setFilters({ scope: 'all', distance: 'all', tip: 'all', sortBy: 'newest' });
+          }}
           backgroundColor="rgba(244,195,0,0.12)"
           borderColor="rgba(244,195,0,0.35)"
           borderWidth={1}
@@ -224,9 +320,9 @@ export default function OrdersScreen() {
           size="$3.5"
           borderRadius={9999}
         >
-          Clear Search
+          Reset Filters
         </Button>
-      ) : (
+      ) : !search.trim() ? (
         <Button
           marginTop="$4"
           onPress={onRefresh}
@@ -239,7 +335,7 @@ export default function OrdersScreen() {
         >
           Refresh Orders
         </Button>
-      )}
+      ) : null}
     </View>
   ) : null;
 
@@ -266,14 +362,80 @@ export default function OrdersScreen() {
           queueCount={queueCount}
           atCapacity={atCapacity}
           isConnected={isConnected}
-          sortBy={sortBy}
-          onSortChange={setSortBy}
         />
         <OrdersSearchBar
           search={search}
           onSearchChange={setSearch}
-          showFilter={false}
+          onFilterPress={() => setIsFilterModalVisible(true)}
+          hasActiveFilter={activeFilterCount > 0}
+          filterBadgeCount={activeFilterCount}
         />
+
+        {activeFilterCount > 0 && (
+          <View style={styles.activeFiltersRow}>
+            {filters.scope !== 'all' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, scope: 'all' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Scope: {filters.scope === 'available' ? 'Available' : 'High Pay'}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            {filters.distance !== 'all' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, distance: 'all' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Distance: {filters.distance === 'under_3' ? '< 3mi' : filters.distance === '3_to_7' ? '3-7mi' : '7mi+'}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            {filters.tip !== 'all' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, tip: 'all' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Tip: {filters.tip === 'with_tip' ? 'With Tip' : 'High Tip (5+)'}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            {filters.sortBy !== 'newest' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, sortBy: 'newest' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Sort: {filters.sortBy === 'oldest' ? 'Oldest First' : 'Newest First'}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() =>
+                setFilters({ scope: 'all', distance: 'all', tip: 'all', sortBy: 'newest' })
+              }
+              style={styles.clearAllButton}
+            >
+              <Text style={styles.clearAllText}>Clear All</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </Animated.View>
 
       <FlatList
@@ -313,6 +475,14 @@ export default function OrdersScreen() {
         keyboardShouldPersistTaps="handled"
       />
 
+      <DriverOrderFilterModal
+        visible={isFilterModalVisible}
+        onClose={() => setIsFilterModalVisible(false)}
+        filters={filters}
+        onApply={(newFilters) => setFilters(newFilters)}
+        counts={filterCounts}
+      />
+
       <ActiveDeliveriesBanner queueCount={queueCount} orders={myActiveOrders} />
     </View>
   );
@@ -333,6 +503,40 @@ const styles = StyleSheet.create({
     zIndex: 50,
     backgroundColor: 'rgba(15, 19, 28, 0.95)',
     paddingBottom: 4,
+  },
+  activeFiltersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  activeFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 227, 153, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 227, 153, 0.35)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  activeFilterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffe399',
+  },
+  clearAllButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  clearAllText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8C90A1',
+    textDecorationLine: 'underline',
   },
   list: {
     paddingBottom: 32,

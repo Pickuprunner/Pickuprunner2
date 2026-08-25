@@ -107,7 +107,49 @@ function unwrapOrder(res: any): OrderItem {
   return res as OrderItem;
 }
 
+export interface AvailableOrdersParams {
+  lat?: number;
+  lng?: number;
+  radiusMiles?: number;
+  cityId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AvailableOrdersResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  sortedBy: string;
+  orders: OrderItem[];
+}
+
 export const ordersApi = {
+  /**
+   * GET /orders/available - List open/unassigned orders for driver job board
+   */
+  getAvailable: async (params: AvailableOrdersParams = {}): Promise<OrderItem[]> => {
+    const searchParams = new URLSearchParams();
+    if (params.lat !== undefined) searchParams.append('lat', String(params.lat));
+    if (params.lng !== undefined) searchParams.append('lng', String(params.lng));
+    if (params.radiusMiles !== undefined) searchParams.append('radiusMiles', String(params.radiusMiles));
+    if (params.cityId !== undefined) searchParams.append('cityId', params.cityId);
+    if (params.limit !== undefined) searchParams.append('limit', String(params.limit));
+    if (params.offset !== undefined) searchParams.append('offset', String(params.offset));
+
+    const qs = searchParams.toString();
+    const endpoint = qs ? `/orders/available?${qs}` : '/orders/available';
+    const res = await apiClient.get<any>(endpoint);
+    const rawList = res?.data?.orders || res?.data || (Array.isArray(res) ? res : []);
+    if (Array.isArray(rawList)) {
+      return rawList.map((item: any) => ({
+        ...unwrapOrder(item),
+        status: item.status || 'pending',
+        tipAmount: item.tipAmount ?? item.tipCents ?? item.tip_amount ?? 0,
+      }));
+    }
+    return [];
+  },
 
   create: async (payload: CreateOrderPayload): Promise<OrderItem> => {
     const res = await apiClient.post<any>('/orders', payload);
@@ -119,12 +161,10 @@ export const ordersApi = {
     return unwrapOrder(res);
   },
 
-
   update: async (id: string, payload: UpdateOrderPayload): Promise<OrderItem> => {
     const res = await apiClient.patch<any>(`/orders/${id}`, payload);
     return unwrapOrder(res);
   },
-
 
   claim: async (id: string, payload: ClaimOrderPayload = {}): Promise<OrderItem> => {
     const res = await apiClient.post<any>(`/orders/${id}/claim`, payload);

@@ -1,9 +1,12 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { View, Text, StyleSheet, Platform } from 'react-native';
+import { useEffect } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOrders } from '@/lib/orders';
 import { useDriverId } from '@/hooks/useDriverId';
+import { useAuth } from '@/hooks/useAuth';
+import { useMyVerification } from '@/lib/verification';
 
 const ACTIVE = '#FFE399';
 const INACTIVE = '#C2C6D8';
@@ -31,6 +34,15 @@ function InventoryTabIcon({ color, size }: { color: string; size: number }) {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { data: verification, isLoading: isVerifLoading } = useMyVerification(user?.id);
+
+  useEffect(() => {
+    if (user?.role === 'driver' && !isVerifLoading && verification?.status !== 'approved') {
+      router.replace('/(auth)/driver-verification');
+    }
+  }, [user?.role, verification?.status, isVerifLoading]);
+
   const androidBottomPad = Platform.OS === 'web' ? 10 : Math.max(insets.bottom, 12);
   const hasHomeBar = insets.bottom > 0;
 
