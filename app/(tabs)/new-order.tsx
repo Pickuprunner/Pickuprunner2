@@ -139,7 +139,7 @@ export default function NewOrderScreen() {
         pickupNumber.trim() ? `Order: ${pickupNumber.trim()} · ` : ''
       }${items.trim()}`.trim();
 
-      await createOrder.mutateAsync({
+      const created = await createOrder.mutateAsync({
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
         customerEmail: customerEmail.trim(),
@@ -155,7 +155,9 @@ export default function NewOrderScreen() {
       }
 
       showToast('Order created', {
-        description: `Order for ${customerName.trim()} added`,
+        description: created?.checkoutUrl
+          ? `Order for ${customerName.trim()} added with Stripe Checkout link`
+          : `Order for ${customerName.trim()} added`,
         type: 'success',
       });
 

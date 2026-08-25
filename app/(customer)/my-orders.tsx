@@ -153,7 +153,7 @@ export default function MyOrdersScreen() {
         // Keep local cache fresh
         try {
           await AsyncStorage.setItem('customer_local_orders', JSON.stringify(result));
-        } catch {}
+        } catch { }
       } catch (err) {
         console.warn('[my-orders] fetch failed or timed out:', err);
         const orderMap = new Map<string, CustomerOrderData>();
@@ -268,7 +268,7 @@ export default function MyOrdersScreen() {
     prevStatusMap.current.delete(id);
 
     if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
     }
 
     showToast('Pickup request cancelled', {
@@ -276,7 +276,6 @@ export default function MyOrdersScreen() {
       description: 'Your request has been removed.',
     });
 
-    // 2. Call backend PATCH /orders/:id with status: 'cancelled' and update local store
     (async () => {
       try {
         await ordersApi.update(id, { status: 'cancelled' });

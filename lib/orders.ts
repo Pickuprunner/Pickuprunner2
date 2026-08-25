@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOrderStore, Order, OrderStatus } from '@/store/useOrderStore';
 import { ordersApi, CreateOrderPayload, UpdateOrderPayload } from '@/apis/orders';
+import { createCheckoutForOrder } from '@/apis/checkout';
 import { publishOrderChange } from './realtime';
 import { APP_CONFIG } from './config';
 
@@ -96,19 +97,41 @@ export function useCreateOrder() {
         customerSessionId: orderData.customerSessionId,
       };
 
+      let createdOrder: Order;
+
       try {
         const created = await ordersApi.create(payload);
-        const saved = useOrderStore.getState().upsertOrder(created);
-        return saved;
+        createdOrder = useOrderStore.getState().upsertOrder(created);
       } catch (err: any) {
         console.warn('[useCreateOrder] Backend POST /orders failed, saving locally as fallback:', err);
         // Fallback to local store if offline / guest mode without token
-        const localSaved = useOrderStore.getState().addOrder({
+        createdOrder = useOrderStore.getState().addOrder({
           ...orderData,
           tipAmount: tipCents,
         });
-        return localSaved;
       }
+
+      // Automatically call create-checkout API after order is generated
+      if (createdOrder?.id) {
+        try {
+          const checkoutRes = await createCheckoutForOrder(createdOrder.id, {
+            amountCents: tipCents,
+            customerEmail: orderData.customerEmail,
+            testMode: true,
+          });
+          if (checkoutRes?.url) {
+            createdOrder = useOrderStore.getState().upsertOrder({
+              ...createdOrder,
+              checkoutUrl: checkoutRes.url,
+              checkoutSessionId: checkoutRes.sessionId,
+            });
+          }
+        } catch (checkoutErr) {
+          console.warn('[useCreateOrder] Post-order createCheckout failed:', checkoutErr);
+        }
+      }
+
+      return createdOrder;
     },
     onSuccess: async (newOrder) => {
       queryClient.invalidateQueries({ queryKey: ['orders', APP_CONFIG.CITY_ID] });
@@ -119,14 +142,12 @@ export function useCreateOrder() {
         customerName: newOrder.customerName,
         deliveryAddress: newOrder.deliveryAddress,
         items: newOrder.items,
-      }).catch(() => {});
+      }).catch(() => { });
     },
   });
 }
 
-/**
- * Hook for drivers to claim an available order using POST /orders/:id/claim
- */
+
 export function useClaimOrder() {
   const queryClient = useQueryClient();
 
@@ -158,7 +179,7 @@ export function useClaimOrder() {
         orderId: updatedOrder.id,
         type: 'updated',
         status: updatedOrder.status,
-      }).catch(() => {});
+      }).catch(() => { });
     },
   });
 }
@@ -251,7 +272,7 @@ export function useUpdateOrderStatus() {
         orderId: updatedOrder.id,
         type: 'updated',
         status: updatedOrder.status,
-      }).catch(() => {});
+      }).catch(() => { });
     },
     onSettled: (_data, _err, vars) => {
       queryClient.invalidateQueries({ queryKey: ['orders', APP_CONFIG.CITY_ID] });

@@ -30,6 +30,8 @@ export interface Order {
   orderScope?: string;
   tipAmount?: number;
   paymentStatus?: string;
+  checkoutUrl?: string;
+  checkoutSessionId?: string;
   distanceMiles?: number;
   customerSessionId?: string;
   hasAlcohol?: number;
@@ -54,6 +56,8 @@ export interface Order {
   tip_amount?: number;
   distance_miles?: number;
   payment_status?: string;
+  checkout_url?: string;
+  checkout_session_id?: string;
   delivery_photo_url?: string;
   created_at?: string;
   updated_at?: string;
@@ -77,6 +81,8 @@ export interface CreateOrderInput {
   userId?: string;
   customerId?: string;
   customerSessionId?: string;
+  checkoutUrl?: string;
+  checkoutSessionId?: string;
 }
 
 export const INITIAL_ORDERS: Order[] = [];
@@ -132,6 +138,8 @@ export const useOrderStore = create<OrderStoreState>()(
           orderScope: incoming.orderScope || incoming.order_scope || ORDER_SCOPE,
           tipAmount: incoming.tipAmount ?? incoming.tip_amount ?? 10.0,
           paymentStatus: incoming.paymentStatus || incoming.payment_status || 'unpaid',
+          checkoutUrl: incoming.checkoutUrl || incoming.checkout_url,
+          checkoutSessionId: incoming.checkoutSessionId || incoming.checkout_session_id,
           distanceMiles: incoming.distanceMiles ?? incoming.distance_miles ?? 0,
           customerSessionId: incoming.customerSessionId || incoming.customer_session_id,
           hasAlcohol: incoming.hasAlcohol ?? 0,

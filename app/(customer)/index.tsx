@@ -25,6 +25,7 @@ import { router } from 'expo-router';
 
 import { blink } from '@/lib/blink';
 import { ordersApi } from '@/apis/orders';
+import { createCheckoutForOrder } from '@/apis/checkout';
 import { useOrderStore } from '@/store/useOrderStore';
 import { publishOrderChange } from '@/lib/realtime';
 import { colors, spacing, borderRadius, shadows } from '@/constants/design';
@@ -130,6 +131,11 @@ export default function CustomerNewOrderScreen() {
   const [customTipText, setCustomTipText] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  // Checkout API states
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+
   // Auto-distance states
   const [calculating, setCalculating] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -164,7 +170,7 @@ export default function CustomerNewOrderScreen() {
         if (calculatedMiles !== null && calculatedMiles > 0) {
           setForm((prev) => ({ ...prev, miles: String(calculatedMiles) }));
         }
-      } catch {}
+      } catch { }
       setCalculating(false);
     }, 1200);
 
@@ -179,11 +185,11 @@ export default function CustomerNewOrderScreen() {
   const haptic = (type: 'light' | 'medium' | 'success' = 'light') => {
     if (Platform.OS !== 'web') {
       if (type === 'success') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       } else if (type === 'medium') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
       } else {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
       }
     }
   };
@@ -254,9 +260,8 @@ export default function CustomerNewOrderScreen() {
       const sessionId = await getOrCreateSessionId();
       const finalTipCents = tipCents < 500 ? 500 : tipCents;
 
-      const orderItems = `${form.deliveryType === 'meet' ? '[MEET AT DOOR] ' : '[LEAVE AT DOOR] '}${
-        form.pickupNumber.trim() ? `Order: ${form.pickupNumber.trim()} · ` : ''
-      }${form.items.trim()}`.trim();
+      const orderItems = `${form.deliveryType === 'meet' ? '[MEET AT DOOR] ' : '[LEAVE AT DOOR] '}${form.pickupNumber.trim() ? `Order: ${form.pickupNumber.trim()} · ` : ''
+        }${form.items.trim()}`.trim();
 
       const fallbackOrderId = `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       let serverOrder: any = null;
@@ -300,6 +305,32 @@ export default function CustomerNewOrderScreen() {
       };
 
       const orderId = finalOrder.id;
+      setLastOrderId(orderId);
+
+      // Invoke create-checkout API after order is generated
+      setCheckoutLoading(true);
+      let checkoutRes: any = null;
+      try {
+        const computedMileage = calcMileageCents(form.miles);
+        const grandTotalCents = DELIVERY_FEE + computedMileage + finalTipCents;
+
+        checkoutRes = await createCheckoutForOrder(orderId, {
+          amountCents: grandTotalCents,
+          customerEmail: form.email.trim() || undefined,
+          testMode: true,
+        });
+
+        if (checkoutRes?.url) {
+          setCheckoutUrl(checkoutRes.url);
+          setCheckoutSessionId(checkoutRes.sessionId || null);
+          finalOrder.checkoutUrl = checkoutRes.url;
+          finalOrder.checkoutSessionId = checkoutRes.sessionId;
+        }
+      } catch (checkoutErr) {
+        console.warn('[customer-new-order] createCheckout failed:', checkoutErr);
+      } finally {
+        setCheckoutLoading(false);
+      }
 
       // Sync into Zustand store
       useOrderStore.getState().upsertOrder(finalOrder);
@@ -315,8 +346,8 @@ export default function CustomerNewOrderScreen() {
 
       // Persist to Blink DB
       try {
-        await blink.db.orders.create(finalOrder).catch(() => {});
-      } catch {}
+        await blink.db.orders.create(finalOrder).catch(() => { });
+      } catch { }
 
       // Broadcast order creation in realtime
       publishOrderChange({
@@ -325,19 +356,19 @@ export default function CustomerNewOrderScreen() {
         customerName: form.name.trim(),
         deliveryAddress: form.deliveryAddress.trim(),
         items: orderItems,
-      }).catch(() => {});
-
-      setLastOrderId(orderId);
+      }).catch(() => { });
 
       // Save customer name preference
       if (form.name.trim()) {
-        AsyncStorage.setItem(NAME_KEY, form.name.trim()).catch(() => {});
+        AsyncStorage.setItem(NAME_KEY, form.name.trim()).catch(() => { });
       }
 
       haptic('success');
       showToast('Order Placed Successfully!', {
         type: 'success',
-        description: 'Searching for nearby drivers to fulfill your delivery.',
+        description: checkoutRes?.url
+          ? 'Checkout session created! You can pay now via Stripe.'
+          : 'Searching for nearby drivers to fulfill your delivery.',
       });
       setSuccess(true);
     } catch (err: any) {
@@ -363,6 +394,9 @@ export default function CustomerNewOrderScreen() {
     setCustomTipText('');
     setAgreedToTerms(false);
     setLastOrderId(null);
+    setCheckoutUrl(null);
+    setCheckoutSessionId(null);
+    setCheckoutLoading(false);
   };
 
   const mileageCents = calcMileageCents(form.miles);
@@ -421,12 +455,58 @@ export default function CustomerNewOrderScreen() {
 
               <View style={styles.successCardDivider} />
 
-              <View style={styles.successPaymentNotice}>
-                <MaterialIcons name="credit-card" size={16} color={GREEN} />
-                <Text style={styles.successPaymentNoticeText}>
-                  No payment needed now · Pay securely via Stripe on pickup
-                </Text>
-              </View>
+              {checkoutLoading ? (
+                <View style={styles.successPaymentNotice}>
+                  <ActivityIndicator size="small" color={GREEN} />
+                  <Text style={styles.successPaymentNoticeText}>
+                    Generating Stripe Checkout session…
+                  </Text>
+                </View>
+              ) : checkoutUrl ? (
+                <View style={{ gap: 10 }}>
+                  <View style={styles.successPaymentNotice}>
+                    <MaterialIcons name="lock" size={16} color={GREEN} />
+                    <Text style={styles.successPaymentNoticeText}>
+                      Stripe Checkout session generated successfully
+                    </Text>
+                  </View>
+
+                  <Pressable
+                    onPress={() => {
+                      haptic('medium');
+                      Linking.openURL(checkoutUrl).catch((err) => {
+                        console.error('Failed to open checkout URL:', err);
+                        showToast('Could not open payment link', { type: 'error' });
+                      });
+                    }}
+                    style={({ pressed }) => [
+                      {
+                        backgroundColor: '#635BFF',
+                        borderRadius: 12,
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                      },
+                      pressed && { opacity: 0.85 },
+                    ]}
+                  >
+                    <MaterialIcons name="payment" size={20} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15 }}>
+                      Pay Now via Stripe Checkout
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.successPaymentNotice}>
+                  <MaterialIcons name="credit-card" size={16} color={GREEN} />
+                  <Text style={styles.successPaymentNoticeText}>
+                    No payment needed now · Pay securely via Stripe on pickup
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Action Buttons */}

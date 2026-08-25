@@ -15,8 +15,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 
-import { useOrders, useUpdateOrderStatus, type Order } from '@/lib/orders';
+import { useOrders, useUpdateOrderStatus, useClaimOrder, type Order } from '@/lib/orders';
 import { ordersApi } from '@/apis/orders';
+import { connectApi } from '@/apis/connect';
 import { getSelectedOrder, setSelectedOrder } from '@/lib/selectedOrder';
 import { calcDriverEarnings } from '@/lib/config';
 import { useAuth } from '@/hooks/useAuth';
@@ -60,6 +61,7 @@ export default function OrderDetailScreen() {
   const { showToast } = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
   const updateStatus = useUpdateOrderStatus();
+  const claimOrder = useClaimOrder();
   const { user } = useAuth();
   const driverId = useDriverId();
   const { data: allOrders = [] } = useOrders();
@@ -220,7 +222,7 @@ export default function OrderDetailScreen() {
     }
   }
 
-  function doAccept() {
+  async function doAccept() {
     if (atCapacity) {
       Alert.alert(
         `Queue Full (${MAX_QUEUE}/${MAX_QUEUE})`,
@@ -237,11 +239,23 @@ export default function OrderDetailScreen() {
     });
 
     if (order) {
+      const driverName = user?.displayName ?? user?.email ?? driverId?.slice(0, 8) ?? 'Driver';
+      const effectiveDriverId = driverId || 'driver_default';
+      try {
+        await claimOrder.mutateAsync({
+          orderId: order.id,
+          driverUserId: effectiveDriverId,
+          driverName,
+        });
+      } catch (claimErr) {
+        console.warn('[doAccept] claimOrder failed:', claimErr);
+      }
+
       updateStatus.mutateAsync({
         id: order.id,
         status: 'accepted',
         driverUserId: driverId,
-        driverName: user?.displayName ?? user?.email ?? driverId?.slice(0, 8),
+        driverName,
       }).catch(() => { });
     }
   }
@@ -259,7 +273,7 @@ export default function OrderDetailScreen() {
     }
   }
 
-  function doDeliver() {
+  async function doDeliver() {
     if (!hasPhoto) {
       Alert.alert(
         'Delivery Photo Required',
@@ -275,11 +289,20 @@ export default function OrderDetailScreen() {
     });
 
     if (order) {
+      const photo = (photoUrl ?? photoUri ?? order?.deliveryPhotoUrl) || undefined;
+
       updateStatus.mutateAsync({
         id: order.id,
         status: 'delivered',
-        deliveryPhotoUrl: (photoUrl ?? photoUri ?? order?.deliveryPhotoUrl) || undefined,
+        deliveryPhotoUrl: photo,
       }).catch(() => { });
+
+      try {
+        const transferRes = await connectApi.transferEarnings(order.id);
+        console.log('[doDeliver] connectApi.transferEarnings response:', transferRes);
+      } catch (transferErr: any) {
+        console.warn('[doDeliver] connectApi.transferEarnings failed:', transferErr?.message || transferErr);
+      }
     }
   }
 

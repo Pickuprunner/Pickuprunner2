@@ -19,7 +19,7 @@ export interface CreateOrderPayload {
   deliveryAddress: string;
   items?: string;
   status?: OrderStatus;
-  tipAmount?: number; // Integer cents (e.g. 500 = $5.00)
+  tipAmount?: number;
   distanceMiles?: number;
   cityId?: string;
   storeId?: string;
@@ -34,7 +34,7 @@ export interface UpdateOrderPayload {
   deliveryPhotoUrl?: string;
   ageVerified?: boolean | number;
   ageVerifiedAt?: string | Date;
-  tipAmount?: number; // Integer cents
+  tipAmount?: number;
   distanceMiles?: number;
   pickupAddress?: string;
   deliveryAddress?: string;
@@ -68,6 +68,8 @@ export interface OrderItem {
   orderScope?: string;
   customerSessionId?: string;
   paymentStatus?: string;
+  checkoutUrl?: string;
+  checkoutSessionId?: string;
   ageVerified?: boolean | number;
   ageVerifiedAt?: string;
   deliveryPhotoUrl?: string;
@@ -79,7 +81,6 @@ export interface OrderItem {
     reason?: string;
     messageSid?: string;
   };
-  // Snake_case aliases returned from backend serialization
   customer_name?: string;
   customer_phone?: string;
   customer_email?: string;
@@ -90,6 +91,8 @@ export interface OrderItem {
   tip_amount?: number;
   distance_miles?: number;
   payment_status?: string;
+  checkout_url?: string;
+  checkout_session_id?: string;
   delivery_photo_url?: string;
   created_at?: string;
   updated_at?: string;
@@ -105,33 +108,24 @@ function unwrapOrder(res: any): OrderItem {
 }
 
 export const ordersApi = {
-  /**
-   * POST /orders - Create a new order
-   */
+
   create: async (payload: CreateOrderPayload): Promise<OrderItem> => {
     const res = await apiClient.post<any>('/orders', payload);
     return unwrapOrder(res);
   },
 
-  /**
-   * GET /orders/:id - Read an order by ID
-   */
   getById: async (id: string): Promise<OrderItem> => {
     const res = await apiClient.get<any>(`/orders/${id}`);
     return unwrapOrder(res);
   },
 
-  /**
-   * PATCH /orders/:id - Update order fields or lifecycle status
-   */
+
   update: async (id: string, payload: UpdateOrderPayload): Promise<OrderItem> => {
     const res = await apiClient.patch<any>(`/orders/${id}`, payload);
     return unwrapOrder(res);
   },
 
-  /**
-   * POST /orders/:id/claim - Claim an available order as driver
-   */
+
   claim: async (id: string, payload: ClaimOrderPayload = {}): Promise<OrderItem> => {
     const res = await apiClient.post<any>(`/orders/${id}/claim`, payload);
     return unwrapOrder(res);
