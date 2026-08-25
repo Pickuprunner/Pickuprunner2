@@ -12,6 +12,7 @@ import {
   Keyboard,
   Linking,
   Animated,
+  Switch,
 } from 'react-native';
 import { Image } from 'expo-image';
 import {
@@ -28,7 +29,7 @@ import { ordersApi } from '@/apis/orders';
 import { createCheckoutForOrder } from '@/apis/checkout';
 import { useOrderStore } from '@/store/useOrderStore';
 import { publishOrderChange } from '@/lib/realtime';
-import { colors, spacing, borderRadius, shadows } from '@/constants/design';
+import { colors, spacing } from '@/constants/design';
 import { APP_CONFIG, IS_STORE_BUILD, ORDER_SCOPE } from '@/lib/config';
 import { calcDistanceMiles } from '@/lib/distance';
 import { isValidEmail } from '@/lib/validation';
@@ -88,6 +89,7 @@ interface FormState {
   address: string;
   deliveryAddress: string;
   items: string;
+  hasAlcohol: boolean;
   miles: string;
   deliveryType: 'door' | 'meet';
 }
@@ -101,6 +103,7 @@ const EMPTY_FORM: FormState = {
   address: INITIAL_ADDRESS,
   deliveryAddress: '',
   items: '',
+  hasAlcohol: false,
   miles: '',
   deliveryType: 'door',
 };
@@ -131,16 +134,13 @@ export default function CustomerNewOrderScreen() {
   const [customTipText, setCustomTipText] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  // Checkout API states
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [checkoutSessionId, setCheckoutSessionId] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  // Auto-distance states
   const [calculating, setCalculating] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Delivery preference sliding animation
   const [toggleWidth, setToggleWidth] = useState(0);
   const slideAnim = useRef(new Animated.Value(form.deliveryType === 'meet' ? 1 : 0)).current;
 
@@ -153,7 +153,6 @@ export default function CustomerNewOrderScreen() {
     }).start();
   }, [form.deliveryType]);
 
-  // Auto-calculate distance when addresses change
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     const pickup = form.address?.trim();
@@ -179,7 +178,7 @@ export default function CustomerNewOrderScreen() {
     };
   }, [form.address, form.deliveryAddress]);
 
-  const set = (key: keyof FormState) => (val: string) =>
+  const set = (key: keyof FormState) => (val: any) =>
     setForm((f) => ({ ...f, [key]: val }));
 
   const haptic = (type: 'light' | 'medium' | 'success' = 'light') => {
@@ -236,6 +235,7 @@ export default function CustomerNewOrderScreen() {
       address: '5765 S Camino del Sol, Green Valley, AZ 85622',
       deliveryAddress: '123 E Test Ave, Sahuarita, AZ 85629',
       items: '2 bags of groceries & deli counter order',
+      hasAlcohol: false,
       miles: '3.5',
       deliveryType: 'door',
     });
@@ -260,8 +260,9 @@ export default function CustomerNewOrderScreen() {
       const sessionId = await getOrCreateSessionId();
       const finalTipCents = tipCents < 500 ? 500 : tipCents;
 
-      const orderItems = `${form.deliveryType === 'meet' ? '[MEET AT DOOR] ' : '[LEAVE AT DOOR] '}${form.pickupNumber.trim() ? `Order: ${form.pickupNumber.trim()} · ` : ''
-        }${form.items.trim()}`.trim();
+      const orderItems = `${form.deliveryType === 'meet' ? '[MEET AT DOOR] ' : '[LEAVE AT DOOR] '}${
+        form.hasAlcohol ? '[21+ ALCOHOL ID REQUIRED] ' : ''
+      }${form.pickupNumber.trim() ? `Order: ${form.pickupNumber.trim()} · ` : ''}${form.items.trim()}`.trim();
 
       const fallbackOrderId = `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       let serverOrder: any = null;
@@ -307,7 +308,6 @@ export default function CustomerNewOrderScreen() {
       const orderId = finalOrder.id;
       setLastOrderId(orderId);
 
-      // Invoke create-checkout API after order is generated
       setCheckoutLoading(true);
       let checkoutRes: any = null;
       try {
@@ -332,10 +332,8 @@ export default function CustomerNewOrderScreen() {
         setCheckoutLoading(false);
       }
 
-      // Sync into Zustand store
       useOrderStore.getState().upsertOrder(finalOrder);
 
-      // Save locally in AsyncStorage so it appears instantly in My Orders
       try {
         const raw = await AsyncStorage.getItem('customer_local_orders');
         const list = raw ? JSON.parse(raw) : [];
@@ -344,12 +342,10 @@ export default function CustomerNewOrderScreen() {
         console.warn('Failed to save to customer_local_orders', storageErr);
       }
 
-      // Persist to Blink DB
       try {
         await blink.db.orders.create(finalOrder).catch(() => { });
       } catch { }
 
-      // Broadcast order creation in realtime
       publishOrderChange({
         orderId,
         type: 'created',
@@ -358,7 +354,6 @@ export default function CustomerNewOrderScreen() {
         items: orderItems,
       }).catch(() => { });
 
-      // Save customer name preference
       if (form.name.trim()) {
         AsyncStorage.setItem(NAME_KEY, form.name.trim()).catch(() => { });
       }
@@ -406,7 +401,6 @@ export default function CustomerNewOrderScreen() {
 
   const isPickupLocked = APP_CONFIG.LOCK_PICKUP_ADDRESS && IS_STORE_BUILD;
 
-  // ── Success State Screen ──────────────────────────────────────────────────
   if (success) {
     const formattedOrderId = lastOrderId ? `#${lastOrderId.slice(-6).toUpperCase()}` : '#CONFIRMED';
 
@@ -419,7 +413,6 @@ export default function CustomerNewOrderScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.successContent}>
-            {/* Glowing Icon Halo */}
             <View style={styles.successIconHalo}>
               <View style={styles.successIconCircle}>
                 <MaterialIcons name="local-shipping" size={40} color={GREEN} />
@@ -429,13 +422,11 @@ export default function CustomerNewOrderScreen() {
               </View>
             </View>
 
-            {/* Title & Subtitle */}
             <Text style={styles.successTitle}>Order Placed!</Text>
             <Text style={styles.successSubtitle}>
               A driver will accept your request shortly. You can track your delivery live in My Orders.
             </Text>
 
-            {/* Golden Order Pill */}
             <LinearGradient
               colors={['rgba(244, 195, 0, 0.22)', 'rgba(255, 227, 153, 0.08)']}
               start={{ x: 0, y: 0 }}
@@ -446,7 +437,6 @@ export default function CustomerNewOrderScreen() {
               <Text style={styles.successOrderPillText}>ORDER {formattedOrderId}</Text>
             </LinearGradient>
 
-            {/* Summary Card */}
             <View style={styles.successCard}>
               <View style={styles.successAmountRow}>
                 <Text style={styles.successTotalLabel}>ESTIMATED TOTAL</Text>
@@ -509,7 +499,6 @@ export default function CustomerNewOrderScreen() {
               )}
             </View>
 
-            {/* Action Buttons */}
             <View style={styles.successActionButtons}>
               <Pressable
                 onPress={() => {
@@ -552,7 +541,6 @@ export default function CustomerNewOrderScreen() {
     );
   }
 
-  // ── Header Title Node (Matching Driver Wizard Style) ───────────────────────
   const titleNode = (
     <View style={styles.headerTitleRow}>
       <Image
@@ -570,7 +558,6 @@ export default function CustomerNewOrderScreen() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Top Header */}
       <CustomHeader
         title={titleNode}
         subtitle="Schedule a grocery or package pickup"
@@ -596,7 +583,6 @@ export default function CustomerNewOrderScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <Pressable onPress={Keyboard.dismiss} style={styles.innerContent}>
-            {/* ── 1. 3-STEP TAB BAR (Matching Driver App Wizard Style) ── */}
             <View style={styles.tabBar}>
               {WIZARD_STEPS.map((s) => {
                 const isActive = currentStep === s.id;
@@ -638,13 +624,11 @@ export default function CustomerNewOrderScreen() {
               })}
             </View>
 
-            {/* ── STEP 1: Customer Details & Preferences ───────────────────── */}
             {currentStep === 1 && (
               <View style={styles.cardSection}>
                 <Text style={styles.sectionTitle}>CUSTOMER DETAILS & PREFERENCE</Text>
 
                 <View style={styles.fieldsGap}>
-                  {/* Delivery Preference Toggle */}
                   <View style={styles.prefContainer}>
                     <Text style={styles.inputSectionLabel}>DELIVERY PREFERENCE</Text>
                     <View
@@ -663,7 +647,7 @@ export default function CustomerNewOrderScreen() {
                               }),
                               borderColor:
                                 form.deliveryType === 'door'
-                                  ? 'rgba(255, 227, 153, 0.5)'
+                                    ? 'rgba(255, 227, 153, 0.5)'
                                   : 'rgba(0, 226, 151, 0.5)',
                             },
                           ]}
@@ -681,7 +665,6 @@ export default function CustomerNewOrderScreen() {
                         </Animated.View>
                       )}
 
-                      {/* Option 1: Leave at Door */}
                       <Pressable
                         onPress={() => {
                           set('deliveryType')('door');
@@ -707,7 +690,6 @@ export default function CustomerNewOrderScreen() {
                         </View>
                       </Pressable>
 
-                      {/* Option 2: Meet at Door */}
                       <Pressable
                         onPress={() => {
                           set('deliveryType')('meet');
@@ -735,7 +717,6 @@ export default function CustomerNewOrderScreen() {
                     </View>
                   </View>
 
-                  {/* CUSTOMER NAME */}
                   <CustomInput
                     label="NAME *"
                     value={form.name}
@@ -747,7 +728,6 @@ export default function CustomerNewOrderScreen() {
                     status={form.name.trim().length >= 2 ? 'success' : 'default'}
                   />
 
-                  {/* PHONE NUMBER */}
                   <CustomInput
                     label="PHONE *"
                     value={form.phone}
@@ -760,7 +740,6 @@ export default function CustomerNewOrderScreen() {
                     status={form.phone.trim().length >= 7 ? 'success' : 'default'}
                   />
 
-                  {/* PICKUP INFO / ORDER NUMBER */}
                   <CustomInput
                     label="PICKUP INFO / ORDER #"
                     value={form.pickupNumber}
@@ -771,7 +750,6 @@ export default function CustomerNewOrderScreen() {
                     leftIcon={<MaterialIcons name="tag" size={18} color={colors.outline} />}
                   />
 
-                  {/* EMAIL ADDRESS */}
                   <CustomInput
                     label="EMAIL (OPTIONAL)"
                     value={form.email}
@@ -787,13 +765,11 @@ export default function CustomerNewOrderScreen() {
               </View>
             )}
 
-            {/* ── STEP 2: Route & Items ───────────────────────────────────── */}
             {currentStep === 2 && (
               <View style={styles.cardSection}>
                 <Text style={styles.sectionTitle}>ROUTE & ITEMS</Text>
 
                 <View style={styles.fieldsGap}>
-                  {/* Store Info Banner (If Store Build) */}
                   {IS_STORE_BUILD && (
                     <View style={styles.storeBanner}>
                       <View style={styles.storeHeaderRow}>
@@ -812,7 +788,6 @@ export default function CustomerNewOrderScreen() {
                     </View>
                   )}
 
-                  {/* PICKUP ADDRESS */}
                   <CustomInput
                     label={isPickupLocked ? 'PICKUP ADDRESS (STORE DEFAULT)' : 'PICKUP ADDRESS'}
                     value={form.address}
@@ -830,7 +805,6 @@ export default function CustomerNewOrderScreen() {
                     status={form.address.trim().length >= 5 ? 'success' : 'default'}
                   />
 
-                  {/* DELIVERY ADDRESS */}
                   <CustomInput
                     label="DELIVERY ADDRESS *"
                     value={form.deliveryAddress}
@@ -842,7 +816,6 @@ export default function CustomerNewOrderScreen() {
                     status={form.deliveryAddress.trim().length >= 5 ? 'success' : 'default'}
                   />
 
-                  {/* ORDER ITEMS */}
                   <CustomInput
                     label="ORDER ITEMS *"
                     value={form.items}
@@ -855,7 +828,41 @@ export default function CustomerNewOrderScreen() {
                     status={form.items.trim().length >= 3 ? 'success' : 'default'}
                   />
 
-                  {/* Auto Distance Calculation Card */}
+                  <Pressable
+                    onPress={() => {
+                      haptic('light');
+                      set('hasAlcohol')(!form.hasAlcohol);
+                    }}
+                    style={[
+                      styles.alcoholCard,
+                      form.hasAlcohol && styles.alcoholCardActive,
+                    ]}
+                  >
+                    <View style={styles.alcoholIconCircle}>
+                      <MaterialIcons
+                        name="wine-bar"
+                        size={20}
+                        color={form.hasAlcohol ? GOLD : '#8C90A1'}
+                      />
+                    </View>
+                    <View style={styles.alcoholTextCol}>
+                      <Text style={styles.alcoholTitle}>Order includes alcohol</Text>
+                      <Text style={styles.alcoholSubtitle}>Driver will require 21+ ID at delivery</Text>
+                    </View>
+                    <Switch
+                      value={form.hasAlcohol}
+                      onValueChange={(val) => {
+                        haptic('light');
+                        set('hasAlcohol')(val);
+                      }}
+                      trackColor={{
+                        false: 'rgba(255, 255, 255, 0.12)',
+                        true: 'rgba(255, 227, 153, 0.45)',
+                      }}
+                      thumbColor={form.hasAlcohol ? GOLD : '#FFFFFF'}
+                    />
+                  </Pressable>
+
                   <View style={styles.distanceSection}>
                     <Text style={styles.inputSectionLabel}>ROUTE DISTANCE</Text>
                     {calculating ? (
@@ -895,13 +902,11 @@ export default function CustomerNewOrderScreen() {
               </View>
             )}
 
-            {/* ── STEP 3: Pricing & Review ─────────────────────────────────── */}
             {currentStep === 3 && (
               <View style={styles.cardSection}>
                 <Text style={styles.sectionTitle}>PRICING & REVIEW</Text>
 
                 <View style={styles.fieldsGap}>
-                  {/* Route Summary Item */}
                   <View style={styles.summaryCard}>
                     <View style={styles.summaryAddressItem}>
                       <View style={styles.summaryDotGreen} />
@@ -935,7 +940,6 @@ export default function CustomerNewOrderScreen() {
                     </View>
                   </View>
 
-                  {/* Distance Input */}
                   <CustomInput
                     label={`DISTANCE (MILES) · free up to ${APP_CONFIG.FREE_MILES} mi`}
                     placeholder="e.g. 4.5"
@@ -952,7 +956,6 @@ export default function CustomerNewOrderScreen() {
                     }
                   />
 
-                  {/* Tip Selector */}
                   <View style={styles.tipSection}>
                     <View style={styles.tipHeaderRow}>
                       <Text style={styles.inputSectionLabel}>DRIVER TIP</Text>
@@ -1014,7 +1017,6 @@ export default function CustomerNewOrderScreen() {
                     )}
                   </View>
 
-                  {/* Price Breakdown Drawer */}
                   <View style={styles.breakdownCard}>
                     <Text style={styles.breakdownTitle}>PRICE BREAKDOWN</Text>
 
@@ -1049,7 +1051,6 @@ export default function CustomerNewOrderScreen() {
                     </View>
                   </View>
 
-                  {/* What to Expect Card */}
                   <View style={styles.expectCard}>
                     <Text style={styles.expectTitle}>WHAT TO EXPECT</Text>
                     <View style={styles.expectItem}>
@@ -1072,7 +1073,6 @@ export default function CustomerNewOrderScreen() {
                     </View>
                   </View>
 
-                  {/* Payment Policy Notice */}
                   <View style={styles.paymentNoticeBox}>
                     <MaterialIcons name="credit-card" size={18} color={GREEN} />
                     <Text style={styles.paymentNoticeText}>
@@ -1080,7 +1080,6 @@ export default function CustomerNewOrderScreen() {
                     </Text>
                   </View>
 
-                  {/* Terms Agreement Checkbox */}
                   <Pressable
                     onPress={() => {
                       haptic('light');
@@ -1111,7 +1110,6 @@ export default function CustomerNewOrderScreen() {
               </View>
             )}
 
-            {/* Error Display */}
             {!!error && (
               <View style={styles.errorBox}>
                 <MaterialIcons name="error-outline" size={16} color="#FF6B6B" />
@@ -1119,7 +1117,6 @@ export default function CustomerNewOrderScreen() {
               </View>
             )}
 
-            {/* ── 2. Bottom Wizard Navigation Buttons ── */}
             <View style={styles.navRow}>
               {currentStep > 1 && (
                 <Pressable
@@ -1692,8 +1689,6 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     transform: [{ scale: 0.985 }],
   },
-
-  // Summary Card in Step 3
   summaryCard: {
     backgroundColor: '#121622',
     borderRadius: 18,
@@ -1754,8 +1749,6 @@ const styles = StyleSheet.create({
     color: '#C2C6D8',
     fontWeight: '500',
   },
-
-  // ── Success Screen Styles ──
   successRoot: {
     flex: 1,
     backgroundColor: '#0F131C',
@@ -1921,5 +1914,40 @@ const styles = StyleSheet.create({
     color: '#DFE2EF',
     fontSize: 14.5,
     fontWeight: '600',
+  },
+  alcoholCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 12,
+  },
+  alcoholCardActive: {
+    backgroundColor: 'rgba(255, 227, 153, 0.08)',
+    borderColor: 'rgba(255, 227, 153, 0.35)',
+  },
+  alcoholIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alcoholTextCol: {
+    flex: 1,
+  },
+  alcoholTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#DFE2EF',
+  },
+  alcoholSubtitle: {
+    fontSize: 11,
+    color: '#8C90A1',
+    marginTop: 2,
   },
 });

@@ -20,6 +20,7 @@ interface Props {
   onFilterPress?: () => void;
   hasActiveFilter?: boolean;
   filterBadgeCount?: number;
+  showFilter?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 }
 
@@ -30,6 +31,7 @@ export function OrdersSearchBar({
   onFilterPress,
   hasActiveFilter = false,
   filterBadgeCount = 0,
+  showFilter = true,
   containerStyle,
 }: Props) {
   const handleFilter = () => {
@@ -58,26 +60,28 @@ export function OrdersSearchBar({
         />
       </View>
 
-      <Pressable
-        onPress={handleFilter}
-        accessibilityLabel="Filters"
-        style={({ pressed }) => [
-          styles.filterBtn,
-          hasActiveFilter && styles.filterBtnActive,
-          pressed && { opacity: 0.8 },
-        ]}
-      >
-        <MaterialIcons
-          name="tune"
-          size={20}
-          color={hasActiveFilter ? '#ffe399' : colors.onSurface}
-        />
-        {hasActiveFilter && filterBadgeCount > 0 && (
-          <View style={styles.filterBadge}>
-            <Text style={styles.filterBadgeText}>{filterBadgeCount}</Text>
-          </View>
-        )}
-      </Pressable>
+      {showFilter && onFilterPress ? (
+        <Pressable
+          onPress={handleFilter}
+          accessibilityLabel="Filters"
+          style={({ pressed }) => [
+            styles.filterBtn,
+            hasActiveFilter && styles.filterBtnActive,
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <MaterialIcons
+            name="tune"
+            size={20}
+            color={hasActiveFilter ? '#ffe399' : colors.onSurface}
+          />
+          {hasActiveFilter && filterBadgeCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{filterBadgeCount}</Text>
+            </View>
+          )}
+        </Pressable>
+      ) : null}
     </View>
   );
 }

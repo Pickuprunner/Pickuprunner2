@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, Switch, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { CustomInput } from '@/components/core';
 import { APP_CONFIG, IS_STORE_BUILD } from '@/lib/config';
 import { colors, spacing, typography } from '@/constants/design';
@@ -19,6 +20,8 @@ interface RouteItemsCardProps {
   onDeliveryAddressChange: (val: string) => void;
   items: string;
   onItemsChange: (val: string) => void;
+  hasAlcohol?: boolean;
+  onHasAlcoholChange?: (val: boolean) => void;
   miles?: string;
   mileageCents?: number;
   calculating?: boolean;
@@ -31,6 +34,8 @@ export function RouteItemsCard({
   onDeliveryAddressChange,
   items,
   onItemsChange,
+  hasAlcohol = false,
+  onHasAlcoholChange,
   miles = '',
   mileageCents = 0,
   calculating = false,
@@ -39,12 +44,17 @@ export function RouteItemsCard({
   const milesNum = parseFloat(miles);
   const hasValidMiles = isFinite(milesNum) && milesNum > 0;
 
+  const haptic = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>ROUTE & ITEMS</Text>
 
       <View style={styles.content}>
-        {/* Store Info Banner (If Store Build) */}
         {IS_STORE_BUILD && (
           <View style={styles.storeBanner}>
             <View style={styles.storeHeaderRow}>
@@ -63,7 +73,6 @@ export function RouteItemsCard({
           </View>
         )}
 
-        {/* PICKUP ADDRESS */}
         <CustomInput
           label={isPickupLocked ? 'PICKUP ADDRESS (STORE DEFAULT)' : 'PICKUP ADDRESS'}
           placeholder="Where to pick up"
@@ -81,7 +90,6 @@ export function RouteItemsCard({
           status={pickupAddress.trim().length >= 5 ? 'success' : 'default'}
         />
 
-        {/* DELIVERY ADDRESS */}
         <CustomInput
           label="DELIVERY ADDRESS *"
           placeholder="Where to drop off"
@@ -93,7 +101,6 @@ export function RouteItemsCard({
           status={deliveryAddress.trim().length >= 5 ? 'success' : 'default'}
         />
 
-        {/* ORDER ITEMS */}
         <CustomInput
           label="ORDER ITEMS *"
           placeholder="e.g. 2 grocery bags, milk & bread, order #1042..."
@@ -106,7 +113,41 @@ export function RouteItemsCard({
           status={items.trim().length >= 3 ? 'success' : 'default'}
         />
 
-        {/* Auto Distance Calculation Card */}
+        <Pressable
+          onPress={() => {
+            haptic();
+            onHasAlcoholChange?.(!hasAlcohol);
+          }}
+          style={[
+            styles.alcoholCard,
+            hasAlcohol && styles.alcoholCardActive,
+          ]}
+        >
+          <View style={styles.alcoholIconCircle}>
+            <MaterialIcons
+              name="wine-bar"
+              size={20}
+              color={hasAlcohol ? GOLD : '#8C90A1'}
+            />
+          </View>
+          <View style={styles.alcoholTextCol}>
+            <Text style={styles.alcoholTitle}>Order includes alcohol</Text>
+            <Text style={styles.alcoholSubtitle}>Driver will require 21+ ID at delivery</Text>
+          </View>
+          <Switch
+            value={hasAlcohol}
+            onValueChange={(val) => {
+              haptic();
+              onHasAlcoholChange?.(val);
+            }}
+            trackColor={{
+              false: 'rgba(255, 255, 255, 0.12)',
+              true: 'rgba(255, 227, 153, 0.45)',
+            }}
+            thumbColor={hasAlcohol ? GOLD : '#FFFFFF'}
+          />
+        </Pressable>
+
         <View style={styles.distanceSection}>
           <Text style={styles.inputSectionLabel}>ROUTE DISTANCE</Text>
           {calculating ? (
@@ -247,5 +288,40 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#8C90A1',
     marginLeft: 4,
+  },
+  alcoholCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 12,
+  },
+  alcoholCardActive: {
+    backgroundColor: 'rgba(255, 227, 153, 0.08)',
+    borderColor: 'rgba(255, 227, 153, 0.35)',
+  },
+  alcoholIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alcoholTextCol: {
+    flex: 1,
+  },
+  alcoholTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#DFE2EF',
+  },
+  alcoholSubtitle: {
+    fontSize: 11,
+    color: '#8C90A1',
+    marginTop: 2,
   },
 });

@@ -45,6 +45,7 @@ export default function NewOrderScreen() {
   );
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [items, setItems] = useState('');
+  const [hasAlcohol, setHasAlcohol] = useState(false);
   const [miles, setMiles] = useState('');
   const [tipCents, setTipCents] = useState(500);
   const [showCustomTip, setShowCustomTip] = useState(false);
@@ -63,6 +64,7 @@ export default function NewOrderScreen() {
     setPickupAddress(APP_CONFIG.LOCK_PICKUP_ADDRESS ? APP_CONFIG.STORE_ADDRESS : '');
     setDeliveryAddress('');
     setItems('');
+    setHasAlcohol(false);
     setMiles('');
     setTipCents(500);
     setShowCustomTip(false);
@@ -80,7 +82,6 @@ export default function NewOrderScreen() {
     }, [resetForm])
   );
 
-  // Auto-distance states
   const [calculating, setCalculating] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -136,8 +137,8 @@ export default function NewOrderScreen() {
     setLoading(true);
     try {
       const formattedItems = `${deliveryType === 'meet' ? '[MEET AT DOOR] ' : '[LEAVE AT DOOR] '}${
-        pickupNumber.trim() ? `Order: ${pickupNumber.trim()} · ` : ''
-      }${items.trim()}`.trim();
+        hasAlcohol ? '[21+ ALCOHOL ID REQUIRED] ' : ''
+      }${pickupNumber.trim() ? `Order: ${pickupNumber.trim()} · ` : ''}${items.trim()}`.trim();
 
       const created = await createOrder.mutateAsync({
         customerName: customerName.trim(),
@@ -178,14 +179,13 @@ export default function NewOrderScreen() {
   const fillTestData = () => {
     setCustomerName('Jamie Test');
     setCustomerPhone('(520) 555-1234');
-    setCustomerEmail('test@example.com');
-    setPickupNumber('#1042');
-    setDeliveryType('door');
-    setPickupAddress('5765 S Camino del Sol, Green Valley, AZ 85622');
-    setDeliveryAddress('123 E Test Ave, Sahuarita, AZ 85629');
-    setItems('2 bags of groceries & deli counter order');
-    setMiles('3.5');
-    setTipCents(500);
+    setCustomerEmail('jamie.test@example.com');
+    setPickupNumber('#4402');
+    setPickupAddress(APP_CONFIG.LOCK_PICKUP_ADDRESS ? APP_CONFIG.STORE_ADDRESS : '101 Commerce Blvd, Tucson, AZ');
+    setDeliveryAddress('5765 S Camino del Sol, Green Valley, AZ 85622');
+    setItems('1 gallon milk, organic eggs, sourdough bread, chips');
+    setMiles('12.5');
+    setTipCents(750);
     setAgreedToTerms(false);
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -222,6 +222,8 @@ export default function NewOrderScreen() {
             onDeliveryAddressChange={setDeliveryAddress}
             items={items}
             onItemsChange={setItems}
+            hasAlcohol={hasAlcohol}
+            onHasAlcoholChange={setHasAlcohol}
             miles={miles}
             onMilesChange={setMiles}
             mileageCents={mileageCents}
