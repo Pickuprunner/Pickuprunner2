@@ -9,11 +9,13 @@ import {
   Text,
   Platform,
   LayoutChangeEvent,
+  TouchableOpacity,
 } from 'react-native';
 import {
   Button,
   Package,
 } from '@blinkdotnew/mobile-ui';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 
@@ -23,6 +25,7 @@ import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
+import { calcDriverEarnings } from '@/lib/config';
 import { colors } from '@/constants/design';
 import { SkeletonList, StripeSetupBanner } from '@/components/core';
 
@@ -31,6 +34,8 @@ import {
   OrdersSearchBar,
   DriverOrderCard,
   ActiveDeliveriesBanner,
+  DriverOrderFilterModal,
+  DriverFilterState,
 } from '@/components/Orders';
 
 function haptic() {
@@ -40,8 +45,14 @@ function haptic() {
 export default function OrdersScreen() {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const [filters, setFilters] = useState<DriverFilterState>({
+    scope: 'all',
+    distance: 'all',
+    tip: 'all',
+    sortBy: 'newest',
+  });
 
-  // ─── 1. State, Refs & Animated Values (Smooth Animation Logic) ───
   const [headerHeight, setHeaderHeight] = useState(200);
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
@@ -65,19 +76,92 @@ export default function OrdersScreen() {
     [orders, isMyOrder]
   );
 
-  const pendingOrders = useMemo(() => orders.filter((o) => o.status === 'pending'), [orders]);
+  const filterCounts = useMemo(() => {
+    return {
+      all: orders.length,
+      available: orders.filter((o) => o.status === 'pending').length,
+      high_payout: orders.filter((o) => {
+        const miles = Number(o.distanceMiles || 0);
+        const tip = Number(o.tipAmount || 0);
+        return calcDriverEarnings(miles, tip).totalCents >= 1500;
+      }).length,
+    };
+  }, [orders]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.scope !== 'all') count++;
+    if (filters.distance !== 'all') count++;
+    if (filters.tip !== 'all') count++;
+    if (filters.sortBy !== 'newest') count++;
+    return count;
+  }, [filters]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return pendingOrders;
-    const q = search.toLowerCase();
-    return pendingOrders.filter(
-      (o) =>
-        o.customerName?.toLowerCase().includes(q) ||
-        o.customerPhone?.toLowerCase().includes(q) ||
-        o.deliveryAddress?.toLowerCase().includes(q) ||
-        o.pickupAddress?.toLowerCase().includes(q)
-    );
-  }, [pendingOrders, search]);
+    let result = orders;
+
+    if (filters.scope === 'available') {
+      result = result.filter((o) => o.status === 'pending');
+    } else if (filters.scope === 'high_payout') {
+      result = result.filter((o) => {
+        const miles = Number(o.distanceMiles || 0);
+        const tip = Number(o.tipAmount || 0);
+        return calcDriverEarnings(miles, tip).totalCents >= 1500;
+      });
+    } else {
+      result = result.filter((o) => o.status === 'pending' || isMyOrder(o.id));
+    }
+
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      result = result.filter((o) => {
+        const idStr = (o.id || '').toLowerCase();
+        const custName = (o.customerName || '').toLowerCase();
+        const phone = (o.customerPhone || '').toLowerCase();
+        const pickup = (o.pickupAddress || '').toLowerCase();
+        const delivery = (o.deliveryAddress || '').toLowerCase();
+        const items = (o.items || '').toLowerCase();
+
+        return (
+          idStr.includes(q) ||
+          custName.includes(q) ||
+          phone.includes(q) ||
+          pickup.includes(q) ||
+          delivery.includes(q) ||
+          items.includes(q)
+        );
+      });
+    }
+
+    if (filters.distance !== 'all') {
+      result = result.filter((o) => {
+        const m = Number(o.distanceMiles || 0);
+        if (filters.distance === 'under_3') return m <= 3;
+        if (filters.distance === '3_to_7') return m > 3 && m <= 7;
+        if (filters.distance === 'over_7') return m > 7;
+        return true;
+      });
+    }
+
+    if (filters.tip !== 'all') {
+      result = result.filter((o) => {
+        const tip = Number(o.tipAmount || 0);
+        if (filters.tip === 'with_tip') return tip > 0;
+        if (filters.tip === 'high_tip') return tip >= 500;
+        return true;
+      });
+    }
+
+    result = [...result].sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+
+      if (filters.sortBy === 'oldest') return timeA - timeB;
+      return timeB - timeA;
+    });
+
+    return result;
+  }, [orders, search, filters, isMyOrder]);
 
   const pendingCount = useMemo(
     () => orders.filter((o) => o.status === 'pending').length,
@@ -90,7 +174,6 @@ export default function OrdersScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  // ─── 2. Header Layout Measurement ───
   const onHeaderLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const { height } = event.nativeEvent.layout;
@@ -101,12 +184,10 @@ export default function OrdersScreen() {
     [headerHeight]
   );
 
-  // ─── 3. Scroll Event Handler with Debounce ───
   const handleScroll = useCallback(
     (event: any) => {
       const currentScrollY = event.nativeEvent.contentOffset.y;
 
-      // 1. Reset to visible when at top of list
       if (currentScrollY <= 0) {
         accumDelta.current = 0;
         if (!isHeaderVisible.current) {
@@ -122,7 +203,6 @@ export default function OrdersScreen() {
         return;
       }
 
-      // 2. Track delta and direction switches
       const delta = currentScrollY - lastScrollY.current;
       lastScrollY.current = currentScrollY;
 
@@ -137,12 +217,10 @@ export default function OrdersScreen() {
       }
       accumDelta.current += delta;
 
-      // Debounce direction change for 100ms to eliminate jitter
       if (now - lastDirectionChangeTime.current < 100) {
         return;
       }
 
-      // 3. Hide header: Scroll Down (accumDelta > 35 & scrollY > 50)
       if (accumDelta.current > 35 && currentScrollY > 50 && isHeaderVisible.current) {
         isHeaderVisible.current = false;
         Animated.timing(headerTranslateY, {
@@ -152,7 +230,6 @@ export default function OrdersScreen() {
           useNativeDriver: true,
         }).start();
       }
-      // 4. Show header: Scroll Up (accumDelta < -60)
       else if (accumDelta.current < -60 && !isHeaderVisible.current) {
         isHeaderVisible.current = true;
         Animated.timing(headerTranslateY, {
@@ -166,7 +243,6 @@ export default function OrdersScreen() {
     [headerHeight, headerTranslateY]
   );
 
-  // ─── 4. Reset Header on Search Change ───
   useEffect(() => {
     isHeaderVisible.current = true;
     Animated.timing(headerTranslateY, {
@@ -176,7 +252,6 @@ export default function OrdersScreen() {
     }).start();
   }, [search, headerTranslateY]);
 
-  // ─── 5. List Header Spacer & Reusable Stripe Banner ───
   const listHeader = useMemo(
     () => (
       <View>
@@ -194,14 +269,30 @@ export default function OrdersScreen() {
         <Package size={36} color="rgba(244, 195, 0, 0.4)" />
       </View>
       <Text style={styles.emptyTitle}>
-        {search.trim() ? 'No matching orders' : 'No available orders'}
+        {search.trim() || activeFilterCount > 0 ? 'No matching orders' : 'No available orders'}
       </Text>
       <Text style={styles.emptySubtitle}>
-        {search.trim()
-          ? 'Try adjusting your search query'
+        {search.trim() || activeFilterCount > 0
+          ? 'Try adjusting your search query or reset filters.'
           : 'New incoming deliveries will appear here in real time.'}
       </Text>
-      {!search.trim() && (
+      {activeFilterCount > 0 ? (
+        <Button
+          marginTop="$4"
+          onPress={() => {
+            setSearch('');
+            setFilters({ scope: 'all', distance: 'all', tip: 'all', sortBy: 'newest' });
+          }}
+          backgroundColor="rgba(244,195,0,0.12)"
+          borderColor="rgba(244,195,0,0.35)"
+          borderWidth={1}
+          color={colors.secondary}
+          size="$3.5"
+          borderRadius={9999}
+        >
+          Reset Filters
+        </Button>
+      ) : !search.trim() ? (
         <Button
           marginTop="$4"
           onPress={onRefresh}
@@ -214,7 +305,7 @@ export default function OrdersScreen() {
         >
           Refresh Orders
         </Button>
-      )}
+      ) : null}
     </View>
   ) : null;
 
@@ -245,8 +336,76 @@ export default function OrdersScreen() {
         <OrdersSearchBar
           search={search}
           onSearchChange={setSearch}
-          onFilterPress={haptic}
+          onFilterPress={() => setIsFilterModalVisible(true)}
+          hasActiveFilter={activeFilterCount > 0}
+          filterBadgeCount={activeFilterCount}
         />
+
+        {activeFilterCount > 0 && (
+          <View style={styles.activeFiltersRow}>
+            {filters.scope !== 'all' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, scope: 'all' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Scope: {filters.scope === 'available' ? 'Available' : 'High Pay'}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            {filters.distance !== 'all' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, distance: 'all' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Distance: {filters.distance === 'under_3' ? '< 3mi' : filters.distance === '3_to_7' ? '3-7mi' : '7mi+'}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            {filters.tip !== 'all' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, tip: 'all' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Tip: {filters.tip === 'with_tip' ? 'With Tip' : 'High Tip (5+)'}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            {filters.sortBy !== 'newest' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, sortBy: 'newest' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Sort: {filters.sortBy === 'oldest' ? 'Oldest First' : 'Newest First'}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() =>
+                setFilters({ scope: 'all', distance: 'all', tip: 'all', sortBy: 'newest' })
+              }
+              style={styles.clearAllButton}
+            >
+              <Text style={styles.clearAllText}>Clear All</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </Animated.View>
 
       <FlatList
@@ -286,6 +445,14 @@ export default function OrdersScreen() {
         keyboardShouldPersistTaps="handled"
       />
 
+      <DriverOrderFilterModal
+        visible={isFilterModalVisible}
+        onClose={() => setIsFilterModalVisible(false)}
+        filters={filters}
+        onApply={(newFilters) => setFilters(newFilters)}
+        counts={filterCounts}
+      />
+
       <ActiveDeliveriesBanner queueCount={queueCount} orders={myActiveOrders} />
     </View>
   );
@@ -304,7 +471,42 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(15, 19, 28, 0.95)',
+    paddingBottom: 4,
+  },
+  activeFiltersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  activeFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 227, 153, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 227, 153, 0.35)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  activeFilterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffe399',
+  },
+  clearAllButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  clearAllText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8C90A1',
+    textDecorationLine: 'underline',
   },
   list: {
     paddingBottom: 32,

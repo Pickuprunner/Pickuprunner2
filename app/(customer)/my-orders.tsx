@@ -21,7 +21,12 @@ import { blink } from '@/lib/blink';
 import { ordersApi } from '@/apis/orders';
 import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
-import { CustomerOrderCard, CustomerOrderData } from '@/components/Orders';
+import {
+  CustomerOrderCard,
+  CustomerOrderData,
+  CustomerOrderFilterModal,
+  CustomerFilterState,
+} from '@/components/Orders';
 import { useToast, SkeletonList, CustomConfirmModal } from '@/components/core';
 
 const SESSION_KEY = 'customer_session_id';
@@ -48,6 +53,12 @@ export default function MyOrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(true);
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const [filters, setFilters] = useState<CustomerFilterState>({
+    status: 'all',
+    dateRange: 'all',
+    sortBy: 'newest',
+  });
   const [cancelTargetOrder, setCancelTargetOrder] = useState<CustomerOrderData | null>(null);
   const prevStatusMap = useRef<Map<string, string>>(new Map());
   const channelRef = useRef<any>(null);
@@ -56,7 +67,6 @@ export default function MyOrdersScreen() {
     async (sid?: string) => {
       const id = sid || sessionId || (await AsyncStorage.getItem(SESSION_KEY));
 
-      // 1. Read locally cached orders from AsyncStorage
       let localOrders: CustomerOrderData[] = [];
       try {
         const raw = await AsyncStorage.getItem('customer_local_orders');
@@ -71,7 +81,6 @@ export default function MyOrdersScreen() {
         const authUser = await blink.auth.me().catch(() => null);
         const userEmail = authUser?.email;
 
-        // 2. Fetch from Blink DB with all filter options
         const fetchPromise = Promise.all([
           id
             ? blink.db.orders
@@ -115,7 +124,6 @@ export default function MyOrdersScreen() {
         (sessionOrders2 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (emailOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
 
-        // Merge latest store state (e.g. driver accepted / updated status)
         (storeList || []).forEach((so) => {
           if (so?.id) {
             const existing = orderMap.get(so.id);
@@ -150,7 +158,6 @@ export default function MyOrdersScreen() {
 
         setOrders(result);
 
-        // Keep local cache fresh
         try {
           await AsyncStorage.setItem('customer_local_orders', JSON.stringify(result));
         } catch { }
@@ -167,7 +174,6 @@ export default function MyOrdersScreen() {
     [sessionId]
   );
 
-  // Instant reactive update whenever Zustand store updates
   useEffect(() => {
     if (storeOrders && storeOrders.length > 0) {
       setOrders((prev) => {
@@ -205,7 +211,6 @@ export default function MyOrdersScreen() {
     }
   }, [storeOrders]);
 
-  // Hook into shared realtime order updates
   useOrdersRealtime(useCallback(() => {
     fetchOrders();
   }, [fetchOrders]));
@@ -262,7 +267,6 @@ export default function MyOrdersScreen() {
     if (!cancelTargetOrder) return;
     const id = cancelTargetOrder.id;
 
-    // 1. Instant Optimistic UI Update (0ms delay)
     setCancelTargetOrder(null);
     setOrders((prev) => prev.filter((o) => o.id !== id));
     prevStatusMap.current.delete(id);
@@ -304,17 +308,96 @@ export default function MyOrdersScreen() {
     })();
   }, [cancelTargetOrder, showToast]);
 
+  const counts = useMemo(() => {
+    return {
+      all: orders.length,
+      pending: orders.filter((o) => o.status === 'pending').length,
+      active: orders.filter((o) =>
+        ['assigned', 'accepted', 'shopping', 'picked_up', 'en_route'].includes(o.status)
+      ).length,
+      delivered: orders.filter((o) => o.status === 'delivered').length,
+      cancelled: orders.filter((o) => o.status === 'cancelled').length,
+    };
+  }, [orders]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.status !== 'all') count++;
+    if (filters.dateRange !== 'all') count++;
+    if (filters.sortBy !== 'newest') count++;
+    return count;
+  }, [filters]);
+
   const filteredOrders = useMemo(() => {
-    if (!search.trim()) return orders;
-    const q = search.toLowerCase();
-    return orders.filter(
-      (o) =>
-        (o.customerName || o.customer_name || '').toLowerCase().includes(q) ||
-        (o.customerPhone || o.customer_phone || '').toLowerCase().includes(q) ||
-        (o.pickupAddress || o.pickup_address || '').toLowerCase().includes(q) ||
-        (o.deliveryAddress || o.delivery_address || '').toLowerCase().includes(q)
-    );
-  }, [orders, search]);
+    let result = orders;
+
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      result = result.filter((o) => {
+        const idStr = (o.id || '').toLowerCase();
+        const custName = (o.customerName || o.customer_name || '').toLowerCase();
+        const phone = (o.customerPhone || o.customer_phone || '').toLowerCase();
+        const email = (o.customerEmail || o.customer_email || '').toLowerCase();
+        const pickup = (o.pickupAddress || o.pickup_address || '').toLowerCase();
+        const delivery = (o.deliveryAddress || o.delivery_address || '').toLowerCase();
+        const items = (o.items || '').toLowerCase();
+        const driver = (o.driverName || o.driver_name || '').toLowerCase();
+        const status = (o.status || '').toLowerCase();
+        const payment = (o.paymentStatus || o.payment_status || '').toLowerCase();
+
+        return (
+          idStr.includes(q) ||
+          custName.includes(q) ||
+          phone.includes(q) ||
+          email.includes(q) ||
+          pickup.includes(q) ||
+          delivery.includes(q) ||
+          items.includes(q) ||
+          driver.includes(q) ||
+          status.includes(q) ||
+          payment.includes(q)
+        );
+      });
+    }
+
+    if (filters.status !== 'all') {
+      if (filters.status === 'active') {
+        result = result.filter((o) =>
+          ['assigned', 'accepted', 'shopping', 'picked_up', 'en_route'].includes(o.status)
+        );
+      } else {
+        result = result.filter((o) => o.status === filters.status);
+      }
+    }
+
+    if (filters.dateRange !== 'all') {
+      const now = Date.now();
+      const oneDay = 24 * 60 * 60 * 1000;
+      const sevenDays = 7 * oneDay;
+      const thirtyDays = 30 * oneDay;
+
+      result = result.filter((o) => {
+        const orderTime = new Date(o.createdAt || o.created_at || 0).getTime();
+        if (!orderTime) return true;
+        const diff = now - orderTime;
+
+        if (filters.dateRange === 'today') return diff <= oneDay;
+        if (filters.dateRange === 'week') return diff <= sevenDays;
+        if (filters.dateRange === 'month') return diff <= thirtyDays;
+        return true;
+      });
+    }
+
+    result = [...result].sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.created_at || 0).getTime();
+      const timeB = new Date(b.createdAt || b.created_at || 0).getTime();
+
+      if (filters.sortBy === 'oldest') return timeA - timeB;
+      return timeB - timeA;
+    });
+
+    return result;
+  }, [orders, search, filters]);
 
   const pendingCount = orders.filter((o) => o.status === 'pending').length;
 
@@ -363,14 +446,79 @@ export default function MyOrdersScreen() {
               if (Platform.OS !== 'web') {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
               }
-              showToast('Showing all recent orders', { type: 'info' });
+              setIsFilterModalVisible(true);
             }}
             activeOpacity={0.8}
-            style={styles.filterButton}
+            style={[
+              styles.filterButton,
+              activeFilterCount > 0 && styles.filterButtonActive,
+            ]}
           >
-            <MaterialIcons name="tune" size={20} color="#dfe2ef" />
+            <MaterialIcons
+              name="tune"
+              size={20}
+              color={activeFilterCount > 0 ? '#ffe399' : '#dfe2ef'}
+            />
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
+
+        {activeFilterCount > 0 && (
+          <View style={styles.activeFiltersRow}>
+            {filters.status !== 'all' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, status: 'all' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Status: {filters.status === 'active' ? 'In Progress' : filters.status.toUpperCase()}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            {filters.dateRange !== 'all' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, dateRange: 'all' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Date: {filters.dateRange === 'today' ? 'Today' : filters.dateRange === 'week' ? 'Past 7d' : 'Past 30d'}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            {filters.sortBy !== 'newest' && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setFilters((prev) => ({ ...prev, sortBy: 'newest' }))}
+                style={styles.activeFilterChip}
+              >
+                <Text style={styles.activeFilterChipText}>
+                  Sort: {filters.sortBy === 'oldest' ? 'Oldest First' : 'Newest First'}
+                </Text>
+                <MaterialIcons name="close" size={14} color="#ffe399" />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() =>
+                setFilters({ status: 'all', dateRange: 'all', sortBy: 'newest' })
+              }
+              style={styles.clearAllButton}
+            >
+              <Text style={styles.clearAllText}>Clear All</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <FlatList
@@ -393,13 +541,33 @@ export default function MyOrdersScreen() {
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyTitle}>No Matching Orders</Text>
               <Text style={styles.emptySubtitle}>
-                {search.trim()
-                  ? 'Try adjusting your search query'
+                {search.trim() || activeFilterCount > 0
+                  ? 'Try adjusting your search query or reset filters.'
                   : 'New pickup requests will appear here in real time.'}
               </Text>
+              {(search.trim() || activeFilterCount > 0) && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setSearch('');
+                    setFilters({ status: 'all', dateRange: 'all', sortBy: 'newest' });
+                  }}
+                  style={styles.resetFiltersBtn}
+                >
+                  <Text style={styles.resetFiltersBtnText}>Reset All Filters</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )
         }
+      />
+
+      <CustomerOrderFilterModal
+        visible={isFilterModalVisible}
+        onClose={() => setIsFilterModalVisible(false)}
+        filters={filters}
+        onApply={(newFilters) => setFilters(newFilters)}
+        counts={counts}
       />
 
       <CustomConfirmModal
@@ -504,6 +672,74 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  filterButtonActive: {
+    backgroundColor: 'rgba(255, 227, 153, 0.12)',
+    borderColor: '#ffe399',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ffe399',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0F131C',
+  },
+  activeFiltersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  activeFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 227, 153, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 227, 153, 0.35)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  activeFilterChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffe399',
+  },
+  clearAllButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  clearAllText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8C90A1',
+    textDecorationLine: 'underline',
+  },
+  resetFiltersBtn: {
+    marginTop: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 227, 153, 0.12)',
+    borderWidth: 1,
+    borderColor: '#ffe399',
+  },
+  resetFiltersBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffe399',
   },
   listContainer: {
     paddingTop: 8,
