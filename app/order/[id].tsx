@@ -17,12 +17,13 @@ import * as Haptics from 'expo-haptics';
 
 import { useOrder, useOrders, useUpdateOrderStatus, useClaimOrder, type Order } from '@/lib/orders';
 import { connectApi } from '@/apis/connect';
+import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { getSelectedOrder, setSelectedOrder } from '@/lib/selectedOrder';
 import { calcDriverEarnings } from '@/lib/config';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue, MAX_QUEUE } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
-import { CustomCard, CustomLoading, useToast } from '@/components/core';
+import { CustomCard, CustomLoading, CustomConfirmModal, useToast } from '@/components/core';
 import { colors } from '@/constants/design';
 
 import {
@@ -66,6 +67,31 @@ export default function OrderDetailScreen() {
   const driverId = useDriverId();
   const { data: allOrders = [] } = useOrders();
   const { queueCount, atCapacity } = useDriverQueue(allOrders, driverId);
+
+  const { data: connectStatus, refetch: refetchConnect } = useConnectStatus(driverId);
+  const connectOnboard = useConnectOnboard();
+  const [showStripeModal, setShowStripeModal] = useState(false);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const isStripeReady = Boolean(connectStatus?.connected && connectStatus?.payoutsEnabled) || Boolean(user?.stripeAccountId);
+
+  const handleSetupPayouts = async () => {
+    setOnboardingLoading(true);
+    try {
+      const res = await connectOnboard.mutateAsync({
+        driverUserId: driverId,
+        driverEmail: user?.email,
+      });
+      if (res?.url) {
+        await openStripeOnboardingSession(res.url);
+      }
+      await refetchConnect();
+      setShowStripeModal(false);
+    } catch (err: any) {
+      showToast(err?.message || 'Could not start bank onboarding', 'error');
+    } finally {
+      setOnboardingLoading(false);
+    }
+  };
 
   const { data: order, isLoading: loading } = useOrder(fetchId);
 
@@ -189,6 +215,10 @@ export default function OrderDetailScreen() {
   }
 
   async function doAccept() {
+    if (!isStripeReady) {
+      setShowStripeModal(true);
+      return;
+    }
     if (atCapacity) {
       Alert.alert(
         `Queue Full (${MAX_QUEUE}/${MAX_QUEUE})`,
@@ -396,6 +426,20 @@ export default function OrderDetailScreen() {
           />
         </>
       )}
+
+      <CustomConfirmModal
+        visible={showStripeModal}
+        onClose={() => setShowStripeModal(false)}
+        onConfirm={handleSetupPayouts}
+        variant="warning"
+        title="Bank Account Setup Required"
+        message="You need to connect your bank account via Stripe before accepting orders. This ensures you can receive payouts for your completed deliveries."
+        confirmText="Set Up Payouts"
+        cancelText="Maybe Later"
+        iconName="account-balance"
+        confirmIconName="arrow-forward"
+        loading={onboardingLoading}
+      />
     </View>
   );
 }

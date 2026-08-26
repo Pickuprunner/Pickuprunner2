@@ -22,7 +22,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { colors, borderRadius, spacing } from '@/constants/design';
 import { useAuth } from '@/hooks/useAuth';
-import { useMyVerification, useReviewVerification } from '@/lib/verification';
+import { useMyVerification, useReviewVerification, useSubmitVerification } from '@/lib/verification';
 import { DriverWizardData } from './mockData';
 
 interface ReviewPendingStepProps {
@@ -34,6 +34,7 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
   const { user, logout } = useAuth();
   const { data: verification } = useMyVerification(user?.id);
   const reviewMutation = useReviewVerification();
+  const submitMutation = useSubmitVerification();
 
   const isApproved = verification?.status === 'approved';
 
@@ -41,11 +42,22 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
-    if (verification?.id) {
-      await reviewMutation.mutateAsync({
-        id: verification.id,
-        status: 'approved',
-      });
+    try {
+      if (verification?.id) {
+        await reviewMutation.mutateAsync({
+          id: verification.id,
+          status: 'approved',
+        });
+      } else {
+        await submitMutation.mutateAsync({
+          userId: user?.id || `usr-${Date.now()}`,
+          driverName: user?.displayName || user?.email || 'Driver',
+          driverEmail: user?.email,
+          status: 'approved',
+        });
+      }
+    } catch (err) {
+      console.warn('[ReviewPendingStep] handleDevApprove error:', err);
     }
     setTimeout(() => {
       router.replace('/(tabs)');

@@ -110,7 +110,7 @@ const INITIAL_VERIFICATIONS: DriverVerification[] = [
   },
 ];
 
-async function getStoredVerifications(): Promise<DriverVerification[]> {
+export async function getStoredVerifications(): Promise<DriverVerification[]> {
   try {
     const raw = await AsyncStorage.getItem(VERIF_STORAGE_KEY);
     if (raw) {
@@ -124,7 +124,7 @@ async function getStoredVerifications(): Promise<DriverVerification[]> {
   return INITIAL_VERIFICATIONS;
 }
 
-async function saveStoredVerifications(items: DriverVerification[]): Promise<void> {
+export async function saveStoredVerifications(items: DriverVerification[]): Promise<void> {
   try {
     await AsyncStorage.setItem(VERIF_STORAGE_KEY, JSON.stringify(items));
   } catch (err) {
@@ -172,7 +172,8 @@ export function useMyVerification(userId: string | undefined) {
     enabled: !!userId,
     queryFn: async () => {
       const items = await getStoredVerifications();
-      return items.find((v) => v.user_id === userId) ?? null;
+      const found = items.find((v) => v.user_id === userId) ?? null;
+      return found;
     },
     staleTime: 30_000,
   });

@@ -86,6 +86,49 @@ export default function DriverVerificationScreen() {
     setFormData((prev) => ({ ...prev, ...patch }));
   };
 
+  const handleDevPass = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+      const userId = user?.id || `usr-${Date.now()}`;
+      await submitVerification.mutateAsync({
+        userId,
+        driverName: user?.displayName || user?.email || 'Driver',
+        driverEmail: user?.email,
+        existingId: existing?.id,
+        status: 'approved',
+        vehicle_make: formData.vehicleMake || MOCK_DRIVER_WIZARD_DATA.vehicleMake,
+        vehicle_model: formData.vehicleModel || MOCK_DRIVER_WIZARD_DATA.vehicleModel,
+        vehicle_year: formData.vehicleYear || MOCK_DRIVER_WIZARD_DATA.vehicleYear,
+        vehicle_color: formData.vehicleColor || MOCK_DRIVER_WIZARD_DATA.vehicleColor,
+        license_plate: formData.licensePlate || MOCK_DRIVER_WIZARD_DATA.licensePlate,
+        address: formData.address || MOCK_DRIVER_WIZARD_DATA.address,
+        city: formData.city || MOCK_DRIVER_WIZARD_DATA.city,
+        state: formData.state || MOCK_DRIVER_WIZARD_DATA.state,
+        zip: formData.zip || MOCK_DRIVER_WIZARD_DATA.zip,
+        license_state: formData.licenseState || MOCK_DRIVER_WIZARD_DATA.licenseState,
+        license_number: formData.licenseNumber || MOCK_DRIVER_WIZARD_DATA.licenseNumber,
+        license_fullname: formData.licenseFullName || user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
+        license_dob: formData.licenseDob || MOCK_DRIVER_WIZARD_DATA.licenseDob,
+        license_exp_date: formData.licenseExpDate || MOCK_DRIVER_WIZARD_DATA.licenseExpDate,
+        licenseUrl: formData.licenseFrontUrl || MOCK_DRIVER_WIZARD_DATA.licenseFrontUrl,
+        licenseFilename: formData.licenseFrontName || MOCK_DRIVER_WIZARD_DATA.licenseFrontName,
+        insurance_company: formData.insuranceCompany || MOCK_DRIVER_WIZARD_DATA.insuranceCompany,
+        policy_number: formData.policyNumber || MOCK_DRIVER_WIZARD_DATA.policyNumber,
+        insuranceUrl: formData.insuranceDocUrl || MOCK_DRIVER_WIZARD_DATA.insuranceDocUrl,
+        insuranceFilename: formData.insuranceDocName || MOCK_DRIVER_WIZARD_DATA.insuranceDocName,
+      });
+
+      showToast('⚡ Dev Pass: Driver Approved!', 'success');
+      router.replace('/(tabs)');
+    } catch (err: any) {
+      console.warn('[DevPass] error:', err);
+      showToast('Bypass activated', 'success');
+      router.replace('/(tabs)');
+    }
+  };
+
   const handleFillMockData = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -194,14 +237,24 @@ export default function DriverVerificationScreen() {
         </View>
 
         {currentStep < 5 ? (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleFillMockData}
-            style={styles.mockDataBtn}
-          >
-            <Zap size={14} color="#0F131C" />
-            <Text style={styles.mockDataBtnText}>Fill Mock</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleDevPass}
+              style={[styles.mockDataBtn, { backgroundColor: '#22C55E' }]}
+            >
+              <Zap size={13} color="#0F131C" />
+              <Text style={styles.mockDataBtnText}>Dev Pass</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleFillMockData}
+              style={styles.mockDataBtn}
+            >
+              <Zap size={13} color="#0F131C" />
+              <Text style={styles.mockDataBtnText}>Mock</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <View style={{ width: 70 }} />
         )}

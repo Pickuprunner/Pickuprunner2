@@ -14,9 +14,6 @@ export const MAX_QUEUE = 3;
 /** Active statuses that count toward the driver's queue */
 const ACTIVE_STATUSES: Order['status'][] = ['accepted', 'picked_up'];
 
-/** Whether test mode allows queue overflow (no real orders at risk) */
-const TEST_MODE_ALLOW_OVERFLOW = true;
-
 /**
  * Given the full order list and the current driver's user ID, returns:
  * - myOrders: orders currently assigned to this driver that are still active
@@ -33,7 +30,7 @@ export function useDriverQueue(orders: Order[], driverUserId: string | undefined
   }, [orders, driverUserId]);
 
   const queueCount = myOrders.length;
-  const atCapacity = !TEST_MODE_ALLOW_OVERFLOW && queueCount >= MAX_QUEUE;
+  const atCapacity = queueCount >= MAX_QUEUE;
 
   const myOrderIds = useMemo(() => new Set(myOrders.map((o) => o.id)), [myOrders]);
   const isMyOrder = (orderId: string) => myOrderIds.has(orderId);

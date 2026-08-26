@@ -19,16 +19,17 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 
-import { useOrders, useAvailableOrders } from '@/lib/orders';
+import { useOrders, useAvailableOrders, useUpdateOrderStatus } from '@/lib/orders';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useMyVerification } from '@/lib/verification';
+import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { calcDriverEarnings } from '@/lib/config';
 import { colors } from '@/constants/design';
-import { SkeletonList, StripeSetupBanner } from '@/components/core';
+import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast } from '@/components/core';
 
 import {
   OrdersHeader,
@@ -63,6 +64,15 @@ export default function OrdersScreen() {
 
   const { user } = useAuth();
   const driverId = useDriverId();
+  const { showToast } = useToast();
+  const updateStatus = useUpdateOrderStatus();
+  const { data: connectStatus, refetch: refetchConnect } = useConnectStatus(driverId);
+  const connectOnboard = useConnectOnboard();
+  const [showStripeModal, setShowStripeModal] = useState(false);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+
+  const isStripeReady = Boolean(connectStatus?.connected && connectStatus?.payoutsEnabled) || Boolean(user?.stripeAccountId);
+
   const { data: verification, isLoading: isLoadingVerif } = useMyVerification(user?.id);
 
   useEffect(() => {
@@ -70,6 +80,56 @@ export default function OrdersScreen() {
       router.replace('/(auth)/driver-verification');
     }
   }, [user?.role, verification?.status, isLoadingVerif]);
+
+  const handleSetupPayouts = async () => {
+    setOnboardingLoading(true);
+    try {
+      const res = await connectOnboard.mutateAsync({
+        driverUserId: driverId,
+        driverEmail: user?.email,
+      });
+      if (res?.url) {
+        await openStripeOnboardingSession(res.url);
+      }
+      await refetchConnect();
+      setShowStripeModal(false);
+    } catch (err: any) {
+      showToast(err?.message || 'Could not start bank onboarding', 'error');
+    } finally {
+      setOnboardingLoading(false);
+    }
+  };
+
+  const handleAcceptOrder = async (orderItem: any) => {
+    if (!isStripeReady) {
+      setShowStripeModal(true);
+      return;
+    }
+    if (atCapacity) {
+      showToast('Queue Limit Reached', {
+        type: 'warning',
+        description: 'Complete existing deliveries before accepting more',
+      });
+      return;
+    }
+    haptic();
+    const uid = driverId || `guest-${Date.now()}`;
+    const uname = user?.displayName ?? user?.email ?? 'Driver';
+    try {
+      await updateStatus.mutateAsync({
+        id: orderItem.id,
+        status: 'accepted',
+        driverUserId: uid,
+        driverName: uname,
+      });
+      showToast('Order Accepted!', {
+        type: 'success',
+        description: `Added #${orderItem.id?.slice(-6).toUpperCase()} to your active deliveries`,
+      });
+    } catch (err: any) {
+      showToast(err?.message || 'Could not accept order', 'error');
+    }
+  };
 
   const { data: availableOrders = [], isLoading: isLoadingAvailable, refetch: refetchAvailable } = useAvailableOrders();
   const { data: allOrders = [], isLoading: isLoadingAll, refetch: refetchAll } = useOrders();
@@ -448,6 +508,7 @@ export default function OrdersScreen() {
             driverAtCapacity={atCapacity && !isMyOrder(item.id)}
             driverUserId={driverId}
             driverDisplayName={user?.displayName ?? user?.email ?? driverId?.slice(0, 8)}
+            onAccept={() => handleAcceptOrder(item)}
             onPress={() => {
               setSelectedOrder(item);
               router.push(`/order/${item.id}`);
@@ -481,6 +542,20 @@ export default function OrdersScreen() {
         filters={filters}
         onApply={(newFilters) => setFilters(newFilters)}
         counts={filterCounts}
+      />
+
+      <CustomConfirmModal
+        visible={showStripeModal}
+        onClose={() => setShowStripeModal(false)}
+        onConfirm={handleSetupPayouts}
+        variant="warning"
+        title="Bank Account Setup Required"
+        message="You need to connect your bank account via Stripe before accepting orders. This ensures you can receive payouts for your completed deliveries."
+        confirmText="Set Up Payouts"
+        cancelText="Maybe Later"
+        iconName="account-balance"
+        confirmIconName="arrow-forward"
+        loading={onboardingLoading}
       />
 
       <ActiveDeliveriesBanner queueCount={queueCount} orders={myActiveOrders} />
