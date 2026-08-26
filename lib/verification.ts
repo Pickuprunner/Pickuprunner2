@@ -132,10 +132,22 @@ export async function saveStoredVerifications(items: DriverVerification[]): Prom
   }
 }
 
+import { accreditationApi } from '@/apis/accreditation';
+
 export async function getDriverVerificationStatus(userId?: string): Promise<'none' | 'pending' | 'approved' | 'rejected'> {
   if (!userId) return 'none';
   const items = await getStoredVerifications();
   const found = items.find((v) => v.user_id === userId);
+  if (found?.status === 'approved') return 'approved';
+
+  try {
+    const accred = await accreditationApi.getAccreditation();
+    const status = accred?.data?.profile?.accreditationStatus;
+    if (status === 'approved') return 'approved';
+    if (status === 'under_review') return 'pending';
+    if (status === 'rejected') return 'rejected';
+  } catch {}
+
   return found?.status || 'none';
 }
 
@@ -173,6 +185,23 @@ export function useMyVerification(userId: string | undefined) {
     queryFn: async () => {
       const items = await getStoredVerifications();
       const found = items.find((v) => v.user_id === userId) ?? null;
+      if (found?.status === 'approved') return found;
+
+      try {
+        const accred = await accreditationApi.getAccreditation();
+        const status = accred?.data?.profile?.accreditationStatus;
+        if (status === 'approved') {
+          return {
+            id: `v-${userId}`,
+            user_id: userId!,
+            driver_name: 'Driver',
+            status: 'approved' as const,
+            submitted_at: new Date().toISOString(),
+            order_scope: ORDER_SCOPE,
+          };
+        }
+      } catch {}
+
       return found;
     },
     staleTime: 30_000,

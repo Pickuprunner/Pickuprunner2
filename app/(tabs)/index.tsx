@@ -16,14 +16,16 @@ import {
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useOrders, useAvailableOrders, useUpdateOrderStatus } from '@/lib/orders';
+import { useOrders, useAvailableOrders, useUpdateOrderStatus, useClaimOrder } from '@/lib/orders';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useMyVerification } from '@/lib/verification';
+import { useDriverAccreditation } from '@/lib/accreditation';
 import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { calcDriverEarnings } from '@/lib/config';
 import { colors } from '@/constants/design';
@@ -45,6 +47,7 @@ function haptic() {
 export default function OrdersScreen() {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const insets = useSafeAreaInsets();
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
 
   const [headerHeight, setHeaderHeight] = useState(200);
@@ -58,6 +61,7 @@ export default function OrdersScreen() {
   const driverId = useDriverId();
   const { showToast } = useToast();
   const updateStatus = useUpdateOrderStatus();
+  const claimOrder = useClaimOrder();
   const { data: connectStatus, refetch: refetchConnect } = useConnectStatus(driverId);
   const connectOnboard = useConnectOnboard();
   const [showStripeModal, setShowStripeModal] = useState(false);
@@ -66,12 +70,22 @@ export default function OrdersScreen() {
   const isStripeReady = Boolean(connectStatus?.connected && connectStatus?.payoutsEnabled) || Boolean(user?.stripeAccountId);
 
   const { data: verification, isLoading: isLoadingVerif } = useMyVerification(user?.id);
+  const { data: accreditation, isLoading: isLoadingAccred } = useDriverAccreditation();
+
+  const isApproved =
+    verification?.status === 'approved' ||
+    accreditation?.profile?.accreditationStatus === 'approved';
 
   useEffect(() => {
-    if (user?.role === 'driver' && !isLoadingVerif && verification?.status !== 'approved') {
+    if (
+      user?.role === 'driver' &&
+      !isLoadingVerif &&
+      !isLoadingAccred &&
+      !isApproved
+    ) {
       router.replace('/(auth)/driver-verification');
     }
-  }, [user?.role, verification?.status, isLoadingVerif]);
+  }, [user?.role, isApproved, isLoadingVerif, isLoadingAccred]);
 
   const handleSetupPayouts = async () => {
     setOnboardingLoading(true);
@@ -108,9 +122,8 @@ export default function OrdersScreen() {
     const uid = driverId || `guest-${Date.now()}`;
     const uname = user?.displayName ?? user?.email ?? 'Driver';
     try {
-      await updateStatus.mutateAsync({
-        id: orderItem.id,
-        status: 'accepted',
+      await claimOrder.mutateAsync({
+        orderId: orderItem.id,
         driverUserId: uid,
         driverName: uname,
       });
@@ -127,20 +140,15 @@ export default function OrdersScreen() {
   const { data: allOrders = [], isLoading: isLoadingAll, refetch: refetchAll } = useOrders();
   const { isConnected } = useOrdersRealtime();
 
+  // Job board displays exclusively unassigned pending jobs
   const orders = useMemo(() => {
-    const orderMap = new Map<string, any>();
-    (availableOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
-    (allOrders || []).forEach((o) => {
-      if (o?.id && ((o.driverUserId === driverId) || o.status !== 'delivered')) {
-        orderMap.set(o.id, { ...(orderMap.get(o.id) || {}), ...o });
-      }
-    });
-    return Array.from(orderMap.values());
-  }, [availableOrders, allOrders, driverId]);
+    return (availableOrders || []).filter((o) => o.status === 'pending' && !o.driverUserId);
+  }, [availableOrders]);
 
-  const isLoading = isLoadingAvailable && isLoadingAll && orders.length === 0;
+  const isLoading = isLoadingAvailable && orders.length === 0;
 
-  const { queueCount, atCapacity, isMyOrder } = useDriverQueue(orders, driverId);
+  // Active queue tracked from driver's claimed orders
+  const { queueCount, atCapacity } = useDriverQueue(allOrders, driverId);
 
   const avatarInitial = useMemo(() => {
     const name = user?.displayName || user?.email || 'Driver';
@@ -148,12 +156,21 @@ export default function OrdersScreen() {
   }, [user]);
 
   const myActiveOrders = useMemo(
-    () => orders.filter((o) => isMyOrder(o.id)),
-    [orders, isMyOrder]
+    () =>
+      (allOrders || []).filter(
+        (o) =>
+          o.driverUserId === driverId &&
+          (o.status === 'assigned' ||
+            o.status === 'accepted' ||
+            o.status === 'shopping' ||
+            o.status === 'picked_up' ||
+            o.status === 'en_route')
+      ),
+    [allOrders, driverId]
   );
 
   const filtered = useMemo(() => {
-    let result = orders.filter((o) => o.status === 'pending' || isMyOrder(o.id));
+    let result = orders;
 
     if (search.trim()) {
       const q = search.toLowerCase().trim();
@@ -185,7 +202,7 @@ export default function OrdersScreen() {
     });
 
     return result;
-  }, [orders, search, sortBy, isMyOrder]);
+  }, [orders, search, sortBy]);
 
   const pendingCount = useMemo(
     () => orders.filter((o) => o.status === 'pending').length,
@@ -362,8 +379,8 @@ export default function OrdersScreen() {
         renderItem={({ item }) => (
           <DriverOrderCard
             order={item}
-            isMyOrder={isMyOrder(item.id)}
-            driverAtCapacity={atCapacity && !isMyOrder(item.id)}
+            isMyOrder={false}
+            driverAtCapacity={atCapacity}
             driverUserId={driverId}
             driverDisplayName={user?.displayName ?? user?.email ?? driverId?.slice(0, 8)}
             onAccept={() => handleAcceptOrder(item)}

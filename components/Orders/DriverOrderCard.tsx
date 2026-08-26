@@ -10,7 +10,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Order, useUpdateOrderStatus } from '@/lib/orders';
+import { Order, useUpdateOrderStatus, useClaimOrder } from '@/lib/orders';
 import { calcDriverEarnings } from '@/lib/config';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -32,11 +32,13 @@ function openNav(address: string) {
   Linking.openURL(url);
 }
 
-export type OrderStatusVariant = 'pending' | 'accepted' | 'picked_up' | 'delivered';
+export type OrderStatusVariant = 'pending' | 'assigned' | 'accepted' | 'shopping' | 'picked_up' | 'en_route' | 'delivered';
+export type DriverCardMode = 'job-board' | 'my-orders';
 
 export interface DriverOrderCardProps {
   order: Order;
   variant?: OrderStatusVariant;
+  mode?: DriverCardMode;
   onPress?: () => void;
   isMyOrder?: boolean;
   driverAtCapacity?: boolean;
@@ -52,6 +54,7 @@ export interface DriverOrderCardProps {
 export function DriverOrderCard({
   order,
   variant,
+  mode,
   onPress,
   isMyOrder = false,
   driverAtCapacity = false,
@@ -65,7 +68,9 @@ export function DriverOrderCard({
 }: DriverOrderCardProps) {
   const { showToast } = useToast();
   const updateStatus = useUpdateOrderStatus();
+  const claimOrder = useClaimOrder();
   const currentStatus: OrderStatusVariant = variant || (order.status as OrderStatusVariant) || 'pending';
+  const cardMode: DriverCardMode = mode || (currentStatus === 'pending' ? 'job-board' : 'my-orders');
   const shortId = order.id ? order.id.slice(-6).toUpperCase() : '------';
 
   const miles = Number(order.distanceMiles ?? 0);
@@ -77,9 +82,13 @@ export function DriverOrderCard({
 
   const getStatusBadge = () => {
     switch (currentStatus) {
+      case 'assigned':
       case 'accepted':
-        return { label: 'ACCEPTED', color: '#FFE399', bg: 'rgba(255, 227, 153, 0.12)', border: 'rgba(255, 227, 153, 0.3)' };
+        return { label: 'ASSIGNED', color: '#FFE399', bg: 'rgba(255, 227, 153, 0.12)', border: 'rgba(255, 227, 153, 0.3)' };
+      case 'shopping':
+        return { label: 'SHOPPING', color: '#FFE399', bg: 'rgba(255, 227, 153, 0.12)', border: 'rgba(255, 227, 153, 0.3)' };
       case 'picked_up':
+      case 'en_route':
         return { label: 'IN TRANSIT', color: '#00E297', bg: 'rgba(0, 226, 151, 0.12)', border: 'rgba(0, 226, 151, 0.3)' };
       case 'delivered':
         return { label: 'DELIVERED', color: '#00E297', bg: 'rgba(0, 226, 151, 0.12)', border: 'rgba(0, 226, 151, 0.3)' };
@@ -90,7 +99,7 @@ export function DriverOrderCard({
   };
 
   const badge = getStatusBadge();
-  const navAddress = currentStatus === 'accepted' ? order.pickupAddress : order.deliveryAddress;
+  const navAddress = (currentStatus === 'assigned' || currentStatus === 'accepted') ? order.pickupAddress : order.deliveryAddress;
 
   const handleDefaultAccept = async () => {
     if (driverAtCapacity) {
@@ -113,9 +122,8 @@ export function DriverOrderCard({
 
     try {
       if (!order.id) throw new Error('Missing order ID.');
-      await updateStatus.mutateAsync({
-        id: order.id,
-        status: 'accepted',
+      await claimOrder.mutateAsync({
+        orderId: order.id,
         driverUserId: uid,
         driverName: uname,
       });
@@ -247,7 +255,7 @@ export function DriverOrderCard({
           </TouchableOpacity>
         )}
 
-        {currentStatus === 'accepted' && (
+        {(currentStatus === 'assigned' || currentStatus === 'accepted') && (
           <TouchableOpacity
             onPress={handleDefaultPickup}
             disabled={updateStatus.isPending}
@@ -260,7 +268,7 @@ export function DriverOrderCard({
           </TouchableOpacity>
         )}
 
-        {currentStatus === 'picked_up' && (
+        {(currentStatus === 'picked_up' || currentStatus === 'en_route' || currentStatus === 'shopping') && (
           <TouchableOpacity
             onPress={handleDefaultDeliver}
             disabled={updateStatus.isPending}
