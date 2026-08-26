@@ -88,6 +88,8 @@ export interface CustomerOrderData {
   driver_photo_url?: string;
   deliveryPhotoUrl?: string;
   delivery_photo_url?: string;
+  customerSessionId?: string;
+  customer_session_id?: string;
 }
 
 export interface CustomerOrderCardProps {

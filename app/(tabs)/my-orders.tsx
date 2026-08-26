@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import {
   Animated,
   Easing,
@@ -15,6 +15,8 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 
 import { useOrders } from '@/lib/orders';
+import { ordersApi } from '@/apis/orders';
+import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,6 +52,19 @@ export default function MyOrdersScreen() {
   const driverId = useDriverId();
   const [refreshing, setRefreshing] = useState(false);
 
+  // Sync driver's assigned orders from backend on mount
+  useEffect(() => {
+    if (user?.role === 'driver') {
+      ordersApi.getMine().then((mine) => {
+        if (Array.isArray(mine)) {
+          mine.forEach((item) => {
+            useOrderStore.getState().upsertOrder(item as any);
+          });
+        }
+      }).catch(() => {});
+    }
+  }, [user?.role]);
+
   // ─── 1. Header State & Smooth Scroll Animation Logic ───
   const [headerHeight, setHeaderHeight] = useState(150);
   const headerTranslateY = useRef(new Animated.Value(0)).current;
@@ -67,16 +82,19 @@ export default function MyOrdersScreen() {
     return getGreeting(user?.displayName || user?.email);
   }, [user]);
 
-  // Driver active orders in progress
+  // Driver active orders in progress (accepted / shopping / picked_up / en_route)
   const activeOrders = useMemo(() => {
     return orders
-      .filter((o) => o.driverUserId === driverId && (o.status === 'accepted' || o.status === 'picked_up'))
+      .filter(
+        (o) =>
+          o.driverUserId === driverId &&
+          (o.status === 'accepted' ||
+            o.status === 'shopping' ||
+            o.status === 'picked_up' ||
+            o.status === 'en_route')
+      )
       .sort((a, b) => Number(a.distanceMiles ?? 0) - Number(b.distanceMiles ?? 0));
   }, [orders, driverId]);
-
-  const availableOrders = useMemo(() => {
-    return orders.filter((o) => o.status === 'pending');
-  }, [orders]);
 
   const deliveredOrders = useMemo(() => {
     return orders.filter((o) => o.status === 'delivered' && o.driverUserId === driverId);
@@ -113,9 +131,23 @@ export default function MyOrdersScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
+    haptic();
+    try {
+      if (user?.role === 'driver') {
+        const mine = await ordersApi.getMine().catch(() => []);
+        if (Array.isArray(mine)) {
+          mine.forEach((item) => {
+            useOrderStore.getState().upsertOrder(item as any);
+          });
+        }
+      }
+      await refetch();
+    } catch {
+      // Ignore network errors on refresh
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch, user?.role]);
 
   // ─── 2. Header Layout Measurement ───
   const onHeaderLayout = useCallback(
@@ -192,11 +224,9 @@ export default function MyOrdersScreen() {
   );
 
   const hasActive = activeOrders.length > 0;
-  const displayList = hasActive ? activeOrders : availableOrders;
-  const sectionTitle = hasActive ? 'Active Deliveries' : 'Available Deliveries';
-  const pillCountText = hasActive
-    ? `${activeOrders.length} ACTIVE`
-    : `${availableOrders.length} NEARBY`;
+  const displayList = activeOrders;
+  const sectionTitle = 'Active Deliveries';
+  const pillCountText = `${activeOrders.length} ACTIVE`;
 
   const listHeader = useMemo(
     () => (
@@ -225,13 +255,9 @@ export default function MyOrdersScreen() {
       <View style={styles.emptyIconCircle}>
         <Package size={36} color="rgba(244, 195, 0, 0.4)" />
       </View>
-      <Text style={styles.emptyTitle}>
-        {hasActive ? 'No active orders' : 'No available orders'}
-      </Text>
+      <Text style={styles.emptyTitle}>No active orders</Text>
       <Text style={styles.emptySubtitle}>
-        {hasActive
-          ? 'Accept orders from the Orders tab to begin deliveries.'
-          : 'New incoming deliveries will appear here in real time.'}
+        Accept orders from the Orders tab to begin deliveries.
       </Text>
     </View>
   ) : null;

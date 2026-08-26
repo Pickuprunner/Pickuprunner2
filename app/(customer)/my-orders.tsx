@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { blink } from '@/lib/blink';
 import { ordersApi } from '@/apis/orders';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
 import {
@@ -74,15 +75,17 @@ export default function MyOrdersScreen() {
         if (raw) localOrders = JSON.parse(raw);
       } catch { }
 
-      const timeoutPromise = new Promise((resolve) =>
-        setTimeout(() => resolve([]), 3500)
+      const timeoutPromise = new Promise<any[]>((resolve) =>
+        setTimeout(() => resolve([[], [], [], []]), 3500)
       );
 
       try {
         const authUser = await blink.auth.me().catch(() => null);
-        const userEmail = authUser?.email;
+        const userEmail = authUser?.email || useAuthStore.getState().user?.email;
+        const token = useAuthStore.getState().token;
 
         const fetchPromise = Promise.all([
+          token ? ordersApi.getMine().catch(() => []) : Promise.resolve([]),
           id
             ? blink.db.orders
               .list({
@@ -112,23 +115,37 @@ export default function MyOrdersScreen() {
             : Promise.resolve([]),
         ]);
 
-        const [sessionOrders1, sessionOrders2, emailOrders] = (await Promise.race([
+        const [backendMine, sessionOrders1, sessionOrders2, emailOrders] = (await Promise.race([
           fetchPromise,
           timeoutPromise,
-        ])) as [CustomerOrderData[], CustomerOrderData[], CustomerOrderData[]];
+        ])) as [CustomerOrderData[], CustomerOrderData[], CustomerOrderData[], CustomerOrderData[]];
 
-        const storeList = useOrderStore.getState().orders;
         const orderMap = new Map<string, CustomerOrderData>();
 
-        (localOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+        // Always include customer's local orders from this device
+        (localOrders || []).forEach((o) => {
+          if (o?.id) orderMap.set(o.id, o);
+        });
+
+        (backendMine || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (sessionOrders1 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (sessionOrders2 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (emailOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
 
+        const storeList = useOrderStore.getState().orders;
         (storeList || []).forEach((so) => {
           if (so?.id) {
+            const matchSession = Boolean(id && (so.customerSessionId === id || so.customer_session_id === id));
+            const matchEmail = Boolean(userEmail && (so.customerEmail === userEmail || so.customer_email === userEmail));
             const existing = orderMap.get(so.id);
-            if (existing || so.customerSessionId === id) {
+            if (existing || matchSession || matchEmail) {
+              const soName = (so.customerName || so.customer_name || '').trim();
+              const existName = (existing?.customerName || existing?.customer_name || '').trim();
+              const finalName =
+                soName && soName !== 'Customer' && soName !== 'Customer Order'
+                  ? soName
+                  : existName || soName || 'Customer';
+
               orderMap.set(so.id, {
                 ...(existing || {}),
                 id: so.id,
@@ -138,8 +155,8 @@ export default function MyOrdersScreen() {
                 driverUserId: so.driverUserId || (existing as any)?.driverUserId,
                 deliveryPhotoUrl: so.deliveryPhotoUrl || existing?.deliveryPhotoUrl,
                 delivery_photo_url: so.deliveryPhotoUrl || existing?.delivery_photo_url,
-                customerName: so.customerName || existing?.customerName,
-                customerPhone: so.customerPhone || existing?.customerPhone,
+                customerName: finalName,
+                customerPhone: so.customerPhone || so.customer_phone || existing?.customerPhone || existing?.customer_phone,
                 pickupAddress: so.pickupAddress || existing?.pickupAddress,
                 deliveryAddress: so.deliveryAddress || existing?.deliveryAddress,
                 items: so.items || existing?.items,
@@ -164,45 +181,53 @@ export default function MyOrdersScreen() {
         } catch { }
       } catch (err) {
         console.warn('[my-orders] fetch failed or timed out:', err);
-        const orderMap = new Map<string, CustomerOrderData>();
-        (localOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
-        setOrders(Array.from(orderMap.values()));
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    []
+    [sessionId]
   );
 
   useEffect(() => {
     if (storeOrders && storeOrders.length > 0) {
       setOrders((prev) => {
+        if (!prev || prev.length === 0) return prev;
         const orderMap = new Map<string, CustomerOrderData>();
-        (prev || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+        prev.forEach((o) => o?.id && orderMap.set(o.id, o));
+        let changed = false;
         storeOrders.forEach((so) => {
-          if (so?.id) {
+          if (so?.id && orderMap.has(so.id)) {
             const existing = orderMap.get(so.id);
+            const soName = (so.customerName || so.customer_name || '').trim();
+            const existName = (existing?.customerName || existing?.customer_name || '').trim();
+            const finalName =
+              soName && soName !== 'Customer' && soName !== 'Customer Order'
+                ? soName
+                : existName || soName || 'Customer';
+
             orderMap.set(so.id, {
               ...(existing || {}),
               id: so.id,
               status: so.status as any,
-              customerName: so.customerName || existing?.customerName || 'Customer',
-              customerPhone: so.customerPhone || existing?.customerPhone,
+              customerName: finalName,
+              customerPhone: so.customerPhone || so.customer_phone || existing?.customerPhone,
               pickupAddress: so.pickupAddress || existing?.pickupAddress || '',
               deliveryAddress: so.deliveryAddress || existing?.deliveryAddress || '',
               items: so.items || existing?.items || '',
               driverName: so.driverName || existing?.driverName,
               driver_name: so.driverName || existing?.driver_name,
-              driverUserId: so.driverUserId,
+              driverUserId: so.driverUserId || (existing as any)?.driverUserId,
               deliveryPhotoUrl: so.deliveryPhotoUrl || existing?.deliveryPhotoUrl,
               delivery_photo_url: so.deliveryPhotoUrl || existing?.delivery_photo_url,
               tipAmount: so.tipAmount ?? existing?.tipAmount,
               distanceMiles: so.distanceMiles ?? existing?.distanceMiles,
               createdAt: so.createdAt || existing?.createdAt,
             } as any);
+            changed = true;
           }
         });
+        if (!changed) return prev;
         return Array.from(orderMap.values()).sort(
           (a, b) =>
             new Date(b.createdAt || b.created_at || 0).getTime() -

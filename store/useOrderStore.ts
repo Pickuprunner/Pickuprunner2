@@ -24,6 +24,7 @@ export interface Order {
   status: OrderStatus;
   createdAt: string;
   customerId?: string;
+  customer_id?: string;
   userId?: string;
   cityId?: string;
   storeId?: string;
@@ -34,6 +35,7 @@ export interface Order {
   checkoutSessionId?: string;
   distanceMiles?: number;
   customerSessionId?: string;
+  customer_session_id?: string;
   hasAlcohol?: number;
   ageVerified?: number | boolean;
   ageVerifiedAt?: string;
@@ -92,6 +94,7 @@ interface OrderStoreState {
   selectedOrderId: string | null;
   upsertOrder: (order: Order | any) => Order;
   setOrders: (orders: Order[]) => void;
+  setAvailableOrders: (orders: Order[]) => void;
   addOrder: (order: CreateOrderInput) => Order;
   updateOrder: (id: string, updates: Partial<Order>) => Order | null;
   claimOrder: (id: string, driverUserId: string, driverName?: string) => Order | null;
@@ -121,39 +124,53 @@ export const useOrderStore = create<OrderStoreState>()(
 
       upsertOrder: (incoming) => {
         const orderId = incoming.id;
-        const normalized: Order = {
-          id: orderId,
-          customerName: incoming.customerName || incoming.customer_name || 'Customer',
-          customerPhone: incoming.customerPhone || incoming.customer_phone || '',
-          customerEmail: incoming.customerEmail || incoming.customer_email,
-          pickupAddress: incoming.pickupAddress || incoming.pickup_address || '',
-          deliveryAddress: incoming.deliveryAddress || incoming.delivery_address || '',
-          items: incoming.items || '',
-          status: incoming.status || 'pending',
-          createdAt: incoming.createdAt || incoming.created_at || new Date().toISOString(),
-          customerId: incoming.customerId || incoming.customer_id,
-          userId: incoming.userId,
-          cityId: incoming.cityId || incoming.city_id || APP_CONFIG.CITY_ID,
-          storeId: incoming.storeId || incoming.store_id || APP_CONFIG.STORE_ID,
-          orderScope: incoming.orderScope || incoming.order_scope || ORDER_SCOPE,
-          tipAmount: incoming.tipAmount ?? incoming.tip_amount ?? 10.0,
-          paymentStatus: incoming.paymentStatus || incoming.payment_status || 'unpaid',
-          checkoutUrl: incoming.checkoutUrl || incoming.checkout_url,
-          checkoutSessionId: incoming.checkoutSessionId || incoming.checkout_session_id,
-          distanceMiles: incoming.distanceMiles ?? incoming.distance_miles ?? 0,
-          customerSessionId: incoming.customerSessionId || incoming.customer_session_id,
-          hasAlcohol: incoming.hasAlcohol ?? 0,
-          ageVerified: incoming.ageVerified ?? incoming.age_verified,
-          ageVerifiedAt: incoming.ageVerifiedAt ?? incoming.age_verified_at,
-          deliveryPhotoUrl: incoming.deliveryPhotoUrl || incoming.delivery_photo_url,
-          deliveredAt: incoming.deliveredAt || incoming.delivered_at,
-          driverUserId: incoming.driverUserId || incoming.driver_user_id,
-          driverName: incoming.driverName || incoming.driver_name,
-          deliveryNotification: incoming.deliveryNotification,
-        };
+        let finalOrder: Order = incoming as Order;
 
         set((state) => {
           const index = state.orders.findIndex((o) => o.id === orderId);
+          const existing = index !== -1 ? state.orders[index] : null;
+
+          const incomingName = (incoming.customerName || incoming.customer_name || '').trim();
+          const existingName = (existing?.customerName || existing?.customer_name || '').trim();
+          const resolvedCustomerName =
+            incomingName && incomingName !== 'Customer' && incomingName !== 'Customer Order'
+              ? incomingName
+              : existingName || incomingName || 'Customer';
+
+          const normalized: Order = {
+            id: orderId,
+            customerName: resolvedCustomerName,
+            customerPhone: incoming.customerPhone || incoming.customer_phone || existing?.customerPhone || '',
+            customerEmail: incoming.customerEmail || incoming.customer_email || existing?.customerEmail,
+            pickupAddress: incoming.pickupAddress || incoming.pickup_address || existing?.pickupAddress || '',
+            deliveryAddress: incoming.deliveryAddress || incoming.delivery_address || existing?.deliveryAddress || '',
+            items: incoming.items || existing?.items || '',
+            status: incoming.status || existing?.status || 'pending',
+            createdAt: incoming.createdAt || incoming.created_at || existing?.createdAt || new Date().toISOString(),
+            customerId: incoming.customerId || incoming.customer_id || existing?.customerId,
+            userId: incoming.userId || existing?.userId,
+            cityId: incoming.cityId || incoming.city_id || existing?.cityId || APP_CONFIG.CITY_ID,
+            storeId: incoming.storeId || incoming.store_id || existing?.storeId || APP_CONFIG.STORE_ID,
+            orderScope: incoming.orderScope || incoming.order_scope || existing?.orderScope || ORDER_SCOPE,
+            tipAmount: incoming.tipAmount ?? incoming.tip_amount ?? existing?.tipAmount ?? 10.0,
+            paymentStatus: incoming.paymentStatus || incoming.payment_status || existing?.paymentStatus || 'unpaid',
+            checkoutUrl: incoming.checkoutUrl || incoming.checkout_url || existing?.checkoutUrl,
+            checkoutSessionId: incoming.checkoutSessionId || incoming.checkout_session_id || existing?.checkoutSessionId,
+            distanceMiles: incoming.distanceMiles ?? incoming.distance_miles ?? existing?.distanceMiles ?? 0,
+            customerSessionId: incoming.customerSessionId || incoming.customer_session_id || existing?.customerSessionId,
+            customer_session_id: incoming.customerSessionId || incoming.customer_session_id || existing?.customerSessionId,
+            hasAlcohol: incoming.hasAlcohol ?? existing?.hasAlcohol ?? 0,
+            ageVerified: incoming.ageVerified ?? incoming.age_verified ?? existing?.ageVerified,
+            ageVerifiedAt: incoming.ageVerifiedAt ?? incoming.age_verified_at ?? existing?.ageVerifiedAt,
+            deliveryPhotoUrl: incoming.deliveryPhotoUrl || incoming.delivery_photo_url || existing?.deliveryPhotoUrl,
+            deliveredAt: incoming.deliveredAt || incoming.delivered_at || existing?.deliveredAt,
+            driverUserId: incoming.driverUserId || incoming.driver_user_id || existing?.driverUserId,
+            driverName: incoming.driverName || incoming.driver_name || existing?.driverName,
+            deliveryNotification: incoming.deliveryNotification || existing?.deliveryNotification,
+          };
+
+          finalOrder = normalized;
+
           if (index === -1) {
             return { orders: [normalized, ...state.orders] };
           }
@@ -162,11 +179,45 @@ export const useOrderStore = create<OrderStoreState>()(
           return { orders: updated };
         });
 
-        syncCustomerLocalOrders(normalized);
-        return normalized;
+        syncCustomerLocalOrders(finalOrder);
+        return finalOrder;
       },
 
       setOrders: (orders) => set({ orders }),
+
+      setAvailableOrders: (incomingAvailable: Order[]) => {
+        set((state) => {
+          const nonPending = state.orders.filter((o) => o.status !== 'pending');
+          const existingMap = new Map<string, Order>();
+          state.orders.forEach((o) => o?.id && existingMap.set(o.id, o));
+
+          const incomingMap = new Map<string, Order>();
+          (incomingAvailable || []).forEach((o) => {
+            if (!o?.id) return;
+            const existing = existingMap.get(o.id);
+            const incomingName = (o.customerName || o.customer_name || '').trim();
+            const existingName = (existing?.customerName || existing?.customer_name || '').trim();
+            const resolvedName =
+              incomingName && incomingName !== 'Customer' && incomingName !== 'Customer Order'
+                ? incomingName
+                : existingName || incomingName || 'Customer';
+
+            incomingMap.set(o.id, {
+              ...(existing || {}),
+              ...o,
+              customerName: resolvedName,
+              customerPhone: o.customerPhone || o.customer_phone || existing?.customerPhone || '',
+            });
+          });
+
+          nonPending.forEach((o) => {
+            if (o?.id && !incomingMap.has(o.id)) {
+              incomingMap.set(o.id, o);
+            }
+          });
+          return { orders: Array.from(incomingMap.values()) };
+        });
+      },
 
       addOrder: (orderData) => {
         const newOrder: Order = {
