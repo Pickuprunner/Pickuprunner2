@@ -17,6 +17,7 @@ import {
 } from '@blinkdotnew/mobile-ui';
 import { colors, borderRadius, spacing } from '@/constants/design';
 import CustomInput from '@/components/core/CustomInput';
+import { useToast } from '@/components/core';
 import { DriverWizardData } from './mockData';
 
 interface BackgroundCheckStepProps {
@@ -32,16 +33,21 @@ export function BackgroundCheckStep({
   onNext,
   onBack,
 }: BackgroundCheckStepProps) {
+  const { showToast } = useToast();
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleNext = () => {
     setErrorMsg('');
     if (!data.ssnLast4.trim() || data.ssnLast4.length < 4) {
-      setErrorMsg('Please enter the last 4 digits of your Social Security Number (SSN).');
+      const msg = 'Please enter the last 4 digits of your Social Security Number (SSN).';
+      setErrorMsg(msg);
+      showToast('SSN Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.fcraAgreed) {
-      setErrorMsg('You must authorize the background check disclosure to continue.');
+      const msg = 'You must authorize the background check disclosure to continue.';
+      setErrorMsg(msg);
+      showToast('FCRA Consent Required', { type: 'warning', description: msg });
       return;
     }
     onNext();

@@ -22,8 +22,9 @@ import {
 import * as Haptics from 'expo-haptics';
 import { colors, borderRadius, spacing } from '@/constants/design';
 import { useAuth } from '@/hooks/useAuth';
+import { useDriverAccreditation, useDevPassAccreditation } from '@/lib/accreditation';
 import { useMyVerification, useReviewVerification, useSubmitVerification } from '@/lib/verification';
-import { DriverWizardData } from './mockData';
+import { DriverWizardData, MOCK_DRIVER_WIZARD_DATA } from './mockData';
 
 interface ReviewPendingStepProps {
   data: DriverWizardData;
@@ -32,17 +33,54 @@ interface ReviewPendingStepProps {
 
 export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
   const { user, logout } = useAuth();
+  const { data: accreditation } = useDriverAccreditation();
+  const devPassMutation = useDevPassAccreditation();
+
   const { data: verification } = useMyVerification(user?.id);
   const reviewMutation = useReviewVerification();
   const submitMutation = useSubmitVerification();
 
-  const isApproved = verification?.status === 'approved';
+  const isApproved =
+    accreditation?.profile?.accreditationStatus === 'approved' ||
+    verification?.status === 'approved';
 
   const handleDevApprove = async () => {
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
     try {
+      
+      await devPassMutation.mutateAsync({
+        vehicle: {
+          vehicleMake: data.vehicleMake || MOCK_DRIVER_WIZARD_DATA.vehicleMake,
+          vehicleModel: data.vehicleModel || MOCK_DRIVER_WIZARD_DATA.vehicleModel,
+          vehicleYear: parseInt(data.vehicleYear || MOCK_DRIVER_WIZARD_DATA.vehicleYear, 10),
+          vehicleColor: data.vehicleColor || MOCK_DRIVER_WIZARD_DATA.vehicleColor,
+          vehiclePlate: data.licensePlate || MOCK_DRIVER_WIZARD_DATA.licensePlate,
+          streetAddress: data.address || MOCK_DRIVER_WIZARD_DATA.address,
+          aptSuite: data.apt || MOCK_DRIVER_WIZARD_DATA.apt,
+          city: data.city || MOCK_DRIVER_WIZARD_DATA.city,
+          state: data.state || MOCK_DRIVER_WIZARD_DATA.state,
+          postalCode: data.zip || MOCK_DRIVER_WIZARD_DATA.zip,
+        },
+        license: {
+          licenseState: data.licenseState || MOCK_DRIVER_WIZARD_DATA.licenseState,
+          licenseNumber: data.licenseNumber || MOCK_DRIVER_WIZARD_DATA.licenseNumber,
+          legalName: data.licenseFullName || user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
+          dateOfBirth: data.licenseDob || MOCK_DRIVER_WIZARD_DATA.licenseDob,
+          licenseExpirationDate: data.licenseExpDate || MOCK_DRIVER_WIZARD_DATA.licenseExpDate,
+        },
+        insurance: {
+          insuranceCompany: data.insuranceCompany || MOCK_DRIVER_WIZARD_DATA.insuranceCompany,
+          insuranceNaicNumber: data.naicNumber || MOCK_DRIVER_WIZARD_DATA.naicNumber,
+          insurancePolicyNumber: data.policyNumber || MOCK_DRIVER_WIZARD_DATA.policyNumber,
+          insuranceEffectiveDate: data.effectiveDate || MOCK_DRIVER_WIZARD_DATA.effectiveDate,
+          insuranceExpirationDate: data.expirationDate || MOCK_DRIVER_WIZARD_DATA.expirationDate,
+          vehicleVin: data.vinNumber || MOCK_DRIVER_WIZARD_DATA.vinNumber,
+        },
+        legalName: data.licenseFullName || user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
+      }).catch(() => {});
+
       if (verification?.id) {
         await reviewMutation.mutateAsync({
           id: verification.id,
@@ -79,6 +117,8 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
       router.replace('/(tabs)');
     }
   };
+
+  const profile = accreditation?.profile;
 
   return (
     <View style={styles.container}>
@@ -120,10 +160,10 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
           <View style={styles.summaryItemContent}>
             <Text style={styles.summaryItemLabel}>Vehicle & Address</Text>
             <Text style={styles.summaryItemValue}>
-              {data.vehicleYear} {data.vehicleMake} {data.vehicleModel} • {data.licensePlate}
+              {profile?.vehicleYear || data.vehicleYear} {profile?.vehicleMake || data.vehicleMake} {profile?.vehicleModel || data.vehicleModel} • {profile?.vehiclePlate || data.licensePlate}
             </Text>
             <Text style={styles.summaryItemSubtext}>
-              {data.address}, {data.city}, {data.state} {data.zip}
+              {profile?.streetAddress || data.address}, {profile?.city || data.city}, {profile?.state || data.state} {profile?.postalCode || data.zip}
             </Text>
           </View>
           <CheckCircle size={16} color="#22C55E" />
@@ -138,9 +178,11 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
           <View style={styles.summaryItemContent}>
             <Text style={styles.summaryItemLabel}>Driver's License</Text>
             <Text style={styles.summaryItemValue}>
-              {data.licenseFullName} • {data.licenseState} #{data.licenseNumber}
+              {profile?.legalName || data.licenseFullName} • {profile?.licenseState || data.licenseState} #{profile?.licenseNumber || data.licenseNumber}
             </Text>
-            <Text style={styles.summaryItemSubtext}>Expires: {data.licenseExpDate}</Text>
+            <Text style={styles.summaryItemSubtext}>
+              Expires: {profile?.licenseExpirationDate || data.licenseExpDate}
+            </Text>
           </View>
           <CheckCircle size={16} color="#22C55E" />
         </View>
@@ -153,7 +195,9 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
           </View>
           <View style={styles.summaryItemContent}>
             <Text style={styles.summaryItemLabel}>Background Check</Text>
-            <Text style={styles.summaryItemValue}>SSN ending in •••• {data.ssnLast4}</Text>
+            <Text style={styles.summaryItemValue}>
+              Status: {profile?.backgroundStatus === 'approved' ? 'Approved' : 'In Review'}
+            </Text>
             <Text style={styles.summaryItemSubtext}>FCRA Consent Authorized</Text>
           </View>
           <CheckCircle size={16} color="#22C55E" />
@@ -168,9 +212,11 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
           <View style={styles.summaryItemContent}>
             <Text style={styles.summaryItemLabel}>Vehicle Insurance</Text>
             <Text style={styles.summaryItemValue}>
-              {data.insuranceCompany} • Policy #{data.policyNumber}
+              {profile?.insuranceCompany || data.insuranceCompany} • Policy #{profile?.insurancePolicyNumber || data.policyNumber}
             </Text>
-            <Text style={styles.summaryItemSubtext}>VIN: {data.vinNumber}</Text>
+            <Text style={styles.summaryItemSubtext}>
+              VIN: {profile?.vehicleVin || data.vinNumber}
+            </Text>
           </View>
           <CheckCircle size={16} color="#22C55E" />
         </View>
@@ -220,6 +266,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 227, 153, 0.2)',
     gap: 10,
   },
+  heroCardApproved: {
+    backgroundColor: 'rgba(34, 197, 94, 0.05)',
+    borderColor: 'rgba(34, 197, 94, 0.25)',
+  },
   iconCircle: {
     width: 68,
     height: 68,
@@ -229,6 +279,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 227, 153, 0.3)',
+  },
+  iconCircleApproved: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderColor: 'rgba(34, 197, 94, 0.35)',
   },
   badgeRow: {
     marginTop: 2,
@@ -244,44 +298,56 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 227, 153, 0.35)',
   },
+  badgeApproved: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    borderColor: 'rgba(34, 197, 94, 0.4)',
+  },
   pulsingDot: {
     width: 7,
     height: 7,
     borderRadius: 3.5,
     backgroundColor: '#FFE399',
   },
+  pulsingDotApproved: {
+    backgroundColor: '#22C55E',
+  },
   badgeText: {
-    color: '#FFE399',
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    color: '#FFE399',
+    letterSpacing: 0.8,
+  },
+  badgeTextApproved: {
+    color: '#22C55E',
   },
   heroTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: colors.onSurface,
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
   heroSubtitle: {
-    fontSize: 13.5,
+    fontSize: 13,
     color: colors.onSurfaceVariant,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 19,
     paddingHorizontal: 8,
   },
   summaryCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: colors.outlineVariant,
     gap: 12,
   },
   summaryTitle: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: colors.onSurfaceVariant,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.outline,
     letterSpacing: 0.8,
+    marginBottom: 2,
   },
   summaryItem: {
     flexDirection: 'row',
@@ -289,10 +355,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   summaryItemIconBg: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -300,89 +366,71 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryItemLabel: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     color: colors.onSurface,
   },
   summaryItemValue: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.onSurfaceVariant,
     marginTop: 1,
   },
   summaryItemSubtext: {
-    fontSize: 11,
+    fontSize: 10,
     color: colors.outline,
     marginTop: 1,
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: colors.outlineVariant,
   },
   doneBtn: {
-    height: 52,
-    backgroundColor: colors.primaryContainer,
-    borderRadius: borderRadius.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    backgroundColor: colors.primaryContainer,
+    paddingVertical: 14,
+    borderRadius: borderRadius.md,
     marginTop: 4,
   },
   doneBtnText: {
-    color: colors.onPrimaryContainer,
     fontSize: 15,
     fontWeight: '700',
-  },
-  heroCardApproved: {
-    backgroundColor: 'rgba(34, 197, 94, 0.06)',
-    borderColor: 'rgba(34, 197, 94, 0.25)',
-  },
-  iconCircleApproved: {
-    backgroundColor: 'rgba(34, 197, 94, 0.12)',
-    borderColor: 'rgba(34, 197, 94, 0.3)',
-  },
-  badgeApproved: {
-    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-    borderColor: 'rgba(34, 197, 94, 0.35)',
-  },
-  pulsingDotApproved: {
-    backgroundColor: '#22C55E',
-  },
-  badgeTextApproved: {
-    color: '#22C55E',
+    color: colors.onPrimaryContainer,
   },
   actionButtonsCol: {
     gap: 10,
     marginTop: 4,
   },
   devApproveBtn: {
-    height: 52,
-    backgroundColor: '#FFE399',
-    borderRadius: borderRadius.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
+    backgroundColor: '#FFE399',
+    paddingVertical: 14,
+    borderRadius: borderRadius.md,
   },
   devApproveBtnText: {
-    color: '#0F131C',
-    fontSize: 14.5,
+    fontSize: 14,
     fontWeight: '700',
+    color: '#0F131C',
   },
   signOutBtn: {
-    height: 48,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: borderRadius.full,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    paddingVertical: 12,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: colors.outlineVariant,
   },
   signOutBtnText: {
-    color: colors.onSurfaceVariant,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+    color: colors.onSurfaceVariant,
   },
 });

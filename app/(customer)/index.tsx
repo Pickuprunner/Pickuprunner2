@@ -750,13 +750,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   successSecondaryBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 16,
+    paddingVertical: 14,
   },
   successSecondaryBtnText: {
     color: '#DFE2EF',
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: '600',
   },
 });
+

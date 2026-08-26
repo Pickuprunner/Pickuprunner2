@@ -1,459 +1,658 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ScrollView,
   Platform,
   Pressable,
   StyleSheet,
-  TextInput,
+  View,
+  Text,
+  StatusBar,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {
-  YStack,
-  XStack,
-  SizableText,
-  SafeArea,
   AlertTriangle,
-  ChevronLeft,
+  ArrowLeft,
   Trash2,
   CheckCircle,
-  Spinner,
   Shield,
   Package,
-  FileText,
-  User,
   CreditCard,
   Mail,
+  User,
 } from '@blinkdotnew/mobile-ui';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { blink } from '@/lib/blink';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
+import { usersApi } from '@/apis/users';
 import { colors, spacing, borderRadius } from '@/constants/design';
+import { useToast } from '@/components/core';
+import CustomInput from '@/components/core/CustomInput';
 import { APP_CONFIG } from '@/lib/config';
 
-type Step = 'review' | 'confirm' | 'deleting' | 'done';
+type Step = 'review' | 'confirm' | 'done';
 
 export default function DeleteAccountScreen() {
-  const { user, logout } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { logout } = useAuth();
+  const { showToast } = useToast();
+
   const [step, setStep] = useState<Step>('review');
   const [confirmText, setConfirmText] = useState('');
-  const [error, setError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [conflictReason, setConflictReason] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(10);
+
+  useEffect(() => {
+    if (step !== 'done') return;
+
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          router.replace('/(landing)/role-select');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [step]);
 
   const handleNext = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
     setStep('confirm');
   };
 
   const handleDelete = async () => {
     if (confirmText.trim().toUpperCase() !== 'DELETE') {
-      setError('Please type DELETE to confirm.');
+      showToast('Confirmation Required', {
+        type: 'warning',
+        description: 'Please type DELETE in the box to confirm.',
+      });
       return;
     }
 
-    setError('');
-    setStep('deleting');
-
     if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
     }
 
+    setIsDeleting(true);
+    setConflictReason(null);
+
     try {
-      const userId = user?.id;
-      if (userId) {
-        // Delete user data from all tables (best-effort, in parallel)
-        const cleanupOps = [
-          blink.db.driverVerifications.list({ where: { user_id: userId } })
-            .then((rows: any[]) => Promise.all(rows.map((r: any) => blink.db.driverVerifications.delete(r.id)))),
-          blink.db.backgroundChecks.list({ where: { user_id: userId } })
-            .then((rows: any[]) => Promise.all(rows.map((r: any) => blink.db.backgroundChecks.delete(r.id)))),
-          blink.db.payoutRequests.list({ where: { driver_user_id: userId } })
-            .then((rows: any[]) => Promise.all(rows.map((r: any) => blink.db.payoutRequests.delete(r.id)))),
-          blink.db.orders.list({ where: { driver_user_id: userId } })
-            .then((rows: any[]) => Promise.all(rows.map((r: any) => blink.db.orders.update(r.id, { driver_user_id: null, driver_name: null, driver_photo_url: null })))),
-        ];
+      await usersApi.deleteMe();
 
-        await Promise.allSettled(cleanupOps);
-
-        // Remove local photo reference
-        await AsyncStorage.removeItem('driver_photo_url').catch(() => { });
-        await AsyncStorage.removeItem('app_role').catch(() => { });
-      }
-
-      // Sign out via useAuth
-      await logout();
+      showToast('Account Closed', {
+        type: 'success',
+        description: 'Your account has been deleted successfully.',
+      });
 
       setStep('done');
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
+
+      await logout();
     } catch (err: any) {
-      console.warn('[delete-account] error:', err?.message);
-      setError('Something went wrong. Please try again or contact support.');
-      setStep('confirm');
+      console.warn('[delete-account] error:', err);
+      const isConflict = err?.status === 409;
+      const errorMsg =
+        err?.data?.error ||
+        err?.data?.message ||
+        err?.message ||
+        'Could not delete account at this time.';
+
+      if (isConflict) {
+        setConflictReason(errorMsg);
+        showToast('Cannot Delete Account', {
+          type: 'warning',
+          description: errorMsg,
+        });
+      } else {
+        showToast('Deletion Failed', {
+          type: 'error',
+          description: errorMsg,
+        });
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  return (
-    <SafeArea edges={['top', 'bottom']}>
-      <XStack
-        alignItems="center"
-        paddingHorizontal="$4"
-        paddingVertical="$3"
-        borderBottomWidth={1}
-        borderBottomColor={colors.border}
-        gap="$3"
-      >
-        {step !== 'deleting' && step !== 'done' && (
-          <Pressable
-            onPress={() => step === 'confirm' ? setStep('review') : router.back()}
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
-          >
-            <ChevronLeft size={24} color={colors.text} />
-          </Pressable>
-        )}
-        <SizableText size="$6" fontWeight="700" color="$color12">
-          Delete Account
-        </SizableText>
-      </XStack>
+  const handleHeaderBack = () => {
+    if (step === 'confirm') {
+      setStep('review');
+      setConflictReason(null);
+    } else if (step === 'done') {
+      router.replace('/(landing)/role-select');
+    } else {
+      router.back();
+    }
+  };
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {step === 'review' && <ReviewStep onNext={handleNext} />}
-        {step === 'confirm' && (
-          <ConfirmStep
-            confirmText={confirmText}
-            setConfirmText={setConfirmText}
-            error={error}
-            onDelete={handleDelete}
-            onBack={() => { setStep('review'); setError(''); }}
-          />
-        )}
-        {step === 'deleting' && <DeletingStep />}
-        {step === 'done' && <DoneStep />}
-      </ScrollView>
-    </SafeArea>
-  );
-}
-
-// ─── Step 1: Review what will be deleted ──────────────────────────────────────
-
-function ReviewStep({ onNext }: { onNext: () => void }) {
   const items = [
-    { icon: <User size={20} color="$red9" />, label: 'Your profile', desc: 'Name, email, and account details' },
-    { icon: <FileText size={20} color="$red9" />, label: 'Verification documents', desc: "Driver's license and insurance files" },
-    { icon: <Shield size={20} color="$red9" />, label: 'Background check records', desc: 'Your background check authorization and results' },
-    { icon: <Package size={20} color="$red9" />, label: 'Order associations', desc: 'Your name will be removed from past deliveries' },
-    { icon: <CreditCard size={20} color="$red9" />, label: 'Payout history', desc: 'Pending payout requests will be cancelled' },
+    {
+      icon: <User size={18} color="#EF4444" />,
+      label: 'Personal Identity & Profile',
+      desc: 'Name, phone, email, credentials and authentication sessions are cleared.',
+    },
+    {
+      icon: <Shield size={18} color="#EF4444" />,
+      label: 'Accreditation & Documents',
+      desc: 'Driver license, insurance files and background authorizations are removed.',
+    },
+    {
+      icon: <Package size={18} color="#EF4444" />,
+      label: 'Orders & Deliveries',
+      desc: 'Orders are anonymized. Deletion is blocked if active orders are in progress.',
+    },
+    {
+      icon: <CreditCard size={18} color="#EF4444" />,
+      label: 'Payouts & Earnings',
+      desc: 'All pending payout transfers must be settled before closing your account.',
+    },
   ];
 
   return (
-    <YStack gap="$6">
-      <YStack alignItems="center" gap="$4" marginTop="$4">
-        <YStack
-          width={80} height={80} borderRadius={40}
-          backgroundColor="rgba(220,38,38,0.1)"
-          alignItems="center" justifyContent="center"
-          borderWidth={2} borderColor="rgba(220,38,38,0.25)"
-        >
-          <AlertTriangle size={36} color="$red9" />
-        </YStack>
-        <YStack alignItems="center" gap="$2">
-          <SizableText size="$7" fontWeight="800" color="$color12">
-            Request Account Deletion
-          </SizableText>
-          <SizableText size="$3" color="$color9" textAlign="center" paddingHorizontal="$6">
-            The following data will be permanently deleted. This action cannot be undone.
-          </SizableText>
-        </YStack>
-      </YStack>
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <YStack
-        backgroundColor="$color2"
-        borderRadius={16}
-        borderWidth={1}
-        borderColor={colors.border}
-        overflow="hidden"
-      >
-        {items.map((item, i) => (
-          <React.Fragment key={item.label}>
-            <XStack alignItems="center" gap="$3" padding="$4">
-              <YStack
-                width={40} height={40} borderRadius={20}
-                backgroundColor="rgba(220,38,38,0.08)"
-                alignItems="center" justifyContent="center"
-                flexShrink={0}
-              >
-                {item.icon}
-              </YStack>
-              <YStack flex={1}>
-                <SizableText size="$4" fontWeight="700" color="$color12">{item.label}</SizableText>
-                <SizableText size="$2" color="$color9">{item.desc}</SizableText>
-              </YStack>
-            </XStack>
-            {i < items.length - 1 && <YStack height={1} backgroundColor={colors.border} />}
-          </React.Fragment>
-        ))}
-      </YStack>
-
-      <YStack
-        backgroundColor="rgba(59,130,246,0.06)"
-        borderRadius={12} borderWidth={1} borderColor="rgba(59,130,246,0.2)"
-        padding="$4" gap="$2"
-      >
-        <XStack alignItems="center" gap="$2">
-          <Mail size={16} color="$blue9" />
-          <SizableText size="$3" fontWeight="700" color="$blue9">
-            Need help instead?
-          </SizableText>
-        </XStack>
-        <SizableText size="$2" color="$color10" lineHeight={20}>
-          If you're having issues with your account, contact us at{' '}
-          <SizableText size="$2" fontWeight="700" color="$blue10">
-            {APP_CONFIG.STORE_EMAIL}
-          </SizableText>{' '}
-          before deleting.
-        </SizableText>
-      </YStack>
-
-      <Pressable
-        onPress={onNext}
-        style={({ pressed }) => [
-          styles.deleteBtn,
-          pressed && styles.deleteBtnPressed,
+      {/* HEADER */}
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: Math.max(
+              insets.top + spacing.xs,
+              Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + spacing.xs : spacing.md
+            ),
+          },
         ]}
       >
-        <Trash2 size={18} color="white" />
-        <SizableText size="$4" fontWeight="800" color="white">
-          Continue to Delete
-        </SizableText>
-      </Pressable>
-
-      <Pressable onPress={() => router.back()} style={styles.cancelBtn}>
-        <SizableText size="$3" fontWeight="600" color="$color10">
-          Cancel
-        </SizableText>
-      </Pressable>
-    </YStack>
-  );
-}
-
-// ─── Step 2: Confirm by typing DELETE ─────────────────────────────────────────
-
-function ConfirmStep({
-  confirmText,
-  setConfirmText,
-  error,
-  onDelete,
-  onBack,
-}: {
-  confirmText: string;
-  setConfirmText: (v: string) => void;
-  error: string;
-  onDelete: () => void;
-  onBack: () => void;
-}) {
-  return (
-    <YStack gap="$5" marginTop="$4">
-      <YStack alignItems="center" gap="$3">
-        <YStack
-          width={64} height={64} borderRadius={32}
-          backgroundColor="rgba(220,38,38,0.12)"
-          alignItems="center" justifyContent="center"
-          borderWidth={2} borderColor="rgba(220,38,38,0.3)"
-        >
-          <Trash2 size={28} color="$red9" />
-        </YStack>
-        <SizableText size="$6" fontWeight="800" color="$color12">
-          Are you sure?
-        </SizableText>
-        <SizableText size="$3" color="$color9" textAlign="center" paddingHorizontal="$4">
-          Type <SizableText size="$3" fontWeight="800" color="$red10">DELETE</SizableText> below to permanently remove your account and all associated data.
-        </SizableText>
-      </YStack>
-
-      <YStack gap="$2">
-        <SizableText size="$2" fontWeight="700" color="$color10" paddingLeft="$1">
-          TYPE DELETE TO CONFIRM
-        </SizableText>
-        <YStack
-          backgroundColor="$color3"
-          borderRadius={14}
-          borderWidth={2}
-          borderColor={confirmText.trim().toUpperCase() === 'DELETE' ? '$green8' : (error ? '$red8' : '$color5')}
-          paddingHorizontal="$4"
-          height={52}
-          justifyContent="center"
-        >
-          <TextInput
-            value={confirmText}
-            onChangeText={setConfirmText}
-            placeholder="Type DELETE"
-            placeholderTextColor={colors.textTertiary}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            autoComplete="off"
-            returnKeyType="done"
-            style={[
-              styles.confirmInput,
-              Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {},
-            ]}
-          />
-        </YStack>
-        {!!error && (
-          <SizableText size="$2" color="$red9">{error}</SizableText>
+        {step !== 'done' && (
+          <Pressable onPress={handleHeaderBack} style={styles.headerBtn} hitSlop={10}>
+            <ArrowLeft size={20} color={colors.onSurface} />
+          </Pressable>
         )}
-      </YStack>
 
-      <Pressable
-        onPress={onDelete}
-        disabled={confirmText.trim().toUpperCase() !== 'DELETE'}
-        style={({ pressed }) => [
-          styles.deleteBtn,
-          confirmText.trim().toUpperCase() !== 'DELETE' && styles.deleteBtnDisabled,
-          pressed && styles.deleteBtnPressed,
+        <View style={styles.headerTitleCol}>
+          <Text style={styles.headerTitle}>Delete Account</Text>
+          <Text style={styles.headerSubtitle}>
+            {step === 'review'
+              ? 'Review impact'
+              : step === 'confirm'
+              ? 'Permanent confirmation'
+              : 'Completed'}
+          </Text>
+        </View>
+
+        {step !== 'done' ? <View style={{ width: 38 }} /> : null}
+      </View>
+
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: Math.max(insets.bottom, 24) + 20 },
         ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Trash2 size={18} color="white" />
-        <SizableText size="$4" fontWeight="800" color="white">
-          Permanently Delete My Account
-        </SizableText>
-      </Pressable>
+        {/* STEP 1: REVIEW */}
+        {step === 'review' && (
+          <View style={styles.contentCol}>
+            <View style={styles.warningCard}>
+              <View style={styles.warningIconCircle}>
+                <AlertTriangle size={32} color="#EF4444" />
+              </View>
+              <Text style={styles.warningTitle}>Permanent Account Deletion</Text>
+              <Text style={styles.warningDesc}>
+                Closing your account is permanent. Once completed, your profile, document records,
+                and session data will be permanently wiped.
+              </Text>
+            </View>
 
-      <Pressable onPress={onBack} style={styles.cancelBtn}>
-        <SizableText size="$3" fontWeight="600" color="$color10">
-          Go Back
-        </SizableText>
-      </Pressable>
-    </YStack>
+            <View style={styles.sectionBox}>
+              <Text style={styles.sectionBoxTitle}>WHAT WILL BE AFFECTED</Text>
+              {items.map((item, i) => (
+                <React.Fragment key={item.label}>
+                  <View style={styles.affectedRow}>
+                    <View style={styles.affectedIconBg}>{item.icon}</View>
+                    <View style={styles.affectedContent}>
+                      <Text style={styles.affectedLabel}>{item.label}</Text>
+                      <Text style={styles.affectedDesc}>{item.desc}</Text>
+                    </View>
+                  </View>
+                  {i < items.length - 1 && <View style={styles.divider} />}
+                </React.Fragment>
+              ))}
+            </View>
+
+            <View style={styles.helpBox}>
+              <View style={styles.helpHeaderRow}>
+                <Mail size={16} color="#38BDF8" />
+                <Text style={styles.helpHeaderTitle}>Need help instead?</Text>
+              </View>
+              <Text style={styles.helpBodyText}>
+                If you are experiencing an issue or need order assistance, contact our support team
+                at <Text style={styles.helpHighlight}>{APP_CONFIG.STORE_EMAIL}</Text> before
+                closing your account.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleNext}
+              style={styles.continueDeleteBtn}
+            >
+              <Trash2 size={18} color="#FFFFFF" />
+              <Text style={styles.continueDeleteBtnText}>Continue to Confirmation</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.back()}
+              style={styles.cancelBtn}
+            >
+              <Text style={styles.cancelBtnText}>Keep Account</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* STEP 2: CONFIRM */}
+        {step === 'confirm' && (
+          <View style={styles.contentCol}>
+            <View style={styles.dangerConfirmCard}>
+              <View style={styles.dangerConfirmIconCircle}>
+                <Trash2 size={30} color="#EF4444" />
+              </View>
+              <Text style={styles.dangerConfirmTitle}>Are you completely sure?</Text>
+              <Text style={styles.dangerConfirmSubtitle}>
+                This action cannot be undone. To verify your intent, please type{' '}
+                <Text style={styles.deleteKeyword}>DELETE</Text> in the field below.
+              </Text>
+            </View>
+
+            {conflictReason && (
+              <View style={styles.conflictCard}>
+                <AlertTriangle size={18} color="#F59E0B" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.conflictTitle}>Cannot Delete Right Now</Text>
+                  <Text style={styles.conflictDesc}>{conflictReason}</Text>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.inputContainer}>
+              <CustomInput
+                label="CONFIRMATION KEYWORD"
+                value={confirmText}
+                onChangeText={setConfirmText}
+                placeholder="Type DELETE"
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleDelete}
+              disabled={isDeleting || confirmText.trim().toUpperCase() !== 'DELETE'}
+              style={[
+                styles.finalDeleteBtn,
+                (isDeleting || confirmText.trim().toUpperCase() !== 'DELETE') &&
+                  styles.finalDeleteBtnDisabled,
+              ]}
+            >
+              {isDeleting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Trash2 size={18} color="#FFFFFF" />
+                  <Text style={styles.finalDeleteBtnText}>Permanently Delete My Account</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                setStep('review');
+                setConflictReason(null);
+              }}
+              style={styles.cancelBtn}
+            >
+              <Text style={styles.cancelBtnText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* STEP 3: DONE */}
+        {step === 'done' && (
+          <View style={[styles.contentCol, { alignItems: 'center', marginTop: 40 }]}>
+            <View style={styles.successIconCircle}>
+              <CheckCircle size={44} color="#22C55E" />
+            </View>
+
+            <Text style={styles.successTitle}>Account Deleted</Text>
+            <Text style={styles.successDesc}>
+              Your account has been closed and your personal credentials have been removed. Thank
+              you for being part of Pickup Runner.
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.replace('/(landing)/role-select')}
+              style={styles.doneBtn}
+            >
+              <Text style={styles.doneBtnText}>Return to Welcome Screen ({countdown}s)</Text>
+            </TouchableOpacity>
+            <Text style={styles.autoRedirectText}>Automatically redirecting in {countdown} seconds...</Text>
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
-
-// ─── Step 3: Deleting in progress ─────────────────────────────────────────────
-
-function DeletingStep() {
-  return (
-    <YStack flex={1} alignItems="center" justifyContent="center" gap="$5" marginTop="$8">
-      <YStack
-        width={80} height={80} borderRadius={40}
-        backgroundColor="rgba(220,38,38,0.08)"
-        alignItems="center" justifyContent="center"
-      >
-        <Spinner size="large" color="$red9" />
-      </YStack>
-      <YStack alignItems="center" gap="$2">
-        <SizableText size="$5" fontWeight="700" color="$color12">
-          Deleting your account...
-        </SizableText>
-        <SizableText size="$3" color="$color9" textAlign="center">
-          Removing your data. This will only take a moment.
-        </SizableText>
-      </YStack>
-    </YStack>
-  );
-}
-
-// ─── Step 4: Done ─────────────────────────────────────────────────────────────
-
-function DoneStep() {
-  return (
-    <YStack alignItems="center" gap="$5" marginTop="$8">
-      <YStack
-        width={80} height={80} borderRadius={40}
-        backgroundColor="rgba(220,38,38,0.1)"
-        alignItems="center" justifyContent="center"
-        borderWidth={2} borderColor="rgba(22,163,74,0.25)"
-      >
-        <CheckCircle size={36} color="$green9" />
-      </YStack>
-      <YStack alignItems="center" gap="$2">
-        <SizableText size="$6" fontWeight="800" color="$color12">
-          Account Deleted
-        </SizableText>
-        <SizableText size="$3" color="$color9" textAlign="center" paddingHorizontal="$6">
-          Your account and all associated data have been permanently removed. You have been signed out.
-        </SizableText>
-      </YStack>
-
-      <YStack
-        backgroundColor="rgba(59,130,246,0.06)"
-        borderRadius={12} borderWidth={1} borderColor="rgba(59,130,246,0.2)"
-        padding="$4" gap="$2" width="100%"
-      >
-        <SizableText size="$2" color="$color10" lineHeight={20}>
-          If you change your mind, you can create a new account at any time. If you have questions, contact{' '}
-          <SizableText size="$2" fontWeight="700" color="$blue10">
-            {APP_CONFIG.STORE_EMAIL}
-          </SizableText>.
-        </SizableText>
-      </YStack>
-
-      <Pressable
-        onPress={() => router.replace('/role-select')}
-        style={({ pressed }) => [
-          styles.homeBtn,
-          pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-        ]}
-      >
-        <SizableText size="$4" fontWeight="700" color="white">
-          Return to Home
-        </SizableText>
-      </Pressable>
-    </YStack>
-  );
-}
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  scroll: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxxl,
+  root: {
+    flex: 1,
+    backgroundColor: '#0F131C',
   },
-  backBtn: {
-    width: 40,
-    height: 40,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.gutter,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(15, 19, 28, 0.98)',
+  },
+  headerBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteBtn: {
+  headerTitleCol: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 8,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.onSurface,
+    letterSpacing: -0.2,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: colors.onSurfaceVariant,
+    marginTop: 1,
+  },
+  scroll: {
+    paddingHorizontal: spacing.gutter,
+    paddingTop: spacing.md,
+  },
+  contentCol: {
+    gap: spacing.md,
+  },
+  warningCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.06)',
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.22)',
+    gap: 8,
+  },
+  warningIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    marginBottom: 4,
+  },
+  warningTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.onSurface,
+    letterSpacing: -0.3,
+  },
+  warningDesc: {
+    fontSize: 13,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  sectionBox: {
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    gap: 12,
+  },
+  sectionBoxTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.outline,
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  affectedRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  affectedIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  affectedContent: {
+    flex: 1,
+  },
+  affectedLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.onSurface,
+  },
+  affectedDesc: {
+    fontSize: 12,
+    color: colors.onSurfaceVariant,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.outlineVariant,
+  },
+  helpBox: {
+    backgroundColor: 'rgba(56, 189, 248, 0.06)',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.2)',
+    gap: 6,
+  },
+  helpHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  helpHeaderTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#38BDF8',
+  },
+  helpBodyText: {
+    fontSize: 12,
+    color: colors.onSurfaceVariant,
+    lineHeight: 17,
+  },
+  helpHighlight: {
+    fontWeight: '700',
+    color: '#38BDF8',
+  },
+  continueDeleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 52,
-    backgroundColor: '#dc2626',
-    borderRadius: borderRadius.xl,
+    backgroundColor: '#DC2626',
+    paddingVertical: 14,
+    borderRadius: borderRadius.md,
+    marginTop: 6,
   },
-  deleteBtnPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
-  deleteBtnDisabled: {
-    opacity: 0.4,
+  continueDeleteBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   cancelBtn: {
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    justifyContent: 'center',
+    paddingVertical: 12,
   },
-  homeBtn: {
+  cancelBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.onSurfaceVariant,
+  },
+  dangerConfirmCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.06)',
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    gap: 8,
+  },
+  dangerConfirmIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 52,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.xl,
-    width: '100%',
+    borderWidth: 1.5,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    marginBottom: 2,
   },
-  confirmInput: {
-    flex: 1,
-    height: 48,
+  dangerConfirmTitle: {
     fontSize: 18,
+    fontWeight: '800',
+    color: colors.onSurface,
+  },
+  dangerConfirmSubtitle: {
+    fontSize: 13,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: 8,
+  },
+  deleteKeyword: {
+    fontWeight: '800',
+    color: '#EF4444',
+  },
+  conflictCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  conflictTitle: {
+    fontSize: 13,
     fontWeight: '700',
-    color: '#fff',
-    letterSpacing: 2,
+    color: '#F59E0B',
+  },
+  conflictDesc: {
+    fontSize: 12,
+    color: colors.onSurfaceVariant,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  inputContainer: {
+    marginTop: 4,
+  },
+  finalDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#DC2626',
+    paddingVertical: 14,
+    borderRadius: borderRadius.md,
+    marginTop: 6,
+  },
+  finalDeleteBtnDisabled: {
+    opacity: 0.45,
+  },
+  finalDeleteBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  successIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(34, 197, 94, 0.35)',
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.onSurface,
+    marginBottom: 8,
+  },
+  successDesc: {
+    fontSize: 14,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  doneBtn: {
+    backgroundColor: colors.primaryContainer,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: borderRadius.md,
+  },
+  doneBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.onPrimaryContainer,
+  },
+  autoRedirectText: {
+    fontSize: 12,
+    color: colors.onSurfaceVariant,
+    marginTop: 12,
   },
 });

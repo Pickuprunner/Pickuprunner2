@@ -18,6 +18,13 @@ import {
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  useDriverAccreditation,
+  useSaveAccreditationStep,
+  useRecordAccreditationConsent,
+  useSubmitAccreditation,
+  useDevPassAccreditation,
+} from '@/lib/accreditation';
 import { useMyVerification, useSubmitVerification } from '@/lib/verification';
 import { colors, spacing, borderRadius } from '@/constants/design';
 import { useToast } from '@/components/core';
@@ -36,54 +43,180 @@ export default function DriverVerificationScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { showToast } = useToast();
+
+  const { data: accreditationData, isLoading: accreditationLoading } = useDriverAccreditation();
+  const saveStepMutation = useSaveAccreditationStep();
+  const recordConsentMutation = useRecordAccreditationConsent();
+  const submitAccreditationMutation = useSubmitAccreditation();
+  const devPassMutation = useDevPassAccreditation();
+
   const { data: existing } = useMyVerification(user?.id);
   const submitVerification = useSubmitVerification();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<DriverWizardData>({
-    vehicleMake: existing?.vehicle_make || '',
-    vehicleModel: existing?.vehicle_model || '',
-    vehicleYear: existing?.vehicle_year || '',
-    vehicleColor: existing?.vehicle_color || '',
-    licensePlate: existing?.license_plate || '',
-    address: existing?.address || '',
-    apt: existing?.apt || '',
-    city: existing?.city || '',
-    state: existing?.state || 'AZ',
-    zip: existing?.zip || '',
+    vehicleMake: '',
+    vehicleModel: '',
+    vehicleYear: '',
+    vehicleColor: '',
+    licensePlate: '',
+    address: '',
+    apt: '',
+    city: '',
+    state: 'AZ',
+    zip: '',
 
-    licenseState: existing?.license_state || 'AZ',
-    licenseNumber: existing?.license_number || '',
-    licenseFullName: existing?.license_fullname || user?.displayName || '',
-    licenseDob: existing?.license_dob || '',
-    licenseExpDate: existing?.license_exp_date || '',
-    licenseFrontUrl: existing?.license_url || '',
-    licenseFrontName: existing?.license_filename || '',
-    licenseBackUrl: existing?.license_back_url || '',
-    licenseBackName: existing?.license_back_filename || '',
+    licenseState: 'AZ',
+    licenseNumber: '',
+    licenseFullName: user?.displayName || '',
+    licenseDob: '',
+    licenseExpDate: '',
+    licenseFrontUrl: '',
+    licenseFrontName: '',
+    licenseBackUrl: '',
+    licenseBackName: '',
 
-    ssnLast4: existing?.ssn_last4 || '',
-    fcraAgreed: existing?.fcra_agreed ?? false,
+    ssnLast4: '',
+    fcraAgreed: false,
 
-    insuranceCompany: existing?.insurance_company || '',
-    naicNumber: existing?.naic_number || '',
-    policyNumber: existing?.policy_number || '',
-    effectiveDate: existing?.effective_date || '',
-    expirationDate: existing?.expiration_date || '',
-    vinNumber: existing?.vin_number || '',
-    insuranceDocUrl: existing?.insurance_url || '',
-    insuranceDocName: existing?.insurance_filename || '',
+    insuranceCompany: '',
+    naicNumber: '',
+    policyNumber: '',
+    effectiveDate: '',
+    expirationDate: '',
+    vinNumber: '',
+    insuranceDocUrl: '',
+    insuranceDocName: '',
   });
 
-  // If already pending or approved from database, start on Step 5
+  // Hydrate from backend profile or local existing data
   useEffect(() => {
-    if (existing?.status === 'pending' || existing?.status === 'approved') {
-      setCurrentStep(5);
+    const profile = accreditationData?.profile;
+    if (profile) {
+      setFormData((prev) => ({
+        ...prev,
+        vehicleMake: profile.vehicleMake || prev.vehicleMake,
+        vehicleModel: profile.vehicleModel || prev.vehicleModel,
+        vehicleYear: profile.vehicleYear ? String(profile.vehicleYear) : prev.vehicleYear,
+        vehicleColor: profile.vehicleColor || prev.vehicleColor,
+        licensePlate: profile.vehiclePlate || prev.licensePlate,
+        address: profile.streetAddress || prev.address,
+        apt: profile.aptSuite || prev.apt,
+        city: profile.city || prev.city,
+        state: profile.state || prev.state,
+        zip: profile.postalCode || prev.zip,
+
+        licenseState: profile.licenseState || prev.licenseState,
+        licenseNumber: profile.licenseNumber || prev.licenseNumber,
+        licenseFullName: profile.legalName || prev.licenseFullName,
+        licenseDob: profile.dateOfBirth || prev.licenseDob,
+        licenseExpDate: profile.licenseExpirationDate || prev.licenseExpDate,
+
+        fcraAgreed: !!profile.backgroundConsentAt || prev.fcraAgreed,
+
+        insuranceCompany: profile.insuranceCompany || prev.insuranceCompany,
+        naicNumber: profile.insuranceNaicNumber || prev.naicNumber,
+        policyNumber: profile.insurancePolicyNumber || prev.policyNumber,
+        effectiveDate: profile.insuranceEffectiveDate || prev.effectiveDate,
+        expirationDate: profile.insuranceExpirationDate || prev.expirationDate,
+        vinNumber: profile.vehicleVin || prev.vinNumber,
+      }));
+
+      if (
+        profile.accreditationStatus === 'under_review' ||
+        profile.accreditationStatus === 'approved'
+      ) {
+        setCurrentStep(5);
+      }
+    } else if (existing) {
+      setFormData((prev) => ({
+        ...prev,
+        vehicleMake: existing.vehicle_make || prev.vehicleMake,
+        vehicleModel: existing.vehicle_model || prev.vehicleModel,
+        vehicleYear: existing.vehicle_year || prev.vehicleYear,
+        vehicleColor: existing.vehicle_color || prev.vehicleColor,
+        licensePlate: existing.license_plate || prev.licensePlate,
+        address: existing.address || prev.address,
+        apt: existing.apt || prev.apt,
+        city: existing.city || prev.city,
+        state: existing.state || prev.state,
+        zip: existing.zip || prev.zip,
+        licenseState: existing.license_state || prev.licenseState,
+        licenseNumber: existing.license_number || prev.licenseNumber,
+        licenseFullName: existing.license_fullname || prev.licenseFullName,
+        licenseDob: existing.license_dob || prev.licenseDob,
+        licenseExpDate: existing.license_exp_date || prev.licenseExpDate,
+        ssnLast4: existing.ssn_last4 || prev.ssnLast4,
+        fcraAgreed: existing.fcra_agreed ?? prev.fcraAgreed,
+        insuranceCompany: existing.insurance_company || prev.insuranceCompany,
+        naicNumber: existing.naic_number || prev.naicNumber,
+        policyNumber: existing.policy_number || prev.policyNumber,
+        effectiveDate: existing.effective_date || prev.effectiveDate,
+        expirationDate: existing.expiration_date || prev.expirationDate,
+        vinNumber: existing.vin_number || prev.vinNumber,
+      }));
+
+      if (existing.status === 'pending' || existing.status === 'approved') {
+        setCurrentStep(5);
+      }
     }
-  }, [existing?.status]);
+  }, [accreditationData?.profile, existing]);
 
   const updateFormData = (patch: Partial<DriverWizardData>) => {
     setFormData((prev) => ({ ...prev, ...patch }));
+  };
+
+  const handleStep1Next = async () => {
+    try {
+      await saveStepMutation.mutateAsync({
+        step: 'vehicle',
+        payload: {
+          vehicleMake: formData.vehicleMake.trim(),
+          vehicleModel: formData.vehicleModel.trim(),
+          vehicleYear: parseInt(formData.vehicleYear, 10) || undefined,
+          vehicleColor: formData.vehicleColor.trim(),
+          vehiclePlate: formData.licensePlate.trim(),
+          streetAddress: formData.address.trim(),
+          aptSuite: formData.apt.trim() || undefined,
+          city: formData.city.trim(),
+          state: formData.state.trim().toUpperCase(),
+          postalCode: formData.zip.trim(),
+        },
+      });
+    } catch (e) {
+      console.warn('[Accreditation] saveStep(vehicle) fallback:', e);
+    }
+    setCurrentStep(2);
+  };
+
+  const handleStep2Next = async () => {
+    try {
+      await saveStepMutation.mutateAsync({
+        step: 'license',
+        payload: {
+          licenseState: formData.licenseState.trim().toUpperCase(),
+          licenseNumber: formData.licenseNumber.trim(),
+          legalName: formData.licenseFullName.trim(),
+          dateOfBirth: formData.licenseDob.trim(),
+          licenseExpirationDate: formData.licenseExpDate.trim(),
+        },
+      });
+    } catch (e) {
+      console.warn('[Accreditation] saveStep(license) fallback:', e);
+    }
+    setCurrentStep(3);
+  };
+
+  const handleStep3Next = async () => {
+    try {
+      await recordConsentMutation.mutateAsync({
+        authorized: formData.fcraAgreed,
+        legalName: formData.licenseFullName.trim() || user?.displayName || undefined,
+      });
+    } catch (e) {
+      console.warn('[Accreditation] recordConsent fallback:', e);
+    }
+    setCurrentStep(4);
   };
 
   const handleDevPass = async () => {
@@ -91,6 +224,40 @@ export default function DriverVerificationScreen() {
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
+
+      const mock = {
+        vehicle: {
+          vehicleMake: formData.vehicleMake || MOCK_DRIVER_WIZARD_DATA.vehicleMake,
+          vehicleModel: formData.vehicleModel || MOCK_DRIVER_WIZARD_DATA.vehicleModel,
+          vehicleYear: parseInt(formData.vehicleYear || MOCK_DRIVER_WIZARD_DATA.vehicleYear, 10),
+          vehicleColor: formData.vehicleColor || MOCK_DRIVER_WIZARD_DATA.vehicleColor,
+          vehiclePlate: formData.licensePlate || MOCK_DRIVER_WIZARD_DATA.licensePlate,
+          streetAddress: formData.address || MOCK_DRIVER_WIZARD_DATA.address,
+          aptSuite: formData.apt || MOCK_DRIVER_WIZARD_DATA.apt,
+          city: formData.city || MOCK_DRIVER_WIZARD_DATA.city,
+          state: formData.state || MOCK_DRIVER_WIZARD_DATA.state,
+          postalCode: formData.zip || MOCK_DRIVER_WIZARD_DATA.zip,
+        },
+        license: {
+          licenseState: formData.licenseState || MOCK_DRIVER_WIZARD_DATA.licenseState,
+          licenseNumber: formData.licenseNumber || MOCK_DRIVER_WIZARD_DATA.licenseNumber,
+          legalName: formData.licenseFullName || user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
+          dateOfBirth: formData.licenseDob || MOCK_DRIVER_WIZARD_DATA.licenseDob,
+          licenseExpirationDate: formData.licenseExpDate || MOCK_DRIVER_WIZARD_DATA.licenseExpDate,
+        },
+        insurance: {
+          insuranceCompany: formData.insuranceCompany || MOCK_DRIVER_WIZARD_DATA.insuranceCompany,
+          insuranceNaicNumber: formData.naicNumber || MOCK_DRIVER_WIZARD_DATA.naicNumber,
+          insurancePolicyNumber: formData.policyNumber || MOCK_DRIVER_WIZARD_DATA.policyNumber,
+          insuranceEffectiveDate: formData.effectiveDate || MOCK_DRIVER_WIZARD_DATA.effectiveDate,
+          insuranceExpirationDate: formData.expirationDate || MOCK_DRIVER_WIZARD_DATA.expirationDate,
+          vehicleVin: formData.vinNumber || MOCK_DRIVER_WIZARD_DATA.vinNumber,
+        },
+        legalName: formData.licenseFullName || user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
+      };
+
+      await devPassMutation.mutateAsync(mock);
+
       const userId = user?.id || `usr-${Date.now()}`;
       await submitVerification.mutateAsync({
         userId,
@@ -98,26 +265,24 @@ export default function DriverVerificationScreen() {
         driverEmail: user?.email,
         existingId: existing?.id,
         status: 'approved',
-        vehicle_make: formData.vehicleMake || MOCK_DRIVER_WIZARD_DATA.vehicleMake,
-        vehicle_model: formData.vehicleModel || MOCK_DRIVER_WIZARD_DATA.vehicleModel,
-        vehicle_year: formData.vehicleYear || MOCK_DRIVER_WIZARD_DATA.vehicleYear,
-        vehicle_color: formData.vehicleColor || MOCK_DRIVER_WIZARD_DATA.vehicleColor,
-        license_plate: formData.licensePlate || MOCK_DRIVER_WIZARD_DATA.licensePlate,
-        address: formData.address || MOCK_DRIVER_WIZARD_DATA.address,
-        city: formData.city || MOCK_DRIVER_WIZARD_DATA.city,
-        state: formData.state || MOCK_DRIVER_WIZARD_DATA.state,
-        zip: formData.zip || MOCK_DRIVER_WIZARD_DATA.zip,
-        license_state: formData.licenseState || MOCK_DRIVER_WIZARD_DATA.licenseState,
-        license_number: formData.licenseNumber || MOCK_DRIVER_WIZARD_DATA.licenseNumber,
-        license_fullname: formData.licenseFullName || user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
-        license_dob: formData.licenseDob || MOCK_DRIVER_WIZARD_DATA.licenseDob,
-        license_exp_date: formData.licenseExpDate || MOCK_DRIVER_WIZARD_DATA.licenseExpDate,
+        vehicle_make: mock.vehicle.vehicleMake,
+        vehicle_model: mock.vehicle.vehicleModel,
+        vehicle_year: String(mock.vehicle.vehicleYear),
+        vehicle_color: mock.vehicle.vehicleColor,
+        license_plate: mock.vehicle.vehiclePlate,
+        address: mock.vehicle.streetAddress,
+        city: mock.vehicle.city,
+        state: mock.vehicle.state,
+        zip: mock.vehicle.postalCode,
+        license_state: mock.license.licenseState,
+        license_number: mock.license.licenseNumber,
+        license_fullname: mock.license.legalName,
+        license_dob: mock.license.dateOfBirth,
+        license_exp_date: mock.license.licenseExpirationDate,
         licenseUrl: formData.licenseFrontUrl || MOCK_DRIVER_WIZARD_DATA.licenseFrontUrl,
-        licenseFilename: formData.licenseFrontName || MOCK_DRIVER_WIZARD_DATA.licenseFrontName,
-        insurance_company: formData.insuranceCompany || MOCK_DRIVER_WIZARD_DATA.insuranceCompany,
-        policy_number: formData.policyNumber || MOCK_DRIVER_WIZARD_DATA.policyNumber,
+        insurance_company: mock.insurance.insuranceCompany,
+        policy_number: mock.insurance.insurancePolicyNumber,
         insuranceUrl: formData.insuranceDocUrl || MOCK_DRIVER_WIZARD_DATA.insuranceDocUrl,
-        insuranceFilename: formData.insuranceDocName || MOCK_DRIVER_WIZARD_DATA.insuranceDocName,
       });
 
       showToast('⚡ Dev Pass: Driver Approved!', 'success');
@@ -146,6 +311,31 @@ export default function DriverVerificationScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       }
 
+      // 1. Save Insurance step to backend
+      try {
+        await saveStepMutation.mutateAsync({
+          step: 'insurance',
+          payload: {
+            insuranceCompany: formData.insuranceCompany.trim(),
+            insuranceNaicNumber: formData.naicNumber.trim() || undefined,
+            insurancePolicyNumber: formData.policyNumber.trim(),
+            insuranceEffectiveDate: formData.effectiveDate.trim(),
+            insuranceExpirationDate: formData.expirationDate.trim(),
+            vehicleVin: formData.vinNumber.trim() || undefined,
+          },
+        });
+      } catch (e) {
+        console.warn('[Accreditation] saveStep(insurance) fallback:', e);
+      }
+
+      // 2. Submit to backend review queue
+      try {
+        await submitAccreditationMutation.mutateAsync();
+      } catch (e) {
+        console.warn('[Accreditation] submit backend fallback:', e);
+      }
+
+      // 3. Keep local verification store in sync
       await submitVerification.mutateAsync({
         userId: user?.id || `usr-${Date.now()}`,
         driverName: formData.licenseFullName || user?.displayName || user?.email || 'Driver',
@@ -274,7 +464,7 @@ export default function DriverVerificationScreen() {
           <VehicleAddressStep
             data={formData}
             onChange={updateFormData}
-            onNext={() => setCurrentStep(2)}
+            onNext={handleStep1Next}
           />
         )}
 
@@ -282,7 +472,7 @@ export default function DriverVerificationScreen() {
           <DriversLicenseStep
             data={formData}
             onChange={updateFormData}
-            onNext={() => setCurrentStep(3)}
+            onNext={handleStep2Next}
             onBack={() => setCurrentStep(1)}
           />
         )}
@@ -291,7 +481,7 @@ export default function DriverVerificationScreen() {
           <BackgroundCheckStep
             data={formData}
             onChange={updateFormData}
-            onNext={() => setCurrentStep(4)}
+            onNext={handleStep3Next}
             onBack={() => setCurrentStep(2)}
           />
         )}
@@ -302,7 +492,7 @@ export default function DriverVerificationScreen() {
             onChange={updateFormData}
             onSubmit={handleSubmitAll}
             onBack={() => setCurrentStep(3)}
-            submitting={submitVerification.isPending}
+            submitting={submitVerification.isPending || submitAccreditationMutation.isPending}
           />
         )}
 

@@ -17,6 +17,7 @@ import {
 } from '@blinkdotnew/mobile-ui';
 import { colors, borderRadius, spacing } from '@/constants/design';
 import CustomInput from '@/components/core/CustomInput';
+import { useToast } from '@/components/core';
 import { US_STATES, DriverWizardData } from './mockData';
 
 interface VehicleAddressStepProps {
@@ -26,21 +27,28 @@ interface VehicleAddressStepProps {
 }
 
 export function VehicleAddressStep({ data, onChange, onNext }: VehicleAddressStepProps) {
+  const { showToast } = useToast();
   const [showStateModal, setShowStateModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleNext = () => {
     setErrorMsg('');
     if (!data.vehicleMake.trim() || !data.vehicleModel.trim()) {
-      setErrorMsg('Please enter vehicle make and model.');
+      const msg = 'Please enter your vehicle make and model.';
+      setErrorMsg(msg);
+      showToast('Vehicle Make & Model Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.vehicleYear.trim() || !data.licensePlate.trim()) {
-      setErrorMsg('Please enter vehicle year and license plate.');
+      const msg = 'Please enter vehicle year and license plate number.';
+      setErrorMsg(msg);
+      showToast('Year & Plate Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.address.trim() || !data.city.trim() || !data.zip.trim()) {
-      setErrorMsg('Please complete your residential address.');
+      const msg = 'Please complete your street address, city, and ZIP code.';
+      setErrorMsg(msg);
+      showToast('Address Details Required', { type: 'warning', description: msg });
       return;
     }
     onNext();

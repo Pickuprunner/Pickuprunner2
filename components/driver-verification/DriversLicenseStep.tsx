@@ -24,6 +24,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { colors, borderRadius, spacing } from '@/constants/design';
 import CustomInput from '@/components/core/CustomInput';
+import { useToast } from '@/components/core';
 import { US_STATES, DriverWizardData } from './mockData';
 
 interface DriversLicenseStepProps {
@@ -39,6 +40,7 @@ export function DriversLicenseStep({
   onNext,
   onBack,
 }: DriversLicenseStepProps) {
+  const { showToast } = useToast();
   const [showStateModal, setShowStateModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [uploadingFront, setUploadingFront] = useState(false);
@@ -63,21 +65,23 @@ export function DriversLicenseStep({
       if (!result.canceled && result.assets?.[0]) {
         const asset = result.assets[0];
         setUploading(true);
-        // Simulate immediate preview uri
         if (side === 'front') {
           onChange({
             licenseFrontUrl: asset.uri,
             licenseFrontName: asset.fileName || 'drivers_license_front.jpg',
           });
+          showToast('License Front Attached', { type: 'success', description: 'Front of driver’s license saved.' });
         } else {
           onChange({
             licenseBackUrl: asset.uri,
             licenseBackName: asset.fileName || 'drivers_license_back.jpg',
           });
+          showToast('License Back Attached', { type: 'success', description: 'Back of driver’s license saved.' });
         }
       }
     } catch (e) {
       console.warn('Doc pick error:', e);
+      showToast('Upload Error', { type: 'error', description: 'Failed to pick image file.' });
     } finally {
       setUploading(false);
     }
@@ -86,23 +90,33 @@ export function DriversLicenseStep({
   const handleNext = () => {
     setErrorMsg('');
     if (!data.licenseNumber.trim()) {
-      setErrorMsg("Please enter your driver's license number.");
+      const msg = "Please enter your driver's license number.";
+      setErrorMsg(msg);
+      showToast('License Number Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.licenseFullName.trim()) {
-      setErrorMsg('Please enter your full legal name matching the license.');
+      const msg = 'Please enter your full legal name matching the license.';
+      setErrorMsg(msg);
+      showToast('Full Legal Name Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.licenseDob.trim() || data.licenseDob.length < 10) {
-      setErrorMsg('Please enter a valid Date of Birth (MM/DD/YYYY).');
+      const msg = 'Please enter a valid Date of Birth (YYYY-MM-DD or MM/DD/YYYY).';
+      setErrorMsg(msg);
+      showToast('Date of Birth Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.licenseExpDate.trim() || data.licenseExpDate.length < 10) {
-      setErrorMsg('Please enter a valid License Expiration Date (MM/DD/YYYY).');
+      const msg = 'Please enter a valid License Expiration Date (YYYY-MM-DD or MM/DD/YYYY).';
+      setErrorMsg(msg);
+      showToast('Expiration Date Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.licenseFrontUrl) {
-      setErrorMsg('Please upload a photo of the front of your driver’s license.');
+      const msg = 'Please upload a photo of the front of your driver’s license.';
+      setErrorMsg(msg);
+      showToast('License Photo Required', { type: 'warning', description: msg });
       return;
     }
     onNext();

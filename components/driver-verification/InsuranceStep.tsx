@@ -21,6 +21,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { colors, borderRadius, spacing } from '@/constants/design';
 import CustomInput from '@/components/core/CustomInput';
+import { useToast } from '@/components/core';
 import { POPULAR_INSURERS, DriverWizardData } from './mockData';
 
 interface InsuranceStepProps {
@@ -38,6 +39,7 @@ export function InsuranceStep({
   onBack,
   submitting = false,
 }: InsuranceStepProps) {
+  const { showToast } = useToast();
   const [errorMsg, setErrorMsg] = useState('');
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
@@ -63,9 +65,11 @@ export function InsuranceStep({
           insuranceDocUrl: asset.uri,
           insuranceDocName: asset.fileName || 'insurance_card.jpg',
         });
+        showToast('Insurance Card Attached', { type: 'success', description: 'Insurance card document saved.' });
       }
     } catch (e) {
       console.warn('Doc pick error:', e);
+      showToast('Upload Error', { type: 'error', description: 'Failed to pick insurance card.' });
     } finally {
       setUploadingDoc(false);
     }
@@ -74,31 +78,45 @@ export function InsuranceStep({
   const handleSubmit = () => {
     setErrorMsg('');
     if (!data.insuranceCompany.trim()) {
-      setErrorMsg('Please enter your insurance company name.');
+      const msg = 'Please enter your insurance company name.';
+      setErrorMsg(msg);
+      showToast('Insurance Company Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.naicNumber.trim() || data.naicNumber.length < 5) {
-      setErrorMsg('Please enter a valid 5-digit NAIC number.');
+      const msg = 'Please enter a valid 5-digit NAIC number.';
+      setErrorMsg(msg);
+      showToast('NAIC Code Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.policyNumber.trim()) {
-      setErrorMsg('Please enter your insurance policy number.');
+      const msg = 'Please enter your insurance policy number.';
+      setErrorMsg(msg);
+      showToast('Policy Number Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.effectiveDate.trim() || data.effectiveDate.length < 10) {
-      setErrorMsg('Please enter a valid Effective Date (MM/DD/YYYY).');
+      const msg = 'Please enter a valid Effective Date (YYYY-MM-DD or MM/DD/YYYY).';
+      setErrorMsg(msg);
+      showToast('Effective Date Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.expirationDate.trim() || data.expirationDate.length < 10) {
-      setErrorMsg('Please enter a valid Expiration Date (MM/DD/YYYY).');
+      const msg = 'Please enter a valid Expiration Date (YYYY-MM-DD or MM/DD/YYYY).';
+      setErrorMsg(msg);
+      showToast('Expiration Date Required', { type: 'warning', description: msg });
       return;
     }
     if (!data.vinNumber.trim() || data.vinNumber.length !== 17) {
-      setErrorMsg('Vehicle Identification Number (VIN) must be exactly 17 characters.');
+      const msg = 'Vehicle Identification Number (VIN) must be exactly 17 characters.';
+      setErrorMsg(msg);
+      showToast('Invalid VIN', { type: 'warning', description: msg });
       return;
     }
     if (!data.insuranceDocUrl) {
-      setErrorMsg('Please upload a digital photo or scan of your insurance card.');
+      const msg = 'Please upload a digital photo or scan of your insurance card.';
+      setErrorMsg(msg);
+      showToast('Insurance Card Photo Required', { type: 'warning', description: msg });
       return;
     }
     onSubmit();

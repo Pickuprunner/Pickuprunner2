@@ -62,4 +62,15 @@ export const usersApi = {
     const res = await apiClient.patch<UserResponse>(`/users/${id}/status`, { status });
     return res.data.user;
   },
+
+  deleteMe: async (): Promise<{ success: boolean; message: string }> => {
+    return apiClient.del<{ success: boolean; message: string }>('/users/me');
+  },
+
+  deleteUser: async (id: string, force = false): Promise<{ success: boolean; message: string }> => {
+    return apiClient.del<{ success: boolean; message: string }>(`/users/${id}`, {
+      body: force ? JSON.stringify({ force: true }) : undefined,
+    });
+  },
 };
+
