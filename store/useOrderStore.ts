@@ -137,6 +137,21 @@ export const useOrderStore = create<OrderStoreState>()(
               ? incomingName
               : existingName || incomingName || 'Customer';
 
+          const isExistingActive =
+            existing &&
+            (existing.status === 'accepted' ||
+              existing.status === 'assigned' ||
+              existing.status === 'shopping' ||
+              existing.status === 'picked_up' ||
+              existing.status === 'en_route' ||
+              existing.status === 'delivered');
+
+          const incomingStatus = incoming.status || incoming.order_status;
+          const resolvedStatus =
+            incomingStatus === 'pending' && isExistingActive
+              ? existing.status
+              : incomingStatus || existing?.status || 'pending';
+
           const normalized: Order = {
             id: orderId,
             customerName: resolvedCustomerName,
@@ -145,7 +160,7 @@ export const useOrderStore = create<OrderStoreState>()(
             pickupAddress: incoming.pickupAddress || incoming.pickup_address || existing?.pickupAddress || '',
             deliveryAddress: incoming.deliveryAddress || incoming.delivery_address || existing?.deliveryAddress || '',
             items: incoming.items || existing?.items || '',
-            status: incoming.status || existing?.status || 'pending',
+            status: resolvedStatus,
             createdAt: incoming.createdAt || incoming.created_at || existing?.createdAt || new Date().toISOString(),
             customerId: incoming.customerId || incoming.customer_id || existing?.customerId,
             userId: incoming.userId || existing?.userId,

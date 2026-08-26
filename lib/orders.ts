@@ -20,9 +20,7 @@ export function useAvailableOrders(params?: AvailableOrdersParams) {
       try {
         const availableItems = await ordersApi.getAvailable(params);
         if (Array.isArray(availableItems) && availableItems.length > 0) {
-          availableItems.forEach((item) => {
-            useOrderStore.getState().upsertOrder(item as Order);
-          });
+          useOrderStore.getState().setAvailableOrders(availableItems as Order[]);
           return availableItems as Order[];
         }
       } catch (err) {

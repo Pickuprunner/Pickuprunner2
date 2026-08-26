@@ -12,7 +12,13 @@ import { Order } from './orders';
 export const MAX_QUEUE = 3;
 
 /** Active statuses that count toward the driver's queue */
-const ACTIVE_STATUSES: Order['status'][] = ['accepted', 'picked_up'];
+const ACTIVE_STATUSES: Order['status'][] = [
+  'assigned',
+  'accepted',
+  'shopping',
+  'picked_up',
+  'en_route',
+];
 
 /**
  * Given the full order list and the current driver's user ID, returns:
