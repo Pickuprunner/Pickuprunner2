@@ -28,7 +28,7 @@ import { SkeletonList } from '@/components/core';
 import {
   MyOrdersHeader,
   TodayEarningsCard,
-  DriverOrderCard as OrderCard,
+  DriverMyOrderCard,
 } from '@/components/Orders';
 
 function haptic() {
@@ -291,9 +291,8 @@ export default function MyOrdersScreen() {
         data={displayList}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <OrderCard
+          <DriverMyOrderCard
             order={item}
-            isMyOrder={item.driverUserId === driverId}
             driverUserId={driverId}
             driverDisplayName={user?.displayName ?? user?.email ?? driverId?.slice(0, 8)}
             onPress={() => {

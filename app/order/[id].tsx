@@ -140,9 +140,14 @@ export default function OrderDetailScreen() {
       case 'delivered':
         return { label: 'DELIVERED', color: colors.tertiary, bg: colors.greenAlpha15, border: colors.greenAlpha40 };
       case 'picked_up':
+      case 'en_route':
+      case 'shopping':
         return { label: 'IN TRANSIT', color: colors.tertiary, bg: colors.greenAlpha15, border: colors.greenAlpha40 };
+      case 'assigned':
       case 'accepted':
         return { label: 'ACCEPTED', color: colors.secondary, bg: colors.accentAlpha15, border: colors.accentAlpha35 };
+      case 'cancelled':
+        return { label: 'CANCELLED', color: colors.error, bg: 'rgba(255, 92, 92, 0.15)', border: 'rgba(255, 92, 92, 0.35)' };
       case 'pending':
       default:
         return { label: 'UNASSIGNED', color: colors.accent, bg: colors.accentAlpha12, border: colors.accentAlpha30 };

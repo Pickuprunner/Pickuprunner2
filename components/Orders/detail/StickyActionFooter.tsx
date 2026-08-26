@@ -28,14 +28,19 @@ export function StickyActionFooter({
   onDeliver,
   onBack,
 }: StickyActionFooterProps) {
+  const isPendingState = status === 'pending' || status === 'unassigned';
+  const isPickupState = status === 'assigned' || status === 'accepted';
+  const isEnRouteState = status === 'picked_up' || status === 'shopping' || status === 'en_route';
+  const isDeliveredState = status === 'delivered';
+
   return (
     <View
       style={[
         styles.stickyBottomBar,
-        { paddingBottom: Math.max(bottomInset, 12) + 6 },
+        { paddingBottom: Math.max(bottomInset, 16) + 8 },
       ]}
     >
-      {status === 'pending' && (
+      {isPendingState && (
         <>
           <Text style={styles.stickyInstruction} numberOfLines={1}>
             {atCapacity ? 'Order queue at capacity' : 'Ready to deliver? Accept this order'}
@@ -65,7 +70,7 @@ export function StickyActionFooter({
         </>
       )}
 
-      {status === 'accepted' && (
+      {isPickupState && (
         <>
           <Text style={styles.stickyInstruction} numberOfLines={1}>
             Collect order at store & confirm below
@@ -88,7 +93,7 @@ export function StickyActionFooter({
         </>
       )}
 
-      {status === 'picked_up' && (
+      {isEnRouteState && (
         <>
           {!hasPhoto && (
             <Text style={styles.stickyWarning} numberOfLines={1}>
@@ -141,7 +146,7 @@ export function StickyActionFooter({
         </>
       )}
 
-      {status === 'delivered' && (
+      {isDeliveredState && (
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.secondaryActionButton}
@@ -161,6 +166,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
+    zIndex: 99,
+    elevation: 10,
     backgroundColor: 'rgba(15, 19, 28, 0.96)',
     borderTopWidth: 1,
     borderTopColor: colors.glassLevel2Border,

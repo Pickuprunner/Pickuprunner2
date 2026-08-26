@@ -1,6 +1,7 @@
 export { OrdersHeader } from './OrdersHeader';
 export { OrdersSearchBar } from './OrdersSearchBar';
-export { DriverOrderCard, type DriverOrderCardProps, type OrderStatusVariant } from './DriverOrderCard';
+export { DriverOrderCard, type DriverOrderCardProps } from './DriverOrderCard';
+export { DriverMyOrderCard, type DriverMyOrderCardProps } from './DriverMyOrderCard';
 export { CustomerOrderCard, type CustomerOrderCardProps, type CustomerOrderData } from './CustomerOrderCard';
 export {
   CustomerOrderFilterModal,

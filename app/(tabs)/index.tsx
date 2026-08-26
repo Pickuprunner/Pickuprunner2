@@ -379,7 +379,6 @@ export default function OrdersScreen() {
         renderItem={({ item }) => (
           <DriverOrderCard
             order={item}
-            isMyOrder={false}
             driverAtCapacity={atCapacity}
             driverUserId={driverId}
             driverDisplayName={user?.displayName ?? user?.email ?? driverId?.slice(0, 8)}

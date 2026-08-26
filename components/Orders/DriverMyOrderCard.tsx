@@ -10,9 +10,10 @@ import {
   ViewStyle,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Order, useClaimOrder } from '@/lib/orders';
+import { Order, useUpdateOrderStatus } from '@/lib/orders';
 import { calcDriverEarnings } from '@/lib/config';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { CustomCard, useToast } from '@/components/core';
 
 function haptic() {
@@ -31,27 +32,34 @@ function openNav(address: string) {
   Linking.openURL(url);
 }
 
-export interface DriverOrderCardProps {
+function callPhone(phone: string) {
+  if (!phone) return;
+  const cleaned = phone.replace(/[^0-9+]/g, '');
+  Linking.openURL(`tel:${cleaned}`);
+}
+
+export interface DriverMyOrderCardProps {
   order: Order;
-  onPress?: () => void;
-  driverAtCapacity?: boolean;
   driverUserId?: string;
   driverDisplayName?: string;
-  onAccept?: () => void | Promise<void>;
+  onPress?: () => void;
+  onPickup?: () => void | Promise<void>;
+  onDeliver?: () => void | Promise<void>;
   style?: StyleProp<ViewStyle>;
 }
 
-export function DriverOrderCard({
+export function DriverMyOrderCard({
   order,
-  onPress,
-  driverAtCapacity = false,
   driverUserId,
   driverDisplayName,
-  onAccept,
+  onPress,
+  onPickup,
+  onDeliver,
   style,
-}: DriverOrderCardProps) {
+}: DriverMyOrderCardProps) {
   const { showToast } = useToast();
-  const claimOrder = useClaimOrder();
+  const updateStatus = useUpdateOrderStatus();
+  const status = order.status || 'assigned';
   const shortId = order.id ? order.id.slice(-6).toUpperCase() : '------';
 
   const miles = Number(order.distanceMiles ?? 0);
@@ -60,43 +68,65 @@ export function DriverOrderCard({
   const [actionError, setActionError] = useState<string | null>(null);
 
   const initial = (order.customerName?.trim() || 'C').charAt(0).toUpperCase();
-  const navAddress = order.pickupAddress || order.deliveryAddress || '';
 
-  const handleDefaultAccept = async () => {
-    if (driverAtCapacity) {
-      showToast('Queue Limit Reached', {
-        type: 'warning',
-        description: 'Complete existing deliveries before accepting more',
-      });
-      return;
+  const getStatusBadge = () => {
+    switch (status) {
+      case 'assigned':
+      case 'accepted':
+        return { label: 'ASSIGNED', color: '#FFE399', bg: 'rgba(255, 227, 153, 0.12)', border: 'rgba(255, 227, 153, 0.3)' };
+      case 'shopping':
+        return { label: 'SHOPPING', color: '#FFE399', bg: 'rgba(255, 227, 153, 0.12)', border: 'rgba(255, 227, 153, 0.3)' };
+      case 'picked_up':
+      case 'en_route':
+        return { label: 'IN TRANSIT', color: '#00E297', bg: 'rgba(0, 226, 151, 0.12)', border: 'rgba(0, 226, 151, 0.3)' };
+      case 'delivered':
+        return { label: 'DELIVERED', color: '#00E297', bg: 'rgba(0, 226, 151, 0.12)', border: 'rgba(0, 226, 151, 0.3)' };
+      case 'cancelled':
+        return { label: 'CANCELLED', color: '#FF5C5C', bg: 'rgba(255, 92, 92, 0.12)', border: 'rgba(255, 92, 92, 0.3)' };
+      default:
+        return { label: status.toUpperCase(), color: '#F4C300', bg: 'rgba(244, 195, 0, 0.1)', border: 'rgba(244, 195, 0, 0.3)' };
     }
+  };
+
+  const badge = getStatusBadge();
+  const navAddress = status === 'assigned' || status === 'accepted' ? order.pickupAddress : order.deliveryAddress;
+
+  const handleDefaultPickup = async () => {
     haptic();
     setActionError(null);
-
-    if (onAccept) {
-      await onAccept();
+    if (onPickup) {
+      await onPickup();
       return;
     }
+    updateStatus.mutate(
+      {
+        id: order.id,
+        status: 'picked_up',
+        driverUserId: driverUserId || order.driverUserId,
+        driverName: driverDisplayName || order.driverName || 'Driver',
+      },
+      {
+        onSuccess: () => {
+          showToast('Order Picked Up', {
+            type: 'info',
+            description: `En route to ${order.customerName || 'customer'}`,
+          });
+        },
+        onError: (err: any) => {
+          setActionError(err?.message || 'Pickup update failed');
+          showToast(err?.message || 'Pickup update failed', 'error');
+        },
+      }
+    );
+  };
 
-    const uid = driverUserId || `guest-${Date.now()}`;
-    const uname = driverDisplayName || 'Driver';
-
-    try {
-      if (!order.id) throw new Error('Missing order ID.');
-      await claimOrder.mutateAsync({
-        orderId: order.id,
-        driverUserId: uid,
-        driverName: uname,
-      });
-      showToast('Order Accepted!', {
-        type: 'success',
-        description: `Added #${shortId} to your active deliveries`,
-      });
-    } catch (err: any) {
-      console.error('[DriverOrderCard Accept Error]:', err);
-      setActionError(err?.message || 'Could not accept order');
-      showToast(err?.message || 'Could not accept order', 'error');
+  const handleDefaultDeliver = async () => {
+    haptic();
+    if (onDeliver) {
+      await onDeliver();
+      return;
     }
+    router.push(`/order/${order.id}`);
   };
 
   const headerNode = (
@@ -114,9 +144,14 @@ export function DriverOrderCard({
       </View>
 
       <View style={styles.badgesWrapper}>
-        <View style={[styles.statusBadge, styles.availableBadge]}>
-          <Text style={[styles.statusText, styles.availableBadgeText]}>
-            AVAILABLE
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: badge.bg, borderColor: badge.border },
+          ]}
+        >
+          <Text style={[styles.statusText, { color: badge.color }]}>
+            {badge.label}
           </Text>
         </View>
       </View>
@@ -130,8 +165,8 @@ export function DriverOrderCard({
           <Text style={styles.priceText}>{earnings.totalDisplay}</Text>
           <Text style={styles.tipText}>
             {earnings.tipCents > 0
-              ? `${(earnings.tipCents / 100).toFixed(2)} tip included`
-              : '0.00 tip included'}
+              ? `${(earnings.tipCents / 100).toFixed(2)} tip`
+              : '0.00 tip'}
           </Text>
         </View>
 
@@ -141,10 +176,22 @@ export function DriverOrderCard({
       </View>
 
       <View style={styles.actionsContainer}>
+        {!!order.customerPhone && (
+          <TouchableOpacity
+            onPress={() => {
+              haptic();
+              callPhone(order.customerPhone!);
+            }}
+            style={styles.iconButton}
+          >
+            <MaterialIcons name="phone" size={18} color="#dfe2ef" />
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           onPress={() => {
             haptic();
-            openNav(navAddress);
+            openNav(navAddress ?? '');
           }}
           style={styles.mapButton}
         >
@@ -152,32 +199,36 @@ export function DriverOrderCard({
           <Text style={styles.mapButtonText}>Map</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleDefaultAccept}
-          disabled={claimOrder.isPending || driverAtCapacity}
-          style={[
-            styles.actionButton,
-            driverAtCapacity && styles.actionButtonDisabled,
-          ]}
-        >
-          <MaterialIcons
-            name="local-shipping"
-            size={18}
-            color={driverAtCapacity ? 'rgba(248, 247, 255, 0.4)' : '#f8f7ff'}
-          />
-          <Text
-            style={[
-              styles.actionButtonText,
-              driverAtCapacity && styles.actionButtonTextDisabled,
-            ]}
+        {(status === 'assigned' || status === 'accepted') && (
+          <TouchableOpacity
+            onPress={handleDefaultPickup}
+            disabled={updateStatus.isPending}
+            style={styles.actionButton}
           >
-            {claimOrder.isPending
-              ? 'Accepting…'
-              : driverAtCapacity
-              ? 'Queue Full'
-              : 'Accept'}
-          </Text>
-        </TouchableOpacity>
+            <MaterialIcons name="inventory" size={18} color="#f8f7ff" />
+            <Text style={styles.actionButtonText}>
+              {updateStatus.isPending ? '…' : 'Picked Up'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {(status === 'picked_up' || status === 'en_route' || status === 'shopping') && (
+          <TouchableOpacity
+            onPress={handleDefaultDeliver}
+            disabled={updateStatus.isPending}
+            style={[styles.actionButton, styles.deliverButton]}
+          >
+            <MaterialIcons name="check-circle" size={18} color="#f8f7ff" />
+            <Text style={styles.actionButtonText}>Deliver</Text>
+          </TouchableOpacity>
+        )}
+
+        {status === 'delivered' && (
+          <View style={styles.deliveredBadgeButton}>
+            <MaterialIcons name="check-circle" size={18} color="#00e297" />
+            <Text style={styles.deliveredBadgeText}>Delivered</Text>
+          </View>
+        )}
       </View>
 
       {actionError && (
@@ -299,18 +350,11 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderWidth: 1,
   },
-  availableBadge: {
-    backgroundColor: 'rgba(244, 195, 0, 0.1)',
-    borderColor: 'rgba(244, 195, 0, 0.3)',
-  },
   statusText: {
     fontSize: 9.5,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-  },
-  availableBadgeText: {
-    color: '#F4C300',
   },
   routesContainer: {
     flexDirection: 'column',
@@ -425,6 +469,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  iconButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 42,
+    height: 42,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(66, 70, 86, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(66, 70, 86, 0.4)',
+  },
   mapButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -452,16 +507,30 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     backgroundColor: '#0066FF',
   },
-  actionButtonDisabled: {
-    backgroundColor: 'rgba(66, 70, 86, 0.2)',
+  deliverButton: {
+    backgroundColor: '#00E297',
   },
   actionButtonText: {
     color: '#f8f7ff',
     fontSize: 13,
     fontWeight: '700',
   },
-  actionButtonTextDisabled: {
-    color: 'rgba(248, 247, 255, 0.4)',
+  deliveredBadgeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 42,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.3)',
+  },
+  deliveredBadgeText: {
+    color: '#00E297',
+    fontSize: 13,
+    fontWeight: '700',
   },
   errorBox: {
     padding: 6,

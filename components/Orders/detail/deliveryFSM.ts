@@ -1,6 +1,15 @@
 import type { Order } from '@/lib/orders';
 
-export type DeliveryState = 'pending' | 'accepted' | 'picked_up' | 'delivered';
+export type DeliveryState =
+  | 'pending'
+  | 'unassigned'
+  | 'assigned'
+  | 'accepted'
+  | 'shopping'
+  | 'picked_up'
+  | 'en_route'
+  | 'delivered'
+  | 'cancelled';
 
 export type DeliveryAction =
   | { type: 'HYDRATE'; status: DeliveryState; photoUrl?: string | null }
