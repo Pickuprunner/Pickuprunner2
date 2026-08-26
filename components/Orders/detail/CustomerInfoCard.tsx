@@ -6,7 +6,7 @@ import { colors } from '@/constants/design';
 import type { Order } from '@/lib/orders';
 
 export interface CustomerInfoCardProps {
-  order: Order | null;
+  order?: Order | null;
 }
 
 function InfoRow({

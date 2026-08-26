@@ -62,10 +62,11 @@ export default function MyOrdersScreen() {
   const [cancelTargetOrder, setCancelTargetOrder] = useState<CustomerOrderData | null>(null);
   const prevStatusMap = useRef<Map<string, string>>(new Map());
   const channelRef = useRef<any>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   const fetchOrders = useCallback(
     async (sid?: string) => {
-      const id = sid || sessionId || (await AsyncStorage.getItem(SESSION_KEY));
+      const id = sid || sessionIdRef.current || sessionId || (await AsyncStorage.getItem(SESSION_KEY));
 
       let localOrders: CustomerOrderData[] = [];
       try {
@@ -171,7 +172,7 @@ export default function MyOrdersScreen() {
         setRefreshing(false);
       }
     },
-    [sessionId]
+    []
   );
 
   useEffect(() => {
@@ -221,6 +222,7 @@ export default function MyOrdersScreen() {
     async function init() {
       const sid = await getOrCreateSessionId();
       if (!mounted) return;
+      sessionIdRef.current = sid;
       setSessionId(sid);
       await fetchOrders(sid);
 

@@ -15,8 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 
-import { useOrders, useUpdateOrderStatus, useClaimOrder, type Order } from '@/lib/orders';
-import { ordersApi } from '@/apis/orders';
+import { useOrder, useOrders, useUpdateOrderStatus, useClaimOrder, type Order } from '@/lib/orders';
 import { connectApi } from '@/apis/connect';
 import { getSelectedOrder, setSelectedOrder } from '@/lib/selectedOrder';
 import { calcDriverEarnings } from '@/lib/config';
@@ -60,6 +59,7 @@ export default function OrderDetailScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const fetchId = Array.isArray(id) ? id[0] : id;
   const updateStatus = useUpdateOrderStatus();
   const claimOrder = useClaimOrder();
   const { user } = useAuth();
@@ -67,8 +67,7 @@ export default function OrderDetailScreen() {
   const { data: allOrders = [] } = useOrders();
   const { queueCount, atCapacity } = useDriverQueue(allOrders, driverId);
 
-  const [order, setOrder] = useState<Order | null>(getSelectedOrder);
-  const [loading, setLoading] = useState(!getSelectedOrder());
+  const { data: order, isLoading: loading } = useOrder(fetchId);
 
   const [fsm, dispatch] = useReducer(deliveryFSM, {
     status: (getSelectedOrder()?.status as DeliveryState) ?? 'pending',
@@ -81,48 +80,15 @@ export default function OrderDetailScreen() {
   const { status, photoUri, photoUrl, uploadingPhoto } = fsm;
 
   useEffect(() => {
-    const fetchId = Array.isArray(id) ? id[0] : id;
-    if (!fetchId) return;
-
-    let mounted = true;
-
-    const loadOrder = async () => {
-      const stored = getSelectedOrder();
-      if (stored && stored.id === fetchId) {
-        setOrder(stored);
-        dispatch({ type: 'HYDRATE', status: stored.status as DeliveryState, photoUrl: stored.deliveryPhotoUrl });
-      }
-
-      const found = allOrders?.find((o) => o.id === fetchId);
-      if (found) {
-        setOrder(found);
-        dispatch({ type: 'HYDRATE', status: found.status as DeliveryState, photoUrl: found.deliveryPhotoUrl });
-      }
-
-      try {
-        const remote = await ordersApi.getById(fetchId);
-        if (remote && remote.id && mounted) {
-          setOrder(remote as Order);
-          setSelectedOrder(remote as Order);
-          dispatch({
-            type: 'HYDRATE',
-            status: (remote.status as DeliveryState) || 'pending',
-            photoUrl: remote.deliveryPhotoUrl || remote.delivery_photo_url,
-          });
-        }
-      } catch (err) {
-        console.warn(`[OrderDetailScreen] GET /orders/${fetchId} failed:`, err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    loadOrder();
-
-    return () => {
-      mounted = false;
-    };
-  }, [id, allOrders]);
+    if (order) {
+      setSelectedOrder(order);
+      dispatch({
+        type: 'HYDRATE',
+        status: (order.status as DeliveryState) || 'pending',
+        photoUrl: order.deliveryPhotoUrl || order.delivery_photo_url,
+      });
+    }
+  }, [order?.status, order?.deliveryPhotoUrl, order?.delivery_photo_url]);
 
   if (!order && !loading) {
     return (

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOrderStore, Order, OrderStatus } from '@/store/useOrderStore';
 import { ordersApi, CreateOrderPayload, UpdateOrderPayload, AvailableOrdersParams } from '@/apis/orders';
 import { createCheckoutForOrder } from '@/apis/checkout';
+import { getSelectedOrder } from './selectedOrder';
 import { publishOrderChange } from './realtime';
 import { APP_CONFIG } from './config';
 
@@ -76,10 +77,19 @@ export function useOrder(id: string | undefined) {
       const localMatch = useOrderStore.getState().orders.find((o) => o.id === id);
       if (localMatch) return localMatch;
 
+      const sel = getSelectedOrder();
+      if (sel && sel.id === id) return sel;
+
       throw new Error(`Order ${id} not found`);
     },
-    initialData: id ? storeOrders.find((o) => o.id === id) : undefined,
-    staleTime: 1000 * 5,
+    initialData: () => {
+      if (!id) return undefined;
+      return (
+        storeOrders.find((o) => o.id === id) ||
+        (getSelectedOrder()?.id === id ? getSelectedOrder()! : undefined)
+      );
+    },
+    staleTime: 1000 * 15,
   });
 }
 

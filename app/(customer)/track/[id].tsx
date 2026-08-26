@@ -151,11 +151,16 @@ export default function TrackOrderScreen() {
     }
   }, [storeOrder]);
 
+  const initialParamsRef = useRef(params);
+  const fetchOrderRef = useRef<((isManualRefresh?: boolean) => Promise<void>) | null>(null);
+
   const fetchOrder = useCallback(
     async (isManualRefresh = false) => {
       if (!id) return;
       if (isManualRefresh) setRefreshing(true);
       else if (!order) setLoading(true);
+
+      const p = initialParamsRef.current;
 
       try {
         const storeCurrent = useOrderStore.getState().orders.find((o) => o.id === id);
@@ -207,7 +212,7 @@ export default function TrackOrderScreen() {
           foundOrder?.destination ||
           foundOrder?.address ||
           storeCurrent?.deliveryAddress ||
-          params.deliveryAddress ||
+          p?.deliveryAddress ||
           '123 E Test Ave, Sahuarita, AZ 85629';
 
         const resolvedPickup =
@@ -215,39 +220,39 @@ export default function TrackOrderScreen() {
           foundOrder?.pickup_address ||
           foundOrder?.pickup ||
           storeCurrent?.pickupAddress ||
-          params.pickupAddress ||
+          p?.pickupAddress ||
           APP_CONFIG.STORE_ADDRESS;
 
-        if (foundOrder || storeCurrent || params.id) {
+        if (foundOrder || storeCurrent || p?.id) {
           const candidateStatus =
             foundOrder?.status ||
             storeCurrent?.status ||
-            (params.status as any);
+            (p?.status as any);
 
           const effectiveStatus =
             candidateStatus && candidateStatus !== 'pending'
               ? candidateStatus
-              : (storeCurrent?.status || foundOrder?.status || (params.status as any) || 'pending');
+              : (storeCurrent?.status || foundOrder?.status || (p?.status as any) || 'pending');
 
           setOrder({
-            id: foundOrder?.id || storeCurrent?.id || params.id,
+            id: foundOrder?.id || storeCurrent?.id || p?.id,
             status: effectiveStatus as any,
             customerName:
               foundOrder?.customerName ||
               foundOrder?.customer_name ||
               storeCurrent?.customerName ||
-              params.customerName ||
+              p?.customerName ||
               'Customer',
             customerPhone:
               foundOrder?.customerPhone ||
               foundOrder?.customer_phone ||
               storeCurrent?.customerPhone ||
-              params.customerPhone,
+              p?.customerPhone,
             pickupAddress: resolvedPickup,
             pickup_address: resolvedPickup,
             deliveryAddress: resolvedDelivery,
             delivery_address: resolvedDelivery,
-            items: foundOrder?.items || storeCurrent?.items || params.items,
+            items: foundOrder?.items || storeCurrent?.items || p?.items,
             createdAt: foundOrder?.createdAt || foundOrder?.created_at || storeCurrent?.createdAt,
             driverName: foundOrder?.driverName || foundOrder?.driver_name || storeCurrent?.driverName,
             driverPhotoUrl:
@@ -282,8 +287,12 @@ export default function TrackOrderScreen() {
         setRefreshing(false);
       }
     },
-    [id, params]
+    [id]
   );
+
+  useEffect(() => {
+    fetchOrderRef.current = fetchOrder;
+  }, [fetchOrder]);
 
   const handleAssignTestDriver = async () => {
     if (!id || !order) return;
@@ -400,7 +409,7 @@ export default function TrackOrderScreen() {
   // Initial load
   useEffect(() => {
     fetchOrder();
-  }, [fetchOrder]);
+  }, [id]);
 
   // Real-time subscription
   useEffect(() => {
@@ -417,7 +426,7 @@ export default function TrackOrderScreen() {
         channel.onMessage((msg: any) => {
           if (!mounted) return;
           if (msg.type === 'order-changed' || msg.type === 'order:status_change') {
-            fetchOrder();
+            fetchOrderRef.current?.();
           }
         });
       } catch {
@@ -434,7 +443,7 @@ export default function TrackOrderScreen() {
         } catch {}
       }
     };
-  }, [id, fetchOrder]);
+  }, [id]);
 
   const shortId = order?.id ? order.id.slice(-6).toUpperCase() : '------';
   const customerName = order?.customerName || order?.customer_name || 'Customer';
