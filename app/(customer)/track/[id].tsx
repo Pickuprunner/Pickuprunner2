@@ -411,6 +411,17 @@ export default function TrackOrderScreen() {
     fetchOrder();
   }, [id]);
 
+  // Periodic auto-polling interval so customer screen updates in real time on any driver action
+  useEffect(() => {
+    if (!id || order?.status === 'delivered') return;
+
+    const interval = setInterval(() => {
+      fetchOrder();
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [id, order?.status, fetchOrder]);
+
   // Real-time subscription
   useEffect(() => {
     if (!id) return;

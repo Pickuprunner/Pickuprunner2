@@ -19,6 +19,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useOrders, useAvailableOrders, useUpdateOrderStatus, useClaimOrder } from '@/lib/orders';
+import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useAuth } from '@/hooks/useAuth';
@@ -122,11 +123,18 @@ export default function OrdersScreen() {
     const uid = driverId || `guest-${Date.now()}`;
     const uname = user?.displayName ?? user?.email ?? 'Driver';
     try {
+      useOrderStore.getState().upsertOrder({
+        ...orderItem,
+        status: 'accepted',
+        driverUserId: uid,
+        driverName: uname,
+      });
       await claimOrder.mutateAsync({
         orderId: orderItem.id,
         driverUserId: uid,
         driverName: uname,
       });
+      await Promise.all([refetchAvailable(), refetchAll()]).catch(() => {});
       showToast('Order Accepted!', {
         type: 'success',
         description: `Added #${orderItem.id?.slice(-6).toUpperCase()} to your active deliveries`,
@@ -140,10 +148,17 @@ export default function OrdersScreen() {
   const { data: allOrders = [], isLoading: isLoadingAll, refetch: refetchAll } = useOrders();
   const { isConnected } = useOrdersRealtime();
 
-  // Job board displays exclusively unassigned pending jobs
+  // Job board displays exclusively unassigned pending jobs that are not already claimed
   const orders = useMemo(() => {
-    return (availableOrders || []).filter((o) => o.status === 'pending' && !o.driverUserId);
-  }, [availableOrders]);
+    const activeOrClaimedIds = new Set(
+      (allOrders || [])
+        .filter((o) => o.status !== 'pending' || !!o.driverUserId)
+        .map((o) => o.id)
+    );
+    return (availableOrders || []).filter(
+      (o) => o.status === 'pending' && !o.driverUserId && !activeOrClaimedIds.has(o.id)
+    );
+  }, [availableOrders, allOrders]);
 
   const isLoading = isLoadingAvailable && orders.length === 0;
 

@@ -202,13 +202,14 @@ export const useOrderStore = create<OrderStoreState>()(
 
       setAvailableOrders: (incomingAvailable: Order[]) => {
         set((state) => {
-          const nonPending = state.orders.filter((o) => o.status !== 'pending');
+          const nonPending = state.orders.filter((o) => o.status !== 'pending' || !!o.driverUserId);
+          const activeIds = new Set(nonPending.map((o) => o.id));
           const existingMap = new Map<string, Order>();
           state.orders.forEach((o) => o?.id && existingMap.set(o.id, o));
 
           const incomingMap = new Map<string, Order>();
           (incomingAvailable || []).forEach((o) => {
-            if (!o?.id) return;
+            if (!o?.id || activeIds.has(o.id)) return;
             const existing = existingMap.get(o.id);
             const incomingName = (o.customerName || o.customer_name || '').trim();
             const existingName = (existing?.customerName || existing?.customer_name || '').trim();
@@ -220,13 +221,14 @@ export const useOrderStore = create<OrderStoreState>()(
             incomingMap.set(o.id, {
               ...(existing || {}),
               ...o,
+              status: 'pending',
               customerName: resolvedName,
               customerPhone: o.customerPhone || o.customer_phone || existing?.customerPhone || '',
             });
           });
 
           nonPending.forEach((o) => {
-            if (o?.id && !incomingMap.has(o.id)) {
+            if (o?.id) {
               incomingMap.set(o.id, o);
             }
           });

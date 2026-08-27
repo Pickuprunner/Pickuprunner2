@@ -19,7 +19,7 @@ export function useAvailableOrders(params?: AvailableOrdersParams) {
     queryFn: async () => {
       try {
         const availableItems = await ordersApi.getAvailable(params);
-        if (Array.isArray(availableItems) && availableItems.length > 0) {
+        if (Array.isArray(availableItems)) {
           useOrderStore.getState().setAvailableOrders(availableItems as Order[]);
           return availableItems as Order[];
         }
@@ -27,9 +27,9 @@ export function useAvailableOrders(params?: AvailableOrdersParams) {
         console.warn('[useAvailableOrders] GET /orders/available failed, fallback to local store:', err);
       }
 
-      return useOrderStore.getState().orders.filter((o) => o.status === 'pending');
+      return useOrderStore.getState().orders.filter((o) => o.status === 'pending' && !o.driverUserId);
     },
-    initialData: () => storeOrders.filter((o) => o.status === 'pending'),
+    initialData: () => storeOrders.filter((o) => o.status === 'pending' && !o.driverUserId),
     staleTime: 1000 * 5,
   });
 }
@@ -43,6 +43,16 @@ export function useOrders() {
   return useQuery({
     queryKey: ['orders', APP_CONFIG.CITY_ID],
     queryFn: async () => {
+      try {
+        const mine = await ordersApi.getMine();
+        if (Array.isArray(mine) && mine.length > 0) {
+          mine.forEach((item) => {
+            useOrderStore.getState().upsertOrder(item as any);
+          });
+        }
+      } catch (err) {
+        console.warn('[useOrders] GET /orders/mine failed, fallback to store:', err);
+      }
       return useOrderStore.getState().orders;
     },
     initialData: storeOrders,
@@ -200,7 +210,16 @@ export function useClaimOrder() {
     }): Promise<Order> => {
       try {
         const claimed = await ordersApi.claim(orderId, { driverUserId, driverName });
-        const saved = useOrderStore.getState().upsertOrder(claimed);
+        let finalOrder = claimed;
+        try {
+          const accepted = await ordersApi.update(orderId, { status: 'accepted' });
+          if (accepted && accepted.id) {
+            finalOrder = accepted;
+          }
+        } catch {
+          // If update to accepted fails, keep assigned
+        }
+        const saved = useOrderStore.getState().upsertOrder(finalOrder);
         return saved;
       } catch (err) {
         console.warn(`[useClaimOrder] POST /orders/${orderId}/claim failed, fallback local:`, err);
@@ -210,8 +229,10 @@ export function useClaimOrder() {
       }
     },
     onSuccess: async (updatedOrder) => {
-      queryClient.invalidateQueries({ queryKey: ['orders', APP_CONFIG.CITY_ID] });
-      queryClient.invalidateQueries({ queryKey: ['orders', 'available'] });
+      queryClient.setQueriesData<Order[]>({ queryKey: ['orders', 'available'] }, (old = []) =>
+        old.filter((o) => o.id !== updatedOrder.id)
+      );
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['order', updatedOrder.id] });
       await publishOrderChange({
         orderId: updatedOrder.id,

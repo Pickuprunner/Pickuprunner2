@@ -87,7 +87,7 @@ export default function MyOrdersScreen() {
     return orders
       .filter(
         (o) =>
-          o.driverUserId === driverId &&
+          (o.driverUserId === driverId || !o.driverUserId) &&
           (o.status === 'assigned' ||
             o.status === 'accepted' ||
             o.status === 'shopping' ||

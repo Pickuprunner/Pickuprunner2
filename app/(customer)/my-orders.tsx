@@ -280,6 +280,18 @@ export default function MyOrdersScreen() {
     };
   }, [fetchOrders]);
 
+  // Periodic background refresh for customer active orders
+  useEffect(() => {
+    const hasActive = orders.some((o) => o.status !== 'delivered' && o.status !== 'cancelled');
+    if (!hasActive) return;
+
+    const interval = setInterval(() => {
+      fetchOrders();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [orders, fetchOrders]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchOrders();
