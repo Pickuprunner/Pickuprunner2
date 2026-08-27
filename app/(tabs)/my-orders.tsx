@@ -52,19 +52,6 @@ export default function MyOrdersScreen() {
   const driverId = useDriverId();
   const [refreshing, setRefreshing] = useState(false);
 
-  // Sync driver's assigned orders from backend on mount
-  useEffect(() => {
-    if (user?.role === 'driver') {
-      ordersApi.getMine().then((mine) => {
-        if (Array.isArray(mine)) {
-          mine.forEach((item) => {
-            useOrderStore.getState().upsertOrder(item as any);
-          });
-        }
-      }).catch(() => {});
-    }
-  }, [user?.role]);
-
   // ─── 1. Header State & Smooth Scroll Animation Logic ───
   const [headerHeight, setHeaderHeight] = useState(150);
   const headerTranslateY = useRef(new Animated.Value(0)).current;

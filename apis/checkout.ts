@@ -1,4 +1,6 @@
 import { apiClient } from '@/lib/apiClient';
+import * as WebBrowser from 'expo-web-browser';
+import { Platform, Linking } from 'react-native';
 
 export interface CreateCheckoutPayload {
   orderId: string;
@@ -50,6 +52,28 @@ export async function createCheckoutForOrder(
   } catch (err: any) {
     console.warn('[checkoutApi] createCheckout failed for order:', orderId, err?.message || err);
     return null;
+  }
+}
+
+export async function openCheckoutUrl(url: string): Promise<boolean> {
+  if (!url) return false;
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank');
+    }
+    return true;
+  }
+  try {
+    await WebBrowser.openBrowserAsync(url);
+    return true;
+  } catch (e) {
+    console.warn('[checkoutApi] WebBrowser failed, trying Linking:', e);
+    try {
+      await Linking.openURL(url);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 

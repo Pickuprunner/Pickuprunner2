@@ -149,7 +149,9 @@ export default function NewOrderScreen() {
         items: formattedItems || '[LEAVE AT DOOR] Standard delivery items',
         tipAmount: tipCents,
         distanceMiles: parseFloat(miles) || 0,
-      });
+        pickupLat: 31.9505,
+        pickupLng: -110.9747,
+      } as any);
 
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });

@@ -116,6 +116,18 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     ? endpoint
     : `${BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
 
+  const method = fetchOptions.method || 'GET';
+  const tag = `[API ${method}] ${endpoint}`;
+
+  if (fetchOptions.body) {
+    try {
+      const parsedBody = JSON.parse(fetchOptions.body as string);
+      console.log(`\n📤 ${tag} Request:\n${JSON.stringify(parsedBody, null, 2)}`);
+    } catch {
+      console.log(`\n📤 ${tag} Request: ${fetchOptions.body}`);
+    }
+  }
+
   let response: Response;
   try {
     response = await fetch(url, {
@@ -123,6 +135,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
       headers,
     });
   } catch (networkError: any) {
+    console.warn(`\n❌ ${tag} -> NETWORK ERROR: ${networkError?.message || networkError}\n`);
     throw new ApiError(0, networkError?.message || 'Network request failed');
   }
 
@@ -170,9 +183,13 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
           (Array.isArray(data.errors) ? data.errors.join(', ') : null)
         : null) || `Request failed with status ${response.status}`;
 
+    const formattedErr = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(message);
+    console.warn(`\n❌ ${tag} -> ${response.status} FAILED:\n${formattedErr}\n`);
     throw new ApiError(response.status, message, data);
   }
 
+  const formattedData = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+  console.log(`\n✅ ${tag} -> ${response.status} OK:\n${formattedData}\n`);
   return data as T;
 }
 

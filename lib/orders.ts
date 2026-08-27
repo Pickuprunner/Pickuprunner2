@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOrderStore, Order, OrderStatus } from '@/store/useOrderStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { ordersApi, CreateOrderPayload, UpdateOrderPayload, AvailableOrdersParams } from '@/apis/orders';
 import { createCheckoutForOrder } from '@/apis/checkout';
 import { getSelectedOrder } from './selectedOrder';
@@ -12,10 +13,12 @@ export type { Order, OrderStatus };
  * Hook for drivers to query open/unassigned available orders from GET /orders/available
  */
 export function useAvailableOrders(params?: AvailableOrdersParams) {
+  const token = useAuthStore((state) => state.token);
   const storeOrders = useOrderStore((state) => state.orders);
 
   return useQuery({
     queryKey: ['orders', 'available', params?.lat, params?.lng, params?.radiusMiles, params?.cityId],
+    enabled: Boolean(token),
     queryFn: async () => {
       try {
         const availableItems = await ordersApi.getAvailable(params);
@@ -30,7 +33,10 @@ export function useAvailableOrders(params?: AvailableOrdersParams) {
       return useOrderStore.getState().orders.filter((o) => o.status === 'pending' && !o.driverUserId);
     },
     initialData: () => storeOrders.filter((o) => o.status === 'pending' && !o.driverUserId),
-    staleTime: 1000 * 5,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -56,7 +62,10 @@ export function useOrders() {
       return useOrderStore.getState().orders;
     },
     initialData: storeOrders,
-    staleTime: 1000 * 5,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -97,7 +106,10 @@ export function useOrder(id: string | undefined) {
         (getSelectedOrder()?.id === id ? getSelectedOrder()! : undefined)
       );
     },
-    staleTime: 1000 * 15,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -157,26 +169,6 @@ export function useCreateOrder() {
         });
       }
 
-      // Automatically call create-checkout API after order is generated
-      if (createdOrder?.id) {
-        try {
-          const checkoutRes = await createCheckoutForOrder(createdOrder.id, {
-            amountCents: tipCents,
-            customerEmail: orderData.customerEmail,
-            testMode: true,
-          });
-          if (checkoutRes?.url) {
-            createdOrder = useOrderStore.getState().upsertOrder({
-              ...createdOrder,
-              checkoutUrl: checkoutRes.url,
-              checkoutSessionId: checkoutRes.sessionId,
-            });
-          }
-        } catch (checkoutErr) {
-          console.warn('[useCreateOrder] Post-order createCheckout failed:', checkoutErr);
-        }
-      }
-
       return createdOrder;
     },
     onSuccess: async (newOrder) => {
@@ -221,11 +213,14 @@ export function useClaimOrder() {
         }
         const saved = useOrderStore.getState().upsertOrder(finalOrder);
         return saved;
-      } catch (err) {
-        console.warn(`[useClaimOrder] POST /orders/${orderId}/claim failed, fallback local:`, err);
-        const updated = useOrderStore.getState().claimOrder(orderId, driverUserId, driverName);
-        if (!updated) throw new Error('Could not claim order');
-        return updated;
+      } catch (err: any) {
+        console.warn(`[useClaimOrder] POST /orders/${orderId}/claim failed:`, err);
+        // Only fallback if true network error (status === 0), never mask 403 / 409 backend gate rejections
+        if (err?.isNetworkError || err?.status === 0) {
+          const updated = useOrderStore.getState().claimOrder(orderId, driverUserId, driverName);
+          if (updated) return updated;
+        }
+        throw err;
       }
     },
     onSuccess: async (updatedOrder) => {

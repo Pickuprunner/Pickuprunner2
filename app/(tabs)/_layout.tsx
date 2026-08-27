@@ -7,6 +7,7 @@ import { useOrders } from '@/lib/orders';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useAuth } from '@/hooks/useAuth';
 import { useMyVerification } from '@/lib/verification';
+import { useDriverAccreditation } from '@/lib/accreditation';
 
 const ACTIVE = '#FFE399';
 const INACTIVE = '#C2C6D8';
@@ -36,12 +37,31 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { data: verification, isLoading: isVerifLoading } = useMyVerification(user?.id);
+  const { data: accreditation, isLoading: isAccredLoading } = useDriverAccreditation();
+
+  const isApproved =
+    verification?.status === 'approved' ||
+    accreditation?.profile?.accreditationStatus === 'approved';
+
+  const isSubmitted =
+    Boolean(accreditation?.profile?.isSubmitted) ||
+    accreditation?.profile?.accreditationStatus === 'under_review' ||
+    verification?.status === 'pending';
 
   useEffect(() => {
-    if (user?.role === 'driver' && !isVerifLoading && verification?.status !== 'approved') {
+    if (
+      user?.role === 'driver' &&
+      !isVerifLoading &&
+      !isAccredLoading &&
+      !isApproved &&
+      !isSubmitted &&
+      accreditation?.profile?.accreditationStatus === 'not_started'
+    ) {
       router.replace('/(auth)/driver-verification');
     }
-  }, [user?.role, verification?.status, isVerifLoading]);
+  }, [user?.role, isApproved, isSubmitted, isVerifLoading, isAccredLoading, accreditation?.profile?.accreditationStatus]);
+
+  const isLocked = user?.role === 'driver' && !isApproved;
 
   const androidBottomPad = Platform.OS === 'web' ? 10 : Math.max(insets.bottom, 12);
   const hasHomeBar = insets.bottom > 0;
@@ -52,15 +72,17 @@ export default function TabLayout() {
         tabBarActiveTintColor: ACTIVE,
         tabBarInactiveTintColor: INACTIVE,
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: TAB_BG,
-          borderTopWidth: 1,
-          borderTopColor: TAB_BORDER,
-          height: Platform.OS === 'ios' ? (hasHomeBar ? 52 + insets.bottom - 10 : 58) : 60 + androidBottomPad,
-          paddingBottom: Platform.OS === 'ios' ? (hasHomeBar ? insets.bottom - 14 : 8) : androidBottomPad,
-          paddingTop: Platform.OS === 'ios' ? 6 : 8,
-          elevation: 12,
-        },
+        tabBarStyle: isLocked
+          ? { display: 'none' }
+          : {
+              backgroundColor: TAB_BG,
+              borderTopWidth: 1,
+              borderTopColor: TAB_BORDER,
+              height: Platform.OS === 'ios' ? (hasHomeBar ? 52 + insets.bottom - 10 : 58) : 60 + androidBottomPad,
+              paddingBottom: Platform.OS === 'ios' ? (hasHomeBar ? insets.bottom - 14 : 8) : androidBottomPad,
+              paddingTop: Platform.OS === 'ios' ? 6 : 8,
+              elevation: 12,
+            },
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '500',

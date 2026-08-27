@@ -153,9 +153,13 @@ export const ordersApi = {
    */
   getAvailable: async (params: AvailableOrdersParams = {}): Promise<OrderItem[]> => {
     const searchParams = new URLSearchParams();
-    if (params.lat !== undefined) searchParams.append('lat', String(params.lat));
-    if (params.lng !== undefined) searchParams.append('lng', String(params.lng));
-    if (params.radiusMiles !== undefined) searchParams.append('radiusMiles', String(params.radiusMiles));
+    if (params.lat !== undefined && params.lng !== undefined) {
+      searchParams.append('lat', String(params.lat));
+      searchParams.append('lng', String(params.lng));
+      if (params.radiusMiles !== undefined) {
+        searchParams.append('radiusMiles', String(params.radiusMiles));
+      }
+    }
     if (params.cityId !== undefined) searchParams.append('cityId', params.cityId);
     if (params.limit !== undefined) searchParams.append('limit', String(params.limit));
     if (params.offset !== undefined) searchParams.append('offset', String(params.offset));

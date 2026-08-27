@@ -56,10 +56,10 @@ export const MOCK_DRIVER_WIZARD_DATA: DriverWizardData = {
   licenseFullName: 'Alex Rivera',
   licenseDob: '1994-05-14',
   licenseExpDate: '2028-05-14',
-  licenseFrontUrl: 'https://images.unsplash.com/photo-1519074069444-1ba4fff66d8c?w=500&q=70',
-  licenseFrontName: 'drivers_license_front.jpg',
-  licenseBackUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994ba43?w=500&q=70',
-  licenseBackName: 'drivers_license_back.jpg',
+  licenseFrontUrl: '',
+  licenseFrontName: '',
+  licenseBackUrl: '',
+  licenseBackName: '',
 
   // Step 3
   ssnLast4: '8842',
@@ -72,8 +72,8 @@ export const MOCK_DRIVER_WIZARD_DATA: DriverWizardData = {
   effectiveDate: '2026-01-01',
   expirationDate: '2027-01-01',
   vinNumber: '4T1B11HK5JU123456',
-  insuranceDocUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=500&q=70',
-  insuranceDocName: 'state_farm_insurance_card.pdf',
+  insuranceDocUrl: '',
+  insuranceDocName: '',
 };
 
 export const US_STATES = [

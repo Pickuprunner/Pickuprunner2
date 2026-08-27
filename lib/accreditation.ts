@@ -90,33 +90,3 @@ export function useSubmitAccreditation() {
   });
 }
 
-export function useDevPassAccreditation() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (mockPayload: {
-      vehicle: Record<string, any>;
-      license: Record<string, any>;
-      insurance: Record<string, any>;
-      legalName: string;
-    }) => {
-      try {
-        await accreditationApi.saveStep('vehicle', mockPayload.vehicle);
-        await accreditationApi.saveStep('license', mockPayload.license);
-        await accreditationApi.recordConsent({
-          authorized: true,
-          legalName: mockPayload.legalName,
-        });
-        await accreditationApi.saveStep('insurance', mockPayload.insurance);
-        const submitRes = await accreditationApi.submit().catch(() => null);
-        return submitRes?.data || null;
-      } catch (err) {
-        console.warn('[dev-pass] backend pass failed, local fallback:', err);
-        return null;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ACCREDITATION_QUERY_KEY });
-    },
-  });
-}

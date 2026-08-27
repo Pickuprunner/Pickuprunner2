@@ -238,30 +238,6 @@ export default function CustomerNewOrderScreen() {
       const orderId = finalOrder.id;
       setLastOrderId(orderId);
 
-      setCheckoutLoading(true);
-      let checkoutRes: any = null;
-      try {
-        const computedMileage = calcMileageCents(form.miles);
-        const grandTotalCents = DELIVERY_FEE + computedMileage + finalTipCents;
-
-        checkoutRes = await createCheckoutForOrder(orderId, {
-          amountCents: grandTotalCents,
-          customerEmail: form.email.trim() || undefined,
-          testMode: true,
-        });
-
-        if (checkoutRes?.url) {
-          setCheckoutUrl(checkoutRes.url);
-          setCheckoutSessionId(checkoutRes.sessionId || null);
-          finalOrder.checkoutUrl = checkoutRes.url;
-          finalOrder.checkoutSessionId = checkoutRes.sessionId;
-        }
-      } catch (checkoutErr) {
-        console.warn('[customer-new-order] createCheckout failed:', checkoutErr);
-      } finally {
-        setCheckoutLoading(false);
-      }
-
       useOrderStore.getState().upsertOrder(finalOrder);
 
       try {
@@ -291,9 +267,7 @@ export default function CustomerNewOrderScreen() {
       haptic('success');
       showToast('Order Placed Successfully!', {
         type: 'success',
-        description: checkoutRes?.url
-          ? 'Checkout session created! You can pay now via Stripe.'
-          : 'Searching for nearby drivers to fulfill your delivery.',
+        description: 'Searching for nearby drivers to fulfill your delivery.',
       });
       setSuccess(true);
     } catch (err: any) {

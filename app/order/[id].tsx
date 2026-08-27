@@ -233,11 +233,6 @@ export default function OrderDetailScreen() {
       return;
     }
     haptic('medium');
-    dispatch({ type: 'ACCEPT_ORDER' });
-    showToast('Order Accepted!', {
-      description: 'Head to pickup address.',
-      type: 'success',
-    });
 
     if (order) {
       const driverName = user?.displayName ?? user?.email ?? driverId?.slice(0, 8) ?? 'Driver';
@@ -248,16 +243,41 @@ export default function OrderDetailScreen() {
           driverUserId: effectiveDriverId,
           driverName,
         });
-      } catch (claimErr) {
-        console.warn('[doAccept] claimOrder failed:', claimErr);
-      }
 
-      updateStatus.mutateAsync({
-        id: order.id,
-        status: 'accepted',
-        driverUserId: driverId,
-        driverName,
-      }).catch(() => { });
+        await updateStatus.mutateAsync({
+          id: order.id,
+          status: 'accepted',
+          driverUserId: driverId,
+          driverName,
+        });
+
+        dispatch({ type: 'ACCEPT_ORDER' });
+        showToast('Order Accepted!', {
+          description: 'Head to pickup address.',
+          type: 'success',
+        });
+      } catch (claimErr: any) {
+        console.warn('[doAccept] claimOrder failed:', claimErr);
+        const errorMsg = claimErr?.data?.message || claimErr?.message || 'Could not claim order';
+        const code = claimErr?.data?.code;
+        const isAccreditationError =
+          claimErr?.status === 403 &&
+          (code === 'not_started' ||
+            code === 'in_progress' ||
+            code === 'under_review' ||
+            code === 'rejected' ||
+            code === 'license_expired' ||
+            code === 'insurance_expired');
+
+        if (isAccreditationError) {
+          Alert.alert('Accreditation Required', errorMsg, [
+            { text: 'Complete Accreditation', onPress: () => router.push('/(auth)/driver-verification') },
+            { text: 'Cancel', style: 'cancel' }
+          ]);
+        } else {
+          showToast(errorMsg, { type: 'error' });
+        }
+      }
     }
   }
 

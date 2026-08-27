@@ -15,6 +15,7 @@ import {
   Package,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -38,6 +39,7 @@ import {
   DriverOrderCard,
   ActiveDeliveriesBanner,
 } from '@/components/Orders';
+import { DriverProfileStatusScreen } from '@/components/driver-verification';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -50,6 +52,7 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
+  const [driverLocation, setDriverLocation] = useState<{ lat?: number; lng?: number }>({});
 
   const [headerHeight, setHeaderHeight] = useState(200);
   const headerTranslateY = useRef(new Animated.Value(0)).current;
@@ -57,6 +60,55 @@ export default function OrdersScreen() {
   const accumDelta = useRef(0);
   const lastDirectionChangeTime = useRef(0);
   const isHeaderVisible = useRef(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const MOCK_LOCATION = { lat: 31.9505, lng: -110.9747 };
+
+    if (__DEV__) {
+      setDriverLocation(MOCK_LOCATION);
+      return;
+    }
+
+    async function initLocation() {
+      try {
+        if (Platform.OS === 'web') {
+          if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                if (isMounted && pos?.coords) {
+                  setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                }
+              },
+              () => {
+                if (isMounted) setDriverLocation(MOCK_LOCATION);
+              },
+              { timeout: 4000 }
+            );
+          } else if (isMounted) {
+            setDriverLocation(MOCK_LOCATION);
+          }
+          return;
+        }
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (isMounted && pos?.coords) {
+            setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            return;
+          }
+        }
+        if (isMounted) setDriverLocation(MOCK_LOCATION);
+      } catch (err) {
+        console.log('[OrdersScreen] GPS unavailable, using mock location');
+        if (isMounted) setDriverLocation(MOCK_LOCATION);
+      }
+    }
+    initLocation();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const { user } = useAuth();
   const driverId = useDriverId();
@@ -77,16 +129,23 @@ export default function OrdersScreen() {
     verification?.status === 'approved' ||
     accreditation?.profile?.accreditationStatus === 'approved';
 
+  const isSubmitted =
+    Boolean(accreditation?.profile?.isSubmitted) ||
+    accreditation?.profile?.accreditationStatus === 'under_review' ||
+    verification?.status === 'pending';
+
   useEffect(() => {
     if (
       user?.role === 'driver' &&
       !isLoadingVerif &&
       !isLoadingAccred &&
-      !isApproved
+      !isApproved &&
+      !isSubmitted &&
+      accreditation?.profile?.accreditationStatus === 'not_started'
     ) {
       router.replace('/(auth)/driver-verification');
     }
-  }, [user?.role, isApproved, isLoadingVerif, isLoadingAccred]);
+  }, [user?.role, isApproved, isSubmitted, isLoadingVerif, isLoadingAccred, accreditation?.profile?.accreditationStatus]);
 
   const handleSetupPayouts = async () => {
     setOnboardingLoading(true);
@@ -140,11 +199,35 @@ export default function OrdersScreen() {
         description: `Added #${orderItem.id?.slice(-6).toUpperCase()} to your active deliveries`,
       });
     } catch (err: any) {
-      showToast(err?.message || 'Could not accept order', 'error');
+      const errorMsg = err?.data?.message || err?.message || 'Could not accept order';
+      const code = err?.data?.code;
+      const isAccreditationError =
+        err?.status === 403 &&
+        (code === 'not_started' ||
+          code === 'in_progress' ||
+          code === 'under_review' ||
+          code === 'rejected' ||
+          code === 'license_expired' ||
+          code === 'insurance_expired');
+
+      if (isAccreditationError) {
+        showToast(errorMsg, { type: 'error' });
+        router.push('/(auth)/driver-verification');
+      } else {
+        showToast(errorMsg, 'error');
+      }
     }
   };
 
-  const { data: availableOrders = [], isLoading: isLoadingAvailable, refetch: refetchAvailable } = useAvailableOrders();
+  const {
+    data: availableOrders = [],
+    isLoading: isLoadingAvailable,
+    refetch: refetchAvailable,
+  } = useAvailableOrders({
+    lat: driverLocation.lat,
+    lng: driverLocation.lng,
+    radiusMiles: 25,
+  });
   const { data: allOrders = [], isLoading: isLoadingAll, refetch: refetchAll } = useOrders();
   const { isConnected } = useOrdersRealtime();
 
@@ -228,13 +311,29 @@ export default function OrdersScreen() {
     setRefreshing(true);
     haptic();
     try {
-      await Promise.all([refetchAvailable(), refetchAll()]);
+      if (__DEV__) {
+        setDriverLocation({ lat: 31.9505, lng: -110.9747 });
+      } else if (Platform.OS !== 'web') {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            if (pos?.coords) {
+              setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            }
+          }
+        } catch {
+          if (!driverLocation.lat) {
+            setDriverLocation({ lat: 31.9505, lng: -110.9747 });
+          }
+        }
+      }
+      await Promise.all([refetchAvailable(), refetchAll(), refetchConnect()]);
     } catch {
-      // Ignore network errors on refresh
     } finally {
       setRefreshing(false);
     }
-  }, [refetchAvailable, refetchAll]);
+  }, [refetchAvailable, refetchAll, refetchConnect, driverLocation.lat]);
 
   const onHeaderLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -354,6 +453,10 @@ export default function OrdersScreen() {
       ) : null}
     </View>
   ) : null;
+
+  if (user?.role === 'driver' && !isApproved) {
+    return <DriverProfileStatusScreen />;
+  }
 
   return (
     <View style={styles.root}>

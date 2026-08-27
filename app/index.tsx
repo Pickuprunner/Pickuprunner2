@@ -32,13 +32,19 @@ export default function Index() {
               console.log('[App:Startup] Routing admin to /(tabs)');
               router.replace('/(tabs)');
             } else {
-              const { getDriverVerificationStatus } = await import('@/lib/verification');
-              const verifStatus = await getDriverVerificationStatus(state.user.id);
-              if (verifStatus !== 'approved') {
-                console.log('[App:Startup] Routing unapproved/pending driver to /(auth)/driver-verification');
-                router.replace('/(auth)/driver-verification');
-              } else {
-                console.log('[App:Startup] Routing approved driver to /(tabs)');
+              try {
+                const { accreditationApi } = await import('@/apis/accreditation');
+                const accred = await accreditationApi.getAccreditation().catch(() => null);
+                const status = accred?.data?.profile?.accreditationStatus;
+
+                if (status === 'not_started' || (!status && !accred?.data?.profile)) {
+                  console.log('[App:Startup] Routing new driver to /(auth)/driver-verification');
+                  router.replace('/(auth)/driver-verification');
+                } else {
+                  console.log(`[App:Startup] Routing driver (${status || 'under_review'}) to /(tabs)`);
+                  router.replace('/(tabs)');
+                }
+              } catch {
                 router.replace('/(tabs)');
               }
             }

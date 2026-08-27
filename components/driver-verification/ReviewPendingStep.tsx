@@ -22,9 +22,9 @@ import {
 import * as Haptics from 'expo-haptics';
 import { colors, borderRadius, spacing } from '@/constants/design';
 import { useAuth } from '@/hooks/useAuth';
-import { useDriverAccreditation, useDevPassAccreditation } from '@/lib/accreditation';
-import { useMyVerification, useReviewVerification, useSubmitVerification } from '@/lib/verification';
-import { DriverWizardData, MOCK_DRIVER_WIZARD_DATA } from './mockData';
+import { useDriverAccreditation } from '@/lib/accreditation';
+import { useMyVerification } from '@/lib/verification';
+import { DriverWizardData } from './mockData';
 
 interface ReviewPendingStepProps {
   data: DriverWizardData;
@@ -34,73 +34,12 @@ interface ReviewPendingStepProps {
 export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
   const { user, logout } = useAuth();
   const { data: accreditation } = useDriverAccreditation();
-  const devPassMutation = useDevPassAccreditation();
 
   const { data: verification } = useMyVerification(user?.id);
-  const reviewMutation = useReviewVerification();
-  const submitMutation = useSubmitVerification();
 
   const isApproved =
     accreditation?.profile?.accreditationStatus === 'approved' ||
     verification?.status === 'approved';
-
-  const handleDevApprove = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    }
-    try {
-      
-      await devPassMutation.mutateAsync({
-        vehicle: {
-          vehicleMake: data.vehicleMake || MOCK_DRIVER_WIZARD_DATA.vehicleMake,
-          vehicleModel: data.vehicleModel || MOCK_DRIVER_WIZARD_DATA.vehicleModel,
-          vehicleYear: parseInt(data.vehicleYear || MOCK_DRIVER_WIZARD_DATA.vehicleYear, 10),
-          vehicleColor: data.vehicleColor || MOCK_DRIVER_WIZARD_DATA.vehicleColor,
-          vehiclePlate: data.licensePlate || MOCK_DRIVER_WIZARD_DATA.licensePlate,
-          streetAddress: data.address || MOCK_DRIVER_WIZARD_DATA.address,
-          aptSuite: data.apt || MOCK_DRIVER_WIZARD_DATA.apt,
-          city: data.city || MOCK_DRIVER_WIZARD_DATA.city,
-          state: data.state || MOCK_DRIVER_WIZARD_DATA.state,
-          postalCode: data.zip || MOCK_DRIVER_WIZARD_DATA.zip,
-        },
-        license: {
-          licenseState: data.licenseState || MOCK_DRIVER_WIZARD_DATA.licenseState,
-          licenseNumber: data.licenseNumber || MOCK_DRIVER_WIZARD_DATA.licenseNumber,
-          legalName: data.licenseFullName || user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
-          dateOfBirth: data.licenseDob || MOCK_DRIVER_WIZARD_DATA.licenseDob,
-          licenseExpirationDate: data.licenseExpDate || MOCK_DRIVER_WIZARD_DATA.licenseExpDate,
-        },
-        insurance: {
-          insuranceCompany: data.insuranceCompany || MOCK_DRIVER_WIZARD_DATA.insuranceCompany,
-          insuranceNaicNumber: data.naicNumber || MOCK_DRIVER_WIZARD_DATA.naicNumber,
-          insurancePolicyNumber: data.policyNumber || MOCK_DRIVER_WIZARD_DATA.policyNumber,
-          insuranceEffectiveDate: data.effectiveDate || MOCK_DRIVER_WIZARD_DATA.effectiveDate,
-          insuranceExpirationDate: data.expirationDate || MOCK_DRIVER_WIZARD_DATA.expirationDate,
-          vehicleVin: data.vinNumber || MOCK_DRIVER_WIZARD_DATA.vinNumber,
-        },
-        legalName: data.licenseFullName || user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
-      }).catch(() => {});
-
-      if (verification?.id) {
-        await reviewMutation.mutateAsync({
-          id: verification.id,
-          status: 'approved',
-        });
-      } else {
-        await submitMutation.mutateAsync({
-          userId: user?.id || `usr-${Date.now()}`,
-          driverName: user?.displayName || user?.email || 'Driver',
-          driverEmail: user?.email,
-          status: 'approved',
-        });
-      }
-    } catch (err) {
-      console.warn('[ReviewPendingStep] handleDevApprove error:', err);
-    }
-    setTimeout(() => {
-      router.replace('/(tabs)');
-    }, 300);
-  };
 
   const handleSignOut = async () => {
     if (Platform.OS !== 'web') {
@@ -229,15 +168,6 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
         </Pressable>
       ) : (
         <View style={styles.actionButtonsCol}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleDevApprove}
-            style={styles.devApproveBtn}
-          >
-            <Zap size={16} color="#0F131C" />
-            <Text style={styles.devApproveBtnText}>⚡ Dev: Approve & Enter Dashboard</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleSignOut}

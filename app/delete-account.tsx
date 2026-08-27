@@ -47,19 +47,17 @@ export default function DeleteAccountScreen() {
   useEffect(() => {
     if (step !== 'done') return;
 
-    const interval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          router.replace('/(landing)/role-select');
-          return 0;
-        }
-        return prev - 1;
-      });
+    if (countdown <= 0) {
+      router.replace('/(landing)/role-select');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown((prev) => prev - 1);
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [step]);
+    return () => clearTimeout(timer);
+  }, [step, countdown]);
 
   const handleNext = () => {
     if (Platform.OS !== 'web') {

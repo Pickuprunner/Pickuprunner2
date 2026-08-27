@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
+  X,
   Zap,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
@@ -21,9 +22,9 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   useDriverAccreditation,
   useSaveAccreditationStep,
+  useUploadAccreditationDocument,
   useRecordAccreditationConsent,
   useSubmitAccreditation,
-  useDevPassAccreditation,
 } from '@/lib/accreditation';
 import { useMyVerification, useSubmitVerification } from '@/lib/verification';
 import { colors, spacing, borderRadius } from '@/constants/design';
@@ -46,9 +47,9 @@ export default function DriverVerificationScreen() {
 
   const { data: accreditationData, isLoading: accreditationLoading } = useDriverAccreditation();
   const saveStepMutation = useSaveAccreditationStep();
+  const uploadDocMutation = useUploadAccreditationDocument();
   const recordConsentMutation = useRecordAccreditationConsent();
   const submitAccreditationMutation = useSubmitAccreditation();
-  const devPassMutation = useDevPassAccreditation();
 
   const { data: existing } = useMyVerification(user?.id);
   const submitVerification = useSubmitVerification();
@@ -201,6 +202,30 @@ export default function DriverVerificationScreen() {
           licenseExpirationDate: formData.licenseExpDate.trim(),
         },
       });
+
+      if (formData.licenseFrontUrl) {
+        await uploadDocMutation
+          .mutateAsync({
+            type: 'license_front',
+            file: {
+              uri: formData.licenseFrontUrl,
+              name: formData.licenseFrontName || 'license_front.jpg',
+            },
+          })
+          .catch((e) => console.warn('[Accreditation] upload license_front error:', e));
+      }
+
+      if (formData.licenseBackUrl) {
+        await uploadDocMutation
+          .mutateAsync({
+            type: 'license_back',
+            file: {
+              uri: formData.licenseBackUrl,
+              name: formData.licenseBackName || 'license_back.jpg',
+            },
+          })
+          .catch((e) => console.warn('[Accreditation] upload license_back error:', e));
+      }
     } catch (e) {
       console.warn('[Accreditation] saveStep(license) fallback:', e);
     }
@@ -217,81 +242,6 @@ export default function DriverVerificationScreen() {
       console.warn('[Accreditation] recordConsent fallback:', e);
     }
     setCurrentStep(4);
-  };
-
-  const handleDevPass = async () => {
-    try {
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      }
-
-      const mock = {
-        vehicle: {
-          vehicleMake: formData.vehicleMake || MOCK_DRIVER_WIZARD_DATA.vehicleMake,
-          vehicleModel: formData.vehicleModel || MOCK_DRIVER_WIZARD_DATA.vehicleModel,
-          vehicleYear: parseInt(formData.vehicleYear || MOCK_DRIVER_WIZARD_DATA.vehicleYear, 10),
-          vehicleColor: formData.vehicleColor || MOCK_DRIVER_WIZARD_DATA.vehicleColor,
-          vehiclePlate: formData.licensePlate || MOCK_DRIVER_WIZARD_DATA.licensePlate,
-          streetAddress: formData.address || MOCK_DRIVER_WIZARD_DATA.address,
-          aptSuite: formData.apt || MOCK_DRIVER_WIZARD_DATA.apt,
-          city: formData.city || MOCK_DRIVER_WIZARD_DATA.city,
-          state: formData.state || MOCK_DRIVER_WIZARD_DATA.state,
-          postalCode: formData.zip || MOCK_DRIVER_WIZARD_DATA.zip,
-        },
-        license: {
-          licenseState: formData.licenseState || MOCK_DRIVER_WIZARD_DATA.licenseState,
-          licenseNumber: formData.licenseNumber || MOCK_DRIVER_WIZARD_DATA.licenseNumber,
-          legalName: formData.licenseFullName || user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
-          dateOfBirth: formData.licenseDob || MOCK_DRIVER_WIZARD_DATA.licenseDob,
-          licenseExpirationDate: formData.licenseExpDate || MOCK_DRIVER_WIZARD_DATA.licenseExpDate,
-        },
-        insurance: {
-          insuranceCompany: formData.insuranceCompany || MOCK_DRIVER_WIZARD_DATA.insuranceCompany,
-          insuranceNaicNumber: formData.naicNumber || MOCK_DRIVER_WIZARD_DATA.naicNumber,
-          insurancePolicyNumber: formData.policyNumber || MOCK_DRIVER_WIZARD_DATA.policyNumber,
-          insuranceEffectiveDate: formData.effectiveDate || MOCK_DRIVER_WIZARD_DATA.effectiveDate,
-          insuranceExpirationDate: formData.expirationDate || MOCK_DRIVER_WIZARD_DATA.expirationDate,
-          vehicleVin: formData.vinNumber || MOCK_DRIVER_WIZARD_DATA.vinNumber,
-        },
-        legalName: formData.licenseFullName || user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
-      };
-
-      await devPassMutation.mutateAsync(mock);
-
-      const userId = user?.id || `usr-${Date.now()}`;
-      await submitVerification.mutateAsync({
-        userId,
-        driverName: user?.displayName || user?.email || 'Driver',
-        driverEmail: user?.email,
-        existingId: existing?.id,
-        status: 'approved',
-        vehicle_make: mock.vehicle.vehicleMake,
-        vehicle_model: mock.vehicle.vehicleModel,
-        vehicle_year: String(mock.vehicle.vehicleYear),
-        vehicle_color: mock.vehicle.vehicleColor,
-        license_plate: mock.vehicle.vehiclePlate,
-        address: mock.vehicle.streetAddress,
-        city: mock.vehicle.city,
-        state: mock.vehicle.state,
-        zip: mock.vehicle.postalCode,
-        license_state: mock.license.licenseState,
-        license_number: mock.license.licenseNumber,
-        license_fullname: mock.license.legalName,
-        license_dob: mock.license.dateOfBirth,
-        license_exp_date: mock.license.licenseExpirationDate,
-        licenseUrl: formData.licenseFrontUrl || MOCK_DRIVER_WIZARD_DATA.licenseFrontUrl,
-        insurance_company: mock.insurance.insuranceCompany,
-        policy_number: mock.insurance.insurancePolicyNumber,
-        insuranceUrl: formData.insuranceDocUrl || MOCK_DRIVER_WIZARD_DATA.insuranceDocUrl,
-      });
-
-      showToast('⚡ Dev Pass: Driver Approved!', 'success');
-      router.replace('/(tabs)');
-    } catch (err: any) {
-      console.warn('[DevPass] error:', err);
-      showToast('Bypass activated', 'success');
-      router.replace('/(tabs)');
-    }
   };
 
   const handleFillMockData = () => {
@@ -324,6 +274,18 @@ export default function DriverVerificationScreen() {
             vehicleVin: formData.vinNumber.trim() || undefined,
           },
         });
+
+        if (formData.insuranceDocUrl) {
+          await uploadDocMutation
+            .mutateAsync({
+              type: 'insurance_card',
+              file: {
+                uri: formData.insuranceDocUrl,
+                name: formData.insuranceDocName || 'insurance_card.jpg',
+              },
+            })
+            .catch((e) => console.warn('[Accreditation] upload insurance_card error:', e));
+        }
       } catch (e) {
         console.warn('[Accreditation] saveStep(insurance) fallback:', e);
       }
@@ -415,8 +377,16 @@ export default function DriverVerificationScreen() {
           },
         ]}
       >
-        <Pressable onPress={handleHeaderBack} style={styles.headerBtn} hitSlop={10}>
-          <ArrowLeft size={22} color={colors.onSurface} />
+        <Pressable
+          onPress={currentStep === 5 ? () => router.replace('/(tabs)') : handleHeaderBack}
+          style={styles.headerBtn}
+          hitSlop={10}
+        >
+          {currentStep === 5 ? (
+            <X size={20} color={colors.onSurface} />
+          ) : (
+            <ArrowLeft size={22} color={colors.onSurface} />
+          )}
         </Pressable>
 
         <View style={styles.headerTitleCol}>
@@ -427,24 +397,14 @@ export default function DriverVerificationScreen() {
         </View>
 
         {currentStep < 5 ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleDevPass}
-              style={[styles.mockDataBtn, { backgroundColor: '#22C55E' }]}
-            >
-              <Zap size={13} color="#0F131C" />
-              <Text style={styles.mockDataBtnText}>Dev Pass</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleFillMockData}
-              style={styles.mockDataBtn}
-            >
-              <Zap size={13} color="#0F131C" />
-              <Text style={styles.mockDataBtnText}>Mock</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleFillMockData}
+            style={styles.mockDataBtn}
+          >
+            <Zap size={13} color="#0F131C" />
+            <Text style={styles.mockDataBtnText}>Mock Fill</Text>
+          </TouchableOpacity>
         ) : (
           <View style={{ width: 70 }} />
         )}
@@ -499,7 +459,7 @@ export default function DriverVerificationScreen() {
         {currentStep === 5 && (
           <ReviewPendingStep
             data={formData}
-            onDone={() => router.replace('/(tabs)/profile')}
+            onDone={() => router.replace('/(tabs)')}
           />
         )}
       </ScrollView>
