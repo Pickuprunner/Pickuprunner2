@@ -73,6 +73,9 @@ interface TrackedOrder {
   delivery_photo_url?: string;
   deliveryPhotoUrl?: string;
   payment_status?: string;
+  paymentStatus?: string;
+  amount_cents?: number;
+  amountCents?: number;
 }
 
 export default function TrackOrderScreen() {
@@ -116,6 +119,8 @@ export default function TrackOrderScreen() {
         customerPhone: params.customerPhone,
         items: params.items,
         status: (params.status as any) || 'pending',
+        paymentStatus: (params as any)?.paymentStatus || (params as any)?.payment_status,
+        payment_status: (params as any)?.paymentStatus || (params as any)?.payment_status,
       };
     }
     return null;
@@ -150,6 +155,8 @@ export default function TrackOrderScreen() {
         driver_photo_url: storeOrder.deliveryPhotoUrl || prev?.driver_photo_url,
         deliveryPhotoUrl: storeOrder.deliveryPhotoUrl || prev?.deliveryPhotoUrl,
         delivery_photo_url: storeOrder.deliveryPhotoUrl || prev?.delivery_photo_url,
+        paymentStatus: storeOrder.paymentStatus || storeOrder.payment_status || prev?.paymentStatus,
+        payment_status: storeOrder.paymentStatus || storeOrder.payment_status || prev?.payment_status,
       }));
     }
   }, [storeOrder]);
@@ -262,6 +269,8 @@ export default function TrackOrderScreen() {
               foundOrder?.driverPhotoUrl || foundOrder?.driver_photo_url || storeCurrent?.deliveryPhotoUrl,
             deliveryPhotoUrl:
               foundOrder?.deliveryPhotoUrl || foundOrder?.delivery_photo_url || storeCurrent?.deliveryPhotoUrl,
+            paymentStatus: foundOrder?.paymentStatus || foundOrder?.payment_status || storeCurrent?.paymentStatus || storeCurrent?.payment_status,
+            payment_status: foundOrder?.payment_status || foundOrder?.paymentStatus || storeCurrent?.payment_status || storeCurrent?.paymentStatus,
           });
 
           // Sync fresh status to customer_local_orders in AsyncStorage
@@ -706,6 +715,27 @@ export default function TrackOrderScreen() {
                   </>
                 )}
               </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
+
+        {isPaid && (
+          <Animated.View entering={FadeInDown.delay(40).springify()}>
+            <View style={[styles.paymentBanner, { borderColor: 'rgba(0, 226, 151, 0.35)', backgroundColor: 'rgba(0, 226, 151, 0.08)' }]}>
+              <View style={styles.paymentBannerLeft}>
+                <View style={[styles.paymentIconCircle, { backgroundColor: 'rgba(0, 226, 151, 0.2)' }]}>
+                  <MaterialIcons name="check-circle" size={20} color="#00E297" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.paymentBannerTitle, { color: '#00E297' }]}>Payment Confirmed</Text>
+                  <Text style={styles.paymentBannerSub}>
+                    Paid via Stripe · ${(totalCents / 100).toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(0, 226, 151, 0.15)', borderWidth: 1, borderColor: '#00E297' }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#00E297', letterSpacing: 0.5 }}> PAID</Text>
+              </View>
             </View>
           </Animated.View>
         )}

@@ -25,6 +25,8 @@ import { useDriverQueue, MAX_QUEUE } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
 import { CustomCard, CustomLoading, CustomConfirmModal, useToast } from '@/components/core';
 import { colors } from '@/constants/design';
+import { useOrderStore } from '@/store/useOrderStore';
+import { ordersApi } from '@/apis/orders';
 
 import {
   StepBar,
@@ -95,6 +97,19 @@ export default function OrderDetailScreen() {
 
   const { data: order, isLoading: loading } = useOrder(fetchId);
 
+  const liveStoreOrder = useOrderStore((state) => state.orders.find((o) => o.id === fetchId));
+  const currentOrder = liveStoreOrder ? ({ ...order, ...liveStoreOrder } as any) : order;
+
+  useEffect(() => {
+    if (fetchId) {
+      ordersApi.getById(fetchId).then((fresh) => {
+        if (fresh && fresh.id) {
+          useOrderStore.getState().upsertOrder(fresh as any); 
+        }
+      }).catch(() => {});
+    }
+  }, [fetchId]);
+
   const [fsm, dispatch] = useReducer(deliveryFSM, {
     status: (getSelectedOrder()?.status as DeliveryState) ?? 'pending',
     photoUri: null,
@@ -106,17 +121,17 @@ export default function OrderDetailScreen() {
   const { status, photoUri, photoUrl, uploadingPhoto } = fsm;
 
   useEffect(() => {
-    if (order) {
-      setSelectedOrder(order);
+    if (currentOrder) {
+      setSelectedOrder(currentOrder);
       dispatch({
         type: 'HYDRATE',
-        status: (order.status as DeliveryState) || 'pending',
-        photoUrl: order.deliveryPhotoUrl || order.delivery_photo_url,
+        status: (currentOrder.status as DeliveryState) || 'pending',
+        photoUrl: currentOrder.deliveryPhotoUrl || currentOrder.delivery_photo_url,
       });
     }
-  }, [order?.status, order?.deliveryPhotoUrl, order?.delivery_photo_url]);
+  }, [currentOrder?.status, currentOrder?.deliveryPhotoUrl, currentOrder?.delivery_photo_url]);
 
-  if (!order && !loading) {
+  if (!currentOrder && !loading) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.errorContainer}>
@@ -130,10 +145,15 @@ export default function OrderDetailScreen() {
     );
   }
 
-  const miles = Number(order?.distanceMiles ?? 0);
-  const earnings = order ? calcDriverEarnings(miles, Number(order.tipAmount ?? 0)) : null;
-  const shortId = order?.id?.slice(-6).toUpperCase() ?? '------';
-  const hasPhoto = !!(photoUrl || photoUri || order?.deliveryPhotoUrl);
+  const miles = Number(currentOrder?.distanceMiles ?? 0);
+  const earnings = currentOrder ? calcDriverEarnings(miles, Number(currentOrder.tipAmount ?? 0)) : null;
+  const shortId = currentOrder?.id?.slice(-6).toUpperCase() ?? '------';
+  const hasPhoto = !!(photoUrl || photoUri || currentOrder?.deliveryPhotoUrl);
+  const isPaid =
+    currentOrder?.payment_status === 'paid' ||
+    currentOrder?.payment_status === 'test_paid' ||
+    (currentOrder as any)?.paymentStatus === 'paid' ||
+    (currentOrder as any)?.paymentStatus === 'test_paid';
 
   const getStatusBadge = () => {
     switch (status) {
@@ -375,7 +395,18 @@ export default function OrderDetailScreen() {
               <CustomCard variant="glass" style={styles.earningsCard}>
                 <View style={styles.earningsRow}>
                   <View>
-                    <Text style={styles.earningsLabel}>YOUR EARNINGS</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                      <Text style={styles.earningsLabel}>YOUR EARNINGS</Text>
+                      {isPaid ? (
+                        <View style={{ backgroundColor: 'rgba(0, 226, 151, 0.15)', borderColor: 'rgba(0, 226, 151, 0.4)', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#00E297' }}>PAID ONLINE</Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: 'rgba(244, 195, 0, 0.12)', borderColor: 'rgba(244, 195, 0, 0.35)', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#F4C300' }}>PAY ON PICKUP</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.earningsTotal}>{earnings.totalDisplay}</Text>
                   </View>
                   <View style={styles.earningsBreakdown}>
@@ -392,6 +423,49 @@ export default function OrderDetailScreen() {
                   </View>
                 </View>
               </CustomCard>
+            )}
+
+            {isPaid ? (
+              <View style={{
+                marginHorizontal: 20,
+                marginTop: 8,
+                padding: 12,
+                borderRadius: 12,
+                backgroundColor: 'rgba(0, 226, 151, 0.08)',
+                borderColor: 'rgba(0, 226, 151, 0.3)',
+                borderWidth: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              }}>
+                <MaterialIcons name="verified-user" size={20} color="#00E297" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#00E297', marginBottom: 2 }}>
+                    Customer Paid Online
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.onSurfaceVariant, lineHeight: 15 }}>
+                    Your earnings ({earnings?.totalDisplay}) are secured and will transfer directly to your Stripe account upon delivery completion.
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={{
+                marginHorizontal: 20,
+                marginTop: 8,
+                padding: 10,
+                borderRadius: 12,
+                backgroundColor: 'rgba(244, 195, 0, 0.08)',
+                borderColor: 'rgba(244, 195, 0, 0.25)',
+                borderWidth: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              }}>
+                <MaterialIcons name="info-outline" size={18} color="#F4C300" />
+                <Text style={{ fontSize: 11, color: '#F4C300', flex: 1, fontWeight: '500' }}>
+                  Customer has not paid online yet. Collect payment upon pickup if required.
+                </Text>
+              </View>
             )}
 
             <View style={styles.sectionHead}>

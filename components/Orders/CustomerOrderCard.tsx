@@ -106,13 +106,20 @@ export interface CustomerOrderCardProps {
 }
 
 export function CustomerOrderCard({
-  order,
+  order: propOrder,
   variant,
   onPress,
   onCancel,
   style,
 }: CustomerOrderCardProps) {
   const [expanded, setExpanded] = useState(false);
+
+  // Subscribe directly to Zustand store for instant real-time status & payment reactivity
+  const storeOrder = useOrderStore((state) =>
+    state.orders.find((o) => o.id === propOrder.id)
+  );
+  const order = storeOrder ? ({ ...propOrder, ...storeOrder } as CustomerOrderData) : propOrder;
+
   const currentStatus: OrderStatusVariant =
     variant || (order.status as OrderStatusVariant) || 'pending';
   const shortId = order.id ? order.id.slice(-6).toUpperCase() : '------';
@@ -143,7 +150,11 @@ export function CustomerOrderCard({
     order.payment_status === 'paid' ||
     order.payment_status === 'test_paid' ||
     order.paymentStatus === 'paid' ||
-    order.paymentStatus === 'test_paid';
+    order.paymentStatus === 'test_paid' ||
+    (storeOrder as any)?.paymentStatus === 'paid' ||
+    (storeOrder as any)?.paymentStatus === 'test_paid' ||
+    (storeOrder as any)?.payment_status === 'paid' ||
+    (storeOrder as any)?.payment_status === 'test_paid';
   const isChargeable =
     currentStatus !== 'pending' &&
     currentStatus !== 'assigned' &&
@@ -282,11 +293,9 @@ export function CustomerOrderCard({
       >
         <View style={styles.priceContainer}>
           <Text style={styles.priceText}>{fmt(totalCents)}</Text>
-          <View style={styles.paymentTag}>
-            <Text style={styles.paymentTagText}>
-              {order.paymentStatus === 'paid' || order.payment_status === 'paid'
-                ? '✓ Paid'
-                : '$ Pay on Pickup'}
+          <View style={[styles.paymentTag, isPaid && { backgroundColor: 'rgba(0, 226, 151, 0.15)', borderColor: 'rgba(0, 226, 151, 0.4)' }]}>
+            <Text style={[styles.paymentTagText, isPaid && { color: '#00E297' }]}>
+              {isPaid ? '✓ Paid' : '$ Pay on Pickup'}
             </Text>
           </View>
         </View>
@@ -353,6 +362,15 @@ export function CustomerOrderCard({
               </>
             )}
           </TouchableOpacity>
+        )}
+
+        {isPaid && (
+          <View style={[styles.payButton, { backgroundColor: 'rgba(0, 226, 151, 0.15)', borderWidth: 1, borderColor: 'rgba(0, 226, 151, 0.4)' }]}>
+            <MaterialIcons name="check-circle" size={15} color="#00E297" />
+            <Text style={[styles.payButtonText, { color: '#00E297' }]} numberOfLines={1}>
+              PAID
+            </Text>
+          </View>
         )}
 
         {!isDelivered ? (

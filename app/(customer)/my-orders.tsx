@@ -122,51 +122,47 @@ export default function MyOrdersScreen() {
 
         const orderMap = new Map<string, CustomerOrderData>();
 
-        // Always include customer's local orders from this device
         (localOrders || []).forEach((o) => {
           if (o?.id) orderMap.set(o.id, o);
         });
 
-        (backendMine || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (sessionOrders1 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (sessionOrders2 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
         (emailOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
 
-        const storeList = useOrderStore.getState().orders;
-        (storeList || []).forEach((so) => {
-          if (so?.id) {
-            const matchSession = Boolean(id && (so.customerSessionId === id || so.customer_session_id === id));
-            const matchEmail = Boolean(userEmail && (so.customerEmail === userEmail || so.customer_email === userEmail));
-            const existing = orderMap.get(so.id);
-            if (existing || matchSession || matchEmail) {
-              const soName = (so.customerName || so.customer_name || '').trim();
-              const existName = (existing?.customerName || existing?.customer_name || '').trim();
-              const finalName =
-                soName && soName !== 'Customer' && soName !== 'Customer Order'
-                  ? soName
-                  : existName || soName || 'Customer';
-
-              orderMap.set(so.id, {
-                ...(existing || {}),
-                id: so.id,
-                status: so.status as any,
-                driverName: so.driverName || existing?.driverName,
-                driver_name: so.driverName || existing?.driver_name,
-                driverUserId: so.driverUserId || (existing as any)?.driverUserId,
-                deliveryPhotoUrl: so.deliveryPhotoUrl || existing?.deliveryPhotoUrl,
-                delivery_photo_url: so.deliveryPhotoUrl || existing?.delivery_photo_url,
-                customerName: finalName,
-                customerPhone: so.customerPhone || so.customer_phone || existing?.customerPhone || existing?.customer_phone,
-                pickupAddress: so.pickupAddress || existing?.pickupAddress,
-                deliveryAddress: so.deliveryAddress || existing?.deliveryAddress,
-                items: so.items || existing?.items,
-                tipAmount: so.tipAmount ?? existing?.tipAmount,
-                distanceMiles: so.distanceMiles ?? existing?.distanceMiles,
-                createdAt: so.createdAt || existing?.createdAt,
-              } as any);
-            }
+        (backendMine || []).forEach((o) => {
+          if (o?.id) {
+            orderMap.set(o.id, o);
+            useOrderStore.getState().upsertOrder(o as any);
           }
         });
+
+        const activeIds = Array.from(orderMap.values())
+          .filter((o) => o?.id && o.status !== 'delivered' && o.status !== 'cancelled')
+          .map((o) => o.id);
+
+        if (activeIds.length > 0) {
+          const directFetches = await Promise.allSettled(
+            activeIds.map((orderId) => ordersApi.getById(orderId))
+          );
+          directFetches.forEach((res) => {
+            if (res.status === 'fulfilled' && res.value && res.value.id) {
+              const fresh = res.value;
+              const existing = orderMap.get(fresh.id);
+              const merged: CustomerOrderData = {
+                ...(existing || {}),
+                ...(fresh as any),
+                status: fresh.status as any,
+                driverName: fresh.driverName || (fresh as any).driver_name || existing?.driverName,
+                driver_name: fresh.driverName || (fresh as any).driver_name || existing?.driver_name,
+                paymentStatus: fresh.paymentStatus || (fresh as any).payment_status || existing?.paymentStatus,
+                payment_status: (fresh as any).payment_status || fresh.paymentStatus || existing?.payment_status,
+              };
+              orderMap.set(fresh.id, merged);
+              useOrderStore.getState().upsertOrder(fresh as any);
+            }
+          });
+        }
 
         const result = Array.from(orderMap.values()).sort(
           (a, b) =>
@@ -223,6 +219,8 @@ export default function MyOrdersScreen() {
               tipAmount: so.tipAmount ?? existing?.tipAmount,
               distanceMiles: so.distanceMiles ?? existing?.distanceMiles,
               createdAt: so.createdAt || existing?.createdAt,
+              paymentStatus: so.paymentStatus || (so as any).payment_status || existing?.paymentStatus || existing?.payment_status,
+              payment_status: (so as any).payment_status || so.paymentStatus || existing?.payment_status || existing?.paymentStatus,
             } as any);
             changed = true;
           }
