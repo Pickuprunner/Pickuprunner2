@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   View,
+  Text,
   Pressable,
   StyleSheet,
   Platform,
@@ -17,6 +18,9 @@ interface Props {
   onSearchChange: (text: string) => void;
   placeholder?: string;
   onFilterPress?: () => void;
+  hasActiveFilter?: boolean;
+  filterBadgeCount?: number;
+  showFilter?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 }
 
@@ -25,6 +29,9 @@ export function OrdersSearchBar({
   onSearchChange,
   placeholder = 'Search by name, phone, address...',
   onFilterPress,
+  hasActiveFilter = false,
+  filterBadgeCount = 0,
+  showFilter = true,
   containerStyle,
 }: Props) {
   const handleFilter = () => {
@@ -53,16 +60,28 @@ export function OrdersSearchBar({
         />
       </View>
 
-      <Pressable
-        onPress={handleFilter}
-        accessibilityLabel="Filters"
-        style={({ pressed }) => [
-          styles.filterBtn,
-          pressed && { backgroundColor: 'rgba(255, 255, 255, 0.12)' },
-        ]}
-      >
-        <MaterialIcons name="tune" size={20} color={colors.onSurface} />
-      </Pressable>
+      {showFilter && onFilterPress ? (
+        <Pressable
+          onPress={handleFilter}
+          accessibilityLabel="Filters"
+          style={({ pressed }) => [
+            styles.filterBtn,
+            hasActiveFilter && styles.filterBtnActive,
+            pressed && { opacity: 0.8 },
+          ]}
+        >
+          <MaterialIcons
+            name="tune"
+            size={20}
+            color={hasActiveFilter ? '#ffe399' : colors.onSurface}
+          />
+          {hasActiveFilter && filterBadgeCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{filterBadgeCount}</Text>
+            </View>
+          )}
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -98,5 +117,26 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  filterBtnActive: {
+    backgroundColor: 'rgba(255, 227, 153, 0.14)',
+    borderColor: '#ffe399',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ffe399',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0F131C',
   },
 });

@@ -54,6 +54,8 @@ interface NewOrderWizardFormProps {
   onDeliveryTypeChange?: (v: 'door' | 'meet') => void;
   pickupNumber?: string;
   onPickupNumberChange?: (v: string) => void;
+  hasAlcohol?: boolean;
+  onHasAlcoholChange?: (v: boolean) => void;
 
   calculating?: boolean;
   showCustomTip?: boolean;
@@ -100,6 +102,8 @@ export function NewOrderWizardForm({
   onDeliveryTypeChange,
   pickupNumber = '',
   onPickupNumberChange,
+  hasAlcohol = false,
+  onHasAlcoholChange,
   calculating = false,
   showCustomTip,
   setShowCustomTip,
@@ -230,6 +234,8 @@ export function NewOrderWizardForm({
             onDeliveryAddressChange={onDeliveryAddressChange}
             items={items}
             onItemsChange={onItemsChange}
+            hasAlcohol={hasAlcohol}
+            onHasAlcoholChange={onHasAlcoholChange}
             miles={miles}
             mileageCents={mileageCents}
             calculating={calculating}
@@ -386,9 +392,7 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     backgroundColor: ACTIVE_COLOR,
   },
-  stepContent: {
-    // Dynamic adaptive layout
-  },
+  stepContent: {},
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',

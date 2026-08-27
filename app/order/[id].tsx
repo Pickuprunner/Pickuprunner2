@@ -15,14 +15,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 
-import { useOrders, useUpdateOrderStatus, type Order } from '@/lib/orders';
-import { ordersApi } from '@/apis/orders';
+import { useOrder, useOrders, useUpdateOrderStatus, useClaimOrder, type Order } from '@/lib/orders';
+import { connectApi } from '@/apis/connect';
+import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { getSelectedOrder, setSelectedOrder } from '@/lib/selectedOrder';
 import { calcDriverEarnings } from '@/lib/config';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue, MAX_QUEUE } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
-import { CustomCard, CustomLoading, useToast } from '@/components/core';
+import { CustomCard, CustomLoading, CustomConfirmModal, useToast } from '@/components/core';
 import { colors } from '@/constants/design';
 
 import {
@@ -59,14 +60,40 @@ export default function OrderDetailScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const fetchId = Array.isArray(id) ? id[0] : id;
   const updateStatus = useUpdateOrderStatus();
+  const claimOrder = useClaimOrder();
   const { user } = useAuth();
   const driverId = useDriverId();
   const { data: allOrders = [] } = useOrders();
   const { queueCount, atCapacity } = useDriverQueue(allOrders, driverId);
 
-  const [order, setOrder] = useState<Order | null>(getSelectedOrder);
-  const [loading, setLoading] = useState(!getSelectedOrder());
+  const { data: connectStatus, refetch: refetchConnect } = useConnectStatus(driverId);
+  const connectOnboard = useConnectOnboard();
+  const [showStripeModal, setShowStripeModal] = useState(false);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const isStripeReady = Boolean(connectStatus?.connected && connectStatus?.payoutsEnabled) || Boolean(user?.stripeAccountId);
+
+  const handleSetupPayouts = async () => {
+    setOnboardingLoading(true);
+    try {
+      const res = await connectOnboard.mutateAsync({
+        driverUserId: driverId,
+        driverEmail: user?.email,
+      });
+      if (res?.url) {
+        await openStripeOnboardingSession(res.url);
+      }
+      await refetchConnect();
+      setShowStripeModal(false);
+    } catch (err: any) {
+      showToast(err?.message || 'Could not start bank onboarding', 'error');
+    } finally {
+      setOnboardingLoading(false);
+    }
+  };
+
+  const { data: order, isLoading: loading } = useOrder(fetchId);
 
   const [fsm, dispatch] = useReducer(deliveryFSM, {
     status: (getSelectedOrder()?.status as DeliveryState) ?? 'pending',
@@ -79,48 +106,15 @@ export default function OrderDetailScreen() {
   const { status, photoUri, photoUrl, uploadingPhoto } = fsm;
 
   useEffect(() => {
-    const fetchId = Array.isArray(id) ? id[0] : id;
-    if (!fetchId) return;
-
-    let mounted = true;
-
-    const loadOrder = async () => {
-      const stored = getSelectedOrder();
-      if (stored && stored.id === fetchId) {
-        setOrder(stored);
-        dispatch({ type: 'HYDRATE', status: stored.status as DeliveryState, photoUrl: stored.deliveryPhotoUrl });
-      }
-
-      const found = allOrders?.find((o) => o.id === fetchId);
-      if (found) {
-        setOrder(found);
-        dispatch({ type: 'HYDRATE', status: found.status as DeliveryState, photoUrl: found.deliveryPhotoUrl });
-      }
-
-      try {
-        const remote = await ordersApi.getById(fetchId);
-        if (remote && remote.id && mounted) {
-          setOrder(remote as Order);
-          setSelectedOrder(remote as Order);
-          dispatch({
-            type: 'HYDRATE',
-            status: (remote.status as DeliveryState) || 'pending',
-            photoUrl: remote.deliveryPhotoUrl || remote.delivery_photo_url,
-          });
-        }
-      } catch (err) {
-        console.warn(`[OrderDetailScreen] GET /orders/${fetchId} failed:`, err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
-    loadOrder();
-
-    return () => {
-      mounted = false;
-    };
-  }, [id, allOrders]);
+    if (order) {
+      setSelectedOrder(order);
+      dispatch({
+        type: 'HYDRATE',
+        status: (order.status as DeliveryState) || 'pending',
+        photoUrl: order.deliveryPhotoUrl || order.delivery_photo_url,
+      });
+    }
+  }, [order?.status, order?.deliveryPhotoUrl, order?.delivery_photo_url]);
 
   if (!order && !loading) {
     return (
@@ -146,9 +140,14 @@ export default function OrderDetailScreen() {
       case 'delivered':
         return { label: 'DELIVERED', color: colors.tertiary, bg: colors.greenAlpha15, border: colors.greenAlpha40 };
       case 'picked_up':
+      case 'en_route':
+      case 'shopping':
         return { label: 'IN TRANSIT', color: colors.tertiary, bg: colors.greenAlpha15, border: colors.greenAlpha40 };
+      case 'assigned':
       case 'accepted':
         return { label: 'ACCEPTED', color: colors.secondary, bg: colors.accentAlpha15, border: colors.accentAlpha35 };
+      case 'cancelled':
+        return { label: 'CANCELLED', color: colors.error, bg: 'rgba(255, 92, 92, 0.15)', border: 'rgba(255, 92, 92, 0.35)' };
       case 'pending':
       default:
         return { label: 'UNASSIGNED', color: colors.accent, bg: colors.accentAlpha12, border: colors.accentAlpha30 };
@@ -220,7 +219,11 @@ export default function OrderDetailScreen() {
     }
   }
 
-  function doAccept() {
+  async function doAccept() {
+    if (!isStripeReady) {
+      setShowStripeModal(true);
+      return;
+    }
     if (atCapacity) {
       Alert.alert(
         `Queue Full (${MAX_QUEUE}/${MAX_QUEUE})`,
@@ -230,19 +233,51 @@ export default function OrderDetailScreen() {
       return;
     }
     haptic('medium');
-    dispatch({ type: 'ACCEPT_ORDER' });
-    showToast('Order Accepted!', {
-      description: 'Head to pickup address.',
-      type: 'success',
-    });
 
     if (order) {
-      updateStatus.mutateAsync({
-        id: order.id,
-        status: 'accepted',
-        driverUserId: driverId,
-        driverName: user?.displayName ?? user?.email ?? driverId?.slice(0, 8),
-      }).catch(() => { });
+      const driverName = user?.displayName ?? user?.email ?? driverId?.slice(0, 8) ?? 'Driver';
+      const effectiveDriverId = driverId || 'driver_default';
+      try {
+        await claimOrder.mutateAsync({
+          orderId: order.id,
+          driverUserId: effectiveDriverId,
+          driverName,
+        });
+
+        await updateStatus.mutateAsync({
+          id: order.id,
+          status: 'accepted',
+          driverUserId: driverId,
+          driverName,
+        });
+
+        dispatch({ type: 'ACCEPT_ORDER' });
+        showToast('Order Accepted!', {
+          description: 'Head to pickup address.',
+          type: 'success',
+        });
+      } catch (claimErr: any) {
+        console.warn('[doAccept] claimOrder failed:', claimErr);
+        const errorMsg = claimErr?.data?.message || claimErr?.message || 'Could not claim order';
+        const code = claimErr?.data?.code;
+        const isAccreditationError =
+          claimErr?.status === 403 &&
+          (code === 'not_started' ||
+            code === 'in_progress' ||
+            code === 'under_review' ||
+            code === 'rejected' ||
+            code === 'license_expired' ||
+            code === 'insurance_expired');
+
+        if (isAccreditationError) {
+          Alert.alert('Accreditation Required', errorMsg, [
+            { text: 'Complete Accreditation', onPress: () => router.push('/(auth)/driver-verification') },
+            { text: 'Cancel', style: 'cancel' }
+          ]);
+        } else {
+          showToast(errorMsg, { type: 'error' });
+        }
+      }
     }
   }
 
@@ -259,7 +294,7 @@ export default function OrderDetailScreen() {
     }
   }
 
-  function doDeliver() {
+  async function doDeliver() {
     if (!hasPhoto) {
       Alert.alert(
         'Delivery Photo Required',
@@ -275,11 +310,20 @@ export default function OrderDetailScreen() {
     });
 
     if (order) {
+      const photo = (photoUrl ?? photoUri ?? order?.deliveryPhotoUrl) || undefined;
+
       updateStatus.mutateAsync({
         id: order.id,
         status: 'delivered',
-        deliveryPhotoUrl: (photoUrl ?? photoUri ?? order?.deliveryPhotoUrl) || undefined,
+        deliveryPhotoUrl: photo,
       }).catch(() => { });
+
+      try {
+        const transferRes = await connectApi.transferEarnings(order.id);
+        console.log('[doDeliver] connectApi.transferEarnings response:', transferRes);
+      } catch (transferErr: any) {
+        console.warn('[doDeliver] connectApi.transferEarnings failed:', transferErr?.message || transferErr);
+      }
     }
   }
 
@@ -407,6 +451,20 @@ export default function OrderDetailScreen() {
           />
         </>
       )}
+
+      <CustomConfirmModal
+        visible={showStripeModal}
+        onClose={() => setShowStripeModal(false)}
+        onConfirm={handleSetupPayouts}
+        variant="warning"
+        title="Bank Account Setup Required"
+        message="You need to connect your bank account via Stripe before accepting orders. This ensures you can receive payouts for your completed deliveries."
+        confirmText="Set Up Payouts"
+        cancelText="Maybe Later"
+        iconName="account-balance"
+        confirmIconName="arrow-forward"
+        loading={onboardingLoading}
+      />
     </View>
   );
 }

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Platform, StyleSheet, View, StatusBar } from 'react-native';
 import { router } from 'expo-router';
 
-import { useOrders, Order, useUpdateOrderStatus } from '@/lib/orders';
+import { useOrders, useAvailableOrders, Order, useUpdateOrderStatus } from '@/lib/orders';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useDriverQueue } from '@/lib/driverQueue';
@@ -19,11 +19,24 @@ import {
 } from '@/components/map';
 
 export default function MapScreen() {
-  const { data: orders = [] } = useOrders();
+  const { data: availableOrders = [] } = useAvailableOrders();
+  const { data: allOrders = [] } = useOrders();
   const { isConnected } = useOrdersRealtime();
   const updateStatus = useUpdateOrderStatus();
   const driverId = useDriverId();
   const { user } = useAuth();
+
+  const orders = useMemo(() => {
+    const orderMap = new Map<string, Order>();
+    (availableOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+    (allOrders || []).forEach((o) => {
+      if (o?.id && ((o.driverUserId === driverId) || o.status !== 'delivered')) {
+        orderMap.set(o.id, { ...(orderMap.get(o.id) || {}), ...o });
+      }
+    });
+    return Array.from(orderMap.values());
+  }, [availableOrders, allOrders, driverId]);
+
   const { isMyOrder } = useDriverQueue(orders, driverId);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { connectApi } from '@/apis/connect';
 import { getApiBaseUrl, resolveApiUrl } from '@/lib/apiClient';
+import { useAuthStore } from '@/store/useAuthStore';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
@@ -36,11 +37,15 @@ export interface ConnectStatus {
 }
 
 export function useConnectStatus(driverUserId?: string) {
+  const token = useAuthStore((s) => s.token);
+
   return useQuery<ConnectStatus>({
     queryKey: ['stripe_connect_status', driverUserId],
-    enabled: !!driverUserId,
-    staleTime: 60_000,
-    gcTime: 10 * 60_000,
+    enabled: Boolean(driverUserId && token),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     queryFn: async () => {
       try {
         const res = await connectApi.getStatus();
@@ -75,33 +80,44 @@ export function useConnectOnboard() {
       const apiBase = getApiBaseUrl();
       const returnUrl = `${apiBase}/connect/onboarding/success`;
       const refreshUrl = `${apiBase}/connect/onboarding/reauth`;
+
+      // 1. Check current status first
+      let currentStatus: any = null;
       try {
+        const statusRes = await connectApi.getStatus();
+        currentStatus = (statusRes as any)?.data || statusRes;
+      } catch (statusErr: any) {
+        console.warn('[StripeConnect] Status check before onboarding:', statusErr?.message);
+      }
+
+      // If already fully connected and payouts enabled, nothing to do
+      if (currentStatus?.connected && currentStatus?.payoutsEnabled) {
+        return { url: null, stripeAccountId: currentStatus.stripeAccountId, alreadyEnabled: true };
+      }
+
+      // 2. If driver already has a Stripe account, generate onboarding link directly
+      if (currentStatus?.stripeAccountId) {
         const res = await connectApi.createOnboardingLink({ returnUrl, refreshUrl });
         const rawUrl = res?.url || res?.data?.url || (res as any)?.data?.accountLink;
         if (rawUrl) {
           return {
             url: resolveApiUrl(rawUrl),
-            stripeAccountId: res?.stripeAccountId || res?.data?.stripeAccountId || null,
+            stripeAccountId: currentStatus.stripeAccountId,
           };
         }
-      } catch (err: any) {
-        console.log('[StripeConnect] First attempt createOnboardingLink failed, auto-creating account:', err?.message);
       }
 
+      // 3. Otherwise, create the connected account first
       const autoRes = await connectApi.autoCreateAccount({ driverEmail, driverUserId });
       let rawUrl = autoRes?.url || autoRes?.data?.url || (autoRes as any)?.data?.accountLink;
 
       if (!rawUrl) {
-        try {
-          const res2 = await connectApi.createOnboardingLink({ returnUrl, refreshUrl });
-          rawUrl = res2?.url || res2?.data?.url || (res2 as any)?.data?.accountLink;
-        } catch (err2: any) {
-          console.warn('[StripeConnect] Second attempt createOnboardingLink failed:', err2?.message);
-        }
+        const res2 = await connectApi.createOnboardingLink({ returnUrl, refreshUrl });
+        rawUrl = res2?.url || res2?.data?.url || (res2 as any)?.data?.accountLink;
       }
 
       if (!rawUrl) {
-        throw new Error(autoRes?.message || 'Could not generate Stripe onboarding link. Please try again.');
+        throw new Error('Could not generate Stripe onboarding link. Please check your Stripe Connect platform settings.');
       }
 
       return {

@@ -15,16 +15,23 @@ import {
   Package,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useOrders } from '@/lib/orders';
+import { useOrders, useAvailableOrders, useUpdateOrderStatus, useClaimOrder } from '@/lib/orders';
+import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
+import { useMyVerification } from '@/lib/verification';
+import { useDriverAccreditation } from '@/lib/accreditation';
+import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
+import { calcDriverEarnings } from '@/lib/config';
 import { colors } from '@/constants/design';
-import { SkeletonList, StripeSetupBanner } from '@/components/core';
+import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast } from '@/components/core';
 
 import {
   OrdersHeader,
@@ -32,16 +39,21 @@ import {
   DriverOrderCard,
   ActiveDeliveriesBanner,
 } from '@/components/Orders';
+import { DriverProfileStatusScreen } from '@/components/driver-verification';
 
 function haptic() {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+  if (Platform.OS !== 'web') {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+  }
 }
 
 export default function OrdersScreen() {
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const insets = useSafeAreaInsets();
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
+  const [driverLocation, setDriverLocation] = useState<{ lat?: number; lng?: number }>({});
 
-  // ─── 1. State, Refs & Animated Values (Smooth Animation Logic) ───
   const [headerHeight, setHeaderHeight] = useState(200);
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
@@ -49,11 +61,191 @@ export default function OrdersScreen() {
   const lastDirectionChangeTime = useRef(0);
   const isHeaderVisible = useRef(true);
 
-  const { data: orders = [], isLoading, refetch } = useOrders();
-  const { isConnected } = useOrdersRealtime();
+  useEffect(() => {
+    let isMounted = true;
+    const MOCK_LOCATION = { lat: 31.9505, lng: -110.9747 };
+
+    if (__DEV__) {
+      setDriverLocation(MOCK_LOCATION);
+      return;
+    }
+
+    async function initLocation() {
+      try {
+        if (Platform.OS === 'web') {
+          if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                if (isMounted && pos?.coords) {
+                  setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                }
+              },
+              () => {
+                if (isMounted) setDriverLocation(MOCK_LOCATION);
+              },
+              { timeout: 4000 }
+            );
+          } else if (isMounted) {
+            setDriverLocation(MOCK_LOCATION);
+          }
+          return;
+        }
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (isMounted && pos?.coords) {
+            setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            return;
+          }
+        }
+        if (isMounted) setDriverLocation(MOCK_LOCATION);
+      } catch (err) {
+        console.log('[OrdersScreen] GPS unavailable, using mock location');
+        if (isMounted) setDriverLocation(MOCK_LOCATION);
+      }
+    }
+    initLocation();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const { user } = useAuth();
   const driverId = useDriverId();
-  const { queueCount, atCapacity, isMyOrder } = useDriverQueue(orders, driverId);
+  const { showToast } = useToast();
+  const updateStatus = useUpdateOrderStatus();
+  const claimOrder = useClaimOrder();
+  const { data: connectStatus, refetch: refetchConnect } = useConnectStatus(driverId);
+  const connectOnboard = useConnectOnboard();
+  const [showStripeModal, setShowStripeModal] = useState(false);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
+
+  const isStripeReady = Boolean(connectStatus?.connected && connectStatus?.payoutsEnabled) || Boolean(user?.stripeAccountId);
+
+  const { data: verification, isLoading: isLoadingVerif } = useMyVerification(user?.id);
+  const { data: accreditation, isLoading: isLoadingAccred } = useDriverAccreditation();
+
+  const isApproved =
+    verification?.status === 'approved' ||
+    accreditation?.profile?.accreditationStatus === 'approved';
+
+  const isSubmitted =
+    Boolean(accreditation?.profile?.isSubmitted) ||
+    accreditation?.profile?.accreditationStatus === 'under_review' ||
+    verification?.status === 'pending';
+
+  useEffect(() => {
+    if (
+      user?.role === 'driver' &&
+      !isLoadingVerif &&
+      !isLoadingAccred &&
+      !isApproved &&
+      !isSubmitted &&
+      accreditation?.profile?.accreditationStatus === 'not_started'
+    ) {
+      router.replace('/(auth)/driver-verification');
+    }
+  }, [user?.role, isApproved, isSubmitted, isLoadingVerif, isLoadingAccred, accreditation?.profile?.accreditationStatus]);
+
+  const handleSetupPayouts = async () => {
+    setOnboardingLoading(true);
+    try {
+      const res = await connectOnboard.mutateAsync({
+        driverUserId: driverId,
+        driverEmail: user?.email,
+      });
+      if (res?.url) {
+        await openStripeOnboardingSession(res.url);
+      }
+      await refetchConnect();
+      setShowStripeModal(false);
+    } catch (err: any) {
+      showToast(err?.message || 'Could not start bank onboarding', 'error');
+    } finally {
+      setOnboardingLoading(false);
+    }
+  };
+
+  const handleAcceptOrder = async (orderItem: any) => {
+    if (!isStripeReady) {
+      setShowStripeModal(true);
+      return;
+    }
+    if (atCapacity) {
+      showToast('Queue Limit Reached', {
+        type: 'warning',
+        description: 'Complete existing deliveries before accepting more',
+      });
+      return;
+    }
+    haptic();
+    const uid = driverId || `guest-${Date.now()}`;
+    const uname = user?.displayName ?? user?.email ?? 'Driver';
+    try {
+      useOrderStore.getState().upsertOrder({
+        ...orderItem,
+        status: 'accepted',
+        driverUserId: uid,
+        driverName: uname,
+      });
+      await claimOrder.mutateAsync({
+        orderId: orderItem.id,
+        driverUserId: uid,
+        driverName: uname,
+      });
+      await Promise.all([refetchAvailable(), refetchAll()]).catch(() => {});
+      showToast('Order Accepted!', {
+        type: 'success',
+        description: `Added #${orderItem.id?.slice(-6).toUpperCase()} to your active deliveries`,
+      });
+    } catch (err: any) {
+      const errorMsg = err?.data?.message || err?.message || 'Could not accept order';
+      const code = err?.data?.code;
+      const isAccreditationError =
+        err?.status === 403 &&
+        (code === 'not_started' ||
+          code === 'in_progress' ||
+          code === 'under_review' ||
+          code === 'rejected' ||
+          code === 'license_expired' ||
+          code === 'insurance_expired');
+
+      if (isAccreditationError) {
+        showToast(errorMsg, { type: 'error' });
+        router.push('/(auth)/driver-verification');
+      } else {
+        showToast(errorMsg, 'error');
+      }
+    }
+  };
+
+  const {
+    data: availableOrders = [],
+    isLoading: isLoadingAvailable,
+    refetch: refetchAvailable,
+  } = useAvailableOrders({
+    lat: driverLocation.lat,
+    lng: driverLocation.lng,
+  });
+  const { data: allOrders = [], isLoading: isLoadingAll, refetch: refetchAll } = useOrders();
+  const { isConnected } = useOrdersRealtime();
+
+  // Job board displays exclusively unassigned pending jobs that are not already claimed
+  const orders = useMemo(() => {
+    const activeOrClaimedIds = new Set(
+      (allOrders || [])
+        .filter((o) => o.status !== 'pending' || !!o.driverUserId)
+        .map((o) => o.id)
+    );
+    return (availableOrders || []).filter(
+      (o) => o.status === 'pending' && !o.driverUserId && !activeOrClaimedIds.has(o.id)
+    );
+  }, [availableOrders, allOrders]);
+
+  const isLoading = isLoadingAvailable && orders.length === 0;
+
+  // Active queue tracked from driver's claimed orders
+  const { queueCount, atCapacity } = useDriverQueue(allOrders, driverId);
 
   const avatarInitial = useMemo(() => {
     const name = user?.displayName || user?.email || 'Driver';
@@ -61,23 +253,53 @@ export default function OrdersScreen() {
   }, [user]);
 
   const myActiveOrders = useMemo(
-    () => orders.filter((o) => isMyOrder(o.id)),
-    [orders, isMyOrder]
+    () =>
+      (allOrders || []).filter(
+        (o) =>
+          o.driverUserId === driverId &&
+          (o.status === 'assigned' ||
+            o.status === 'accepted' ||
+            o.status === 'shopping' ||
+            o.status === 'picked_up' ||
+            o.status === 'en_route')
+      ),
+    [allOrders, driverId]
   );
 
-  const pendingOrders = useMemo(() => orders.filter((o) => o.status === 'pending'), [orders]);
-
   const filtered = useMemo(() => {
-    if (!search.trim()) return pendingOrders;
-    const q = search.toLowerCase();
-    return pendingOrders.filter(
-      (o) =>
-        o.customerName?.toLowerCase().includes(q) ||
-        o.customerPhone?.toLowerCase().includes(q) ||
-        o.deliveryAddress?.toLowerCase().includes(q) ||
-        o.pickupAddress?.toLowerCase().includes(q)
-    );
-  }, [pendingOrders, search]);
+    let result = orders;
+
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      result = result.filter((o) => {
+        const idStr = (o.id || '').toLowerCase();
+        const custName = (o.customerName || '').toLowerCase();
+        const phone = (o.customerPhone || '').toLowerCase();
+        const pickup = (o.pickupAddress || '').toLowerCase();
+        const delivery = (o.deliveryAddress || '').toLowerCase();
+        const items = (o.items || '').toLowerCase();
+
+        return (
+          idStr.includes(q) ||
+          custName.includes(q) ||
+          phone.includes(q) ||
+          pickup.includes(q) ||
+          delivery.includes(q) ||
+          items.includes(q)
+        );
+      });
+    }
+
+    result = [...result].sort((a, b) => {
+      const timeA = new Date(a.createdAt || 0).getTime();
+      const timeB = new Date(b.createdAt || 0).getTime();
+
+      if (sortBy === 'oldest') return timeA - timeB;
+      return timeB - timeA;
+    });
+
+    return result;
+  }, [orders, search, sortBy]);
 
   const pendingCount = useMemo(
     () => orders.filter((o) => o.status === 'pending').length,
@@ -86,11 +308,32 @@ export default function OrdersScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
+    haptic();
+    try {
+      if (__DEV__) {
+        setDriverLocation({ lat: 31.9505, lng: -110.9747 });
+      } else if (Platform.OS !== 'web') {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            if (pos?.coords) {
+              setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            }
+          }
+        } catch {
+          if (!driverLocation.lat) {
+            setDriverLocation({ lat: 31.9505, lng: -110.9747 });
+          }
+        }
+      }
+      await Promise.all([refetchAvailable(), refetchAll(), refetchConnect()]);
+    } catch {
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchAvailable, refetchAll, refetchConnect, driverLocation.lat]);
 
-  // ─── 2. Header Layout Measurement ───
   const onHeaderLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const { height } = event.nativeEvent.layout;
@@ -101,12 +344,10 @@ export default function OrdersScreen() {
     [headerHeight]
   );
 
-  // ─── 3. Scroll Event Handler with Debounce ───
   const handleScroll = useCallback(
     (event: any) => {
       const currentScrollY = event.nativeEvent.contentOffset.y;
 
-      // 1. Reset to visible when at top of list
       if (currentScrollY <= 0) {
         accumDelta.current = 0;
         if (!isHeaderVisible.current) {
@@ -122,7 +363,6 @@ export default function OrdersScreen() {
         return;
       }
 
-      // 2. Track delta and direction switches
       const delta = currentScrollY - lastScrollY.current;
       lastScrollY.current = currentScrollY;
 
@@ -137,12 +377,10 @@ export default function OrdersScreen() {
       }
       accumDelta.current += delta;
 
-      // Debounce direction change for 100ms to eliminate jitter
       if (now - lastDirectionChangeTime.current < 100) {
         return;
       }
 
-      // 3. Hide header: Scroll Down (accumDelta > 35 & scrollY > 50)
       if (accumDelta.current > 35 && currentScrollY > 50 && isHeaderVisible.current) {
         isHeaderVisible.current = false;
         Animated.timing(headerTranslateY, {
@@ -152,7 +390,6 @@ export default function OrdersScreen() {
           useNativeDriver: true,
         }).start();
       }
-      // 4. Show header: Scroll Up (accumDelta < -60)
       else if (accumDelta.current < -60 && !isHeaderVisible.current) {
         isHeaderVisible.current = true;
         Animated.timing(headerTranslateY, {
@@ -166,7 +403,6 @@ export default function OrdersScreen() {
     [headerHeight, headerTranslateY]
   );
 
-  // ─── 4. Reset Header on Search Change ───
   useEffect(() => {
     isHeaderVisible.current = true;
     Animated.timing(headerTranslateY, {
@@ -176,7 +412,6 @@ export default function OrdersScreen() {
     }).start();
   }, [search, headerTranslateY]);
 
-  // ─── 5. List Header Spacer & Reusable Stripe Banner ───
   const listHeader = useMemo(
     () => (
       <View>
@@ -198,10 +433,10 @@ export default function OrdersScreen() {
       </Text>
       <Text style={styles.emptySubtitle}>
         {search.trim()
-          ? 'Try adjusting your search query'
+          ? 'Try adjusting your search query.'
           : 'New incoming deliveries will appear here in real time.'}
       </Text>
-      {!search.trim() && (
+      {!search.trim() ? (
         <Button
           marginTop="$4"
           onPress={onRefresh}
@@ -214,9 +449,13 @@ export default function OrdersScreen() {
         >
           Refresh Orders
         </Button>
-      )}
+      ) : null}
     </View>
   ) : null;
+
+  if (user?.role === 'driver' && !isApproved) {
+    return <DriverProfileStatusScreen />;
+  }
 
   return (
     <View style={styles.root}>
@@ -241,11 +480,13 @@ export default function OrdersScreen() {
           queueCount={queueCount}
           atCapacity={atCapacity}
           isConnected={isConnected}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
         />
         <OrdersSearchBar
           search={search}
           onSearchChange={setSearch}
-          onFilterPress={haptic}
+          showFilter={false}
         />
       </Animated.View>
 
@@ -255,10 +496,10 @@ export default function OrdersScreen() {
         renderItem={({ item }) => (
           <DriverOrderCard
             order={item}
-            isMyOrder={isMyOrder(item.id)}
-            driverAtCapacity={atCapacity && !isMyOrder(item.id)}
+            driverAtCapacity={atCapacity}
             driverUserId={driverId}
             driverDisplayName={user?.displayName ?? user?.email ?? driverId?.slice(0, 8)}
+            onAccept={() => handleAcceptOrder(item)}
             onPress={() => {
               setSelectedOrder(item);
               router.push(`/order/${item.id}`);
@@ -286,6 +527,22 @@ export default function OrdersScreen() {
         keyboardShouldPersistTaps="handled"
       />
 
+      
+
+      <CustomConfirmModal
+        visible={showStripeModal}
+        onClose={() => setShowStripeModal(false)}
+        onConfirm={handleSetupPayouts}
+        variant="warning"
+        title="Bank Account Setup Required"
+        message="You need to connect your bank account via Stripe before accepting orders. This ensures you can receive payouts for your completed deliveries."
+        confirmText="Set Up Payouts"
+        cancelText="Maybe Later"
+        iconName="account-balance"
+        confirmIconName="arrow-forward"
+        loading={onboardingLoading}
+      />
+
       <ActiveDeliveriesBanner queueCount={queueCount} orders={myActiveOrders} />
     </View>
   );
@@ -304,7 +561,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 50,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(15, 19, 28, 0.95)',
+    paddingBottom: 4,
   },
   list: {
     paddingBottom: 32,

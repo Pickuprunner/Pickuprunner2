@@ -9,12 +9,17 @@ import {
   Platform,
   StyleProp,
   ViewStyle,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { CustomCard } from '@/components/core';
 import { APP_CONFIG } from '@/lib/config';
+import { createCheckoutForOrder, openCheckoutUrl } from '@/apis/checkout';
+import { ordersApi } from '@/apis/orders';
+import { useOrderStore } from '@/store/useOrderStore';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -88,6 +93,8 @@ export interface CustomerOrderData {
   driver_photo_url?: string;
   deliveryPhotoUrl?: string;
   delivery_photo_url?: string;
+  customerSessionId?: string;
+  customer_session_id?: string;
 }
 
 export interface CustomerOrderCardProps {
@@ -129,6 +136,47 @@ export function CustomerOrderCard({
   const driverName = order.driverName || order.driver_name;
 
   const initial = (customerName?.trim() || 'C').charAt(0).toUpperCase();
+
+  const [paying, setPaying] = useState(false);
+
+  const isPaid =
+    order.payment_status === 'paid' ||
+    order.payment_status === 'test_paid' ||
+    order.paymentStatus === 'paid' ||
+    order.paymentStatus === 'test_paid';
+  const isChargeable =
+    currentStatus !== 'pending' &&
+    currentStatus !== 'assigned' &&
+    currentStatus !== 'cancelled';
+  const needsPayment = isChargeable && !isPaid;
+
+  const handlePayNow = async () => {
+    if (paying) return;
+    haptic();
+    setPaying(true);
+    try {
+      const res = await createCheckoutForOrder(order.id, {
+        amountCents: totalCents,
+        customerEmail: order.customerEmail || order.customer_email,
+        testMode: true,
+      });
+      if (res?.url) {
+        await openCheckoutUrl(res.url);
+        try {
+          const latest = await ordersApi.getById(order.id);
+          if (latest && latest.id) {
+            useOrderStore.getState().upsertOrder(latest);
+          }
+        } catch {}
+      } else {
+        Alert.alert('Payment', res?.error || 'Could not create checkout session. Please try again.');
+      }
+    } catch (err: any) {
+      Alert.alert('Payment Error', err?.message || 'Failed to initiate checkout.');
+    } finally {
+      setPaying(false);
+    }
+  };
 
   const getStatusBadge = () => {
     switch (currentStatus) {
@@ -287,6 +335,26 @@ export function CustomerOrderCard({
       )}
 
       <View style={styles.actionsContainer}>
+        {needsPayment && (
+          <TouchableOpacity
+            onPress={handlePayNow}
+            disabled={paying}
+            activeOpacity={0.85}
+            style={styles.payButton}
+          >
+            {paying ? (
+              <ActivityIndicator size="small" color="#0F131C" />
+            ) : (
+              <>
+                <MaterialIcons name="payment" size={15} color="#0F131C" />
+                <Text style={styles.payButtonText} numberOfLines={1}>
+                  Pay {fmt(totalCents)}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
         {!isDelivered ? (
           <TouchableOpacity
             onPress={() => {
@@ -694,6 +762,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     width: '100%',
+  },
+  payButton: {
+    flex: 1.2,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#00E297',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 4,
+    shadowColor: 'rgba(0, 226, 151, 0.35)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  payButtonText: {
+    color: '#0F131C',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   actionButton: {
     flex: 1,

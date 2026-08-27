@@ -8,6 +8,7 @@ import {
   Text,
   StatusBar,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -17,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 
 import { blink } from '@/lib/blink';
 import { ordersApi } from '@/apis/orders';
+import { createCheckoutForOrder, openCheckoutUrl } from '@/apis/checkout';
 import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { APP_CONFIG } from '@/lib/config';
@@ -57,7 +59,7 @@ interface TrackedOrder {
   delivery_address?: string;
   deliveryAddress?: string;
   items?: string;
-  status: 'pending' | 'accepted' | 'picked_up' | 'delivered';
+  status: 'pending' | 'assigned' | 'accepted' | 'shopping' | 'picked_up' | 'en_route' | 'delivered' | 'cancelled' | string;
   created_at?: string;
   createdAt?: string;
   driver_name?: string;
@@ -122,6 +124,7 @@ export default function TrackOrderScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   const channelRef = useRef<any>(null);
   const { showToast } = useToast();
@@ -151,11 +154,16 @@ export default function TrackOrderScreen() {
     }
   }, [storeOrder]);
 
+  const initialParamsRef = useRef(params);
+  const fetchOrderRef = useRef<((isManualRefresh?: boolean) => Promise<void>) | null>(null);
+
   const fetchOrder = useCallback(
     async (isManualRefresh = false) => {
       if (!id) return;
       if (isManualRefresh) setRefreshing(true);
       else if (!order) setLoading(true);
+
+      const p = initialParamsRef.current;
 
       try {
         const storeCurrent = useOrderStore.getState().orders.find((o) => o.id === id);
@@ -207,7 +215,7 @@ export default function TrackOrderScreen() {
           foundOrder?.destination ||
           foundOrder?.address ||
           storeCurrent?.deliveryAddress ||
-          params.deliveryAddress ||
+          p?.deliveryAddress ||
           '123 E Test Ave, Sahuarita, AZ 85629';
 
         const resolvedPickup =
@@ -215,39 +223,39 @@ export default function TrackOrderScreen() {
           foundOrder?.pickup_address ||
           foundOrder?.pickup ||
           storeCurrent?.pickupAddress ||
-          params.pickupAddress ||
+          p?.pickupAddress ||
           APP_CONFIG.STORE_ADDRESS;
 
-        if (foundOrder || storeCurrent || params.id) {
+        if (foundOrder || storeCurrent || p?.id) {
           const candidateStatus =
             foundOrder?.status ||
             storeCurrent?.status ||
-            (params.status as any);
+            (p?.status as any);
 
           const effectiveStatus =
             candidateStatus && candidateStatus !== 'pending'
               ? candidateStatus
-              : (storeCurrent?.status || foundOrder?.status || (params.status as any) || 'pending');
+              : (storeCurrent?.status || foundOrder?.status || (p?.status as any) || 'pending');
 
           setOrder({
-            id: foundOrder?.id || storeCurrent?.id || params.id,
+            id: foundOrder?.id || storeCurrent?.id || p?.id,
             status: effectiveStatus as any,
             customerName:
               foundOrder?.customerName ||
               foundOrder?.customer_name ||
               storeCurrent?.customerName ||
-              params.customerName ||
+              p?.customerName ||
               'Customer',
             customerPhone:
               foundOrder?.customerPhone ||
               foundOrder?.customer_phone ||
               storeCurrent?.customerPhone ||
-              params.customerPhone,
+              p?.customerPhone,
             pickupAddress: resolvedPickup,
             pickup_address: resolvedPickup,
             deliveryAddress: resolvedDelivery,
             delivery_address: resolvedDelivery,
-            items: foundOrder?.items || storeCurrent?.items || params.items,
+            items: foundOrder?.items || storeCurrent?.items || p?.items,
             createdAt: foundOrder?.createdAt || foundOrder?.created_at || storeCurrent?.createdAt,
             driverName: foundOrder?.driverName || foundOrder?.driver_name || storeCurrent?.driverName,
             driverPhotoUrl:
@@ -282,8 +290,12 @@ export default function TrackOrderScreen() {
         setRefreshing(false);
       }
     },
-    [id, params]
+    [id]
   );
+
+  useEffect(() => {
+    fetchOrderRef.current = fetchOrder;
+  }, [fetchOrder]);
 
   const handleAssignTestDriver = async () => {
     if (!id || !order) return;
@@ -400,7 +412,7 @@ export default function TrackOrderScreen() {
   // Initial load
   useEffect(() => {
     fetchOrder();
-  }, [fetchOrder]);
+  }, [id]);
 
   // Real-time subscription
   useEffect(() => {
@@ -417,7 +429,7 @@ export default function TrackOrderScreen() {
         channel.onMessage((msg: any) => {
           if (!mounted) return;
           if (msg.type === 'order-changed' || msg.type === 'order:status_change') {
-            fetchOrder();
+            fetchOrderRef.current?.();
           }
         });
       } catch {
@@ -434,7 +446,7 @@ export default function TrackOrderScreen() {
         } catch {}
       }
     };
-  }, [id, fetchOrder]);
+  }, [id]);
 
   const shortId = order?.id ? order.id.slice(-6).toUpperCase() : '------';
   const customerName = order?.customerName || order?.customer_name || 'Customer';
@@ -465,6 +477,52 @@ export default function TrackOrderScreen() {
   const driverName = order?.driverName || order?.driver_name;
   const driverPhoto = order?.driverPhotoUrl || order?.driver_photo_url;
   const deliveryPhoto = order?.deliveryPhotoUrl || order?.delivery_photo_url;
+
+  const DELIVERY_FEE = APP_CONFIG.DELIVERY_FEE_CENTS;
+  const MILEAGE_FREE_MILES = APP_CONFIG.FREE_MILES;
+  const MILEAGE_RATE_CENTS = APP_CONFIG.MILEAGE_RATE_CENTS;
+
+  const miles = Number(order?.distanceMiles ?? order?.distance_miles ?? 0);
+  const tipAmount = Number(order?.tipAmount ?? order?.tip_amount ?? 500);
+  const mileageCents = miles > MILEAGE_FREE_MILES ? Math.round((miles - MILEAGE_FREE_MILES) * MILEAGE_RATE_CENTS) : 0;
+  const totalCents = DELIVERY_FEE + mileageCents + tipAmount;
+
+  const isPaid =
+    order?.payment_status === 'paid' ||
+    order?.payment_status === 'test_paid' ||
+    (order as any)?.paymentStatus === 'paid' ||
+    (order as any)?.paymentStatus === 'test_paid';
+
+  const isChargeable =
+    currentStatus !== 'pending' &&
+    currentStatus !== 'assigned' &&
+    currentStatus !== 'cancelled';
+
+  const needsPayment = isChargeable && !isPaid;
+
+  const handlePayNow = async () => {
+    if (!id || paying) return;
+    haptic();
+    setPaying(true);
+    try {
+      const res = await createCheckoutForOrder(id, {
+        amountCents: totalCents,
+        customerEmail: (order as any)?.customerEmail || (order as any)?.customer_email,
+        testMode: true,
+      });
+      if (res?.url) {
+        await openCheckoutUrl(res.url);
+        // Refresh order status immediately upon returning from checkout
+        await fetchOrder(true);
+      } else {
+        showToast(res?.error || 'Could not create checkout session', { type: 'error' });
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to initiate payment', { type: 'error' });
+    } finally {
+      setPaying(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -617,6 +675,40 @@ export default function TrackOrderScreen() {
             deliveryPhoto={deliveryPhoto}
           />
         </Animated.View>
+
+        {/* Payment Banner (When Driver has Accepted & Order is Chargeable) */}
+        {needsPayment && (
+          <Animated.View entering={FadeInDown.delay(40).springify()}>
+            <View style={styles.paymentBanner}>
+              <View style={styles.paymentBannerLeft}>
+                <View style={styles.paymentIconCircle}>
+                  <MaterialIcons name="credit-card" size={20} color="#00E297" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.paymentBannerTitle}>Payment Ready</Text>
+                  <Text style={styles.paymentBannerSub}>
+                    Driver assigned. Total: ${(totalCents / 100).toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={handlePayNow}
+                disabled={paying}
+                activeOpacity={0.85}
+                style={styles.payNowBtn}
+              >
+                {paying ? (
+                  <ActivityIndicator size="small" color="#0F131C" />
+                ) : (
+                  <>
+                    <MaterialIcons name="lock" size={16} color="#0F131C" />
+                    <Text style={styles.payNowBtnText}>Pay Now</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
 
         {/* Order Status Timeline */}
         <Animated.View entering={FadeInDown.delay(70).springify()}>
@@ -839,5 +931,59 @@ const styles = StyleSheet.create({
     color: colors.onSurface,
     fontSize: 15,
     fontWeight: '700',
+  },
+  paymentBanner: {
+    backgroundColor: 'rgba(0, 226, 151, 0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 226, 151, 0.35)',
+    borderRadius: 18,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  paymentBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  paymentIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 226, 151, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentBannerTitle: {
+    color: '#00E297',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  paymentBannerSub: {
+    color: '#c2c6d8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  payNowBtn: {
+    backgroundColor: '#00E297',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: 'rgba(0, 226, 151, 0.4)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  payNowBtnText: {
+    color: '#0F131C',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

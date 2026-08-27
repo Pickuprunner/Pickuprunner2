@@ -1,8 +1,10 @@
 import { apiClient } from '@/lib/apiClient';
+import * as WebBrowser from 'expo-web-browser';
+import { Platform, Linking } from 'react-native';
 
 export interface CreateCheckoutPayload {
   orderId: string;
-  amountCents: number;
+  amountCents?: number;
   customerEmail?: string;
   testMode?: boolean;
 }
@@ -20,6 +22,9 @@ export interface CheckoutResponse {
   clientSecret?: string;
   sessionId?: string;
   paymentIntentId?: string;
+  splitPayment?: boolean;
+  applicationFeeCents?: number;
+  error?: string;
 }
 
 export const checkoutApi = {
@@ -29,3 +34,46 @@ export const checkoutApi = {
   sendPaymentLink: (payload: SendPaymentLinkPayload) =>
     apiClient.post<{ success: boolean; message: string }>('/send-payment-link', payload),
 };
+
+export async function createCheckoutForOrder(
+  orderId: string,
+  options: { amountCents?: number; customerEmail?: string; testMode?: boolean } = {}
+): Promise<CheckoutResponse | null> {
+  if (!orderId) return null;
+  try {
+    const payload: CreateCheckoutPayload = {
+      orderId,
+      testMode: options.testMode ?? true,
+      ...(options.amountCents !== undefined ? { amountCents: options.amountCents } : {}),
+      ...(options.customerEmail ? { customerEmail: options.customerEmail } : {}),
+    };
+    const res = await checkoutApi.createCheckout(payload);
+    return res;
+  } catch (err: any) {
+    console.warn('[checkoutApi] createCheckout failed for order:', orderId, err?.message || err);
+    return null;
+  }
+}
+
+export async function openCheckoutUrl(url: string): Promise<boolean> {
+  if (!url) return false;
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank');
+    }
+    return true;
+  }
+  try {
+    await WebBrowser.openBrowserAsync(url);
+    return true;
+  } catch (e) {
+    console.warn('[checkoutApi] WebBrowser failed, trying Linking:', e);
+    try {
+      await Linking.openURL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
