@@ -18,6 +18,8 @@ import { router } from 'expo-router';
 import { CustomCard } from '@/components/core';
 import { APP_CONFIG } from '@/lib/config';
 import { createCheckoutForOrder, openCheckoutUrl } from '@/apis/checkout';
+import { ordersApi } from '@/apis/orders';
+import { useOrderStore } from '@/store/useOrderStore';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -160,6 +162,12 @@ export function CustomerOrderCard({
       });
       if (res?.url) {
         await openCheckoutUrl(res.url);
+        try {
+          const latest = await ordersApi.getById(order.id);
+          if (latest && latest.id) {
+            useOrderStore.getState().upsertOrder(latest);
+          }
+        } catch {}
       } else {
         Alert.alert('Payment', res?.error || 'Could not create checkout session. Please try again.');
       }

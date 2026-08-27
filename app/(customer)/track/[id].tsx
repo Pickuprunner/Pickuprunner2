@@ -414,17 +414,6 @@ export default function TrackOrderScreen() {
     fetchOrder();
   }, [id]);
 
-  // Periodic auto-polling interval so customer screen updates in real time on any driver action
-  useEffect(() => {
-    if (!id || order?.status === 'delivered' || order?.status === 'cancelled') return;
-
-    const interval = setInterval(() => {
-      fetchOrderRef.current?.();
-    }, 6000);
-
-    return () => clearInterval(interval);
-  }, [id, order?.status]);
-
   // Real-time subscription
   useEffect(() => {
     if (!id) return;
@@ -523,6 +512,8 @@ export default function TrackOrderScreen() {
       });
       if (res?.url) {
         await openCheckoutUrl(res.url);
+        // Refresh order status immediately upon returning from checkout
+        await fetchOrder(true);
       } else {
         showToast(res?.error || 'Could not create checkout session', { type: 'error' });
       }
