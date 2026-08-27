@@ -226,7 +226,6 @@ export default function OrdersScreen() {
   } = useAvailableOrders({
     lat: driverLocation.lat,
     lng: driverLocation.lng,
-    radiusMiles: 25,
   });
   const { data: allOrders = [], isLoading: isLoadingAll, refetch: refetchAll } = useOrders();
   const { isConnected } = useOrdersRealtime();

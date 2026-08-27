@@ -127,6 +127,8 @@ export function useCreateOrder() {
       customerEmail?: string;
       pickupAddress: string;
       deliveryAddress: string;
+      pickupLat?: number;
+      pickupLng?: number;
       items: string;
       tipAmount?: number; // In cents or dollars
       distanceMiles?: number;
@@ -146,6 +148,8 @@ export function useCreateOrder() {
         customerEmail: orderData.customerEmail?.trim() || undefined,
         pickupAddress: orderData.pickupAddress.trim(),
         deliveryAddress: orderData.deliveryAddress.trim(),
+        pickupLat: orderData.pickupLat,
+        pickupLng: orderData.pickupLng,
         items: orderData.items?.trim() || '[LEAVE AT DOOR] Standard delivery items',
         tipAmount: tipCents,
         distanceMiles: Math.max(0, Number(orderData.distanceMiles ?? 0)),

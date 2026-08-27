@@ -17,6 +17,8 @@ export interface CreateOrderPayload {
   customerEmail?: string;
   pickupAddress: string;
   deliveryAddress: string;
+  pickupLat?: number;
+  pickupLng?: number;
   items?: string;
   status?: OrderStatus;
   tipAmount?: number;
@@ -38,6 +40,8 @@ export interface UpdateOrderPayload {
   distanceMiles?: number;
   pickupAddress?: string;
   deliveryAddress?: string;
+  pickupLat?: number;
+  pickupLng?: number;
   items?: string;
   customerName?: string;
   customerPhone?: string;
@@ -57,6 +61,16 @@ export interface OrderItem {
   customerEmail?: string;
   pickupAddress: string;
   deliveryAddress: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  pickup_lat?: number;
+  pickup_lng?: number;
+  pickupDistanceMiles?: number;
+  pickup_distance_miles?: number;
+  earningsCents?: number;
+  earnings_cents?: number;
+  mileageCents?: number;
+  tipCents?: number;
   items?: string;
   status: OrderStatus;
   driverUserId?: string;
@@ -113,6 +127,10 @@ function unwrapOrder(res: any): OrderItem {
     customerEmail: raw.customerEmail || raw.customer_email,
     pickupAddress: raw.pickupAddress || raw.pickup_address || '',
     deliveryAddress: raw.deliveryAddress || raw.delivery_address || '',
+    pickupLat: raw.pickupLat ?? raw.pickup_lat,
+    pickupLng: raw.pickupLng ?? raw.pickup_lng,
+    pickupDistanceMiles: raw.pickupDistanceMiles ?? raw.pickup_distance_miles,
+    earningsCents: raw.earningsCents ?? raw.earnings_cents,
     items: raw.items || '',
     status: raw.status || 'pending',
     createdAt: raw.createdAt || raw.created_at || new Date().toISOString(),

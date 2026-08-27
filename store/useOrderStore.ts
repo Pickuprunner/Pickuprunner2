@@ -20,6 +20,12 @@ export interface Order {
   customerEmail?: string;
   pickupAddress: string;
   deliveryAddress: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  pickup_lat?: number;
+  pickup_lng?: number;
+  pickupDistanceMiles?: number;
+  earningsCents?: number;
   items: string;
   status: OrderStatus;
   createdAt: string;
@@ -72,6 +78,8 @@ export interface CreateOrderInput {
   customerEmail?: string;
   pickupAddress: string;
   deliveryAddress: string;
+  pickupLat?: number;
+  pickupLng?: number;
   items: string;
   status?: OrderStatus;
   tipAmount?: number;

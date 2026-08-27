@@ -204,6 +204,8 @@ export default function CustomerNewOrderScreen() {
           customerEmail: form.email.trim() || undefined,
           pickupAddress: form.address.trim(),
           deliveryAddress: form.deliveryAddress.trim(),
+          pickupLat: 31.9505,
+          pickupLng: -110.9747,
           items: orderItems || '[LEAVE AT DOOR] Standard delivery items',
           distanceMiles: parseFloat(form.miles) || 0,
           tipAmount: finalTipCents,
