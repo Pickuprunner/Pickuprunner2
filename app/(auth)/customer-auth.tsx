@@ -348,15 +348,6 @@ export default function CustomerAuthScreen() {
                     </Text>
                   </Pressable>
                 </View>
-
-                <Pressable
-                  onPress={() => router.replace('/(customer)/my-orders')}
-                  style={({ pressed }) => [styles.guestBtn, pressed && { opacity: 0.7 }]}
-                >
-                  <Text style={styles.guestBtnText}>
-                    Continue without an account
-                  </Text>
-                </Pressable>
               </View>
             </View>
           </ScrollView>
@@ -461,14 +452,5 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     color: colors.primary,
     fontWeight: '600',
-  },
-  guestBtn: {
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  guestBtnText: {
-    fontSize: 13.5,
-    color: colors.outline,
   },
 });

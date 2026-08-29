@@ -365,9 +365,9 @@ export function CustomerOrderCard({
         )}
 
         {isPaid && (
-          <View style={[styles.payButton, { backgroundColor: 'rgba(0, 226, 151, 0.15)', borderWidth: 1, borderColor: 'rgba(0, 226, 151, 0.4)' }]}>
-            <MaterialIcons name="check-circle" size={15} color="#00E297" />
-            <Text style={[styles.payButtonText, { color: '#00E297' }]} numberOfLines={1}>
+          <View style={styles.paidBadge}>
+            <MaterialIcons name="check-circle" size={15} color="#00e297" />
+            <Text style={styles.paidBadgeText} numberOfLines={1}>
               PAID
             </Text>
           </View>
@@ -880,5 +880,24 @@ const styles = StyleSheet.create({
     color: '#00e297',
     fontSize: 12,
     fontWeight: '700',
+  },
+  paidBadge: {
+    flex: 1.2,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  paidBadgeText: {
+    color: '#00e297',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
 });

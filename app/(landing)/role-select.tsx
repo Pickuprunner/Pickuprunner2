@@ -9,7 +9,6 @@ import {
   Truck,
   ShoppingBag,
   ChevronRight,
-  Zap,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { saveRole, AppRole } from '@/hooks/useRole';
@@ -118,24 +117,6 @@ export default function RoleSelectScreen() {
           <Text style={styles.switchRolesHint}>Switch roles anytime from Profile</Text>
         </View>
         <View style={styles.footerSection}>
-          <Pressable
-            onPress={async () => {
-              if (selecting) return;
-              setSelecting('driver');
-              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
-              await AsyncStorage.setItem('app_role', 'driver');
-              await AsyncStorage.setItem('driver_test_mode', 'true');
-              router.replace('/(tabs)');
-            }}
-            disabled={!!selecting}
-            style={({ pressed }) => [
-              styles.testDriverButton,
-              pressed && styles.testDriverButtonPressed,
-            ]}
-          >
-            <Zap size={14} color={colors.secondaryContainer} />
-            <Text style={styles.testDriverButtonText}>Enter as test driver</Text>
-          </Pressable>
           <View style={styles.linksRow}>
             <Text
               style={styles.linkText}
@@ -298,29 +279,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
     marginTop: spacing.lg,
-  },
-  testDriverButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 102, 255, 0.3)',
-    backgroundColor: 'rgba(28, 31, 41, 0.65)',
-  },
-  testDriverButtonPressed: {
-    backgroundColor: 'rgba(28, 31, 41, 0.95)',
-    borderColor: 'rgba(0, 102, 255, 0.5)',
-    transform: [{ scale: 0.97 }],
-  },
-  testDriverButtonText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.2,
   },
   linksRow: {
     flexDirection: 'row',
