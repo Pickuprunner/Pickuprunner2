@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '@/constants/design';
 
@@ -16,15 +17,23 @@ export function TrackDriverCard({
   driverPhone,
   isPickedUp,
 }: TrackDriverCardProps) {
+  const initial = (driverName || 'D').trim().charAt(0).toUpperCase();
+
   return (
     <View style={styles.card}>
       <Text style={styles.cardHeaderLabel}>ASSIGNED DRIVER</Text>
       <View style={styles.driverRow}>
-        {driverPhoto ? (
-          <Image source={{ uri: driverPhoto }} style={styles.driverAvatarImg} />
+        {driverPhoto && driverPhoto.startsWith('http') ? (
+          <Image
+            source={{ uri: driverPhoto }}
+            style={styles.driverAvatarImg}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
+          />
         ) : (
           <View style={styles.driverAvatarFallback}>
-            <MaterialIcons name="person" size={24} color={colors.secondary} />
+            <Text style={styles.driverInitialText}>{initial}</Text>
           </View>
         )}
 
@@ -92,11 +101,16 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: colors.accentAlpha15,
-    borderWidth: 1,
-    borderColor: colors.accentAlpha30,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 226, 151, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  driverInitialText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#00E297',
   },
   driverInfoCol: {
     flex: 1,

@@ -9,6 +9,7 @@ import {
   View,
   Text,
   LayoutChangeEvent,
+  TouchableOpacity,
 } from 'react-native';
 import { Package } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
@@ -84,17 +85,25 @@ export default function MyOrdersScreen() {
       .sort((a, b) => Number(a.distanceMiles ?? 0) - Number(b.distanceMiles ?? 0));
   }, [orders, driverId]);
 
+  const [selectedTab, setSelectedTab] = useState<'active' | 'completed'>('active');
+
   const deliveredOrders = useMemo(() => {
-    return orders.filter((o) => o.status === 'delivered' && o.driverUserId === driverId);
+    return orders
+      .filter(
+        (o) =>
+          o.status === 'delivered' &&
+          (o.driverUserId === driverId || !o.driverUserId)
+      )
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }, [orders, driverId]);
 
   const allDriverOrders = useMemo(() => {
-    return orders.filter((o) => o.driverUserId === driverId);
+    return orders.filter((o) => o.driverUserId === driverId || !o.driverUserId);
   }, [orders, driverId]);
 
   // Compute Today's Stats from driver's completed and active deliveries
   const todayStats = useMemo(() => {
-    const totalDeliveries = deliveredOrders.length > 0 ? deliveredOrders.length : allDriverOrders.length;
+    const totalDeliveries = deliveredOrders.length;
     let totalCents = 0;
     let totalMiles = 0;
     let totalTipCents = 0;
@@ -211,10 +220,7 @@ export default function MyOrdersScreen() {
     [headerHeight, headerTranslateY]
   );
 
-  const hasActive = activeOrders.length > 0;
-  const displayList = activeOrders;
-  const sectionTitle = 'Active Deliveries';
-  const pillCountText = `${activeOrders.length} ACTIVE`;
+  const displayList = selectedTab === 'active' ? activeOrders : deliveredOrders;
 
   const listHeader = useMemo(
     () => (
@@ -224,28 +230,69 @@ export default function MyOrdersScreen() {
         <TodayEarningsCard stats={todayStats} />
 
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{sectionTitle}</Text>
-          <View style={[styles.sectionPill, hasActive && styles.sectionPillActive]}>
-            <Text style={[styles.sectionPillText, hasActive && styles.sectionPillActiveText]}>
-              {pillCountText}
-            </Text>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                haptic();
+                setSelectedTab('active');
+              }}
+              style={[
+                styles.tabBtn,
+                selectedTab === 'active' && styles.tabBtnActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.tabBtnText,
+                  selectedTab === 'active' && styles.tabBtnTextActive,
+                ]}
+              >
+                Active ({activeOrders.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                haptic();
+                setSelectedTab('completed');
+              }}
+              style={[
+                styles.tabBtn,
+                selectedTab === 'completed' && styles.tabBtnActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.tabBtnText,
+                  selectedTab === 'completed' && styles.tabBtnTextActive,
+                ]}
+              >
+                Completed ({deliveredOrders.length})
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         {isLoading && <SkeletonList count={2} />}
       </View>
     ),
-    [headerHeight, todayStats, sectionTitle, hasActive, pillCountText, isLoading]
+    [headerHeight, todayStats, selectedTab, activeOrders.length, deliveredOrders.length, isLoading]
   );
 
   const EmptyView = !isLoading ? (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconCircle}>
-        <Package size={36} color="rgba(244, 195, 0, 0.4)" />
+        <Package size={36} color={selectedTab === 'completed' ? '#00E297' : 'rgba(244, 195, 0, 0.4)'} />
       </View>
-      <Text style={styles.emptyTitle}>No active orders</Text>
+      <Text style={styles.emptyTitle}>
+        {selectedTab === 'active' ? 'No active orders' : 'No completed deliveries'}
+      </Text>
       <Text style={styles.emptySubtitle}>
-        Accept orders from the Orders tab to begin deliveries.
+        {selectedTab === 'active'
+          ? 'Accept orders from the Orders tab to begin deliveries.'
+          : 'Delivered orders will be recorded here.'}
       </Text>
     </View>
   ) : null;
@@ -277,17 +324,65 @@ export default function MyOrdersScreen() {
       <FlatList
         data={displayList}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <DriverMyOrderCard
-            order={item}
-            driverUserId={driverId}
-            driverDisplayName={user?.displayName ?? user?.email ?? driverId?.slice(0, 8)}
-            onPress={() => {
-              setSelectedOrder(item);
-              router.push(`/order/${item.id}`);
-            }}
-          />
-        )}
+        renderItem={({ item }) => {
+          if (selectedTab === 'completed') {
+            const miles = Number(item.distanceMiles ?? 0);
+            const earnings = calcDriverEarnings(miles, Number(item.tipAmount ?? 0));
+            const shortId = item.id ? item.id.slice(-6).toUpperCase() : '------';
+            const customerName = item.customerName || (item as any).customer_name || 'Customer';
+            const address = item.deliveryAddress || (item as any).delivery_address || 'Delivery Destination';
+
+            return (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  haptic();
+                  setSelectedOrder(item);
+                  router.push(`/order/${item.id}`);
+                }}
+                style={styles.minimalCard}
+              >
+                <View style={styles.minimalCardLeft}>
+                  <View style={styles.minimalAvatar}>
+                    <Text style={styles.minimalAvatarText}>
+                      {customerName.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.minimalCustomerName} numberOfLines={1}>
+                        {customerName}
+                      </Text>
+                      <Text style={styles.minimalRefText}>#{shortId}</Text>
+                    </View>
+                    <Text style={styles.minimalAddress} numberOfLines={1}>
+                      {address}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.minimalCardRight}>
+                  <Text style={styles.minimalEarnings}>{earnings.totalDisplay}</Text>
+                  <View style={styles.deliveredPill}>
+                    <Text style={styles.deliveredPillText}>DELIVERED ✓</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            );
+          }
+
+          return (
+            <DriverMyOrderCard
+              order={item}
+              driverUserId={driverId}
+              driverDisplayName={user?.displayName ?? user?.email ?? driverId?.slice(0, 8)}
+              onPress={() => {
+                setSelectedOrder(item);
+                router.push(`/order/${item.id}`);
+              }}
+            />
+          );
+        }}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={EmptyView}
         onScroll={handleScroll}
@@ -330,40 +425,109 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
     marginTop: 8,
     marginBottom: 16,
   },
-  sectionTitle: {
-    color: '#DFE2EF',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  sectionPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  tabContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 14,
+    padding: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  sectionPillActive: {
-    backgroundColor: 'rgba(244, 195, 0, 0.12)',
-    borderColor: 'rgba(244, 195, 0, 0.3)',
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
   },
-  sectionPillText: {
+  tabBtnActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  tabBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#8C90A1',
+  },
+  tabBtnTextActive: {
+    color: '#DFE2EF',
+    fontWeight: '700',
+  },
+  minimalCard: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: colors.glassLevel2Bg,
+    borderWidth: 1,
+    borderColor: colors.glassLevel2Border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  minimalCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  minimalAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  minimalAvatarText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#00E297',
+  },
+  minimalCustomerName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#DFE2EF',
+    maxWidth: 140,
+  },
+  minimalRefText: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    color: '#8C90A1',
   },
-  sectionPillActiveText: {
-    color: '#FFE399',
+  minimalAddress: {
+    fontSize: 12,
+    color: '#8C90A1',
+  },
+  minimalCardRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  minimalEarnings: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#DFE2EF',
+  },
+  deliveredPill: {
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderColor: 'rgba(0, 226, 151, 0.3)',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  deliveredPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#00E297',
+    letterSpacing: 0.5,
   },
   emptyContainer: {
     alignItems: 'center',

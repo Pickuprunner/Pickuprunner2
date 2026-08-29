@@ -54,4 +54,26 @@ export const deliveryApi = {
 
     return data as UploadPhotoResponse;
   },
+
+  getPhotoUrl: async (orderId: string): Promise<string | null> => {
+    try {
+      const baseUrl = getApiBaseUrl();
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${baseUrl}/delivery-photo/${orderId}`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data?.url || null;
+    } catch {
+      return null;
+    }
+  },
 };

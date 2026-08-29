@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '@/constants/design';
 
@@ -40,7 +41,13 @@ export function TrackHeroCard({ hero, isDelivered, deliveryPhoto }: TrackHeroCar
             <MaterialIcons name="verified" size={16} color={colors.tertiary} />
             <Text style={styles.photoHeaderText}>Verified Delivery Photo</Text>
           </View>
-          <Image source={{ uri: deliveryPhoto }} style={styles.deliveryImage} resizeMode="cover" />
+          <Image
+            source={{ uri: deliveryPhoto }}
+            style={styles.deliveryImage}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
+          />
         </View>
       )}
     </View>

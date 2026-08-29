@@ -185,7 +185,18 @@ export const useOrderStore = create<OrderStoreState>()(
             hasAlcohol: incoming.hasAlcohol ?? existing?.hasAlcohol ?? 0,
             ageVerified: incoming.ageVerified ?? incoming.age_verified ?? existing?.ageVerified,
             ageVerifiedAt: incoming.ageVerifiedAt ?? incoming.age_verified_at ?? existing?.ageVerifiedAt,
-            deliveryPhotoUrl: incoming.deliveryPhotoUrl || incoming.delivery_photo_url || existing?.deliveryPhotoUrl,
+            deliveryPhotoUrl:
+              incoming.deliveryPhotoUrl && (incoming.deliveryPhotoUrl.startsWith('http') || incoming.deliveryPhotoUrl.startsWith('file://'))
+                ? incoming.deliveryPhotoUrl
+                : existing?.deliveryPhotoUrl && (existing.deliveryPhotoUrl.startsWith('http') || existing.deliveryPhotoUrl.startsWith('file://'))
+                ? existing.deliveryPhotoUrl
+                : incoming.deliveryPhotoUrl || incoming.delivery_photo_url || existing?.deliveryPhotoUrl,
+            delivery_photo_url:
+              incoming.delivery_photo_url && (incoming.delivery_photo_url.startsWith('http') || incoming.delivery_photo_url.startsWith('file://'))
+                ? incoming.delivery_photo_url
+                : existing?.delivery_photo_url && (existing.delivery_photo_url.startsWith('http') || existing.delivery_photo_url.startsWith('file://'))
+                ? existing.delivery_photo_url
+                : incoming.deliveryPhotoUrl || incoming.delivery_photo_url || existing?.delivery_photo_url,
             deliveredAt: incoming.deliveredAt || incoming.delivered_at || existing?.deliveredAt,
             driverUserId: incoming.driverUserId || incoming.driver_user_id || existing?.driverUserId,
             driverName: incoming.driverName || incoming.driver_name || existing?.driverName,

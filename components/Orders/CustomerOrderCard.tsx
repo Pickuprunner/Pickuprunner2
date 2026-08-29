@@ -273,7 +273,9 @@ export function CustomerOrderCard({
       {driverName && !isDelivered && (
         <View style={styles.driverBanner}>
           <View style={styles.driverAvatar}>
-            <MaterialIcons name="person" size={16} color="#00E297" />
+            <Text style={{ fontSize: 13, fontWeight: '800', color: '#00E297' }}>
+              {(driverName || 'D').trim().charAt(0).toUpperCase()}
+            </Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.driverNameText}>{driverName}</Text>
@@ -293,11 +295,11 @@ export function CustomerOrderCard({
       >
         <View style={styles.priceContainer}>
           <Text style={styles.priceText}>{fmt(totalCents)}</Text>
-          <View style={[styles.paymentTag, isPaid && { backgroundColor: 'rgba(0, 226, 151, 0.15)', borderColor: 'rgba(0, 226, 151, 0.4)' }]}>
-            <Text style={[styles.paymentTagText, isPaid && { color: '#00E297' }]}>
-              {isPaid ? '✓ Paid' : '$ Pay on Pickup'}
-            </Text>
-          </View>
+          {!isPaid && (
+            <View style={styles.paymentTag}>
+              <Text style={styles.paymentTagText}>Pay on Pickup</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.detailsToggle}>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { CustomCard } from '@/components/core';
 import { colors } from '@/constants/design';
@@ -38,7 +39,9 @@ export function DeliveredSuccessCard({
           <Image
             source={{ uri: photoUrl }}
             style={styles.deliveredPhoto}
-            resizeMode="cover"
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
           />
         </View>
       )}

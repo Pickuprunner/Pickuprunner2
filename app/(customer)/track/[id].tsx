@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 
 import { blink } from '@/lib/blink';
 import { ordersApi } from '@/apis/orders';
+import { deliveryApi } from '@/apis/delivery';
 import { createCheckoutForOrder, openCheckoutUrl } from '@/apis/checkout';
 import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
@@ -155,8 +156,8 @@ export default function TrackOrderScreen() {
         driver_photo_url: storeOrder.deliveryPhotoUrl || prev?.driver_photo_url,
         deliveryPhotoUrl: storeOrder.deliveryPhotoUrl || prev?.deliveryPhotoUrl,
         delivery_photo_url: storeOrder.deliveryPhotoUrl || prev?.delivery_photo_url,
-        paymentStatus: storeOrder.paymentStatus || storeOrder.payment_status || prev?.paymentStatus,
-        payment_status: storeOrder.paymentStatus || storeOrder.payment_status || prev?.payment_status,
+        paymentStatus: (storeOrder as any).paymentStatus || (storeOrder as any).payment_status || prev?.paymentStatus,
+        payment_status: (storeOrder as any).payment_status || (storeOrder as any).paymentStatus || prev?.payment_status,
       }));
     }
   }, [storeOrder]);
@@ -244,6 +245,19 @@ export default function TrackOrderScreen() {
               ? candidateStatus
               : (storeCurrent?.status || foundOrder?.status || (p?.status as any) || 'pending');
 
+          let resolvedPhoto =
+            foundOrder?.deliveryPhotoUrl ||
+            foundOrder?.delivery_photo_url ||
+            storeCurrent?.deliveryPhotoUrl;
+
+          if (resolvedPhoto && !resolvedPhoto.startsWith('http') && !resolvedPhoto.startsWith('file://')) {
+            const targetId = foundOrder?.id || id;
+            if (targetId) {
+              const signed = await deliveryApi.getPhotoUrl(targetId).catch(() => null);
+              if (signed) resolvedPhoto = signed;
+            }
+          }
+
           setOrder({
             id: foundOrder?.id || storeCurrent?.id || p?.id,
             status: effectiveStatus as any,
@@ -267,8 +281,7 @@ export default function TrackOrderScreen() {
             driverName: foundOrder?.driverName || foundOrder?.driver_name || storeCurrent?.driverName,
             driverPhotoUrl:
               foundOrder?.driverPhotoUrl || foundOrder?.driver_photo_url || storeCurrent?.deliveryPhotoUrl,
-            deliveryPhotoUrl:
-              foundOrder?.deliveryPhotoUrl || foundOrder?.delivery_photo_url || storeCurrent?.deliveryPhotoUrl,
+            deliveryPhotoUrl: resolvedPhoto,
             paymentStatus: foundOrder?.paymentStatus || foundOrder?.payment_status || storeCurrent?.paymentStatus || storeCurrent?.payment_status,
             payment_status: foundOrder?.payment_status || foundOrder?.paymentStatus || storeCurrent?.payment_status || storeCurrent?.paymentStatus,
           });

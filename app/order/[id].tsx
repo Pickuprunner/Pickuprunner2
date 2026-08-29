@@ -27,6 +27,7 @@ import { CustomCard, CustomLoading, CustomConfirmModal, useToast } from '@/compo
 import { colors } from '@/constants/design';
 import { useOrderStore } from '@/store/useOrderStore';
 import { ordersApi } from '@/apis/orders';
+import { deliveryApi } from '@/apis/delivery';
 
 import {
   StepBar,
@@ -102,9 +103,17 @@ export default function OrderDetailScreen() {
 
   useEffect(() => {
     if (fetchId) {
-      ordersApi.getById(fetchId).then((fresh) => {
+      ordersApi.getById(fetchId).then(async (fresh) => {
         if (fresh && fresh.id) {
-          useOrderStore.getState().upsertOrder(fresh as any); 
+          let resolved = fresh;
+          const raw = fresh.deliveryPhotoUrl || (fresh as any).delivery_photo_url;
+          if (raw && !raw.startsWith('http') && !raw.startsWith('file://')) {
+            const signed = await deliveryApi.getPhotoUrl(fresh.id).catch(() => null);
+            if (signed) {
+              resolved = { ...fresh, deliveryPhotoUrl: signed, delivery_photo_url: signed };
+            }
+          }
+          useOrderStore.getState().upsertOrder(resolved as any);
         }
       }).catch(() => {});
     }
@@ -123,11 +132,28 @@ export default function OrderDetailScreen() {
   useEffect(() => {
     if (currentOrder) {
       setSelectedOrder(currentOrder);
-      dispatch({
-        type: 'HYDRATE',
-        status: (currentOrder.status as DeliveryState) || 'pending',
-        photoUrl: currentOrder.deliveryPhotoUrl || currentOrder.delivery_photo_url,
-      });
+      const pUrl = currentOrder.deliveryPhotoUrl || currentOrder.delivery_photo_url;
+      if (pUrl && !pUrl.startsWith('http') && !pUrl.startsWith('file://') && currentOrder.id) {
+        deliveryApi.getPhotoUrl(currentOrder.id).then((signed) => {
+          if (signed) {
+            useOrderStore.getState().updateOrder(currentOrder.id, {
+              deliveryPhotoUrl: signed,
+              delivery_photo_url: signed,
+            });
+            dispatch({
+              type: 'HYDRATE',
+              status: (currentOrder.status as DeliveryState) || 'pending',
+              photoUrl: signed,
+            });
+          }
+        }).catch(() => {});
+      } else {
+        dispatch({
+          type: 'HYDRATE',
+          status: (currentOrder.status as DeliveryState) || 'pending',
+          photoUrl: pUrl,
+        });
+      }
     }
   }, [currentOrder?.status, currentOrder?.deliveryPhotoUrl, currentOrder?.delivery_photo_url]);
 
@@ -209,24 +235,26 @@ export default function OrderDetailScreen() {
   }
 
   async function uploadPhoto(uri: string) {
+    if (!currentOrder?.id) return;
     dispatch({ type: 'SET_UPLOADING', uploading: true });
     try {
       const ext = uri.split('.').pop()?.split('?')[0]?.replace('jpg', 'jpeg') ?? 'jpeg';
       const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
-      const filename = `delivery_${order!.id}_${Date.now()}.${ext}`;
+      const filename = `delivery_${currentOrder.id}_${Date.now()}.${ext}`;
       const storagePath = `delivery-photos/${filename}`;
 
-      const formData = new FormData();
-      if (Platform.OS === 'web') {
-        const resp = await fetch(uri);
-        const blob = await resp.blob();
-        formData.append('file', new File([blob], filename, { type: mimeType }));
-      } else {
-        formData.append('file', { uri, type: mimeType, name: filename } as any);
-      }
-      formData.append('path', storagePath);
+      const res = await deliveryApi.uploadPhoto({
+        file: { uri, name: filename, type: mimeType },
+        orderId: currentOrder.id,
+        path: storagePath,
+      });
 
-      dispatch({ type: 'SET_PHOTO', uri });
+      const photoUrl = res?.url || res?.publicUrl || storagePath;
+      dispatch({ type: 'SET_PHOTO', uri: photoUrl });
+      useOrderStore.getState().updateOrder(currentOrder.id, {
+        deliveryPhotoUrl: photoUrl,
+        delivery_photo_url: photoUrl,
+      });
       showToast('Photo uploaded', { type: 'success' });
     } catch (e: any) {
       console.error('[uploadPhoto] Error:', e?.message || e);
