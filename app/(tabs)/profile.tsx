@@ -156,9 +156,13 @@ export default function ProfileScreen() {
     if (isAuthenticated) {
       try {
         await updateProfile({ displayName: trimmed });
+        showToast('Name updated successfully', 'success');
       } catch (e) {
         console.warn('Profile sync failed:', e);
+        showToast('Name updated locally', 'info');
       }
+    } else {
+      showToast('Name updated', 'success');
     }
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });

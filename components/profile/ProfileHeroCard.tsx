@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -52,7 +52,7 @@ function getInitials(name: string, fallback: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() || fallback;
 }
 
-const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none', outline: 'none' } as any) : {};
+const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none', outline: 'none', boxShadow: 'none' } as any) : {};
 
 export function ProfileHeroCard({
   displayName,
@@ -66,6 +66,13 @@ export function ProfileHeroCard({
 }: ProfileHeroCardProps) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(displayName);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!editing) {
+      setEditValue(displayName);
+    }
+  }, [displayName, editing]);
 
   const startEdit = () => {
     haptic('light');
@@ -81,10 +88,24 @@ export function ProfileHeroCard({
 
   const confirmEdit = async () => {
     const trimmed = editValue.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      cancelEdit();
+      return;
+    }
+    if (trimmed === displayName) {
+      setEditing(false);
+      return;
+    }
     haptic('medium');
     if (onSaveDisplayName) {
-      await onSaveDisplayName(trimmed);
+      setIsSaving(true);
+      try {
+        await onSaveDisplayName(trimmed);
+      } catch (err) {
+        console.warn('[ProfileHeroCard] save error:', err);
+      } finally {
+        setIsSaving(false);
+      }
     }
     setEditing(false);
   };
@@ -123,30 +144,65 @@ export function ProfileHeroCard({
               <TextInput
                 value={editValue}
                 onChangeText={setEditValue}
-                placeholder="Your Name"
-                placeholderTextColor="rgba(255,255,255,0.4)"
+                placeholder="Enter name"
+                placeholderTextColor="rgba(255,255,255,0.35)"
                 autoFocus
+                underlineColorAndroid="transparent"
+                returnKeyType="done"
+                onSubmitEditing={confirmEdit}
+                maxLength={30}
                 style={[styles.nameEditInput, webNoOutline]}
               />
               <View style={styles.editActionRow}>
-                <Pressable onPress={cancelEdit} style={styles.editCancelBtn}>
-                  <X size={14} color={TEXT_MUTED} />
+                <Pressable
+                  onPress={cancelEdit}
+                  disabled={isSaving}
+                  style={({ pressed }) => [
+                    styles.editCancelBtn,
+                    pressed && styles.btnPressed,
+                  ]}
+                  hitSlop={4}
+                >
+                  <X size={13} color={TEXT_MUTED} />
                 </Pressable>
-                <Pressable onPress={confirmEdit} style={styles.editSaveBtn}>
-                  <Check size={14} color="#FFFFFF" />
+                <Pressable
+                  onPress={confirmEdit}
+                  disabled={isSaving}
+                  style={({ pressed }) => [
+                    styles.editSaveBtn,
+                    pressed && styles.btnPressed,
+                  ]}
+                  hitSlop={4}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Check size={13} color="#FFFFFF" />
+                  )}
                 </Pressable>
               </View>
             </View>
           ) : (
             <View style={styles.nameRow}>
-              <Text style={styles.nameText}>{displayName}</Text>
-              <Pressable onPress={startEdit} hitSlop={8} style={styles.editIconBtn}>
-                <Edit3 size={15} color={GOLD} />
+              <Text style={styles.nameText} numberOfLines={1} ellipsizeMode="tail">
+                {displayName}
+              </Text>
+              <Pressable
+                onPress={startEdit}
+                hitSlop={10}
+                style={({ pressed }) => [
+                  styles.editIconBtn,
+                  pressed && styles.btnPressed,
+                ]}
+              >
+                <Edit3 size={14} color={GOLD} />
               </Pressable>
             </View>
           )}
 
-          <Text style={styles.emailText}>{emailText}</Text>
+          <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
+            {emailText}
+          </Text>
         </View>
       </View>
 
@@ -214,44 +270,53 @@ const styles = StyleSheet.create({
   },
   infoCol: {
     flex: 1,
+    justifyContent: 'center',
+    minHeight: 52,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   nameText: {
     color: TEXT_PRIMARY,
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.3,
+    maxWidth: '85%',
   },
   editIconBtn: {
-    padding: 4,
+    padding: 5,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   emailText: {
     color: TEXT_MUTED,
     fontSize: 12.5,
-    marginTop: 2,
+    marginTop: 4,
   },
 
   /* Editing */
   editingWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1.2,
+    borderColor: BLUE,
+    borderRadius: 10,
+    paddingLeft: 10,
+    paddingRight: 5,
+    height: 38,
     gap: 6,
   },
   nameEditInput: {
     flex: 1,
-    height: 36,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1.2,
-    borderColor: GOLD,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    color: TEXT_PRIMARY,
+    height: '100%',
+    paddingVertical: 0,
+    backgroundColor: 'transparent',
+    color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   editActionRow: {
     flexDirection: 'row',
@@ -259,20 +324,24 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   editCancelBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 7,
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   editSaveBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 7,
     backgroundColor: BLUE,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  btnPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.95 }],
   },
 
   /* Metrics */
@@ -306,3 +375,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
 });
+
