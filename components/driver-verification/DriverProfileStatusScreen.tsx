@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
   LogOut,
   RefreshCw,
   ArrowRight,
+  X,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius } from '@/constants/design';
@@ -44,6 +45,12 @@ export function DriverProfileStatusScreen() {
     verification?.status === 'pending';
   const isApproved = profile?.accreditationStatus === 'approved' || verification?.status === 'approved';
 
+  useEffect(() => {
+    if (user?.role === 'driver' && isApproved) {
+      router.replace('/(tabs)');
+    }
+  }, [user?.role, isApproved]);
+
   const hasVehicle = Boolean(profile?.vehicleMake && profile?.vehiclePlate);
   const hasLicense = Boolean(profile?.licenseNumber);
   const hasConsent = Boolean(profile?.backgroundConsentAt);
@@ -60,6 +67,7 @@ export function DriverProfileStatusScreen() {
       const newStatus = accredRes.data?.profile?.accreditationStatus;
       if (newStatus === 'approved') {
         showToast('Accreditation Approved! Welcome to PickupRunner.', 'success');
+        router.replace('/(tabs)');
       } else {
         showToast('Profile is still under review. We will notify you soon.', 'info');
       }
@@ -86,6 +94,37 @@ export function DriverProfileStatusScreen() {
   };
 
   const isChecking = isFetchingAccred || isFetchingVerif || refreshing;
+
+  const getItemVisuals = (hasData: boolean, itemStatus?: string) => {
+    if (!hasData) {
+      return {
+        iconColor: colors.onSurfaceVariant,
+        badgeNode: <Clock size={16} color={colors.onSurfaceVariant} />,
+      };
+    }
+    if (isApproved || itemStatus === 'approved') {
+      return {
+        iconColor: '#22C55E',
+        badgeNode: <CheckCircle size={16} color="#22C55E" />,
+      };
+    }
+    if (itemStatus === 'rejected') {
+      return {
+        iconColor: '#EF4444',
+        badgeNode: <X size={16} color="#EF4444" />,
+      };
+    }
+    // Submitted and Under Review / Pending -> Amber Gold
+    return {
+      iconColor: '#FFE399',
+      badgeNode: <Clock size={16} color="#FFE399" />,
+    };
+  };
+
+  const vehicleVisuals = getItemVisuals(hasVehicle);
+  const licenseVisuals = getItemVisuals(hasLicense, profile?.licenseStatus);
+  const consentVisuals = getItemVisuals(hasConsent, profile?.backgroundStatus);
+  const insuranceVisuals = getItemVisuals(hasInsurance, profile?.insuranceStatus);
 
   return (
     <View style={styles.root}>
@@ -137,7 +176,7 @@ export function DriverProfileStatusScreen() {
           {/* 1. Vehicle Info */}
           <View style={styles.checkItem}>
             <View style={styles.itemIconBox}>
-              <Car size={20} color={hasVehicle ? '#22C55E' : colors.onSurfaceVariant} />
+              <Car size={20} color={vehicleVisuals.iconColor} />
             </View>
             <View style={styles.itemTextCol}>
               <Text style={styles.itemTitle}>Vehicle & Address</Text>
@@ -147,11 +186,7 @@ export function DriverProfileStatusScreen() {
                   : 'Incomplete'}
               </Text>
             </View>
-            {hasVehicle ? (
-              <CheckCircle size={16} color="#22C55E" />
-            ) : (
-              <Clock size={16} color="#FFE399" />
-            )}
+            {vehicleVisuals.badgeNode}
           </View>
 
           <View style={styles.divider} />
@@ -159,7 +194,7 @@ export function DriverProfileStatusScreen() {
           {/* 2. Driver License */}
           <View style={styles.checkItem}>
             <View style={styles.itemIconBox}>
-              <ShieldCheck size={20} color={hasLicense ? '#22C55E' : colors.onSurfaceVariant} />
+              <ShieldCheck size={20} color={licenseVisuals.iconColor} />
             </View>
             <View style={styles.itemTextCol}>
               <Text style={styles.itemTitle}>Driver's License</Text>
@@ -169,11 +204,7 @@ export function DriverProfileStatusScreen() {
                   : 'Incomplete'}
               </Text>
             </View>
-            {hasLicense ? (
-              <CheckCircle size={16} color="#22C55E" />
-            ) : (
-              <Clock size={16} color="#FFE399" />
-            )}
+            {licenseVisuals.badgeNode}
           </View>
 
           <View style={styles.divider} />
@@ -181,7 +212,7 @@ export function DriverProfileStatusScreen() {
           {/* 3. Background Check */}
           <View style={styles.checkItem}>
             <View style={styles.itemIconBox}>
-              <FileText size={20} color={hasConsent ? '#22C55E' : colors.onSurfaceVariant} />
+              <FileText size={20} color={consentVisuals.iconColor} />
             </View>
             <View style={styles.itemTextCol}>
               <Text style={styles.itemTitle}>Background Check Consent</Text>
@@ -189,11 +220,7 @@ export function DriverProfileStatusScreen() {
                 {hasConsent ? 'FCRA Disclosure Authorized' : 'Authorization Required'}
               </Text>
             </View>
-            {hasConsent ? (
-              <CheckCircle size={16} color="#22C55E" />
-            ) : (
-              <Clock size={16} color="#FFE399" />
-            )}
+            {consentVisuals.badgeNode}
           </View>
 
           <View style={styles.divider} />
@@ -201,7 +228,7 @@ export function DriverProfileStatusScreen() {
           {/* 4. Insurance */}
           <View style={styles.checkItem}>
             <View style={styles.itemIconBox}>
-              <Shield size={20} color={hasInsurance ? '#22C55E' : colors.onSurfaceVariant} />
+              <Shield size={20} color={insuranceVisuals.iconColor} />
             </View>
             <View style={styles.itemTextCol}>
               <Text style={styles.itemTitle}>Vehicle Insurance Policy</Text>
@@ -211,11 +238,7 @@ export function DriverProfileStatusScreen() {
                   : 'Incomplete'}
               </Text>
             </View>
-            {hasInsurance ? (
-              <CheckCircle size={16} color="#22C55E" />
-            ) : (
-              <Clock size={16} color="#FFE399" />
-            )}
+            {insuranceVisuals.badgeNode}
           </View>
         </View>
 
