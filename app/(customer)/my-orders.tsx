@@ -16,7 +16,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { blink } from '@/lib/blink';
 import { ordersApi } from '@/apis/orders';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -122,20 +122,21 @@ export default function MyOrdersScreen() {
 
         const orderMap = new Map<string, CustomerOrderData>();
 
-        (localOrders || []).forEach((o) => {
-          if (o?.id) orderMap.set(o.id, o);
-        });
-
-        (sessionOrders1 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
-        (sessionOrders2 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
-        (emailOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
-
-        (backendMine || []).forEach((o) => {
-          if (o?.id) {
-            orderMap.set(o.id, o);
-            useOrderStore.getState().upsertOrder(o as any);
-          }
-        });
+        const hasBackend = Array.isArray(backendMine);
+        if (hasBackend) {
+          (backendMine || []).forEach((o) => {
+            if (o?.id) {
+              orderMap.set(o.id, o);
+            }
+          });
+        } else {
+          (localOrders || []).forEach((o) => {
+            if (o?.id) orderMap.set(o.id, o);
+          });
+          (sessionOrders1 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+          (sessionOrders2 || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+          (emailOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+        }
 
         const activeIds = Array.from(orderMap.values())
           .filter((o) => o?.id && o.status !== 'delivered' && o.status !== 'cancelled')
@@ -179,6 +180,7 @@ export default function MyOrdersScreen() {
         );
 
         setOrders(result);
+        useOrderStore.getState().setOrders(result as any);
 
         try {
           await AsyncStorage.setItem('customer_local_orders', JSON.stringify(result));
@@ -285,6 +287,12 @@ export default function MyOrdersScreen() {
       }
     };
   }, [fetchOrders]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+    }, [fetchOrders])
+  );
 
 
 

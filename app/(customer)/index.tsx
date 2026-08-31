@@ -403,6 +403,7 @@ export default function CustomerNewOrderScreen() {
               <Pressable
                 onPress={() => {
                   haptic('medium');
+                  handleReset();
                   router.push('/(customer)/my-orders');
                 }}
                 style={({ pressed }) => [

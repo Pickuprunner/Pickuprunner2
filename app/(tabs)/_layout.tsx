@@ -1,6 +1,6 @@
 import { Tabs, router } from 'expo-router';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOrders } from '@/lib/orders';
@@ -8,6 +8,7 @@ import { useDriverId } from '@/hooks/useDriverId';
 import { useAuth } from '@/hooks/useAuth';
 import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
+import { chatApi } from '@/apis/chat';
 
 const ACTIVE = '#FFE399';
 const INACTIVE = '#C2C6D8';
@@ -33,7 +34,44 @@ function InventoryTabIcon({ color, size }: { color: string; size: number }) {
   );
 }
 
+function ChatTabIcon({ color, size }: { color: string; size: number }) {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUnread = async () => {
+      try {
+        const res = await chatApi.getChats();
+        if (!isMounted) return;
+        const count = res.totalUnread ?? res.chats?.reduce((sum, c) => sum + (c.unread || 0), 0) ?? 0;
+        setUnreadCount(count);
+      } catch { }
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  return (
+    <View style={styles.iconWrapper}>
+      <MaterialIcons name="chat-bubble-outline" size={size || 22} color={color} />
+      {unreadCount > 0 && (
+        <View style={[styles.badge, { backgroundColor: '#FFE399' }]}>
+          <Text style={[styles.badgeText, { color: '#000' }]}>
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function TabLayout() {
+
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { data: verification, isLoading: isVerifLoading } = useMyVerification(user?.id);
@@ -75,14 +113,14 @@ export default function TabLayout() {
         tabBarStyle: isLocked
           ? { display: 'none' }
           : {
-              backgroundColor: TAB_BG,
-              borderTopWidth: 1,
-              borderTopColor: TAB_BORDER,
-              height: Platform.OS === 'ios' ? (hasHomeBar ? 52 + insets.bottom - 10 : 58) : 60 + androidBottomPad,
-              paddingBottom: Platform.OS === 'ios' ? (hasHomeBar ? insets.bottom - 14 : 8) : androidBottomPad,
-              paddingTop: Platform.OS === 'ios' ? 6 : 8,
-              elevation: 12,
-            },
+            backgroundColor: TAB_BG,
+            borderTopWidth: 1,
+            borderTopColor: TAB_BORDER,
+            height: Platform.OS === 'ios' ? (hasHomeBar ? 52 + insets.bottom - 10 : 58) : 60 + androidBottomPad,
+            paddingBottom: Platform.OS === 'ios' ? (hasHomeBar ? insets.bottom - 14 : 8) : androidBottomPad,
+            paddingTop: Platform.OS === 'ios' ? 6 : 8,
+            elevation: 12,
+          },
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '500',
@@ -113,10 +151,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="new-order"
         options={{
-          title: 'New Order',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="add-circle-outline" size={size || 24} color={color} />
-          ),
+          href: null,
         }}
       />
 
@@ -125,7 +160,7 @@ export default function TabLayout() {
         options={{
           title: 'Chat',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="chat-bubble-outline" size={size || 22} color={color} />
+            <ChatTabIcon color={color} size={size || 22} />
           ),
         }}
       />

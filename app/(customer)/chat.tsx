@@ -3,16 +3,12 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  TextInput,
   TouchableOpacity,
-  Pressable,
   StyleSheet,
   View,
   Text,
   StatusBar,
-  ActivityIndicator,
   RefreshControl,
-  Image,
   BackHandler,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -20,9 +16,11 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { blink } from '@/lib/blink';
+import { ordersApi } from '@/apis/orders';
+import { useAuthStore } from '@/store/useAuthStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOrderChat, ChatMessage } from '@/lib/chat';
+import { chatApi, ApiChatSummary } from '@/apis/chat';
 import { CustomerOrderData } from '@/components/Orders';
 import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
@@ -68,9 +66,11 @@ function CustomerOrderChatView({
   const flatListRef = useRef<FlatList>(null);
   const shortId = order.id ? order.id.slice(-6).toUpperCase() : '------';
   const driverDisplayName = order.driverName || order.driver_name || 'Assigned Driver';
+  const isClosed = order.status === 'delivered' || order.status === 'cancelled';
 
   const { messages, isConnected, sendMessage } = useOrderChat({
     orderId: order.id,
+    orderStatus: order.status,
     displayName: customerName || 'Customer',
     role: 'customer',
   });
@@ -83,7 +83,7 @@ function CustomerOrderChatView({
 
   const handleSend = useCallback(async (customText?: string) => {
     const text = (customText || inputText).trim();
-    if (!text || sending) return;
+    if (!text || sending || isClosed) return;
     if (!isConnected) {
       showToast('Chat is currently offline', {
         type: 'warning',
@@ -104,7 +104,7 @@ function CustomerOrderChatView({
     } finally {
       setSending(false);
     }
-  }, [inputText, sending, sendMessage, isConnected, showToast]);
+  }, [inputText, sending, isClosed, sendMessage, isConnected, showToast]);
 
   const listItems = useMemo(() => {
     const items: (
@@ -118,7 +118,7 @@ function CustomerOrderChatView({
         items.push({ type: 'date', ts: msg.timestamp, key: `date-${msg.timestamp}` });
         lastDate = dateStr;
       }
-      const isMine = msg.role === 'customer';
+      const isMine = msg.mine === true || msg.role === 'customer';
       items.push({ type: 'message', msg, isMine, key: msg.id });
     }
     return items;
@@ -132,7 +132,7 @@ function CustomerOrderChatView({
         title={driverDisplayName}
         orderNumber={shortId}
         subtitle={order.status === 'delivered' ? 'Delivered' : 'Live Delivery'}
-        isLive={isConnected}
+        isLive={!isClosed && isConnected}
         onBack={onBack}
       />
 
@@ -162,17 +162,25 @@ function CustomerOrderChatView({
           />
         )}
 
-        <ChatInputBar
-          value={inputText}
-          onChangeText={setInputText}
-          onSend={() => handleSend()}
-          sending={sending}
-          disabled={!isConnected}
-          placeholder={`Message ${driverDisplayName.split(' ')[0]}...`}
-          accentColor={colors.primaryContainer}
-          quickPrompts={QUICK_PROMPTS}
-          onSelectPrompt={(p) => handleSend(p)}
-        />
+        {isClosed ? (
+          <View style={styles.closedChatBanner}>
+            <Text style={styles.closedChatText}>
+              You can no longer message this driver after your delivery has ended.
+            </Text>
+          </View>
+        ) : (
+          <ChatInputBar
+            value={inputText}
+            onChangeText={setInputText}
+            onSend={() => handleSend()}
+            sending={sending}
+            disabled={!isConnected}
+            placeholder={`Message ${driverDisplayName.split(' ')[0]}...`}
+            accentColor={colors.primaryContainer}
+            quickPrompts={QUICK_PROMPTS}
+            onSelectPrompt={(p) => handleSend(p)}
+          />
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -182,10 +190,30 @@ export default function CustomerChatScreen() {
   const insets = useSafeAreaInsets();
   const storeOrders = useOrderStore((state) => state.orders);
   const [orders, setOrders] = useState<CustomerOrderData[]>([]);
+  const [apiChats, setApiChats] = useState<ApiChatSummary[]>([]);
   const [activeChatOrder, setActiveChatOrder] = useState<CustomerOrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [customerName, setCustomerName] = useState('Customer');
+  const [chatsLoaded, setChatsLoaded] = useState(false);
+
+  const fetchChatsList = useCallback(async () => {
+    try {
+      const res = await chatApi.getChats({ includeClosed: true });
+      const valid = (res.chats || []).filter((c) => c.orderStatus !== 'pending' && !c.awaitingDriver);
+      setApiChats(valid);
+    } catch (err) {
+      console.warn('[CustomerChatScreen] Error fetching GET /chats:', err);
+    } finally {
+      setChatsLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChatsList();
+    const interval = setInterval(fetchChatsList, 5000);
+    return () => clearInterval(interval);
+  }, [fetchChatsList]);
 
   const fetchOrders = useCallback(async () => {
     let local: CustomerOrderData[] = [];
@@ -195,63 +223,22 @@ export default function CustomerChatScreen() {
     } catch { }
 
     const name = (await AsyncStorage.getItem('customer_display_name')) || 'Customer';
+    setCustomerName(name);
 
     try {
-      const authUser = await blink.auth.me().catch(() => null);
-      const userEmail = authUser?.email;
-      const sid = await AsyncStorage.getItem('customer_session_id');
+      const token = useAuthStore.getState().token;
+      const backendMine = token ? await ordersApi.getMine().catch(() => null) : null;
 
-      const fetchPromise = Promise.all([
-        sid
-          ? blink.db.orders.list({ where: { customer_session_id: sid }, limit: 20 }).catch(() => [])
-          : Promise.resolve([]),
-        userEmail
-          ? blink.db.orders.list({ where: { customer_email: userEmail }, limit: 20 }).catch(() => [])
-          : Promise.resolve([]),
-      ]);
-
-      const timeoutPromise = new Promise((res) => setTimeout(() => res([]), 3000));
-      const [res1, res2] = (await Promise.race([fetchPromise, timeoutPromise])) as any[];
-
-      const storeList = useOrderStore.getState().orders;
       const map = new Map<string, CustomerOrderData>();
-      (local || []).forEach((o) => o?.id && map.set(o.id, o));
-      (res1 || []).forEach((o: any) => o?.id && map.set(o.id, o));
-      (res2 || []).forEach((o: any) => o?.id && map.set(o.id, o));
-
-      // Merge latest store state (e.g. driver assigned / active delivery)
-      (storeList || []).forEach((so) => {
-        if (so?.id && (map.has(so.id) || so.customerSessionId === sid)) {
-          const existing = map.get(so.id);
-          map.set(so.id, {
-            ...(existing || {}),
-            id: so.id,
-            status: so.status as any,
-            driverName: so.driverName || existing?.driverName,
-            driver_name: so.driverName || existing?.driver_name,
-            driverUserId: so.driverUserId || (existing as any)?.driverUserId,
-            deliveryPhotoUrl: so.deliveryPhotoUrl || existing?.deliveryPhotoUrl,
-            customerName: so.customerName || existing?.customerName,
-            deliveryAddress: so.deliveryAddress || existing?.deliveryAddress,
-            pickupAddress: so.pickupAddress || existing?.pickupAddress,
-            items: so.items || existing?.items,
-            createdAt: so.createdAt || existing?.createdAt,
-          } as any);
-        }
-      });
+      if (Array.isArray(backendMine)) {
+        backendMine.forEach((o) => o?.id && map.set(o.id, o as any));
+      } else {
+        (local || []).forEach((o) => o?.id && map.set(o.id, o));
+      }
 
       setOrders(Array.from(map.values()));
     } catch {
-      const storeList = useOrderStore.getState().orders;
-      const map = new Map<string, CustomerOrderData>();
-      (local || []).forEach((o) => o?.id && map.set(o.id, o));
-      (storeList || []).forEach((so) => {
-        if (so?.id && map.has(so.id)) {
-          const existing = map.get(so.id);
-          map.set(so.id, { ...(existing || {}), ...so } as any);
-        }
-      });
-      setOrders(Array.from(map.values()));
+      setOrders(local || []);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -298,7 +285,8 @@ export default function CustomerChatScreen() {
 
   useOrdersRealtime(useCallback(() => {
     fetchOrders();
-  }, [fetchOrders]));
+    fetchChatsList();
+  }, [fetchOrders, fetchChatsList]));
 
   useEffect(() => {
     fetchOrders();
@@ -309,18 +297,22 @@ export default function CustomerChatScreen() {
     if (!activeChatOrder) return;
     const onBackPress = () => {
       setActiveChatOrder(null);
+      fetchChatsList();
       return true; // prevent navigating away from screen
     };
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [activeChatOrder]);
+  }, [activeChatOrder, fetchChatsList]);
 
   if (activeChatOrder) {
     return (
       <CustomerOrderChatView
         order={activeChatOrder}
         customerName={customerName}
-        onBack={() => setActiveChatOrder(null)}
+        onBack={() => {
+          setActiveChatOrder(null);
+          fetchChatsList();
+        }}
       />
     );
   }
@@ -328,7 +320,25 @@ export default function CustomerChatScreen() {
   const activeOrders = orders.filter((o) => o.status !== 'delivered');
   const recentOrders = orders.filter((o) => o.status === 'delivered');
 
-  const mapToChatItem = (item: CustomerOrderData): ChatConversationItem => {
+  const mapApiChatToItem = (chat: ApiChatSummary): ChatConversationItem => {
+    const shortId = chat.orderId ? chat.orderId.slice(-6).toUpperCase() : '------';
+    const isDelivered = chat.orderStatus === 'delivered';
+    return {
+      id: chat.orderId,
+      name: chat.counterpartyName || 'Driver',
+      orderNumber: `#ORD-${shortId}`,
+      orderMetaText: chat.lastMessage?.body || (isDelivered ? 'Delivered' : 'Active order'),
+      address: chat.deliveryAddress || 'Delivery Address',
+      time: chat.lastMessage?.createdAt ? new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+      status: chat.orderStatus,
+      statusLabel: isDelivered ? 'Delivered' : 'Active order',
+      statusVariant: isDelivered ? 'gray' : 'emerald',
+      avatarVariant: isDelivered ? 'gray' : 'mint',
+      unreadCount: chat.unread || 0,
+    };
+  };
+
+  const mapOrderToChatItem = (item: CustomerOrderData): ChatConversationItem => {
     const shortId = item.id ? item.id.slice(-6).toUpperCase() : '------';
     const driverName = item.driverName || item.driver_name || 'Driver';
     const isDelivered = item.status === 'delivered';
@@ -348,6 +358,8 @@ export default function CustomerChatScreen() {
     };
   };
 
+  const hasApiChats = apiChats.length > 0;
+
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
@@ -357,9 +369,13 @@ export default function CustomerChatScreen() {
         <View style={styles.headerSubtitleRow}>
           <LiveBadge label="Live" isLive />
           <Text style={styles.headerSubtitle}>
-            {activeOrders.length > 0
-              ? `${activeOrders.length} driver${activeOrders.length > 1 ? 's' : ''} on route`
-              : 'Direct messages with your delivery driver'}
+            {chatsLoaded
+              ? apiChats.length > 0
+                ? `${apiChats.length} active conversation${apiChats.length > 1 ? 's' : ''}`
+                : 'Direct messages with your delivery driver'
+              : activeOrders.length > 0
+                ? `${activeOrders.length} driver${activeOrders.length > 1 ? 's' : ''} on route`
+                : 'Direct messages with your delivery driver'}
           </Text>
         </View>
       </View>
@@ -375,55 +391,82 @@ export default function CustomerChatScreen() {
             onRefresh={() => {
               setRefreshing(true);
               fetchOrders();
+              fetchChatsList();
             }}
             tintColor="#FFE399"
           />
         }
         ListHeaderComponent={
           <>
-            {activeOrders.length > 0 && (
+            {hasApiChats ? (
               <>
-                <ChatSectionHeader title="On Active Order" count={activeOrders.length} />
-                {activeOrders.map((item, idx) => (
-                  <Animated.View key={item.id} entering={FadeInDown.delay(idx * 50).springify()}>
+                <ChatSectionHeader title="Active Conversations" count={apiChats.length} />
+                {apiChats.map((item, idx) => (
+                  <Animated.View key={item.orderId} entering={FadeInDown.delay(idx * 50).springify()}>
                     <ConversationCard
-                      item={mapToChatItem(item)}
+                      item={mapApiChatToItem(item)}
                       role="customer"
                       onPress={() => {
                         haptic();
-                        setActiveChatOrder(item);
+                        setActiveChatOrder({
+                          id: item.orderId,
+                          driverName: item.counterpartyName || 'Driver',
+                          driver_name: item.counterpartyName || 'Driver',
+                          deliveryAddress: item.deliveryAddress || '',
+                          status: item.orderStatus as any,
+                        } as any);
                       }}
                     />
                   </Animated.View>
                 ))}
               </>
-            )}
-
-            {recentOrders.length > 0 && (
+            ) : (
               <>
-                <ChatSectionHeader
-                  title="Recently Completed"
-                  count={recentOrders.length}
-                  marginTop={activeOrders.length > 0 ? 18 : 0}
-                />
-                {recentOrders.map((item, idx) => (
-                  <Animated.View key={item.id} entering={FadeInDown.delay((activeOrders.length + idx) * 50).springify()}>
-                    <ConversationCard
-                      item={mapToChatItem(item)}
-                      role="customer"
-                      onPress={() => {
-                        haptic();
-                        setActiveChatOrder(item);
-                      }}
+                {activeOrders.length > 0 && (
+                  <>
+                    <ChatSectionHeader title="On Active Order" count={activeOrders.length} />
+                    {activeOrders.map((item, idx) => (
+                      <Animated.View key={item.id} entering={FadeInDown.delay(idx * 50).springify()}>
+                        <ConversationCard
+                          item={mapOrderToChatItem(item)}
+                          role="customer"
+                          onPress={() => {
+                            haptic();
+                            setActiveChatOrder(item);
+                          }}
+                        />
+                      </Animated.View>
+                    ))}
+                  </>
+                )}
+
+                {recentOrders.length > 0 && (
+                  <>
+                    <ChatSectionHeader
+                      title="Recently Completed"
+                      count={recentOrders.length}
+                      marginTop={activeOrders.length > 0 ? 18 : 0}
                     />
-                  </Animated.View>
-                ))}
+                    {recentOrders.map((item, idx) => (
+                      <Animated.View key={item.id} entering={FadeInDown.delay((activeOrders.length + idx) * 50).springify()}>
+                        <ConversationCard
+                          item={mapOrderToChatItem(item)}
+                          role="customer"
+                          onPress={() => {
+                            haptic();
+                            setActiveChatOrder(item);
+                          }}
+                        />
+                      </Animated.View>
+                    ))}
+                  </>
+                )}
               </>
             )}
           </>
         }
         ListEmptyComponent={
-          loading ? (
+          loading && !hasApiChats ? (
             <View style={{ gap: 12 }}>
               {[1, 2, 3].map((i) => (
                 <View key={i} style={styles.skeletonConvoCard}>
@@ -439,7 +482,7 @@ export default function CustomerChatScreen() {
                 </View>
               ))}
             </View>
-          ) : activeOrders.length === 0 && recentOrders.length === 0 ? (
+          ) : !hasApiChats && activeOrders.length === 0 && recentOrders.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>
                 <MaterialIcons name="forum" size={36} color="#FFE399" />
@@ -496,44 +539,11 @@ const styles = StyleSheet.create({
     color: 'rgba(194, 198, 216, 0.7)',
     fontWeight: '500',
   },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0, 226, 151, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 226, 151, 0.35)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  livePulseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#00E297',
-  },
-  liveBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#00E297',
-    letterSpacing: 0.8,
-  },
   listContainer: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 100,
     gap: 12,
-  },
-  conversationCard: {
-    backgroundColor: '#151821',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
   },
   skeletonConvoCard: {
     backgroundColor: '#151821',
@@ -545,258 +555,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
   },
-  convoAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 227, 153, 0.12)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 227, 153, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  convoAvatarText: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#FFE399',
-  },
-  convoDetails: {
-    flex: 1,
-    gap: 3,
-  },
-  convoTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  convoDriverName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#DFE2EF',
-  },
-  statusBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-  },
-  statusBadgeActive: {
-    backgroundColor: 'rgba(0, 102, 255, 0.12)',
-    borderColor: 'rgba(0, 102, 255, 0.3)',
-  },
-  statusBadgeDelivered: {
-    backgroundColor: 'rgba(0, 226, 151, 0.10)',
-    borderColor: 'rgba(0, 226, 151, 0.3)',
-  },
-  statusBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  convoSubtitle: {
-    fontSize: 12.5,
-    color: '#8C90A1',
-  },
-  convoFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
-  },
-  convoTapHint: {
-    fontSize: 11.5,
-    color: '#FFE399',
-    fontWeight: '600',
-  },
-  chatHeaderBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 64 : 56,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-    gap: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chatHeaderInfo: {
-    flex: 1,
-  },
-  chatHeaderDriverName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#DFE2EF',
-  },
-  chatHeaderSubtitle: {
-    fontSize: 12,
-    color: '#8C90A1',
-    marginTop: 1,
-  },
   messagesListPadding: {
     paddingVertical: 16,
     paddingHorizontal: 16,
     gap: 12,
-  },
-  messageBubbleContainer: {
-    marginBottom: 8,
-  },
-  senderLabel: {
-    fontSize: 11,
-    color: '#8C90A1',
-    marginBottom: 4,
-    marginLeft: 4,
-    fontWeight: '600',
-  },
-  bubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-  },
-  bubbleMine: {
-    backgroundColor: '#0066FF',
-    borderBottomRightRadius: 4,
-  },
-  bubbleOther: {
-    backgroundColor: '#1C202C',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderBottomLeftRadius: 4,
-  },
-  bubbleText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  bubbleTextMine: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-  },
-  bubbleTextOther: {
-    color: '#DFE2EF',
-  },
-  bubbleTime: {
-    fontSize: 10.5,
-    color: '#8C90A1',
-    marginTop: 4,
-    marginHorizontal: 4,
-  },
-  dateSeparatorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginVertical: 12,
-  },
-  dateDivider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  dateText: {
-    fontSize: 11,
-    color: '#8C90A1',
-    fontWeight: '700',
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#0F131C',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
-    gap: 10,
-  },
-  inputFieldContainer: {
-    flex: 1,
-    minHeight: 46,
-    maxHeight: 110,
-    backgroundColor: '#151821',
-    borderRadius: 23,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  textInput: {
-    color: '#DFE2EF',
-    fontSize: 14,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
-  },
-  sendButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: '#0066FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    opacity: 0.4,
-  },
-  emptyChatContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 10,
-  },
-  emptyChatIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 227, 153, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  emptyChatTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#DFE2EF',
-  },
-  emptyChatSubtitle: {
-    fontSize: 13.5,
-    color: '#8C90A1',
-    textAlign: 'center',
-    lineHeight: 19,
-    maxWidth: 300,
-  },
-  quickPromptsContainer: {
-    width: '100%',
-    marginTop: 20,
-    gap: 10,
-  },
-  quickPromptsLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#8C90A1',
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  quickPromptsGrid: {
-    gap: 8,
-  },
-  quickPromptPill: {
-    backgroundColor: '#151821',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    alignItems: 'center',
-  },
-  quickPromptText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFE399',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -836,9 +598,20 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '700',
   },
-  loadingText: {
-    fontSize: 14,
-    color: '#8C90A1',
-    fontWeight: '600',
+  closedChatBanner: {
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    backgroundColor: '#151821',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closedChatText: {
+    fontSize: 13.5,
+    color: 'rgba(194, 198, 216, 0.7)',
+    textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 19,
   },
 });

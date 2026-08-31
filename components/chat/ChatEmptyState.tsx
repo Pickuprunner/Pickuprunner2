@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { MessageCircle } from '@blinkdotnew/mobile-ui';
 import { colors } from '@/constants/design';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export interface ChatEmptyStateProps {
   title?: string;
@@ -22,8 +22,8 @@ export function ChatEmptyState({
 }: ChatEmptyStateProps) {
   return (
     <View style={styles.container}>
-      <View style={styles.iconCircle}>
-        {icon || <MessageCircle size={32} color="rgba(255, 255, 255, 0.4)" />}
+      <View style={styles.emptyIconCircle}>
+        <MaterialIcons name="forum" size={36} color="#FFE399" />
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
@@ -67,6 +67,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.onSurface,
     textAlign: 'center',
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 227, 153, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   subtitle: {
     fontSize: 13.5,

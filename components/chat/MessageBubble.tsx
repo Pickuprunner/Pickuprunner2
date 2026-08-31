@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { User, Truck } from '@blinkdotnew/mobile-ui';
 import { colors } from '@/constants/design';
 import { ChatMessage } from '@/lib/chat';
@@ -16,6 +17,7 @@ function formatTime(ts: number) {
 
 export function MessageBubble({ msg, isMine, role }: MessageBubbleProps) {
   const isCustomer = msg.role === 'customer';
+  const isRead = Boolean(msg.readAt);
 
   return (
     <View
@@ -49,14 +51,19 @@ export function MessageBubble({ msg, isMine, role }: MessageBubbleProps) {
           </Text>
         </View>
 
-        <Text
-          style={[
-            styles.timeText,
-            { alignSelf: isMine ? 'flex-end' : 'flex-start' },
-          ]}
-        >
-          {formatTime(msg.timestamp)}
-        </Text>
+        <View style={[styles.timeRow, { alignSelf: isMine ? 'flex-end' : 'flex-start' }]}>
+          <Text style={styles.timeText}>
+            {formatTime(msg.timestamp)}
+          </Text>
+          {isMine && (
+            <MaterialIcons
+              name="done-all"
+              size={14}
+              color={isRead ? '#34B7F1' : 'rgba(255, 255, 255, 0.45)'}
+              style={styles.checkIcon}
+            />
+          )}
+        </View>
       </View>
     </View>
   );
@@ -108,10 +115,18 @@ const styles = StyleSheet.create({
     color: '#DFE2EF',
     fontWeight: '400',
   },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+    paddingHorizontal: 2,
+    gap: 3,
+  },
   timeText: {
     fontSize: 10,
     color: 'rgba(255, 255, 255, 0.4)',
-    marginTop: 3,
-    paddingHorizontal: 2,
+  },
+  checkIcon: {
+    marginLeft: 2,
   },
 });

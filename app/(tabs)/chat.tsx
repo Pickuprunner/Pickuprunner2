@@ -10,27 +10,22 @@ import {
   Text,
   ScrollView,
   BackHandler,
+  RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
   YStack,
-  XStack,
   SizableText,
   SafeArea,
   Spinner,
   MessageCircle,
-  Send,
-  Wifi,
-  WifiOff,
-  Package,
-  ChevronRight,
-  ChevronLeft,
   Truck,
 } from '@blinkdotnew/mobile-ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useOrders, Order } from '@/lib/orders';
 import { useOrderChat, getSavedDisplayName, saveDisplayName, ChatMessage } from '@/lib/chat';
+import { chatApi, ApiChatSummary } from '@/apis/chat';
 import { useDriverId } from '@/hooks/useDriverId';
 import { colors, spacing, borderRadius } from '@/constants/design';
 import {
@@ -94,9 +89,11 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
   const [sending, setSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const shortId = order.id ? order.id.slice(-6).toUpperCase() : '------';
+  const isClosed = order.status === 'delivered' || order.status === 'cancelled';
 
   const { messages, isConnected, sendMessage } = useOrderChat({
     orderId: order.id,
+    orderStatus: order.status,
     displayName,
     role: 'driver',
   });
@@ -109,7 +106,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
 
   const handleSend = useCallback(async (customText?: string) => {
     const text = (customText || inputText).trim();
-    if (!text || sending) return;
+    if (!text || sending || isClosed) return;
     setInputText('');
     setSending(true);
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
@@ -120,7 +117,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
     } finally {
       setSending(false);
     }
-  }, [inputText, sending, sendMessage]);
+  }, [inputText, sending, isClosed, sendMessage]);
 
   const listItems = React.useMemo(() => {
     const items: ({ type: 'date'; ts: number; key: string } | { type: 'message'; msg: ChatMessage; isMine: boolean; key: string })[] = [];
@@ -131,7 +128,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
         items.push({ type: 'date', ts: msg.timestamp, key: `date-${msg.timestamp}` });
         lastDate = dateStr;
       }
-      const isMine = msg.role === 'driver';
+      const isMine = msg.mine === true || msg.role === 'driver';
       items.push({ type: 'message', msg, isMine, key: msg.id });
     }
     return items;
@@ -143,7 +140,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
         title={order.customerName || 'Customer'}
         orderNumber={shortId}
         subtitle={order.deliveryAddress || 'No delivery address'}
-        isLive={isConnected}
+        isLive={!isClosed && isConnected}
         onBack={onBack}
       />
 
@@ -173,43 +170,57 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
           />
         )}
 
-        <ChatInputBar
-          value={inputText}
-          onChangeText={setInputText}
-          onSend={() => handleSend()}
-          sending={sending}
-          disabled={!isConnected}
-          placeholder={`Message ${order.customerName?.split(' ')[0] || 'customer'}…`}
-          accentColor={colors.primaryContainer}
-          quickPrompts={DRIVER_QUICK_PROMPTS}
-          onSelectPrompt={(p) => handleSend(p)}
-        />
+        {isClosed ? (
+          <View style={styles.closedChatBanner}>
+            <Text style={styles.closedChatText}>
+              You can no longer message this customer after your delivery has ended.
+            </Text>
+          </View>
+        ) : (
+          <ChatInputBar
+            value={inputText}
+            onChangeText={setInputText}
+            onSend={() => handleSend()}
+            sending={sending}
+            disabled={!isConnected}
+            placeholder={`Message ${order.customerName?.split(' ')[0] || 'customer'}…`}
+            accentColor={colors.primaryContainer}
+            quickPrompts={DRIVER_QUICK_PROMPTS}
+            onSelectPrompt={(p) => handleSend(p)}
+          />
+        )}
       </KeyboardAvoidingView>
     </View>
   );
 }
-
-
-type ListItem =
-  | { type: 'date'; ts: number; key: string }
-  | { type: 'message'; msg: ChatMessage; isMine: boolean; key: string };
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [nameReady, setNameReady] = useState(false);
   const [activeChatOrder, setActiveChatOrder] = useState<Order | null>(null);
+  const [apiChats, setApiChats] = useState<ApiChatSummary[]>([]);
+  const [totalUnread, setTotalUnread] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const { data: orders = [], isLoading } = useOrders();
+  const { data: orders = [], isLoading: ordersLoading } = useOrders();
   const driverId = useDriverId();
 
-  const activeOrders = orders.filter(
-    (o) => o.driverUserId === driverId && (o.status === 'accepted' || o.status === 'picked_up')
-  );
+  const [chatsLoaded, setChatsLoaded] = useState(false);
 
-  const recentOrders = orders.filter(
-    (o) => o.driverUserId === driverId && o.status === 'delivered'
-  );
+  const fetchChatsList = useCallback(async () => {
+    try {
+      const res = await chatApi.getChats({ includeClosed: true });
+      const valid = (res.chats || []).filter((c) => c.orderStatus !== 'pending' && !c.awaitingDriver);
+      setApiChats(valid);
+      setTotalUnread(res.totalUnread || 0);
+    } catch (err) {
+      console.warn('[ChatScreen] Error fetching GET /chats:', err);
+    } finally {
+      setRefreshing(false);
+      setChatsLoaded(true);
+    }
+  }, []);
 
   useEffect(() => {
     getSavedDisplayName().then((name) => {
@@ -217,6 +228,12 @@ export default function ChatScreen() {
       setNameReady(true);
     });
   }, []);
+
+  useEffect(() => {
+    fetchChatsList();
+    const interval = setInterval(fetchChatsList, 5000);
+    return () => clearInterval(interval);
+  }, [fetchChatsList]);
 
   const handleSetName = useCallback(async (name: string) => {
     await saveDisplayName(name);
@@ -228,11 +245,12 @@ export default function ChatScreen() {
     if (!activeChatOrder) return;
     const onBackPress = () => {
       setActiveChatOrder(null);
+      fetchChatsList();
       return true; // prevent navigating away from screen
     };
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [activeChatOrder]);
+  }, [activeChatOrder, fetchChatsList]);
 
   if (!nameReady) {
     return (
@@ -247,11 +265,47 @@ export default function ChatScreen() {
   if (!displayName) {
     return <SafeArea><NameSetupPrompt onSet={handleSetName} /></SafeArea>;
   }
+
   if (activeChatOrder) {
-    return <OrderChatView order={activeChatOrder} displayName={displayName} onBack={() => setActiveChatOrder(null)} />;
+    return (
+      <OrderChatView
+        order={activeChatOrder}
+        displayName={displayName}
+        onBack={() => {
+          setActiveChatOrder(null);
+          fetchChatsList();
+        }}
+      />
+    );
   }
 
-  const mapToChatItem = (item: Order): ChatConversationItem => {
+  const activeOrders = orders.filter(
+    (o) => o.driverUserId === driverId && (o.status === 'accepted' || o.status === 'picked_up')
+  );
+
+  const recentOrders = orders.filter(
+    (o) => o.driverUserId === driverId && o.status === 'delivered'
+  );
+
+  const mapApiChatToItem = (chat: ApiChatSummary): ChatConversationItem => {
+    const shortId = chat.orderId ? chat.orderId.slice(-6).toUpperCase() : '------';
+    const isDelivered = chat.orderStatus === 'delivered';
+    return {
+      id: chat.orderId,
+      name: chat.counterpartyName || 'Customer',
+      orderNumber: `#${shortId}`,
+      address: chat.deliveryAddress || 'No delivery address',
+      status: chat.orderStatus,
+      statusLabel: chat.orderStatus === 'accepted' ? 'Heading to pickup' : isDelivered ? 'Delivered' : 'Delivering',
+      statusVariant: isDelivered ? 'gray' : chat.orderStatus === 'accepted' ? 'amber' : 'emerald',
+      avatarVariant: isDelivered ? 'gray' : 'amber',
+      unreadCount: chat.unread || 0,
+      orderMetaText: chat.lastMessage?.body,
+      time: chat.lastMessage?.createdAt ? new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+    };
+  };
+
+  const mapOrderToItem = (item: Order): ChatConversationItem => {
     const shortId = item?.id ? item.id.slice(-6).toUpperCase() : '------';
     const isDelivered = item.status === 'delivered';
     return {
@@ -267,26 +321,34 @@ export default function ChatScreen() {
     };
   };
 
+  const hasApiChats = apiChats.length > 0;
+
   return (
     <View style={styles.root}>
       <View style={[styles.appHeader, { paddingTop: Math.max(insets.top, 16) }]}>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerSubtitleRow}>
           <Text style={styles.headerSubtitle}>
-            {activeOrders.length > 0
+            {chatsLoaded
+              ? apiChats.length > 0
+                ? `${apiChats.length} conversation${apiChats.length > 1 ? 's' : ''}`
+                : 'No active deliveries'
+              : activeOrders.length > 0
               ? `${activeOrders.length} active conversation${activeOrders.length > 1 ? 's' : ''}`
               : 'No active deliveries'}
           </Text>
           <Text style={styles.headerDot}>·</Text>
-          <Text style={styles.headerStatusText}>All read</Text>
+          <Text style={[styles.headerStatusText, totalUnread > 0 && { color: '#FFE399' }]}>
+            {totalUnread > 0 ? `${totalUnread} unread` : 'All read'}
+          </Text>
         </View>
       </View>
 
-      {isLoading ? (
+      {!chatsLoaded && ordersLoading && !hasApiChats ? (
         <YStack flex={1} alignItems="center" justifyContent="center">
           <Spinner size="large" color="$color9" />
         </YStack>
-      ) : activeOrders.length === 0 && recentOrders.length === 0 ? (
+      ) : chatsLoaded && !hasApiChats ? (
         <ChatEmptyState
           title="No Active Deliveries"
           subtitle="Accept an order from the feed to start messaging your customer."
@@ -295,32 +357,68 @@ export default function ChatScreen() {
           onButtonPress={() => router.push('/(tabs)')}
         />
       ) : (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
-          {activeOrders.length > 0 && (
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                fetchChatsList();
+              }}
+              tintColor="#FFE399"
+            />
+          }
+        >
+          {hasApiChats ? (
             <>
-              <ChatSectionHeader title="Active Orders" count={activeOrders.length} />
-              {activeOrders.map((item) => (
+              <ChatSectionHeader title="Conversations" count={apiChats.length} />
+              {apiChats.map((chat) => (
                 <ConversationCard
-                  key={item.id}
-                  item={mapToChatItem(item)}
+                  key={chat.orderId}
+                  item={mapApiChatToItem(chat)}
                   role="driver"
-                  onPress={() => setActiveChatOrder(item)}
+                  onPress={() =>
+                    setActiveChatOrder({
+                      id: chat.orderId,
+                      customerName: chat.counterpartyName || 'Customer',
+                      deliveryAddress: chat.deliveryAddress || '',
+                      status: chat.orderStatus as any,
+                    } as any)
+                  }
                 />
               ))}
             </>
-          )}
-
-          {recentOrders.length > 0 && (
+          ) : (
             <>
-              <ChatSectionHeader title="Recent" count={recentOrders.length} marginTop={activeOrders.length > 0 ? 14 : 0} />
-              {recentOrders.map((item) => (
-                <ConversationCard
-                  key={item.id}
-                  item={mapToChatItem(item)}
-                  role="driver"
-                  onPress={() => setActiveChatOrder(item)}
-                />
-              ))}
+              {activeOrders.length > 0 && (
+                <>
+                  <ChatSectionHeader title="Active Orders" count={activeOrders.length} />
+                  {activeOrders.map((item) => (
+                    <ConversationCard
+                      key={item.id}
+                      item={mapOrderToItem(item)}
+                      role="driver"
+                      onPress={() => setActiveChatOrder(item)}
+                    />
+                  ))}
+                </>
+              )}
+
+              {recentOrders.length > 0 && (
+                <>
+                  <ChatSectionHeader title="Recent" count={recentOrders.length} marginTop={activeOrders.length > 0 ? 14 : 0} />
+                  {recentOrders.map((item) => (
+                    <ConversationCard
+                      key={item.id}
+                      item={mapOrderToItem(item)}
+                      role="driver"
+                      onPress={() => setActiveChatOrder(item)}
+                    />
+                  ))}
+                </>
+              )}
             </>
           )}
         </ScrollView>
@@ -387,5 +485,21 @@ const styles = StyleSheet.create({
   },
   nameBtnDisabled: {
     opacity: 0.4,
+  },
+  closedChatBanner: {
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    backgroundColor: '#151821',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closedChatText: {
+    fontSize: 13.5,
+    color: 'rgba(194, 198, 216, 0.7)',
+    textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 19,
   },
 });

@@ -9,19 +9,21 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useOrderChat, getSavedDisplayName } from '@/lib/chat';
+import { useOrderChat, getSavedDisplayName, isOrderActive } from '@/lib/chat';
 import { colors } from '@/constants/design';
 import * as Haptics from 'expo-haptics';
 
 export interface CustomerOrderChatProps {
   orderId: string;
+  orderStatus?: string;
   customerName: string;
 }
 
-export function CustomerOrderChat({ orderId, customerName }: CustomerOrderChatProps) {
+export function CustomerOrderChat({ orderId, orderStatus, customerName }: CustomerOrderChatProps) {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [chatName, setChatName] = useState<string | null>(null);
+  const isClosed = orderStatus === 'delivered' || orderStatus === 'cancelled' || !isOrderActive(orderStatus);
 
   useEffect(() => {
     getSavedDisplayName().then((n) => setChatName(n || customerName || 'Customer'));
@@ -29,16 +31,17 @@ export function CustomerOrderChat({ orderId, customerName }: CustomerOrderChatPr
 
   const { messages, isConnected, sendMessage } = useOrderChat({
     orderId,
+    orderStatus,
     displayName: chatName || customerName || 'Customer',
     role: 'customer',
   });
 
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
-    if (!text || sending) return;
+    if (!text || sending || isClosed) return;
     setSending(true);
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     try {
       await sendMessage(text);
@@ -48,7 +51,7 @@ export function CustomerOrderChat({ orderId, customerName }: CustomerOrderChatPr
     } finally {
       setSending(false);
     }
-  }, [inputText, sending, sendMessage]);
+  }, [inputText, sending, isClosed, sendMessage]);
 
   return (
     <View style={styles.chatCard}>
@@ -60,7 +63,7 @@ export function CustomerOrderChat({ orderId, customerName }: CustomerOrderChatPr
         <View
           style={[
             styles.chatStatusDot,
-            { backgroundColor: isConnected ? colors.tertiary : colors.outline },
+            { backgroundColor: !isClosed && isConnected ? colors.tertiary : colors.outline },
           ]}
         />
       </View>
@@ -87,14 +90,23 @@ export function CustomerOrderChat({ orderId, customerName }: CustomerOrderChatPr
                     isMe ? styles.bubbleCustomer : styles.bubbleDriver,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.bubbleSender,
-                      isMe ? styles.senderCustomer : styles.senderDriver,
-                    ]}
-                  >
-                    {isMe ? 'You' : msg.senderName || 'Driver'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <Text
+                      style={[
+                        styles.bubbleSender,
+                        isMe ? styles.senderCustomer : styles.senderDriver,
+                      ]}
+                    >
+                      {isMe ? 'You' : msg.senderName || 'Driver'}
+                    </Text>
+                    {isMe && (
+                      <MaterialIcons
+                        name="done-all"
+                        size={13}
+                        color={msg.readAt ? '#34B7F1' : 'rgba(255, 255, 255, 0.45)'}
+                      />
+                    )}
+                  </View>
                   <Text style={styles.bubbleText}>{msg.text}</Text>
                 </View>
               </View>
@@ -103,35 +115,43 @@ export function CustomerOrderChat({ orderId, customerName }: CustomerOrderChatPr
         )}
       </View>
 
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.chatInput}
-          placeholder="Type message to driver…"
-          placeholderTextColor="rgba(194, 198, 216, 0.4)"
-          value={inputText}
-          onChangeText={setInputText}
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
-        />
-        <TouchableOpacity
-          onPress={handleSend}
-          disabled={!inputText.trim() || sending}
-          style={[
-            styles.sendBtn,
-            inputText.trim() && !sending ? styles.sendBtnActive : styles.sendBtnDisabled,
-          ]}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <MaterialIcons
-              name="send"
-              size={16}
-              color={inputText.trim() ? '#FFFFFF' : 'rgba(255, 255, 255, 0.3)'}
-            />
-          )}
-        </TouchableOpacity>
-      </View>
+      {isClosed ? (
+        <View style={styles.closedNoticeBox}>
+          <Text style={styles.closedNoticeText}>
+            You can no longer message this driver after your delivery has ended.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.chatInput}
+            placeholder="Type message to driver…"
+            placeholderTextColor="rgba(194, 198, 216, 0.4)"
+            value={inputText}
+            onChangeText={setInputText}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+          />
+          <TouchableOpacity
+            onPress={handleSend}
+            disabled={!inputText.trim() || sending}
+            style={[
+              styles.sendBtn,
+              inputText.trim() && !sending ? styles.sendBtnActive : styles.sendBtnDisabled,
+            ]}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <MaterialIcons
+                name="send"
+                size={16}
+                color={inputText.trim() ? '#FFFFFF' : 'rgba(255, 255, 255, 0.3)'}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -245,5 +265,23 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  closedNoticeBox: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: colors.glassLevel2Border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  closedNoticeText: {
+    fontSize: 12.5,
+    color: colors.outline,
+    textAlign: 'center',
+    lineHeight: 18,
+    fontWeight: '500',
   },
 });

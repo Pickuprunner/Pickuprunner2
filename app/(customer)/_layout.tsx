@@ -1,12 +1,52 @@
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { chatApi } from '@/apis/chat';
 
 const ACTIVE = '#FFE399';
 const INACTIVE = '#C2C6D8';
 const TAB_BG = '#0F131C';
 const TAB_BORDER = 'rgba(255, 255, 255, 0.05)';
+
+function ChatTabIcon({ color, size }: { color: string; size: number }) {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUnread = async () => {
+      try {
+        const res = await chatApi.getChats();
+        if (!isMounted) return;
+        const count = res.totalUnread ?? res.chats?.reduce((sum, c) => sum + (c.unread || 0), 0) ?? 0;
+        setUnreadCount(count);
+      } catch {
+        // quiet catch
+      }
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  return (
+    <View style={styles.iconWrapper}>
+      <MaterialIcons name="chat-bubble-outline" size={size || 22} color={color} />
+      {unreadCount > 0 && (
+        <View style={[styles.badge, { backgroundColor: '#FFE399' }]}>
+          <Text style={[styles.badgeText, { color: '#000' }]}>
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
 
 export default function CustomerTabLayout() {
   const insets = useSafeAreaInsets();
@@ -61,7 +101,7 @@ export default function CustomerTabLayout() {
         options={{
           title: 'Chat',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="chat-bubble-outline" size={size || 22} color={color} />
+            <ChatTabIcon color={color} size={size || 22} />
           ),
         }}
       />
@@ -87,3 +127,30 @@ export default function CustomerTabLayout() {
   );
 }
 
+const styles = StyleSheet.create({
+  iconWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -7,
+    minWidth: 15,
+    height: 15,
+    borderRadius: 7.5,
+    backgroundColor: '#0066FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#0F131C',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    lineHeight: 11,
+  },
+});

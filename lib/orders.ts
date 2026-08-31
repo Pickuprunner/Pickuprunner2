@@ -9,9 +9,6 @@ import { APP_CONFIG } from './config';
 
 export type { Order, OrderStatus };
 
-/**
- * Hook for drivers to query open/unassigned available orders from GET /orders/available
- */
 export function useAvailableOrders(params?: AvailableOrdersParams) {
   const token = useAuthStore((state) => state.token);
   const storeOrders = useOrderStore((state) => state.orders);
@@ -47,15 +44,14 @@ export function useAvailableOrders(params?: AvailableOrdersParams) {
 export function useOrders() {
   const storeOrders = useOrderStore((state) => state.orders);
 
-  return useQuery({
+  return useQuery<Order[]>({
     queryKey: ['orders', APP_CONFIG.CITY_ID],
     queryFn: async () => {
       try {
         const mine = await ordersApi.getMine();
-        if (Array.isArray(mine) && mine.length > 0) {
-          mine.forEach((item) => {
-            useOrderStore.getState().upsertOrder(item as any);
-          });
+        if (Array.isArray(mine)) {
+          useOrderStore.getState().setOrders(mine as Order[]);
+          return mine as Order[];
         }
       } catch (err) {
         console.warn('[useOrders] GET /orders/mine failed, fallback to store:', err);
@@ -71,9 +67,6 @@ export function useOrders() {
   });
 }
 
-/**
- * Hook to query a single order by ID using GET /orders/:id
- */
 export function useOrder(id: string | undefined) {
   const storeOrders = useOrderStore((state) => state.orders);
 
@@ -116,9 +109,6 @@ export function useOrder(id: string | undefined) {
   });
 }
 
-/**
- * Hook to place a new delivery order using POST /orders
- */
 export function useCreateOrder() {
   const queryClient = useQueryClient();
 
@@ -133,14 +123,13 @@ export function useCreateOrder() {
       pickupLat?: number;
       pickupLng?: number;
       items: string;
-      tipAmount?: number; // In cents or dollars
+      tipAmount?: number;
       distanceMiles?: number;
       cityId?: string;
       storeId?: string;
       orderScope?: string;
       customerSessionId?: string;
     }): Promise<Order> => {
-      // Ensure tip amount is integer cents for backend validation
       const rawTip = Number(orderData.tipAmount ?? 500);
       const tipCents = rawTip > 0 && rawTip < 100 ? Math.round(rawTip * 100) : Math.round(rawTip);
 
@@ -222,7 +211,6 @@ export function useClaimOrder() {
         return saved;
       } catch (err: any) {
         console.warn(`[useClaimOrder] POST /orders/${orderId}/claim failed:`, err);
-        // Only fallback if true network error (status === 0), never mask 403 / 409 backend gate rejections
         if (err?.isNetworkError || err?.status === 0) {
           const updated = useOrderStore.getState().claimOrder(orderId, driverUserId, driverName);
           if (updated) return updated;
@@ -244,10 +232,6 @@ export function useClaimOrder() {
     },
   });
 }
-
-/**
- * Hook to update order fields and transition lifecycle status using PATCH /orders/:id
- */
 export function useUpdateOrderStatus() {
   const queryClient = useQueryClient();
 

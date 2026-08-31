@@ -5,4 +5,6 @@ export * from './delivery';
 export * from './connect';
 export * from './checkout';
 export * from './accreditation';
+export * from './chat';
+
 

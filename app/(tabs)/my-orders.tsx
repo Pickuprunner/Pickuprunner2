@@ -53,7 +53,6 @@ export default function MyOrdersScreen() {
   const driverId = useDriverId();
   const [refreshing, setRefreshing] = useState(false);
 
-  // ─── 1. Header State & Smooth Scroll Animation Logic ───
   const [headerHeight, setHeaderHeight] = useState(150);
   const headerTranslateY = useRef(new Animated.Value(0)).current;
   const lastScrollY = useRef(0);
@@ -70,35 +69,34 @@ export default function MyOrdersScreen() {
     return getGreeting(user?.displayName || user?.email);
   }, [user]);
 
-  // Driver active orders in progress (accepted / shopping / picked_up / en_route)
   const activeOrders = useMemo(() => {
-    return orders
+    return (orders as any[])
       .filter(
-        (o) =>
-          (o.driverUserId === driverId || !o.driverUserId) &&
+        (o: any) =>
+          (driverId ? o.driverUserId === driverId : true) &&
           (o.status === 'assigned' ||
             o.status === 'accepted' ||
             o.status === 'shopping' ||
             o.status === 'picked_up' ||
             o.status === 'en_route')
       )
-      .sort((a, b) => Number(a.distanceMiles ?? 0) - Number(b.distanceMiles ?? 0));
+      .sort((a: any, b: any) => Number(a.distanceMiles ?? 0) - Number(b.distanceMiles ?? 0));
   }, [orders, driverId]);
 
   const [selectedTab, setSelectedTab] = useState<'active' | 'completed'>('active');
 
   const deliveredOrders = useMemo(() => {
-    return orders
+    return (orders as any[])
       .filter(
-        (o) =>
+        (o: any) =>
           o.status === 'delivered' &&
-          (o.driverUserId === driverId || !o.driverUserId)
+          (driverId ? o.driverUserId === driverId : true)
       )
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }, [orders, driverId]);
 
   const allDriverOrders = useMemo(() => {
-    return orders.filter((o) => o.driverUserId === driverId || !o.driverUserId);
+    return (orders as any[]).filter((o: any) => o.driverUserId === driverId || !o.driverUserId);
   }, [orders, driverId]);
 
   // Compute Today's Stats from driver's completed and active deliveries
