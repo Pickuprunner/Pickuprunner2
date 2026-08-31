@@ -28,7 +28,7 @@ import {
   CustomerOrderFilterModal,
   CustomerFilterState,
 } from '@/components/Orders';
-import { useToast, SkeletonList, CustomConfirmModal } from '@/components/core';
+import { useToast, SkeletonList, CustomConfirmModal, CustomLoading } from '@/components/core';
 
 const SESSION_KEY = 'customer_session_id';
 const CHANNEL_NAME = 'order-updates';
@@ -282,7 +282,13 @@ export default function MyOrdersScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchOrders();
+    try {
+      const minDelay = new Promise((resolve) => setTimeout(resolve, 550));
+      await Promise.all([fetchOrders(), minDelay]);
+    } catch {
+    } finally {
+      setRefreshing(false);
+    }
   }, [fetchOrders]);
 
   const handleCancel = useCallback((id: string) => {
@@ -556,9 +562,10 @@ export default function MyOrdersScreen() {
         contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={false}
             onRefresh={onRefresh}
-            tintColor="#ffe399"
+            tintColor="transparent"
+            colors={['transparent']}
           />
         }
         ListEmptyComponent={
@@ -566,15 +573,24 @@ export default function MyOrdersScreen() {
             <SkeletonList count={3} />
           ) : (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>No Matching Orders</Text>
+              <View style={styles.emptyIconWrapper}>
+                <MaterialIcons
+                  name={search.trim() || activeFilterCount > 0 ? 'search-off' : 'inventory-2'}
+                  size={52}
+                  color="#FFE399"
+                />
+              </View>
+              <Text style={styles.emptyTitle}>
+                {search.trim() || activeFilterCount > 0 ? 'No Matching Orders' : 'No Orders Placed Yet'}
+              </Text>
               <Text style={styles.emptySubtitle}>
                 {search.trim() || activeFilterCount > 0
-                  ? 'Try adjusting your search query or reset filters.'
-                  : 'New pickup requests will appear here in real time.'}
+                  ? 'Try adjusting your search query or reset your filters.'
+                  : 'Place your first pickup request to track its live status here.'}
               </Text>
-              {(search.trim() || activeFilterCount > 0) && (
+              {search.trim() || activeFilterCount > 0 ? (
                 <TouchableOpacity
-                  activeOpacity={0.7}
+                  activeOpacity={0.8}
                   onPress={() => {
                     setSearch('');
                     setFilters({ status: 'all', dateRange: 'all', sortBy: 'newest' });
@@ -582,6 +598,14 @@ export default function MyOrdersScreen() {
                   style={styles.resetFiltersBtn}
                 >
                   <Text style={styles.resetFiltersBtnText}>Reset All Filters</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => router.push('/(customer)')}
+                  style={styles.createOrderBtn}
+                >
+                  <Text style={styles.createOrderBtnText}>Request a Pickup</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -607,6 +631,7 @@ export default function MyOrdersScreen() {
         onClose={() => setCancelTargetOrder(null)}
         onConfirm={confirmCancel}
       />
+      <CustomLoading visible={refreshing} variant="circle" overlay position="top" />
     </View>
   );
 }
@@ -788,18 +813,41 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: 64,
     paddingHorizontal: 32,
     gap: 8,
+  },
+  emptyIconWrapper: {
+    marginBottom: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#dfe2ef',
+    color: '#F8FAFC',
+    textAlign: 'center',
+    letterSpacing: -0.2,
   },
   emptySubtitle: {
-    fontSize: 13,
-    color: '#8C90A1',
+    fontSize: 13.5,
+    color: '#94A3B8',
     textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 280,
+    marginBottom: 4,
+  },
+  createOrderBtn: {
+    marginTop: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 20,
+    backgroundColor: '#FFE399',
+  },
+  createOrderBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F131C',
+    letterSpacing: 0.2,
   },
 });

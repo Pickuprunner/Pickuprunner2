@@ -39,6 +39,7 @@ import {
   MOCK_DRIVER_WIZARD_DATA,
   DriverWizardData,
 } from '@/components/driver-verification';
+import { DriverProfileStatusScreen } from '@/components/driver-verification';
 
 export default function DriverVerificationScreen() {
   const insets = useSafeAreaInsets();
@@ -368,6 +369,10 @@ export default function DriverVerificationScreen() {
       router.replace('/(tabs)/profile');
     }
   };
+
+  if (currentStep === 5) {
+    return <DriverProfileStatusScreen />;
+  }
 
   return (
     <View style={styles.root}>

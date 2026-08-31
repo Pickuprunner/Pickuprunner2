@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,12 +19,7 @@ export type LoadingSize = 'small' | 'medium' | 'large' | number;
 export interface CustomLoadingProps {
   /** Controls visibility of the loading component */
   visible?: boolean;
-  /** Display variant:
-   *  - `circle`: Floating circular badge with spinner (matching design screenshot)
-   *  - `card`: Rounded floating container with spinner and optional text
-   *  - `fullscreen`: Centered overlay taking up full screen with dimmed backdrop
-   *  - `inline`: Minimal lightweight inline spinner
-   */
+  /** Display variant */
   variant?: LoadingVariant;
   /** Size preset ('small' | 'medium' | 'large') or custom number in px */
   size?: LoadingSize;
@@ -36,8 +31,12 @@ export interface CustomLoadingProps {
   text?: string;
   /** Text color override */
   textColor?: string;
-  /** Whether to render as an absolute centered overlay */
+  /** Whether to render as an absolute overlay */
   overlay?: boolean;
+  /** Position when overlay is true ('top' | 'center') */
+  position?: 'top' | 'center';
+  /** Custom top offset in px when position='top' */
+  topOffset?: number;
   /** Dim backdrop opacity when overlay or fullscreen is true (0 to 1) */
   backdropOpacity?: number;
   /** Enable subtle ambient shadow/glow */
@@ -55,40 +54,63 @@ export interface CustomLoadingProps {
 export function CustomLoading({
   visible = true,
   variant = 'circle',
-  size = 'medium',
-  color = colors.secondaryContainer || '#F4C300',
-  backgroundColor,
+  size = 'large',
+  color = '#F4C300',
+  backgroundColor = 'transparent',
   text,
-  textColor = '#DFE2EF',
+  textColor = '#0F131C',
   overlay = false,
-  backdropOpacity = 0.5,
-  shadow = true,
+  position = 'top',
+  topOffset,
+  backdropOpacity = 0,
+  shadow = false,
   customSpinner,
   containerStyle,
   contentStyle,
   textStyle,
 }: CustomLoadingProps) {
+  const [mounted, setMounted] = useState(visible);
   const fadeAnim = useRef(new Animated.Value(visible ? 1 : 0)).current;
   const scaleAnim = useRef(new Animated.Value(visible ? 1 : 0.85)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: visible ? 1 : 0,
-        duration: 200,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: visible ? 1 : 0.85,
-        duration: 200,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start();
+    if (visible) {
+      setMounted(true);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 180,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.85,
+          duration: 180,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (finished) setMounted(false);
+      });
+    }
   }, [visible]);
 
-  if (!visible && (fadeAnim as any)._value === 0) {
+  if (!mounted && !visible) {
     return null;
   }
 
@@ -110,7 +132,7 @@ export function CustomLoading({
         return { width: 64, height: 64, borderRadius: 32 };
       case 'medium':
       default:
-        return { width: 48, height: 48, borderRadius: 24 };
+        return { width: 50, height: 50, borderRadius: 25 };
     }
   };
 
@@ -128,6 +150,7 @@ export function CustomLoading({
   if (variant === 'fullscreen') {
     return (
       <Animated.View
+        pointerEvents={visible ? 'auto' : 'none'}
         style={[
           styles.fullscreenOverlay,
           {
@@ -172,21 +195,25 @@ export function CustomLoading({
 
     if (overlay) {
       return (
-        <View
+        <Animated.View
+          pointerEvents={visible ? 'auto' : 'none'}
           style={[
             styles.absoluteOverlay,
-            { backgroundColor: `rgba(0, 0, 0, ${backdropOpacity})` },
+            {
+              backgroundColor: `rgba(0, 0, 0, ${backdropOpacity})`,
+              opacity: fadeAnim,
+            },
             containerStyle,
           ]}
         >
           {cardContent}
-        </View>
+        </Animated.View>
       );
     }
     return <View style={containerStyle}>{cardContent}</View>;
   }
 
-  // ─── Circle Variant (Default - Matching Screenshot) ───
+  // ─── Circle Variant (Default) ───
   const badgeDims = getBadgeDimensions();
   const circleContent = (
     <Animated.View
@@ -204,16 +231,20 @@ export function CustomLoading({
   );
 
   if (overlay) {
+    const overlayStyle = position === 'top' ? styles.topOverlay : styles.absoluteOverlay;
     return (
-      <View
+      <Animated.View
+        pointerEvents={visible ? 'auto' : 'none'}
         style={[
-          styles.absoluteOverlay,
-          { backgroundColor: `rgba(0, 0, 0, ${backdropOpacity})` },
+          overlayStyle,
+          position === 'top' && typeof topOffset === 'number' && { paddingTop: topOffset },
+          backdropOpacity > 0 && { backgroundColor: `rgba(0, 0, 0, ${backdropOpacity})` },
+          { opacity: fadeAnim },
           containerStyle,
         ]}
       >
         {circleContent}
-      </View>
+      </Animated.View>
     );
   }
 
@@ -249,11 +280,10 @@ const styles = StyleSheet.create({
   circleBadge: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'transparent',
   },
   defaultCircleBg: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   cardBadge: {
     flexDirection: 'row',
@@ -293,6 +323,16 @@ const styles = StyleSheet.create({
         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
       },
     }),
+  },
+  topOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: Platform.OS === 'ios' ? 250 : 235,
+    zIndex: 9999,
   },
   absoluteOverlay: {
     ...StyleSheet.absoluteFillObject,

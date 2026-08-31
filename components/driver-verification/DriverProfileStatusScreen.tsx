@@ -27,7 +27,7 @@ import { colors, spacing, borderRadius } from '@/constants/design';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { useMyVerification } from '@/lib/verification';
-import { useToast } from '@/components/core';
+import { useToast, CustomLoading } from '@/components/core';
 
 export function DriverProfileStatusScreen() {
   const insets = useSafeAreaInsets();
@@ -55,7 +55,8 @@ export function DriverProfileStatusScreen() {
     }
     setRefreshing(true);
     try {
-      const [accredRes] = await Promise.all([refetchAccred(), refetchVerif()]);
+      const minDelay = new Promise((resolve) => setTimeout(resolve, 550));
+      const [accredRes] = await Promise.all([refetchAccred(), refetchVerif(), minDelay]);
       const newStatus = accredRes.data?.profile?.accreditationStatus;
       if (newStatus === 'approved') {
         showToast('Accreditation Approved! Welcome to PickupRunner.', 'success');
@@ -99,10 +100,10 @@ export function DriverProfileStatusScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={false}
             onRefresh={handleRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+            tintColor="transparent"
+            colors={['transparent']}
           />
         }
       >
@@ -118,29 +119,31 @@ export function DriverProfileStatusScreen() {
             </Text>
           </View>
 
-          <Text style={styles.title}>
-            {isSubmitted ? 'See you Shortly' : 'Finish Your Application'}
+          <Text style={styles.heroTitle}>
+            {isSubmitted ? 'Accreditation Under Review' : 'Accreditation In Progress'}
           </Text>
-          <Text style={styles.subtitle}>
+
+          <Text style={styles.heroSubtitle}>
             {isSubmitted
-              ? 'Once your profile has been reviewed, come back here to start accepting and fulfilling local deliveries.'
-              : 'You have unfinished steps in your driver accreditation. Complete all steps to submit your profile for review.'}
+              ? 'Our safety compliance team is reviewing your vehicle details, driver license, background check, and insurance. Most reviews complete within 2–24 hours.'
+              : 'Please complete all required steps to activate your driver account and start receiving delivery orders.'}
           </Text>
         </View>
 
-        {/* SUBMISSION DETAILS SUMMARY */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryHeader}>APPLICATION SUMMARY</Text>
+        {/* CHECKLIST ITEMS */}
+        <View style={styles.checklistCard}>
+          <Text style={styles.checklistHeader}>VERIFICATION CHECKLIST</Text>
 
-          <View style={styles.summaryRow}>
-            <View style={styles.iconBadge}>
-              <Car size={16} color={colors.primary} />
+          {/* 1. Vehicle Info */}
+          <View style={styles.checkItem}>
+            <View style={styles.itemIconBox}>
+              <Car size={20} color={hasVehicle ? '#22C55E' : colors.onSurfaceVariant} />
             </View>
-            <View style={styles.summaryTextCol}>
-              <Text style={styles.summaryLabel}>Vehicle & Address</Text>
-              <Text style={styles.summaryVal}>
+            <View style={styles.itemTextCol}>
+              <Text style={styles.itemTitle}>Vehicle & Address</Text>
+              <Text style={styles.itemSubtitle}>
                 {hasVehicle
-                  ? `${profile?.vehicleYear ? `${profile.vehicleYear} ` : ''}${profile?.vehicleMake} ${profile?.vehicleModel || ''} • ${profile?.vehiclePlate}`
+                  ? `${profile?.vehicleYear || ''} ${profile?.vehicleMake || ''} ${profile?.vehicleModel || ''} (${profile?.vehiclePlate || ''})`
                   : 'Incomplete'}
               </Text>
             </View>
@@ -153,15 +156,16 @@ export function DriverProfileStatusScreen() {
 
           <View style={styles.divider} />
 
-          <View style={styles.summaryRow}>
-            <View style={styles.iconBadge}>
-              <ShieldCheck size={16} color={colors.primary} />
+          {/* 2. Driver License */}
+          <View style={styles.checkItem}>
+            <View style={styles.itemIconBox}>
+              <ShieldCheck size={20} color={hasLicense ? '#22C55E' : colors.onSurfaceVariant} />
             </View>
-            <View style={styles.summaryTextCol}>
-              <Text style={styles.summaryLabel}>Driver's License</Text>
-              <Text style={styles.summaryVal}>
+            <View style={styles.itemTextCol}>
+              <Text style={styles.itemTitle}>Driver's License</Text>
+              <Text style={styles.itemSubtitle}>
                 {hasLicense
-                  ? `${profile?.legalName || user?.displayName || 'Driver'} • ${profile?.licenseState || 'State'} #${profile?.licenseNumber || '••••'}`
+                  ? `${profile?.licenseState || 'AZ'} • #${profile?.licenseNumber ? '••••' + String(profile.licenseNumber).slice(-4) : '••••'}`
                   : 'Incomplete'}
               </Text>
             </View>
@@ -174,14 +178,15 @@ export function DriverProfileStatusScreen() {
 
           <View style={styles.divider} />
 
-          <View style={styles.summaryRow}>
-            <View style={styles.iconBadge}>
-              <Shield size={16} color="#FFE399" />
+          {/* 3. Background Check */}
+          <View style={styles.checkItem}>
+            <View style={styles.itemIconBox}>
+              <FileText size={20} color={hasConsent ? '#22C55E' : colors.onSurfaceVariant} />
             </View>
-            <View style={styles.summaryTextCol}>
-              <Text style={styles.summaryLabel}>Background Check</Text>
-              <Text style={styles.summaryVal}>
-                {hasConsent ? 'FCRA Consent Authorized' : 'Consent Required'}
+            <View style={styles.itemTextCol}>
+              <Text style={styles.itemTitle}>Background Check Consent</Text>
+              <Text style={styles.itemSubtitle}>
+                {hasConsent ? 'FCRA Disclosure Authorized' : 'Authorization Required'}
               </Text>
             </View>
             {hasConsent ? (
@@ -193,13 +198,14 @@ export function DriverProfileStatusScreen() {
 
           <View style={styles.divider} />
 
-          <View style={styles.summaryRow}>
-            <View style={styles.iconBadge}>
-              <FileText size={16} color={colors.primary} />
+          {/* 4. Insurance */}
+          <View style={styles.checkItem}>
+            <View style={styles.itemIconBox}>
+              <Shield size={20} color={hasInsurance ? '#22C55E' : colors.onSurfaceVariant} />
             </View>
-            <View style={styles.summaryTextCol}>
-              <Text style={styles.summaryLabel}>Vehicle Insurance</Text>
-              <Text style={styles.summaryVal}>
+            <View style={styles.itemTextCol}>
+              <Text style={styles.itemTitle}>Vehicle Insurance Policy</Text>
+              <Text style={styles.itemSubtitle}>
                 {hasInsurance
                   ? `${profile?.insuranceCompany || 'Insurance'} • Policy #${profile?.insurancePolicyNumber || '••••'}`
                   : 'Incomplete'}
@@ -252,6 +258,7 @@ export function DriverProfileStatusScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <CustomLoading visible={refreshing} variant="circle" overlay position="top" topOffset={insets.top + 24} />
     </View>
   );
 }
@@ -301,6 +308,63 @@ const styles = StyleSheet.create({
     color: colors.onSurfaceVariant,
     textAlign: 'center',
     paddingHorizontal: spacing.md,
+  },
+  heroTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.onSurface,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+    letterSpacing: -0.3,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.onSurfaceVariant,
+    textAlign: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  checklistCard: {
+    backgroundColor: '#191E2B',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    gap: spacing.sm,
+  },
+  checklistHeader: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.onSurfaceVariant,
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  checkItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 2,
+  },
+  itemIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemTextCol: {
+    flex: 1,
+  },
+  itemTitle: {
+    fontSize: 11,
+    color: colors.onSurfaceVariant,
+    fontWeight: '500',
+  },
+  itemSubtitle: {
+    fontSize: 13,
+    color: colors.onSurface,
+    fontWeight: '600',
   },
   summaryCard: {
     backgroundColor: '#191E2B',

@@ -24,7 +24,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { calcDriverEarnings } from '@/lib/config';
 import { colors } from '@/constants/design';
-import { SkeletonList } from '@/components/core';
+import { SkeletonList, CustomLoading } from '@/components/core';
 
 import {
   MyOrdersHeader,
@@ -138,7 +138,8 @@ export default function MyOrdersScreen() {
           });
         }
       }
-      await refetch();
+      const minDelay = new Promise((resolve) => setTimeout(resolve, 550));
+      await Promise.all([refetch(), minDelay]);
     } catch {
       // Ignore network errors on refresh
     } finally {
@@ -283,17 +284,26 @@ export default function MyOrdersScreen() {
 
   const EmptyView = !isLoading ? (
     <View style={styles.emptyContainer}>
-      <View style={styles.emptyIconCircle}>
-        <Package size={36} color={selectedTab === 'completed' ? '#00E297' : 'rgba(244, 195, 0, 0.4)'} />
+      <View style={styles.emptyIconWrapper}>
+        <Package size={52} color={selectedTab === 'completed' ? '#00E297' : '#FFE399'} />
       </View>
       <Text style={styles.emptyTitle}>
-        {selectedTab === 'active' ? 'No active orders' : 'No completed deliveries'}
+        {selectedTab === 'active' ? 'No Active Orders' : 'No Completed Deliveries'}
       </Text>
       <Text style={styles.emptySubtitle}>
         {selectedTab === 'active'
-          ? 'Accept orders from the Orders tab to begin deliveries.'
-          : 'Delivered orders will be recorded here.'}
+          ? 'Claim available orders from the Orders tab to begin deliveries.'
+          : 'Completed and delivered orders will appear here.'}
       </Text>
+      {selectedTab === 'active' ? (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => router.push('/(tabs)')}
+          style={styles.emptyActionBtn}
+        >
+          <Text style={styles.emptyActionBtnText}>Find Available Orders</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   ) : null;
 
@@ -389,17 +399,17 @@ export default function MyOrdersScreen() {
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={false}
             onRefresh={onRefresh}
-            progressViewOffset={Platform.OS === 'android' ? headerHeight : 0}
-            tintColor={colors.secondary}
-            colors={[colors.secondaryContainer]}
+            tintColor="transparent"
+            colors={['transparent']}
           />
         }
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       />
+      <CustomLoading visible={refreshing} variant="circle" overlay position="top" />
     </View>
   );
 }
@@ -532,31 +542,41 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
+    paddingVertical: 56,
+    paddingHorizontal: 32,
+    gap: 8,
   },
-  emptyIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(244, 195, 0, 0.25)',
+  emptyIconWrapper: {
+    marginBottom: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
   },
   emptyTitle: {
-    color: '#DFE2EF',
+    color: '#F8FAFC',
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 6,
+    letterSpacing: -0.2,
   },
   emptySubtitle: {
-    color: '#C2C6D8',
-    fontSize: 13,
+    color: '#94A3B8',
+    fontSize: 13.5,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
+    maxWidth: 280,
+    marginBottom: 4,
+  },
+  emptyActionBtn: {
+    marginTop: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 20,
+    backgroundColor: '#FFE399',
+  },
+  emptyActionBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F131C',
+    letterSpacing: 0.2,
   },
 });

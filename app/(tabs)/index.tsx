@@ -9,6 +9,7 @@ import {
   Text,
   Platform,
   LayoutChangeEvent,
+  TouchableOpacity,
 } from 'react-native';
 import {
   Button,
@@ -31,7 +32,7 @@ import { useDriverAccreditation } from '@/lib/accreditation';
 import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { calcDriverEarnings } from '@/lib/config';
 import { colors } from '@/constants/design';
-import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast } from '@/components/core';
+import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast, CustomLoading } from '@/components/core';
 
 import {
   OrdersHeader,
@@ -145,6 +146,7 @@ export default function OrdersScreen() {
       router.replace('/(auth)/driver-verification');
     }
   }, [user?.role, isApproved, isSubmitted, isLoadingVerif, isLoadingAccred]);
+
 
   const handleSetupPayouts = async () => {
     setOnboardingLoading(true);
@@ -326,7 +328,8 @@ export default function OrdersScreen() {
           }
         }
       }
-      await Promise.all([refetchAvailable(), refetchAll(), refetchConnect()]);
+      const minDelay = new Promise((resolve) => setTimeout(resolve, 550));
+      await Promise.all([refetchAvailable(), refetchAll(), refetchConnect(), minDelay]);
     } catch {
     } finally {
       setRefreshing(false);
@@ -424,31 +427,34 @@ export default function OrdersScreen() {
 
   const EmptyView = !isLoading ? (
     <View style={styles.emptyContainer}>
-      <View style={styles.emptyIconCircle}>
-        <Package size={36} color="rgba(244, 195, 0, 0.4)" />
+      <View style={styles.emptyIconWrapper}>
+        <Package size={52} color="#FFE399" />
       </View>
       <Text style={styles.emptyTitle}>
-        {search.trim() ? 'No matching orders' : 'No available orders'}
+        {search.trim() ? 'No Matching Orders' : 'No Available Orders'}
       </Text>
       <Text style={styles.emptySubtitle}>
         {search.trim()
           ? 'Try adjusting your search query.'
           : 'New incoming deliveries will appear here in real time.'}
       </Text>
-      {!search.trim() ? (
-        <Button
-          marginTop="$4"
-          onPress={onRefresh}
-          backgroundColor="rgba(244,195,0,0.12)"
-          borderColor="rgba(244,195,0,0.35)"
-          borderWidth={1}
-          color={colors.secondary}
-          size="$3.5"
-          borderRadius={9999}
+      {search.trim() ? (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setSearch('')}
+          style={styles.emptyActionBtn}
         >
-          Refresh Orders
-        </Button>
-      ) : null}
+          <Text style={styles.emptyActionBtnText}>Clear Search</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={onRefresh}
+          style={styles.emptyActionBtn}
+        >
+          <Text style={styles.emptyActionBtnText}>Refresh Feed</Text>
+        </TouchableOpacity>
+      )}
     </View>
   ) : null;
 
@@ -511,11 +517,10 @@ export default function OrdersScreen() {
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={false}
             onRefresh={onRefresh}
-            progressViewOffset={Platform.OS === 'android' ? headerHeight : 0}
-            tintColor={colors.secondary}
-            colors={[colors.secondaryContainer]}
+            tintColor="transparent"
+            colors={['transparent']}
           />
         }
         contentContainerStyle={[
@@ -543,6 +548,7 @@ export default function OrdersScreen() {
       />
 
       <ActiveDeliveriesBanner queueCount={queueCount} orders={myActiveOrders} />
+      <CustomLoading visible={refreshing} variant="circle" overlay position="top" />
     </View>
   );
 }
@@ -571,31 +577,41 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
+    paddingVertical: 56,
+    paddingHorizontal: 32,
+    gap: 8,
   },
-  emptyIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(244, 195, 0, 0.25)',
+  emptyIconWrapper: {
+    marginBottom: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
   },
   emptyTitle: {
-    color: '#DFE2EF',
+    color: '#F8FAFC',
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 6,
+    letterSpacing: -0.2,
   },
   emptySubtitle: {
-    color: '#C2C6D8',
-    fontSize: 13,
+    color: '#94A3B8',
+    fontSize: 13.5,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 20,
+    maxWidth: 280,
+    marginBottom: 4,
+  },
+  emptyActionBtn: {
+    marginTop: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 20,
+    backgroundColor: '#FFE399',
+  },
+  emptyActionBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F131C',
+    letterSpacing: 0.2,
   },
 });
