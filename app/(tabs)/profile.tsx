@@ -24,6 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getSavedDisplayName, saveDisplayName } from '@/lib/chat';
 import { useAuth } from '@/hooks/useAuth';
+import { useDriverAccreditation } from '@/lib/accreditation';
 import { useMyVerification } from '@/lib/verification';
 import { useMyBackgroundCheck } from '@/lib/backgroundCheck';
 import { blink } from '@/lib/blink';
@@ -36,7 +37,6 @@ import {
   ProfileHeroCard,
   ProfileSection,
   ProfileActionRow,
-  ProfileSwitchRoleSection,
   ProfileSupportSection,
   ProfileAccountSection,
   DocStatusItem,
@@ -67,6 +67,7 @@ export default function ProfileScreen() {
   const { showToast } = useToast();
   const { user, isAuthenticated, isLoading: authLoading, logout, updateProfile, forgotPassword } = useAuth();
   const driverId = useDriverId();
+  const { data: accreditation } = useDriverAccreditation();
   const { data: verification } = useMyVerification(user?.id);
   const { data: bgCheck } = useMyBackgroundCheck(user?.id);
   const { data: connectStatus, isLoading: isConnectStatusLoading, refetch: refetchConnect } = useConnectStatus(driverId);
@@ -200,22 +201,62 @@ export default function ProfileScreen() {
     try {
       haptic('heavy');
       await logout();
-      router.replace('/(auth)/sign-in');
+      await AsyncStorage.removeItem('app_role');
+      router.replace('/(landing)/role-select');
     } catch (err) {
       console.warn('[auth] sign out failed:', err);
     }
   };
 
-  const handleChooseRole = async () => {
-    haptic('medium');
-    showToast('Returning to role selection...', { type: 'info' });
-    await AsyncStorage.removeItem('app_role');
-    router.replace('/(landing)/role-select');
-  };
 
-  const docStatus: DocStatus = verification?.status;
-  const bgStatus: DocStatus = bgCheck?.status as DocStatus;
-  const allApproved = docStatus === 'approved' && bgStatus === 'approved';
+  const accredProfile = accreditation?.profile;
+  const accredSteps = accreditation?.steps;
+
+  const isProfileSubmitted =
+    Boolean(accredProfile?.isSubmitted) ||
+    accredProfile?.accreditationStatus === 'under_review' ||
+    accredProfile?.accreditationStatus === 'approved';
+
+  const hasLicenseData = Boolean(accredProfile?.licenseNumber || accredProfile?.documents?.licenseFront);
+  const hasInsuranceData = Boolean(accredProfile?.insurancePolicyNumber || accredProfile?.documents?.insuranceCard);
+  const hasConsentData = Boolean(accredProfile?.backgroundConsentAt);
+
+  const licenseStatus: DocStatus =
+    accredSteps?.license === 'approved' || verification?.status === 'approved'
+      ? 'approved'
+      : accredSteps?.license === 'rejected'
+        ? 'rejected'
+        : hasLicenseData || isProfileSubmitted
+          ? 'pending'
+          : undefined;
+
+  const insuranceStatus: DocStatus =
+    accredSteps?.insurance === 'approved' || verification?.status === 'approved'
+      ? 'approved'
+      : accredSteps?.insurance === 'rejected'
+        ? 'rejected'
+        : hasInsuranceData || isProfileSubmitted
+          ? 'pending'
+          : undefined;
+
+  const bgStatus: DocStatus =
+    accredSteps?.backgroundCheck === 'approved' || bgCheck?.status === 'approved'
+      ? 'approved'
+      : accredSteps?.backgroundCheck === 'rejected' || bgCheck?.status === 'rejected'
+        ? 'rejected'
+        : hasConsentData || isProfileSubmitted
+          ? 'in_review'
+          : undefined;
+
+  const isAccredApproved =
+    accreditation?.eligibility?.eligible ||
+    accredProfile?.accreditationStatus === 'approved' ||
+    verification?.status === 'approved';
+
+  const isAccredUnderReview =
+    !isAccredApproved &&
+    (accredProfile?.accreditationStatus === 'under_review' ||
+      (isProfileSubmitted && (licenseStatus === 'pending' || insuranceStatus === 'pending' || bgStatus === 'in_review')));
 
   const isStatusLoading = isConnectStatusLoading && !connectStatus;
   const hasStripeAccount = Boolean(connectStatus?.stripeAccountId || connectStatus?.connected);
@@ -293,16 +334,16 @@ export default function ProfileScreen() {
             <View
               style={[
                 styles.overallBadge,
-                allApproved ? styles.overallBadgeSuccess : styles.overallBadgeWarning,
+                isAccredApproved ? styles.overallBadgeSuccess : styles.overallBadgeWarning,
               ]}
             >
               <Text
                 style={[
                   styles.overallBadgeText,
-                  allApproved ? { color: GREEN } : { color: GOLD_ACCENT },
+                  isAccredApproved ? { color: GREEN } : { color: GOLD_ACCENT },
                 ]}
               >
-                {allApproved ? '✓ FULLY CLEARED' : '● IN PROGRESS'}
+                {isAccredApproved ? 'FULLY CLEARED' : isAccredUnderReview ? 'UNDER REVIEW' : 'IN PROGRESS'}
               </Text>
             </View>
           }
@@ -310,15 +351,15 @@ export default function ProfileScreen() {
           <DocStatusItem
             title="Driver's License"
             subtitle={
-              docStatus === 'approved'
+              licenseStatus === 'approved'
                 ? 'Valid license on file'
-                : docStatus === 'rejected'
+                : licenseStatus === 'rejected'
                   ? 'Resubmission required'
-                  : docStatus === 'pending'
+                  : licenseStatus === 'pending' || licenseStatus === 'in_review'
                     ? 'Under review'
                     : 'Upload driver license'
             }
-            status={docStatus}
+            status={licenseStatus}
             onPress={() => router.push('/driver-verification')}
           />
 
@@ -327,15 +368,15 @@ export default function ProfileScreen() {
           <DocStatusItem
             title="Vehicle Insurance"
             subtitle={
-              docStatus === 'approved'
+              insuranceStatus === 'approved'
                 ? 'Current policy verified'
-                : docStatus === 'rejected'
+                : insuranceStatus === 'rejected'
                   ? 'Resubmission required'
-                  : docStatus === 'pending'
+                  : insuranceStatus === 'pending' || insuranceStatus === 'in_review'
                     ? 'Under review'
                     : 'Upload insurance policy'
             }
-            status={docStatus}
+            status={insuranceStatus}
             onPress={() => router.push('/driver-verification')}
           />
 
@@ -348,7 +389,7 @@ export default function ProfileScreen() {
                 ? 'MVR & criminal check cleared'
                 : bgStatus === 'rejected'
                   ? 'Check failed — tap details'
-                  : bgStatus === 'in_review'
+                  : bgStatus === 'in_review' || bgStatus === 'pending'
                     ? 'Screening in progress'
                     : 'FCRA authorization needed'
             }
@@ -421,10 +462,6 @@ export default function ProfileScreen() {
           />
         </ProfileSection>
 
-        <ProfileSwitchRoleSection
-          currentRole="driver"
-          onChooseRoleAgain={handleChooseRole}
-        />
 
         {user?.role === 'admin' && (
           <ProfileSection title="ADMINISTRATION">

@@ -279,7 +279,7 @@ export function InsuranceStep({
             <ActivityIndicator size="small" color={colors.onPrimaryContainer} />
           ) : (
             <>
-              <Text style={styles.submitBtnText}>Submit for Admin Approval</Text>
+              <Text style={styles.submitBtnText}>Submit for Approval</Text>
               <CheckCircle size={18} color={colors.onPrimaryContainer} />
             </>
           )}

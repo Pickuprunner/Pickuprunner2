@@ -128,6 +128,14 @@ export default function DriverVerificationScreen() {
         profile.accreditationStatus === 'approved'
       ) {
         setCurrentStep(5);
+      } else if (profile.backgroundConsentAt) {
+        setCurrentStep(4);
+      } else if (profile.licenseNumber) {
+        setCurrentStep(3);
+      } else if (profile.vehicleMake && profile.vehiclePlate) {
+        setCurrentStep(2);
+      } else {
+        setCurrentStep(1);
       }
     } else if (existing) {
       setFormData((prev) => ({
@@ -521,6 +529,7 @@ const styles = StyleSheet.create({
     color: '#0F131C',
   },
   scroll: {
+    flexGrow: 1,
     paddingHorizontal: spacing.gutter,
     paddingTop: spacing.md,
   },

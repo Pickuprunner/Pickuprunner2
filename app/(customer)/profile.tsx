@@ -14,7 +14,6 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { saveRole } from '@/hooks/useRole';
 import { useAuth } from '@/hooks/useAuth';
 import { blink } from '@/lib/blink';
 import { APP_CONFIG } from '@/lib/config';
@@ -24,7 +23,6 @@ import {
   ProfileHeroCard,
   ProfileSection,
   ProfileActionRow,
-  ProfileSwitchRoleSection,
   ProfileSupportSection,
   ProfileAccountSection,
 } from '@/components/profile';
@@ -164,12 +162,6 @@ export default function CustomerProfileScreen() {
     }
   };
 
-  const handleChooseRole = async () => {
-    haptic('medium');
-    showToast('Returning to role selection...', { type: 'info' });
-    await AsyncStorage.removeItem('app_role');
-    router.replace('/(landing)/role-select');
-  };
 
   const handleResetPassword = async () => {
     if (!user?.email) {
@@ -202,7 +194,8 @@ export default function CustomerProfileScreen() {
     try {
       haptic('heavy');
       await logout();
-      router.replace('/(auth)/customer-auth');
+      await AsyncStorage.removeItem('app_role');
+      router.replace('/(landing)/role-select');
     } catch (err) {
       console.warn('[auth] sign out failed:', err);
     }
@@ -259,10 +252,6 @@ export default function CustomerProfileScreen() {
           />
         </ProfileSection>
 
-        <ProfileSwitchRoleSection
-          currentRole="customer"
-          onChooseRoleAgain={handleChooseRole}
-        />
 
         <ProfileSupportSection supportEmail={SUPPORT_EMAIL} isCustomer />
 

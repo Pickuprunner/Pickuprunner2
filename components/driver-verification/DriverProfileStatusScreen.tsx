@@ -20,6 +20,7 @@ import {
   Shield,
   LogOut,
   RefreshCw,
+  ArrowRight,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius } from '@/constants/design';
@@ -37,7 +38,16 @@ export function DriverProfileStatusScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const profile = accreditation?.profile;
+  const isSubmitted =
+    Boolean(profile?.isSubmitted) ||
+    profile?.accreditationStatus === 'under_review' ||
+    verification?.status === 'pending';
   const isApproved = profile?.accreditationStatus === 'approved' || verification?.status === 'approved';
+
+  const hasVehicle = Boolean(profile?.vehicleMake && profile?.vehiclePlate);
+  const hasLicense = Boolean(profile?.licenseNumber);
+  const hasConsent = Boolean(profile?.backgroundConsentAt);
+  const hasInsurance = Boolean(profile?.insurancePolicyNumber);
 
   const handleRefresh = async () => {
     if (Platform.OS !== 'web') {
@@ -59,6 +69,13 @@ export function DriverProfileStatusScreen() {
     }
   };
 
+  const handleResume = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+    router.push('/(auth)/driver-verification');
+  };
+
   const handleSignOut = async () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -70,11 +87,14 @@ export function DriverProfileStatusScreen() {
   const isChecking = isFetchingAccred || isFetchingVerif || refreshing;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + spacing.md }]}>
+    <View style={styles.root}>
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingBottom: insets.bottom + spacing.xl },
+          {
+            paddingTop: insets.top + spacing.lg,
+            paddingBottom: insets.bottom + spacing.xl,
+          },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -89,19 +109,22 @@ export function DriverProfileStatusScreen() {
         {/* HERO ICON & STATUS */}
         <View style={styles.heroSection}>
           <View style={styles.iconGlowWrapper}>
-            <View style={styles.iconCircle}>
-              <Clock size={44} color="#FFE399" />
-            </View>
+            <Clock size={52} color="#FFE399" />
           </View>
 
           <View style={styles.statusPill}>
-            <View style={styles.pulsingDot} />
-            <Text style={styles.statusPillText}>UNDER REVIEW</Text>
+            <Text style={styles.statusPillText}>
+              {isSubmitted ? 'UNDER REVIEW' : 'IN PROGRESS'}
+            </Text>
           </View>
 
-          <Text style={styles.title}>See you Shortly</Text>
+          <Text style={styles.title}>
+            {isSubmitted ? 'See you Shortly' : 'Finish Your Application'}
+          </Text>
           <Text style={styles.subtitle}>
-            Once your profile has been reviewed, come back here to start accepting and fulfilling local deliveries.
+            {isSubmitted
+              ? 'Once your profile has been reviewed, come back here to start accepting and fulfilling local deliveries.'
+              : 'You have unfinished steps in your driver accreditation. Complete all steps to submit your profile for review.'}
           </Text>
         </View>
 
@@ -116,12 +139,16 @@ export function DriverProfileStatusScreen() {
             <View style={styles.summaryTextCol}>
               <Text style={styles.summaryLabel}>Vehicle & Address</Text>
               <Text style={styles.summaryVal}>
-                {profile?.vehicleYear ? `${profile.vehicleYear} ` : ''}
-                {profile?.vehicleMake || 'Vehicle'} {profile?.vehicleModel || ''}
-                {profile?.vehiclePlate ? ` • ${profile.vehiclePlate}` : ''}
+                {hasVehicle
+                  ? `${profile?.vehicleYear ? `${profile.vehicleYear} ` : ''}${profile?.vehicleMake} ${profile?.vehicleModel || ''} • ${profile?.vehiclePlate}`
+                  : 'Incomplete'}
               </Text>
             </View>
-            <CheckCircle size={16} color="#22C55E" />
+            {hasVehicle ? (
+              <CheckCircle size={16} color="#22C55E" />
+            ) : (
+              <Clock size={16} color="#FFE399" />
+            )}
           </View>
 
           <View style={styles.divider} />
@@ -133,10 +160,16 @@ export function DriverProfileStatusScreen() {
             <View style={styles.summaryTextCol}>
               <Text style={styles.summaryLabel}>Driver's License</Text>
               <Text style={styles.summaryVal}>
-                {profile?.legalName || user?.displayName || 'Driver'} • {profile?.licenseState || 'State'} #{profile?.licenseNumber || '••••'}
+                {hasLicense
+                  ? `${profile?.legalName || user?.displayName || 'Driver'} • ${profile?.licenseState || 'State'} #${profile?.licenseNumber || '••••'}`
+                  : 'Incomplete'}
               </Text>
             </View>
-            <CheckCircle size={16} color="#22C55E" />
+            {hasLicense ? (
+              <CheckCircle size={16} color="#22C55E" />
+            ) : (
+              <Clock size={16} color="#FFE399" />
+            )}
           </View>
 
           <View style={styles.divider} />
@@ -147,9 +180,15 @@ export function DriverProfileStatusScreen() {
             </View>
             <View style={styles.summaryTextCol}>
               <Text style={styles.summaryLabel}>Background Check</Text>
-              <Text style={styles.summaryVal}>FCRA Consent Authorized</Text>
+              <Text style={styles.summaryVal}>
+                {hasConsent ? 'FCRA Consent Authorized' : 'Consent Required'}
+              </Text>
             </View>
-            <CheckCircle size={16} color="#22C55E" />
+            {hasConsent ? (
+              <CheckCircle size={16} color="#22C55E" />
+            ) : (
+              <Clock size={16} color="#FFE399" />
+            )}
           </View>
 
           <View style={styles.divider} />
@@ -161,30 +200,47 @@ export function DriverProfileStatusScreen() {
             <View style={styles.summaryTextCol}>
               <Text style={styles.summaryLabel}>Vehicle Insurance</Text>
               <Text style={styles.summaryVal}>
-                {profile?.insuranceCompany || 'Insurance Card'} • Policy #{profile?.insurancePolicyNumber || '••••'}
+                {hasInsurance
+                  ? `${profile?.insuranceCompany || 'Insurance'} • Policy #${profile?.insurancePolicyNumber || '••••'}`
+                  : 'Incomplete'}
               </Text>
             </View>
-            <CheckCircle size={16} color="#22C55E" />
+            {hasInsurance ? (
+              <CheckCircle size={16} color="#22C55E" />
+            ) : (
+              <Clock size={16} color="#FFE399" />
+            )}
           </View>
         </View>
 
         {/* ACTIONS */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={handleRefresh}
-            disabled={isChecking}
-            style={styles.refreshBtn}
-          >
-            {isChecking ? (
-              <ActivityIndicator size="small" color="#0F131C" />
-            ) : (
-              <>
-                <RefreshCw size={16} color="#0F131C" />
-                <Text style={styles.refreshBtnText}>Check Approval Status</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {!isSubmitted ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleResume}
+              style={styles.refreshBtn}
+            >
+              <ArrowRight size={16} color="#0F131C" />
+              <Text style={styles.refreshBtnText}>Resume Application</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleRefresh}
+              disabled={isChecking}
+              style={styles.refreshBtn}
+            >
+              {isChecking ? (
+                <ActivityIndicator size="small" color="#0F131C" />
+              ) : (
+                <>
+                  <RefreshCw size={16} color="#0F131C" />
+                  <Text style={styles.refreshBtnText}>Check Approval Status</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             activeOpacity={0.8}
@@ -192,7 +248,7 @@ export function DriverProfileStatusScreen() {
             style={styles.signOutBtn}
           >
             <LogOut size={16} color={colors.onSurfaceVariant} />
-            <Text style={styles.signOutBtnText}>Sign Out / Switch Role</Text>
+            <Text style={styles.signOutBtnText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -206,8 +262,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F131C',
   },
   scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
     paddingHorizontal: spacing.gutter,
-    paddingTop: spacing.md,
     gap: spacing.lg,
   },
   heroSection: {
@@ -215,41 +272,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   iconGlowWrapper: {
-    marginBottom: spacing.md,
-  },
-  iconCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: 'rgba(255, 227, 153, 0.08)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 227, 153, 0.25)',
+    marginBottom: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 227, 153, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 227, 153, 0.25)',
     marginBottom: spacing.sm,
-  },
-  pulsingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFE399',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statusPillText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 13.5,
+    fontWeight: '800',
     color: '#FFE399',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
   title: {
     fontSize: 24,

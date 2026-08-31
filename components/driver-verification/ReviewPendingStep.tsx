@@ -62,21 +62,18 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
   return (
     <View style={styles.container}>
       <View style={[styles.heroCard, isApproved && styles.heroCardApproved]}>
-        <View style={[styles.iconCircle, isApproved && styles.iconCircleApproved]}>
+        <View style={styles.iconWrapper}>
           {isApproved ? (
-            <CheckCircle size={36} color="#22C55E" />
+            <CheckCircle size={52} color="#22C55E" />
           ) : (
-            <Clock size={36} color="#FFE399" />
+            <Clock size={52} color="#FFE399" />
           )}
         </View>
 
         <View style={styles.badgeRow}>
-          <View style={[styles.badge, isApproved && styles.badgeApproved]}>
-            <View style={[styles.pulsingDot, isApproved && styles.pulsingDotApproved]} />
-            <Text style={[styles.badgeText, isApproved && styles.badgeTextApproved]}>
-              {isApproved ? 'ACCREDITATION APPROVED' : 'UNDER ADMIN REVIEW'}
-            </Text>
-          </View>
+          <Text style={[styles.badgeText, isApproved && styles.badgeTextApproved]}>
+            {isApproved ? 'ACCREDITATION APPROVED' : 'UNDER REVIEW'}
+          </Text>
         </View>
 
         <Text style={styles.heroTitle}>
@@ -174,7 +171,7 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
             style={styles.signOutBtn}
           >
             <LogOut size={16} color={colors.onSurfaceVariant} />
-            <Text style={styles.signOutBtnText}>Sign Out / Switch Role</Text>
+            <Text style={styles.signOutBtnText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -200,52 +197,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(34, 197, 94, 0.05)',
     borderColor: 'rgba(34, 197, 94, 0.25)',
   },
-  iconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: 'rgba(255, 227, 153, 0.12)',
+  iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 227, 153, 0.3)',
-  },
-  iconCircleApproved: {
-    backgroundColor: 'rgba(34, 197, 94, 0.12)',
-    borderColor: 'rgba(34, 197, 94, 0.35)',
+    marginBottom: spacing.xs,
   },
   badgeRow: {
     marginTop: 2,
-  },
-  badge: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 227, 153, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 227, 153, 0.35)',
-  },
-  badgeApproved: {
-    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-    borderColor: 'rgba(34, 197, 94, 0.4)',
-  },
-  pulsingDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#FFE399',
-  },
-  pulsingDotApproved: {
-    backgroundColor: '#22C55E',
+    justifyContent: 'center',
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#FFE399',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
   badgeTextApproved: {
     color: '#22C55E',

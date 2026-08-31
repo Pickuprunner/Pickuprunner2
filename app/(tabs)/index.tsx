@@ -140,12 +140,11 @@ export default function OrdersScreen() {
       !isLoadingVerif &&
       !isLoadingAccred &&
       !isApproved &&
-      !isSubmitted &&
-      accreditation?.profile?.accreditationStatus === 'not_started'
+      !isSubmitted
     ) {
       router.replace('/(auth)/driver-verification');
     }
-  }, [user?.role, isApproved, isSubmitted, isLoadingVerif, isLoadingAccred, accreditation?.profile?.accreditationStatus]);
+  }, [user?.role, isApproved, isSubmitted, isLoadingVerif, isLoadingAccred]);
 
   const handleSetupPayouts = async () => {
     setOnboardingLoading(true);
