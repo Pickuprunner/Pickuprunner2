@@ -176,18 +176,30 @@ export function CustomerOrderCard({
         const paidSuccess = await openCheckoutUrl(res.url);
         if (paidSuccess) {
           setShowPaymentSuccessModal(true);
+          useOrderStore.getState().updateOrder(order.id, {
+            paymentStatus: 'paid',
+            payment_status: 'paid',
+          });
         }
         try {
           const latest = await ordersApi.getById(order.id);
           if (latest && latest.id) {
-            useOrderStore.getState().upsertOrder(latest);
+            useOrderStore.getState().upsertOrder({
+              ...latest,
+              paymentStatus: paidSuccess ? 'paid' : (latest.paymentStatus || 'unpaid'),
+              payment_status: paidSuccess ? 'paid' : ((latest as any).payment_status || 'unpaid'),
+            });
           }
         } catch {}
         setTimeout(async () => {
           try {
             const latest = await ordersApi.getById(order.id);
             if (latest && latest.id) {
-              useOrderStore.getState().upsertOrder(latest);
+              useOrderStore.getState().upsertOrder({
+                ...latest,
+                paymentStatus: paidSuccess ? 'paid' : (latest.paymentStatus || 'unpaid'),
+                payment_status: paidSuccess ? 'paid' : ((latest as any).payment_status || 'unpaid'),
+              });
             }
           } catch {}
         }, 700);

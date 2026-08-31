@@ -176,7 +176,10 @@ export const useOrderStore = create<OrderStoreState>()(
             storeId: incoming.storeId || incoming.store_id || existing?.storeId || APP_CONFIG.STORE_ID,
             orderScope: incoming.orderScope || incoming.order_scope || existing?.orderScope || ORDER_SCOPE,
             tipAmount: incoming.tipAmount ?? incoming.tip_amount ?? existing?.tipAmount ?? 10.0,
-            paymentStatus: incoming.paymentStatus || incoming.payment_status || existing?.paymentStatus || 'unpaid',
+            paymentStatus:
+              existing?.paymentStatus === 'paid' || existing?.paymentStatus === 'test_paid'
+                ? existing.paymentStatus
+                : incoming.paymentStatus || incoming.payment_status || existing?.paymentStatus || 'unpaid',
             checkoutUrl: incoming.checkoutUrl || incoming.checkout_url || existing?.checkoutUrl,
             checkoutSessionId: incoming.checkoutSessionId || incoming.checkout_session_id || existing?.checkoutSessionId,
             distanceMiles: incoming.distanceMiles ?? incoming.distance_miles ?? existing?.distanceMiles ?? 0,

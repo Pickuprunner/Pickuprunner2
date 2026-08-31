@@ -461,8 +461,16 @@ export default function TrackOrderScreen() {
     };
 
     connect();
+
+    const pollInterval = setInterval(() => {
+      if (mounted) {
+        fetchOrderRef.current?.(false);
+      }
+    }, 30000);
+
     return () => {
       mounted = false;
+      clearInterval(pollInterval);
       if (channelRef.current) {
         try {
           channelRef.current.unsubscribe();
@@ -537,6 +545,19 @@ export default function TrackOrderScreen() {
         const paidSuccess = await openCheckoutUrl(res.url);
         if (paidSuccess) {
           setShowPaymentSuccessModal(true);
+          setOrder((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  paymentStatus: 'paid',
+                  payment_status: 'paid',
+                }
+              : prev
+          );
+          useOrderStore.getState().updateOrder(id, {
+            paymentStatus: 'paid',
+            payment_status: 'paid',
+          });
         }
         // Refresh order status immediately upon returning from checkout
         await fetchOrder(true);

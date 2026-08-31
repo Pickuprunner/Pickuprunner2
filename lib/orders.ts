@@ -32,11 +32,12 @@ export function useAvailableOrders(params?: AvailableOrdersParams) {
 
       return useOrderStore.getState().orders.filter((o) => o.status === 'pending' && !o.driverUserId);
     },
-    initialData: () => storeOrders.filter((o) => o.status === 'pending' && !o.driverUserId),
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+    placeholderData: () => storeOrders.filter((o) => o.status === 'pending' && !o.driverUserId),
+    staleTime: 2000,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
   });
 }
 
@@ -61,11 +62,12 @@ export function useOrders() {
       }
       return useOrderStore.getState().orders;
     },
-    initialData: storeOrders,
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+    placeholderData: () => storeOrders,
+    staleTime: 2000,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
   });
 }
 
@@ -99,17 +101,18 @@ export function useOrder(id: string | undefined) {
 
       throw new Error(`Order ${id} not found`);
     },
-    initialData: () => {
+    placeholderData: () => {
       if (!id) return undefined;
       return (
         storeOrders.find((o) => o.id === id) ||
         (getSelectedOrder()?.id === id ? getSelectedOrder()! : undefined)
       );
     },
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+    staleTime: 2000,
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
   });
 }
 

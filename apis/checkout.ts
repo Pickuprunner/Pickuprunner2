@@ -50,8 +50,9 @@ export async function createCheckoutForOrder(
     const res = await checkoutApi.createCheckout(payload);
     return res;
   } catch (err: any) {
-    console.warn('[checkoutApi] createCheckout failed for order:', orderId, err?.message || err);
-    return null;
+    const errorMsg = err?.response?.data?.message || err?.message || 'Could not create checkout session';
+    console.warn('[checkoutApi] createCheckout failed for order:', orderId, errorMsg);
+    return { success: false, error: errorMsg };
   }
 }
 

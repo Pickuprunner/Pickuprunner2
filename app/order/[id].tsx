@@ -99,7 +99,7 @@ export default function OrderDetailScreen() {
   const { data: order, isLoading: loading } = useOrder(fetchId);
 
   const liveStoreOrder = useOrderStore((state) => state.orders.find((o) => o.id === fetchId));
-  const currentOrder = liveStoreOrder ? ({ ...order, ...liveStoreOrder } as any) : order;
+  const currentOrder = order ? ({ ...(liveStoreOrder || {}), ...order } as any) : liveStoreOrder;
 
   useEffect(() => {
     if (fetchId) {

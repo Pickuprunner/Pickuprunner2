@@ -149,17 +149,25 @@ export default function MyOrdersScreen() {
             if (res.status === 'fulfilled' && res.value && res.value.id) {
               const fresh = res.value;
               const existing = orderMap.get(fresh.id);
+              const isAlreadyPaid =
+                existing?.paymentStatus === 'paid' ||
+                existing?.paymentStatus === 'test_paid' ||
+                existing?.payment_status === 'paid' ||
+                existing?.payment_status === 'test_paid';
+              const resolvedPaymentStatus = isAlreadyPaid
+                ? (existing?.paymentStatus || 'paid')
+                : (fresh.paymentStatus || (fresh as any).payment_status || existing?.paymentStatus || 'unpaid');
               const merged: CustomerOrderData = {
                 ...(existing || {}),
                 ...(fresh as any),
                 status: fresh.status as any,
                 driverName: fresh.driverName || (fresh as any).driver_name || existing?.driverName,
                 driver_name: fresh.driverName || (fresh as any).driver_name || existing?.driver_name,
-                paymentStatus: fresh.paymentStatus || (fresh as any).payment_status || existing?.paymentStatus,
-                payment_status: (fresh as any).payment_status || fresh.paymentStatus || existing?.payment_status,
+                paymentStatus: resolvedPaymentStatus,
+                payment_status: resolvedPaymentStatus,
               };
               orderMap.set(fresh.id, merged);
-              useOrderStore.getState().upsertOrder(fresh as any);
+              useOrderStore.getState().upsertOrder(merged as any);
             }
           });
         }
