@@ -521,6 +521,8 @@ export default function OrdersScreen() {
             onRefresh={onRefresh}
             tintColor="transparent"
             colors={['transparent']}
+            progressBackgroundColor="transparent"
+            style={{ opacity: 0 }}
           />
         }
         contentContainerStyle={[

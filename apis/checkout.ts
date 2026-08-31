@@ -1,4 +1,4 @@
-import { apiClient } from '@/lib/apiClient';
+import { apiClient, resolveApiUrl } from '@/lib/apiClient';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform, Linking } from 'react-native';
 
@@ -55,25 +55,32 @@ export async function createCheckoutForOrder(
   }
 }
 
+export const STRIPE_PAYMENT_REDIRECT_URL = 'pickuprunner://payment/success';
+
 export async function openCheckoutUrl(url: string): Promise<boolean> {
   if (!url) return false;
+  const targetUrl = resolveApiUrl(url);
+
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined') {
-      window.open(url, '_blank');
+      window.open(targetUrl, '_blank');
     }
     return true;
   }
+
   try {
-    await WebBrowser.openBrowserAsync(url);
-    return true;
-  } catch (e) {
-    console.warn('[checkoutApi] WebBrowser failed, trying Linking:', e);
-    try {
-      await Linking.openURL(url);
+    const result = await WebBrowser.openAuthSessionAsync(targetUrl, STRIPE_PAYMENT_REDIRECT_URL);
+    if (result.type === 'success') {
       return true;
-    } catch {
-      return false;
     }
+  } catch (err) {
+    console.warn('[checkoutApi] openAuthSessionAsync failed, falling back to Linking:', err);
+  }
+
+  try {
+    await Linking.openURL(targetUrl);
+    return true;
+  } catch {
+    return false;
   }
 }
-

@@ -15,7 +15,7 @@ import {
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { CustomCard } from '@/components/core';
+import { CustomCard, CustomConfirmModal } from '@/components/core';
 import { APP_CONFIG } from '@/lib/config';
 import { createCheckoutForOrder, openCheckoutUrl } from '@/apis/checkout';
 import { ordersApi } from '@/apis/orders';
@@ -113,6 +113,7 @@ export function CustomerOrderCard({
   style,
 }: CustomerOrderCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
 
   // Subscribe directly to Zustand store for instant real-time status & payment reactivity
   const storeOrder = useOrderStore((state) =>
@@ -172,13 +173,24 @@ export function CustomerOrderCard({
         testMode: true,
       });
       if (res?.url) {
-        await openCheckoutUrl(res.url);
+        const paidSuccess = await openCheckoutUrl(res.url);
+        if (paidSuccess) {
+          setShowPaymentSuccessModal(true);
+        }
         try {
           const latest = await ordersApi.getById(order.id);
           if (latest && latest.id) {
             useOrderStore.getState().upsertOrder(latest);
           }
         } catch {}
+        setTimeout(async () => {
+          try {
+            const latest = await ordersApi.getById(order.id);
+            if (latest && latest.id) {
+              useOrderStore.getState().upsertOrder(latest);
+            }
+          } catch {}
+        }, 700);
       } else {
         Alert.alert('Payment', res?.error || 'Could not create checkout session. Please try again.');
       }
@@ -517,6 +529,18 @@ export function CustomerOrderCard({
           </View>
         </View>
       ) : null}
+
+      <CustomConfirmModal
+        visible={showPaymentSuccessModal}
+        variant="success"
+        title="Payment Successful"
+        message="Your payment was processed successfully. Thank you!"
+        confirmText="Got It"
+        singleButton
+        orderId={order.id}
+        onClose={() => setShowPaymentSuccessModal(false)}
+        onConfirm={() => setShowPaymentSuccessModal(false)}
+      />
     </CustomCard>
   );
 }

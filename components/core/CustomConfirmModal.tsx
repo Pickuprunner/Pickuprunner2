@@ -32,6 +32,7 @@ export interface CustomConfirmModalProps {
   loading?: boolean;
   orderId?: string;
   dismissOnBackdropPress?: boolean;
+  singleButton?: boolean;
 }
 
 const VARIANT_CONFIG: Record<
@@ -104,6 +105,7 @@ export function CustomConfirmModal({
   loading = false,
   orderId,
   dismissOnBackdropPress = true,
+  singleButton = false,
 }: CustomConfirmModalProps) {
   const config = VARIANT_CONFIG[variant] || VARIANT_CONFIG.danger;
   const activeIcon = iconName || config.icon;
@@ -161,7 +163,7 @@ export function CustomConfirmModal({
   const handleCancel = () => {
     if (loading) return;
     if (Platform.OS !== 'web') {
-      Haptics.selectionAsync().catch(() => { });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     onClose();
   };
@@ -261,15 +263,17 @@ export function CustomConfirmModal({
               {/* Bottom Action Buttons Row */}
               <View style={styles.buttonRow}>
                 {/* Keep It (Cancel/Dismiss) Button */}
-                <TouchableOpacity
-                  onPress={handleCancel}
-                  disabled={loading}
-                  activeOpacity={0.8}
-                  style={styles.cancelBtn}
-                >
-                  <Ionicons name={cancelIconName} size={17} color="#FFFFFF" />
-                  <Text style={styles.cancelBtnText}>{cancelText}</Text>
-                </TouchableOpacity>
+                {!singleButton && cancelText ? (
+                  <TouchableOpacity
+                    onPress={handleCancel}
+                    disabled={loading}
+                    activeOpacity={0.8}
+                    style={styles.cancelBtn}
+                  >
+                    <Ionicons name={cancelIconName} size={17} color="#FFFFFF" />
+                    <Text style={styles.cancelBtnText}>{cancelText}</Text>
+                  </TouchableOpacity>
+                ) : null}
 
                 {/* Confirm Action Button */}
                 <TouchableOpacity
@@ -279,6 +283,7 @@ export function CustomConfirmModal({
                   style={[
                     styles.confirmBtn,
                     { backgroundColor: config.buttonBg },
+                    (singleButton || !cancelText) && { flex: 1 },
                     loading && { opacity: 0.75 },
                   ]}
                 >

@@ -23,7 +23,7 @@ import { createCheckoutForOrder, openCheckoutUrl } from '@/apis/checkout';
 import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { APP_CONFIG } from '@/lib/config';
-import { useToast, CustomSkeleton } from '@/components/core';
+import { useToast, CustomSkeleton, CustomConfirmModal } from '@/components/core';
 import { colors } from '@/constants/design';
 import {
   TrackHeroCard,
@@ -131,6 +131,7 @@ export default function TrackOrderScreen() {
   const [isConnected, setIsConnected] = useState(false);
   const [testBusy, setTestBusy] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
 
   const channelRef = useRef<any>(null);
   const { showToast } = useToast();
@@ -533,9 +534,15 @@ export default function TrackOrderScreen() {
         testMode: true,
       });
       if (res?.url) {
-        await openCheckoutUrl(res.url);
+        const paidSuccess = await openCheckoutUrl(res.url);
+        if (paidSuccess) {
+          setShowPaymentSuccessModal(true);
+        }
         // Refresh order status immediately upon returning from checkout
         await fetchOrder(true);
+        setTimeout(() => {
+          fetchOrder(true);
+        }, 700);
       } else {
         showToast(res?.error || 'Could not create checkout session', { type: 'error' });
       }
@@ -828,6 +835,18 @@ export default function TrackOrderScreen() {
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
+
+      <CustomConfirmModal
+        visible={showPaymentSuccessModal}
+        variant="success"
+        title="Payment Successful"
+        message="Your payment was processed successfully. Thank you!"
+        confirmText="Got It"
+        singleButton
+        orderId={id}
+        onClose={() => setShowPaymentSuccessModal(false)}
+        onConfirm={() => setShowPaymentSuccessModal(false)}
+      />
     </View>
   );
 }

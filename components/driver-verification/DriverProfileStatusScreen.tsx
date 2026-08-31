@@ -143,6 +143,8 @@ export function DriverProfileStatusScreen() {
             onRefresh={handleRefresh}
             tintColor="transparent"
             colors={['transparent']}
+            progressBackgroundColor="transparent"
+            style={{ opacity: 0 }}
           />
         }
       >
