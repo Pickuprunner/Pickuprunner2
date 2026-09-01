@@ -16,6 +16,8 @@ import {
   CreditCard,
   DollarSign,
   Shield,
+  Wifi,
+  WifiOff,
 } from '@blinkdotnew/mobile-ui';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -32,7 +34,6 @@ import { APP_CONFIG } from '@/lib/config';
 import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useDriverStore } from '@/store/useDriverStore';
-import { colors } from '@/constants/design';
 import { CustomHeader, useToast } from '@/components/core';
 
 import {
@@ -335,29 +336,36 @@ export default function ProfileScreen() {
         />
 
         <ProfileSection title="DRIVER AVAILABILITY">
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.onSurface }}>
-                {isOnline ? 'Online & Available' : 'Offline'}
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.onSurfaceVariant, marginTop: 2 }}>
-                {isOnline
-                  ? 'You are active and receiving new pickup requests'
-                  : 'You are paused and will not receive order requests'}
-              </Text>
-            </View>
-            <Switch
-              value={isOnline}
-              onValueChange={() => {
-                if (Platform.OS !== 'web') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                }
-                toggleOnline();
-              }}
-              trackColor={{ false: 'rgba(255, 255, 255, 0.1)', true: 'rgba(0, 226, 151, 0.35)' }}
-              thumbColor={isOnline ? '#00E297' : '#8C90A1'}
-            />
-          </View>
+          <ProfileActionRow
+            icon={
+              isOnline ? (
+                <Wifi size={18} color={GREEN} />
+              ) : (
+                <WifiOff size={18} color="#8C90A1" />
+              )
+            }
+            iconBg={isOnline ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.06)'}
+            title={isOnline ? 'Online & Available' : 'Offline'}
+            subtitle={
+              isOnline
+                ? 'You are active and receiving new pickup requests'
+                : 'You are paused and will not receive order requests'
+            }
+            showChevron={false}
+            rightControl={
+              <Switch
+                value={isOnline}
+                onValueChange={() => {
+                  if (Platform.OS !== 'web') {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                  }
+                  toggleOnline();
+                }}
+                trackColor={{ false: '#262A38', true: 'rgba(0, 226, 151, 0.35)' }}
+                thumbColor={isOnline ? '#00E297' : '#8C90A1'}
+              />
+            }
+          />
         </ProfileSection>
 
         <ProfileSection

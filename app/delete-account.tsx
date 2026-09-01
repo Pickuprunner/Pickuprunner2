@@ -35,8 +35,10 @@ type Step = 'review' | 'confirm' | 'done';
 
 export default function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const { showToast } = useToast();
+
+  const isDriver = user?.role === 'driver';
 
   const [step, setStep] = useState<Step>('review');
   const [confirmText, setConfirmText] = useState('');
@@ -133,29 +135,46 @@ export default function DeleteAccountScreen() {
     }
   };
 
-  const items = [
-    {
-      icon: <User size={18} color="#EF4444" />,
-      label: 'Personal Identity & Profile',
-      desc: 'Name, phone, email, credentials and authentication sessions are cleared.',
-    },
-    {
-      icon: <Shield size={18} color="#EF4444" />,
-      label: 'Accreditation & Documents',
-      desc: 'Driver license, insurance files and background authorizations are removed.',
-    },
-    {
-      icon: <Package size={18} color="#EF4444" />,
-      label: 'Orders & Deliveries',
-      desc: 'Orders are anonymized. Deletion is blocked if active orders are in progress.',
-    },
-    {
-      icon: <CreditCard size={18} color="#EF4444" />,
-      label: 'Payouts & Earnings',
-      desc: 'All pending payout transfers must be settled before closing your account.',
-    },
-  ];
-
+  const items = isDriver
+    ? [
+        {
+          icon: <User size={18} color="#EF4444" />,
+          label: 'Personal Identity & Profile',
+          desc: 'Name, phone, email, credentials and authentication sessions are cleared.',
+        },
+        {
+          icon: <Shield size={18} color="#EF4444" />,
+          label: 'Accreditation & Documents',
+          desc: 'Driver license, insurance files and background authorizations are removed.',
+        },
+        {
+          icon: <Package size={18} color="#EF4444" />,
+          label: 'Orders & Deliveries',
+          desc: 'Orders are anonymized. Deletion is blocked if active orders are in progress.',
+        },
+        {
+          icon: <CreditCard size={18} color="#EF4444" />,
+          label: 'Payouts & Earnings',
+          desc: 'All pending payout transfers must be settled before closing your account.',
+        },
+      ]
+    : [
+        {
+          icon: <User size={18} color="#EF4444" />,
+          label: 'Personal Identity & Profile',
+          desc: 'Name, phone, email, saved addresses, and authentication sessions are cleared.',
+        },
+        {
+          icon: <Package size={18} color="#EF4444" />,
+          label: 'Orders & Deliveries',
+          desc: 'Past order history is anonymized. Deletion is blocked if active orders are in progress.',
+        },
+        {
+          icon: <CreditCard size={18} color="#EF4444" />,
+          label: 'Payment Data & Preferences',
+          desc: 'Saved payment details, receipts, and account preferences are permanently removed.',
+        },
+      ];
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
@@ -200,7 +219,6 @@ export default function DeleteAccountScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* STEP 1: REVIEW */}
         {step === 'review' && (
           <View style={styles.contentCol}>
             <View style={styles.warningCard}>
@@ -209,8 +227,9 @@ export default function DeleteAccountScreen() {
               </View>
               <Text style={styles.warningTitle}>Permanent Account Deletion</Text>
               <Text style={styles.warningDesc}>
-                Closing your account is permanent. Once completed, your profile, document records,
-                and session data will be permanently wiped.
+                {isDriver
+                  ? 'Closing your account is permanent. Once completed, your profile, document records, and session data will be permanently wiped.'
+                  : 'Closing your account is permanent. Once completed, your profile, order history, and account data will be permanently wiped.'}
               </Text>
             </View>
 
