@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "622950958549",
+    "project_id": "pickuprunner-sahuarita",
+    "storage_bucket": "pickuprunner-sahuarita.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:622950958549:android:30060d88d7c5c51b0ba95c",
+        "android_client_info": {
+          "package_name": "com.mycompany.pickuprunner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvdgn4Ou-py_L49VLe93YE14pD5QLVgIU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:622950958549:android:82c4be2f030d36c40ba95c",
+        "android_client_info": {
+          "package_name": "com.pickuprunner.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvdgn4Ou-py_L49VLe93YE14pD5QLVgIU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

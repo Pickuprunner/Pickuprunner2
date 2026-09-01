@@ -1,4 +1,4 @@
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import { useEffect } from 'react';
@@ -7,13 +7,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BlinkProvider, createTamagui, tamaguiDefaultConfig, Theme, BlinkToastProvider } from '@blinkdotnew/mobile-ui';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { RealtimeProvider } from '@/components/RealtimeProvider';
-import { getOrderIdFromNotification, getScreenFromNotification } from '@/lib/notifications';
+import { setupNotificationHandler } from '@/lib/notifications';
+import { NotificationProvider } from '@/context/NotificationContext';
 import { colors } from '@/constants/design';
 import { ToastProvider } from '@/components/core';
-
-const isExpoGoAndroid =
-  Platform.OS === 'android' &&
-  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,67 +47,42 @@ export default function RootLayout() {
   useFrameworkReady();
 
   useEffect(() => {
-    if (Platform.OS === 'web' || isExpoGoAndroid) return;
-
-    import('expo-notifications').then((Notifications) => {
-      const resolveNavigation = (response: any, delay = 0) => {
-        const orderId = getOrderIdFromNotification(response);
-        if (orderId) {
-          const go = () => router.push(`/order/${orderId}`);
-          delay ? setTimeout(go, delay) : go();
-          return;
-        }
-        const screen = getScreenFromNotification(response);
-        if (screen === 'chat') {
-          const go = () => router.push('/(tabs)/chat');
-          delay ? setTimeout(go, delay) : go();
-        }
-      };
-
-      const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
-        resolveNavigation(response);
-      });
-
-      Notifications.getLastNotificationResponseAsync().then((response) => {
-        if (!response) return;
-        resolveNavigation(response, 500);
-      });
-
-      return () => subscription.remove();
-    });
+    setupNotificationHandler();
   }, []);
 
   return (
     <BlinkProvider config={config} defaultTheme="dark">
       <Theme name="dark">
         <QueryClientProvider client={queryClient}>
-          <BlinkToastProvider>
-            <ToastProvider>
-              <RealtimeProvider />
-              <WebStyleReset />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: colors.background },
-                  animation: 'slide_from_right',
-                }}
-              >
-                <Stack.Screen name="index" />
-                <Stack.Screen name="(landing)" options={{ gestureEnabled: false }} />
-                <Stack.Screen name="(auth)" options={{ gestureEnabled: false }} />
-                <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
-                <Stack.Screen name="(customer)" options={{ gestureEnabled: false }} />
-                <Stack.Screen name="order/[id]" />
-                <Stack.Screen name="connect/onboarding/success" />
-                <Stack.Screen name="connect/onboarding/reauth" />
-                <Stack.Screen name="delete-account" />
-                <Stack.Screen name="terms" />
-                <Stack.Screen name="privacy-policy" />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-              <StatusBar style="auto" />
-            </ToastProvider>
-          </BlinkToastProvider>
+          <NotificationProvider>
+            <BlinkToastProvider>
+              <ToastProvider>
+                <RealtimeProvider />
+                <WebStyleReset />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: colors.background },
+                    animation: 'slide_from_right',
+                  }}
+                >
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="(landing)" options={{ gestureEnabled: false }} />
+                  <Stack.Screen name="(auth)" options={{ gestureEnabled: false }} />
+                  <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
+                  <Stack.Screen name="(customer)" options={{ gestureEnabled: false }} />
+                  <Stack.Screen name="order/[id]" />
+                  <Stack.Screen name="connect/onboarding/success" />
+                  <Stack.Screen name="connect/onboarding/reauth" />
+                  <Stack.Screen name="delete-account" />
+                  <Stack.Screen name="terms" />
+                  <Stack.Screen name="privacy-policy" />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+                <StatusBar style="auto" />
+              </ToastProvider>
+            </BlinkToastProvider>
+          </NotificationProvider>
         </QueryClientProvider>
       </Theme>
     </BlinkProvider>

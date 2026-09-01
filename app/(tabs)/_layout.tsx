@@ -9,8 +9,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { isAccreditationFullyApproved } from '@/apis/accreditation';
-import { chatApi } from '@/apis/chat';
-
 const ACTIVE = '#FFE399';
 const INACTIVE = '#C2C6D8';
 const TAB_BG = '#0F131C';
@@ -36,34 +34,9 @@ function InventoryTabIcon({ color, size }: { color: string; size: number }) {
 }
 
 function ChatTabIcon({ color, size }: { color: string; size: number }) {
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchUnread = async () => {
-      try {
-        const res = await chatApi.getChats();
-        if (!isMounted) return;
-        const count = res.totalUnread ?? res.chats?.reduce((sum, c) => sum + (c.unread || 0), 0) ?? 0;
-        setUnreadCount(count);
-      } catch {}
-    };
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 15000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
   return (
     <View style={styles.iconWrapper}>
-      <MaterialIcons name="chat" size={size} color={color} />
-      {unreadCount > 0 && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-        </View>
-      )}
+      <MaterialIcons name="chat" size={size || 24} color={color} />
     </View>
   );
 }
@@ -81,8 +54,6 @@ export default function TabLayout() {
     accreditation?.profile?.accreditationStatus === 'under_review' ||
     accreditation?.profile?.accreditationStatus === 'approved' ||
     verification?.status === 'pending';
-
-  // Guard: if unauthenticated, token not found, or user deleted, redirect to role-select
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || !user || !token)) {
       if (router.canDismiss()) router.dismissAll();

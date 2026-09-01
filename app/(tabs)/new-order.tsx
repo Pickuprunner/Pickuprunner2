@@ -101,7 +101,7 @@ export default function NewOrderScreen() {
         if (calculatedMiles !== null && calculatedMiles > 0) {
           setMiles(String(calculatedMiles));
         }
-      } catch {}
+      } catch { }
       setCalculating(false);
     }, 1200);
 
@@ -136,9 +136,8 @@ export default function NewOrderScreen() {
 
     setLoading(true);
     try {
-      const formattedItems = `${deliveryType === 'meet' ? '[MEET AT DOOR] ' : '[LEAVE AT DOOR] '}${
-        hasAlcohol ? '[21+ ALCOHOL ID REQUIRED] ' : ''
-      }${pickupNumber.trim() ? `Order: ${pickupNumber.trim()} · ` : ''}${items.trim()}`.trim();
+      const formattedItems = `${deliveryType === 'meet' ? '[MEET AT DOOR] ' : '[LEAVE AT DOOR] '}${hasAlcohol ? '[21+ ALCOHOL ID REQUIRED] ' : ''
+        }${pickupNumber.trim() ? `Order: ${pickupNumber.trim()} · ` : ''}${items.trim()}`.trim();
 
       let pickupCoords: { lat: number; lon: number } | null = null;
       try {
@@ -156,9 +155,6 @@ export default function NewOrderScreen() {
         items: formattedItems || '[LEAVE AT DOOR] Standard delivery items',
         tipAmount: tipCents,
         distanceMiles: parseFloat(miles) || 0,
-        // Hardcoded location commented out - live geocoded location used instead:
-        // pickupLat: 31.9505,
-        // pickupLng: -110.9747,
         pickupLat: pickupCoords?.lat,
         pickupLng: pickupCoords?.lon,
       } as any);
@@ -200,7 +196,7 @@ export default function NewOrderScreen() {
     setTipCents(750);
     setAgreedToTerms(false);
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
     }
     showToast('Driver test data filled', { type: 'info' });
   };

@@ -4,47 +4,15 @@ import { useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
-import { chatApi } from '@/apis/chat';
-
 const ACTIVE = '#FFE399';
 const INACTIVE = '#C2C6D8';
 const TAB_BG = '#0F131C';
 const TAB_BORDER = 'rgba(255, 255, 255, 0.05)';
 
 function ChatTabIcon({ color, size }: { color: string; size: number }) {
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchUnread = async () => {
-      try {
-        const res = await chatApi.getChats();
-        if (!isMounted) return;
-        const count = res.totalUnread ?? res.chats?.reduce((sum, c) => sum + (c.unread || 0), 0) ?? 0;
-        setUnreadCount(count);
-      } catch {
-        // quiet catch
-      }
-    };
-
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 4000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
   return (
     <View style={styles.iconWrapper}>
-      <MaterialIcons name="chat-bubble-outline" size={size || 22} color={color} />
-      {unreadCount > 0 && (
-        <View style={[styles.badge, { backgroundColor: '#FFE399' }]}>
-          <Text style={[styles.badgeText, { color: '#000' }]}>
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </Text>
-        </View>
-      )}
+      <MaterialIcons name="chat" size={size || 24} color={color} />
     </View>
   );
 }
@@ -55,7 +23,6 @@ export default function CustomerTabLayout() {
   const androidBottomPad = Platform.OS === 'web' ? 10 : Math.max(insets.bottom, 12);
   const hasHomeBar = insets.bottom > 0;
 
-  // Guard: if unauthenticated, token not found, or user deleted, redirect to role-select
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || !user || !token)) {
       if (router.canDismiss()) router.dismissAll();
@@ -117,7 +84,7 @@ export default function CustomerTabLayout() {
         options={{
           title: 'Chat',
           tabBarIcon: ({ color, size }) => (
-            <ChatTabIcon color={color} size={size || 22} />
+            <ChatTabIcon color={color} size={size || 24} />
           ),
         }}
       />
@@ -156,7 +123,7 @@ const styles = StyleSheet.create({
     minWidth: 15,
     height: 15,
     borderRadius: 7.5,
-    backgroundColor: '#0066FF',
+    backgroundColor: '#FFE399',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
@@ -164,7 +131,7 @@ const styles = StyleSheet.create({
     borderColor: '#0F131C',
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: '#0F131C',
     fontSize: 9,
     fontWeight: '800',
     lineHeight: 11,

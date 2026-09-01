@@ -1,33 +1,32 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  TextInput,
-  Pressable,
   StyleSheet,
   View,
   Text,
   ScrollView,
   BackHandler,
   RefreshControl,
+  StatusBar,
 } from 'react-native';
-import { router } from 'expo-router';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { ordersApi } from '@/apis/orders';
 import {
   YStack,
-  SizableText,
-  SafeArea,
   Spinner,
-  MessageCircle,
   Truck,
 } from '@blinkdotnew/mobile-ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useOrders, Order } from '@/lib/orders';
-import { useOrderChat, getSavedDisplayName, saveDisplayName, ChatMessage } from '@/lib/chat';
+import { useOrderChat, getSavedDisplayName, ChatMessage } from '@/lib/chat';
 import { chatApi, ApiChatSummary } from '@/apis/chat';
 import { useDriverId } from '@/hooks/useDriverId';
-import { colors, spacing, borderRadius } from '@/constants/design';
+import { useAuthStore } from '@/store/useAuthStore';
+import { colors } from '@/constants/design';
 import {
   ConversationCard,
   ChatHeader,
@@ -36,46 +35,9 @@ import {
   ChatInputBar,
   ChatEmptyState,
   ChatSectionHeader,
+  LiveBadge,
   ChatConversationItem,
 } from '@/components/chat';
-
-// ── Name setup prompt ────────────────────────────────────────────────────────
-
-function NameSetupPrompt({ onSet }: { onSet: (name: string) => void }) {
-  const [value, setValue] = useState('');
-  return (
-    <YStack flex={1} alignItems="center" justifyContent="center" padding="$6" gap="$4">
-      <YStack width={72} height={72} borderRadius={36} backgroundColor="$color3" alignItems="center" justifyContent="center">
-        <MessageCircle size={36} color="$color9" />
-      </YStack>
-      <YStack alignItems="center" gap="$1">
-        <SizableText size="$6" fontWeight="800" color="$color12">Set Your Name</SizableText>
-        <SizableText size="$3" color="$color10" textAlign="center">
-          Customers will see this name when you message them.
-        </SizableText>
-      </YStack>
-      <TextInput
-        value={value}
-        onChangeText={setValue}
-        placeholder="Your name (e.g. Alex)"
-        placeholderTextColor="rgba(255, 255, 255, 0.4)"
-        style={[styles.nameInput, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}]}
-        autoFocus
-        returnKeyType="done"
-        onSubmitEditing={() => value.trim() && onSet(value.trim())}
-      />
-      <Pressable
-        onPress={() => value.trim() && onSet(value.trim())}
-        style={[styles.nameBtn, !value.trim() && styles.nameBtnDisabled]}
-        disabled={!value.trim()}
-      >
-        <SizableText size="$4" fontWeight="700" color="white">Continue</SizableText>
-      </Pressable>
-    </YStack>
-  );
-}
-
-// ── Per-order chat view ──────────────────────────────────────────────────────
 
 const DRIVER_QUICK_PROMPTS = [
   'On my way',
@@ -94,7 +56,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
   const { messages, isConnected, sendMessage } = useOrderChat({
     orderId: order.id,
     orderStatus: order.status,
-    displayName,
+    displayName: displayName || 'Driver',
     role: 'driver',
   });
 
@@ -119,7 +81,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
     }
   }, [inputText, sending, isClosed, sendMessage]);
 
-  const listItems = React.useMemo(() => {
+  const listItems = useMemo(() => {
     const items: ({ type: 'date'; ts: number; key: string } | { type: 'message'; msg: ChatMessage; isMine: boolean; key: string })[] = [];
     let lastDate = '';
     for (const msg of messages) {
@@ -136,6 +98,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
 
   return (
     <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <ChatHeader
         title={order.customerName || 'Customer'}
         orderNumber={shortId}
@@ -196,8 +159,9 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const [displayName, setDisplayName] = useState<string | null>(null);
-  const [nameReady, setNameReady] = useState(false);
+  const user = useAuthStore((state) => state.user);
+  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
+  const [savedName, setSavedName] = useState<string>('');
   const [activeChatOrder, setActiveChatOrder] = useState<Order | null>(null);
   const [apiChats, setApiChats] = useState<ApiChatSummary[]>([]);
   const [totalUnread, setTotalUnread] = useState(0);
@@ -207,6 +171,36 @@ export default function ChatScreen() {
   const driverId = useDriverId();
 
   const [chatsLoaded, setChatsLoaded] = useState(false);
+
+  useEffect(() => {
+    getSavedDisplayName().then((name) => {
+      if (name) setSavedName(name);
+    });
+  }, []);
+
+  const displayName = savedName || user?.displayName || user?.email?.split('@')[0] || 'Driver';
+
+  useEffect(() => {
+    if (!orderId) return;
+    const match = orders.find((o) => o.id === orderId);
+    if (match) {
+      setActiveChatOrder(match);
+      router.setParams({ orderId: '' });
+    } else {
+      ordersApi
+        .getById(orderId)
+        .then((res) => {
+          const o = res as any;
+          if (o && o.id) {
+            setActiveChatOrder(o);
+          }
+          router.setParams({ orderId: '' });
+        })
+        .catch(() => {
+          router.setParams({ orderId: '' });
+        });
+    }
+  }, [orderId, orders]);
 
   const fetchChatsList = useCallback(async () => {
     try {
@@ -222,49 +216,28 @@ export default function ChatScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    getSavedDisplayName().then((name) => {
-      setDisplayName(name || null);
-      setNameReady(true);
-    });
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchChatsList();
+      if (!orderId) {
+        setActiveChatOrder(null);
+      }
+      return () => {
+        setActiveChatOrder(null);
+      };
+    }, [fetchChatsList, orderId])
+  );
 
-  useEffect(() => {
-    fetchChatsList();
-    const interval = setInterval(fetchChatsList, 5000);
-    return () => clearInterval(interval);
-  }, [fetchChatsList]);
-
-  const handleSetName = useCallback(async (name: string) => {
-    await saveDisplayName(name);
-    setDisplayName(name);
-  }, []);
-
-  // Handle hardware/gesture back press when in individual chat view
   useEffect(() => {
     if (!activeChatOrder) return;
     const onBackPress = () => {
       setActiveChatOrder(null);
       fetchChatsList();
-      return true; // prevent navigating away from screen
+      return true;
     };
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
   }, [activeChatOrder, fetchChatsList]);
-
-  if (!nameReady) {
-    return (
-      <SafeArea>
-        <YStack flex={1} alignItems="center" justifyContent="center">
-          <Spinner size="large" color="$color9" />
-        </YStack>
-      </SafeArea>
-    );
-  }
-
-  if (!displayName) {
-    return <SafeArea><NameSetupPrompt onSet={handleSetName} /></SafeArea>;
-  }
 
   if (activeChatOrder) {
     return (
@@ -293,7 +266,7 @@ export default function ChatScreen() {
     return {
       id: chat.orderId,
       name: chat.counterpartyName || 'Customer',
-      orderNumber: `#${shortId}`,
+      orderNumber: `#ORD-${shortId}`,
       address: chat.deliveryAddress || 'No delivery address',
       status: chat.orderStatus,
       statusLabel: chat.orderStatus === 'accepted' ? 'Heading to pickup' : isDelivered ? 'Delivered' : 'Delivering',
@@ -311,7 +284,7 @@ export default function ChatScreen() {
     return {
       id: item.id,
       name: item.customerName || 'Customer',
-      orderNumber: `#${shortId}`,
+      orderNumber: `#ORD-${shortId}`,
       address: item.deliveryAddress || 'No delivery address',
       status: item.status,
       statusLabel: item.status === 'accepted' ? 'Heading to pickup' : isDelivered ? 'Delivered' : 'Delivering',
@@ -322,24 +295,24 @@ export default function ChatScreen() {
   };
 
   const hasApiChats = apiChats.length > 0;
+  const conversationCount = hasApiChats ? apiChats.length : activeOrders.length;
 
   return (
     <View style={styles.root}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
       <View style={[styles.appHeader, { paddingTop: Math.max(insets.top, 16) }]}>
         <Text style={styles.headerTitle}>Messages</Text>
         <View style={styles.headerSubtitleRow}>
+          <LiveBadge label="Live" isLive={conversationCount > 0} />
           <Text style={styles.headerSubtitle}>
             {chatsLoaded
               ? apiChats.length > 0
-                ? `${apiChats.length} conversation${apiChats.length > 1 ? 's' : ''}`
-                : 'No active deliveries'
+                ? `${apiChats.length} active conversation${apiChats.length > 1 ? 's' : ''}`
+                : 'Direct messages with your customer'
               : activeOrders.length > 0
-              ? `${activeOrders.length} active conversation${activeOrders.length > 1 ? 's' : ''}`
-              : 'No active deliveries'}
-          </Text>
-          <Text style={styles.headerDot}>·</Text>
-          <Text style={[styles.headerStatusText, totalUnread > 0 && { color: '#FFE399' }]}>
-            {totalUnread > 0 ? `${totalUnread} unread` : 'All read'}
+                ? `${activeOrders.length} active conversation${activeOrders.length > 1 ? 's' : ''}`
+                : 'Direct messages with your customer'}
           </Text>
         </View>
       </View>
@@ -348,7 +321,7 @@ export default function ChatScreen() {
         <YStack flex={1} alignItems="center" justifyContent="center">
           <Spinner size="large" color="$color9" />
         </YStack>
-      ) : chatsLoaded && !hasApiChats ? (
+      ) : chatsLoaded && !hasApiChats && activeOrders.length === 0 && recentOrders.length === 0 ? (
         <ChatEmptyState
           title="No Active Deliveries"
           subtitle="Accept an order from the feed to start messaging your customer."
@@ -358,7 +331,7 @@ export default function ChatScreen() {
         />
       ) : (
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 24 }}
+          contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -373,21 +346,22 @@ export default function ChatScreen() {
         >
           {hasApiChats ? (
             <>
-              <ChatSectionHeader title="Conversations" count={apiChats.length} />
-              {apiChats.map((chat) => (
-                <ConversationCard
-                  key={chat.orderId}
-                  item={mapApiChatToItem(chat)}
-                  role="driver"
-                  onPress={() =>
-                    setActiveChatOrder({
-                      id: chat.orderId,
-                      customerName: chat.counterpartyName || 'Customer',
-                      deliveryAddress: chat.deliveryAddress || '',
-                      status: chat.orderStatus as any,
-                    } as any)
-                  }
-                />
+              <ChatSectionHeader title="Active Conversations" count={apiChats.length} />
+              {apiChats.map((chat, idx) => (
+                <Animated.View key={chat.orderId} entering={FadeInDown.delay(idx * 50).springify()}>
+                  <ConversationCard
+                    item={mapApiChatToItem(chat)}
+                    role="driver"
+                    onPress={() =>
+                      setActiveChatOrder({
+                        id: chat.orderId,
+                        customerName: chat.counterpartyName || 'Customer',
+                        deliveryAddress: chat.deliveryAddress || '',
+                        status: chat.orderStatus as any,
+                      } as any)
+                    }
+                  />
+                </Animated.View>
               ))}
             </>
           ) : (
@@ -395,27 +369,33 @@ export default function ChatScreen() {
               {activeOrders.length > 0 && (
                 <>
                   <ChatSectionHeader title="Active Orders" count={activeOrders.length} />
-                  {activeOrders.map((item) => (
-                    <ConversationCard
-                      key={item.id}
-                      item={mapOrderToItem(item)}
-                      role="driver"
-                      onPress={() => setActiveChatOrder(item)}
-                    />
+                  {activeOrders.map((item, idx) => (
+                    <Animated.View key={item.id} entering={FadeInDown.delay(idx * 50).springify()}>
+                      <ConversationCard
+                        item={mapOrderToItem(item)}
+                        role="driver"
+                        onPress={() => setActiveChatOrder(item)}
+                      />
+                    </Animated.View>
                   ))}
                 </>
               )}
 
               {recentOrders.length > 0 && (
                 <>
-                  <ChatSectionHeader title="Recent" count={recentOrders.length} marginTop={activeOrders.length > 0 ? 14 : 0} />
-                  {recentOrders.map((item) => (
-                    <ConversationCard
-                      key={item.id}
-                      item={mapOrderToItem(item)}
-                      role="driver"
-                      onPress={() => setActiveChatOrder(item)}
-                    />
+                  <ChatSectionHeader
+                    title="Recently Completed"
+                    count={recentOrders.length}
+                    marginTop={activeOrders.length > 0 ? 18 : 0}
+                  />
+                  {recentOrders.map((item, idx) => (
+                    <Animated.View key={item.id} entering={FadeInDown.delay((activeOrders.length + idx) * 50).springify()}>
+                      <ConversationCard
+                        item={mapOrderToItem(item)}
+                        role="driver"
+                        onPress={() => setActiveChatOrder(item)}
+                      />
+                    </Animated.View>
                   ))}
                 </>
               )}
@@ -440,51 +420,27 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#DFE2EF',
     letterSpacing: -0.5,
   },
   headerSubtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
+    gap: 10,
+    marginTop: 6,
+    flexWrap: 'wrap',
   },
   headerSubtitle: {
     fontSize: 13,
     color: 'rgba(194, 198, 216, 0.7)',
+    fontWeight: '500',
   },
-  headerDot: {
-    fontSize: 13,
-    color: 'rgba(194, 198, 216, 0.4)',
-  },
-  headerStatusText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#00E297',
-    opacity: 0.85,
-  },
-  nameInput: {
-    width: '100%',
-    height: 52,
-    backgroundColor: '#181C28',
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.gutter,
-    fontSize: 16,
-    color: colors.onSurface,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  nameBtn: {
-    width: '100%',
-    height: 52,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nameBtnDisabled: {
-    opacity: 0.4,
+  listContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 100,
+    gap: 12,
   },
   closedChatBanner: {
     paddingVertical: 18,

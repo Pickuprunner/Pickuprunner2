@@ -23,7 +23,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pickuprunner.app",
-      "deploymentTarget": "16.0",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Pickup Runner uses your location to calculate delivery distances and show nearby orders.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Pickup Runner uses your location in the background to track active deliveries.",
@@ -39,7 +38,7 @@
         "backgroundColor": "#0052FF"
       },
       "package": "com.pickuprunner.app",
-      "minSdkVersion": 26,
+      "googleServicesFile": "./android/app/google-services.json",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCGboNsbOQDX-ocETLgbZ6impbXaSSkVvY"
@@ -88,6 +87,18 @@
         {
           "photosPermission": "Pickup Runner needs photo library access to upload your driver's license and insurance documents.",
           "cameraPermission": "Pickup Runner needs camera access to scan customer IDs for age-restricted deliveries."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "buildReactNativeFromSource": true,
+            "deploymentTarget": "16.0"
+          },
+          "android": {
+            "minSdkVersion": 26
+          }
         }
       ]
     ],

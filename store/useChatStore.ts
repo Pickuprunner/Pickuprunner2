@@ -17,9 +17,16 @@ const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {};
 
 interface ChatStoreState {
   conversations: Record<string, ChatMessage[]>;
+  unreadCounts: Record<string, number>;
+  totalUnread: number;
+  activeThreadOrderId: string | null;
+  setActiveThreadOrderId: (orderId: string | null) => void;
+  setTotalUnread: (count: number) => void;
+  incrementUnread: (orderId: string) => void;
+  clearUnread: (orderId: string) => void;
   sendMessage: (
     orderId: string,
-    message: {
+    messageData: {
       id?: string;
       text: string;
       senderId: string;
@@ -39,6 +46,53 @@ export const useChatStore = create<ChatStoreState>()(
   persist(
     (set, get) => ({
       conversations: INITIAL_MESSAGES,
+      unreadCounts: {},
+      totalUnread: 0,
+      activeThreadOrderId: null,
+
+      setActiveThreadOrderId: (orderId) => {
+        set((state) => {
+          if (!orderId) return { activeThreadOrderId: null };
+          const unreadForThis = state.unreadCounts[orderId] || 0;
+          const newCounts = { ...state.unreadCounts, [orderId]: 0 };
+          const newTotal = Math.max(0, state.totalUnread - unreadForThis);
+          return {
+            activeThreadOrderId: orderId,
+            unreadCounts: newCounts,
+            totalUnread: newTotal,
+          };
+        });
+      },
+
+      setTotalUnread: (count) => set({ totalUnread: Math.max(0, count) }),
+
+      incrementUnread: (orderId) => {
+        set((state) => {
+          if (state.activeThreadOrderId === orderId) {
+            return state;
+          }
+          const prevOrderUnread = state.unreadCounts[orderId] || 0;
+          const nextOrderUnread = prevOrderUnread + 1;
+          const nextCounts = { ...state.unreadCounts, [orderId]: nextOrderUnread };
+          const nextTotal = Object.values(nextCounts).reduce((sum, v) => sum + v, 0);
+          return {
+            unreadCounts: nextCounts,
+            totalUnread: nextTotal,
+          };
+        });
+      },
+
+      clearUnread: (orderId) => {
+        set((state) => {
+          const unreadForThis = state.unreadCounts[orderId] || 0;
+          const nextCounts = { ...state.unreadCounts, [orderId]: 0 };
+          const nextTotal = Math.max(0, state.totalUnread - unreadForThis);
+          return {
+            unreadCounts: nextCounts,
+            totalUnread: nextTotal,
+          };
+        });
+      },
 
       sendMessage: (orderId, messageData) => {
         const newMsg: ChatMessage = {

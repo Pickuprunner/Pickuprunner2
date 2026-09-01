@@ -6,5 +6,7 @@ export * from './connect';
 export * from './checkout';
 export * from './accreditation';
 export * from './chat';
+export * from './device';
+
 
 

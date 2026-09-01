@@ -1,6 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useAuthStore, User } from '@/store/useAuthStore';
 import { authApi, usersApi, UpdateProfilePayload } from '@/apis';
+import { registerAndSyncDeviceToken } from '@/lib/notifications';
 
 export interface AuthUser extends User {}
 
@@ -38,6 +39,12 @@ export function useAuth(): AuthState {
     updateUser,
   } = useAuthStore();
 
+  useEffect(() => {
+    if (isHydrated && isAuthenticated && user?.id) {
+      registerAndSyncDeviceToken(user.id);
+    }
+  }, [isHydrated, isAuthenticated, user?.id]);
+
   const login = useCallback(
     async (email: string, password: string): Promise<AuthUser> => {
       const res = await authApi.login({
@@ -48,6 +55,10 @@ export function useAuth(): AuthState {
       const session = res?.data || res;
       const authToken = (session as any).token || (session as any).accessToken || '';
       setSession(session.user, authToken, session.refreshToken);
+
+      // Trigger permission check & device token backend sync
+      registerAndSyncDeviceToken(session.user?.id);
+
       return session.user;
     },
     [setSession]
@@ -69,6 +80,10 @@ export function useAuth(): AuthState {
       const session = res?.data || res;
       const authToken = (session as any).token || (session as any).accessToken || '';
       setSession(session.user, authToken, session.refreshToken);
+
+      // Trigger permission check & device token backend sync
+      registerAndSyncDeviceToken(session.user?.id);
+
       return session.user;
     },
     [setSession]

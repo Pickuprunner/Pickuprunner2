@@ -15,7 +15,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ordersApi } from '@/apis/orders';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -189,6 +189,7 @@ function CustomerOrderChatView({
 export default function CustomerChatScreen() {
   const insets = useSafeAreaInsets();
   const storeOrders = useOrderStore((state) => state.orders);
+  const { orderId } = useLocalSearchParams<{ orderId?: string }>();
   const [orders, setOrders] = useState<CustomerOrderData[]>([]);
   const [apiChats, setApiChats] = useState<ApiChatSummary[]>([]);
   const [activeChatOrder, setActiveChatOrder] = useState<CustomerOrderData | null>(null);
@@ -196,6 +197,29 @@ export default function CustomerChatScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [customerName, setCustomerName] = useState('Customer');
   const [chatsLoaded, setChatsLoaded] = useState(false);
+
+  // Auto-open specific chat if orderId is provided in URL
+  useEffect(() => {
+    if (!orderId) return;
+    const match = orders.find((o) => o.id === orderId);
+    if (match) {
+      setActiveChatOrder(match);
+      router.setParams({ orderId: '' });
+    } else {
+      ordersApi
+        .getById(orderId)
+        .then((res) => {
+          const o = res as any;
+          if (o && o.id) {
+            setActiveChatOrder(o);
+          }
+          router.setParams({ orderId: '' });
+        })
+        .catch(() => {
+          router.setParams({ orderId: '' });
+        });
+    }
+  }, [orderId, orders]);
 
   const fetchChatsList = useCallback(async () => {
     try {
@@ -209,11 +233,17 @@ export default function CustomerChatScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchChatsList();
-    const interval = setInterval(fetchChatsList, 5000);
-    return () => clearInterval(interval);
-  }, [fetchChatsList]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchChatsList();
+      if (!orderId) {
+        setActiveChatOrder(null);
+      }
+      return () => {
+        setActiveChatOrder(null);
+      };
+    }, [fetchChatsList, orderId])
+  );
 
   const fetchOrders = useCallback(async () => {
     let local: CustomerOrderData[] = [];

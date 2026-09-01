@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { chatApi, ApiChatMessage } from '@/apis/chat';
+import { notifyChatMessage } from '@/lib/notifications';
 
 const SESSION_KEY = 'chat_session_id';
 const NAME_KEY = 'chat_display_name';
@@ -129,7 +132,21 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
 
       if (res.messages && Array.isArray(res.messages)) {
         const mapped = res.messages.map((m) => mapApiToChatMessage(m, role));
-        setMessages(mapped);
+
+        setMessages((prev) => {
+          if (prev.length > 0) {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newIncomingMessages = mapped.filter((m) => !m.mine && !existingIds.has(m.id));
+
+            if (newIncomingMessages.length > 0) {
+              if (Platform.OS !== 'web') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+              }
+            }
+          }
+          return mapped;
+        });
+
         saveStoredMessages(currentOrderId, mapped);
       }
 
@@ -170,9 +187,16 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
       }, 3000);
     }
 
+    if (orderId) {
+      useChatStore.getState().setActiveThreadOrderId(orderId);
+    }
+
     return () => {
       isMounted = false;
       if (intervalId) clearInterval(intervalId);
+      if (orderId) {
+        useChatStore.getState().setActiveThreadOrderId(null);
+      }
     };
   }, [orderId, orderStatus, fetchAndSyncMessages]);
 
