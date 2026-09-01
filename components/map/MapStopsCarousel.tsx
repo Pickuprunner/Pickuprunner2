@@ -1,10 +1,13 @@
-import React from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet, Dimensions } from 'react-native';
 import { CheckCircle, Wifi, WifiOff } from '@blinkdotnew/mobile-ui';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Order } from '@/lib/orders';
 import { APP_CONFIG, calcDriverEarnings } from '@/lib/config';
-import { haptic, GOLD, CYAN, GREEN } from './mapTypes';
+import { colors, shadows, borderRadius } from '@/constants/design';
+import { haptic, GOLD, GREEN, COBALT } from './mapTypes';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export function MapStopsCarousel({
   pendingOrders,
@@ -19,24 +22,78 @@ export function MapStopsCarousel({
   isConnected: boolean;
   onSelectId: (id: string) => void;
 }) {
+  const [currentTab, setCurrentTab] = useState<'active' | 'pending'>('pending');
+
+  useEffect(() => {
+    if (activeOrders.length > 0 && currentTab !== 'active') {
+      setCurrentTab('active');
+    } else if (activeOrders.length === 0 && pendingOrders.length > 0 && currentTab === 'active') {
+      setCurrentTab('pending');
+    }
+  }, [activeOrders.length, pendingOrders.length]);
+
+  const displayOrders = currentTab === 'active' ? activeOrders : pendingOrders;
+
   return (
     <View style={styles.pendingStopsContainer}>
       <View style={styles.bottomHeaderRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScrollView}>
-          <View style={styles.filterRow}>
-            <View style={styles.filterPillPending}>
-              <View style={[styles.statusDot, { backgroundColor: GOLD }]} />
-              <Text style={styles.filterPillTextPending}>Pending ({pendingOrders.length})</Text>
-            </View>
+        <View style={styles.filterRow}>
+          {activeOrders.length > 0 && (
+            <Pressable
+              onPress={() => {
+                haptic('light');
+                setCurrentTab('active');
+              }}
+              style={({ pressed }) => [
+                styles.tabPill,
+                currentTab === 'active' ? styles.tabPillActiveSelected : styles.tabPillActiveUnselected,
+                pressed && { opacity: 0.8 },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: currentTab === 'active' ? '#FFFFFF' : COBALT },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.tabPillText,
+                  currentTab === 'active' ? styles.tabPillTextActiveSelected : styles.tabPillTextActiveUnselected,
+                ]}
+              >
+                Active ({activeOrders.length})
+              </Text>
+            </Pressable>
+          )}
 
-            {activeOrders.length > 0 && (
-              <View style={styles.filterPillActive}>
-                <View style={[styles.statusDot, { backgroundColor: CYAN }]} />
-                <Text style={styles.filterPillTextActive}>Active ({activeOrders.length})</Text>
-              </View>
-            )}
-          </View>
-        </ScrollView>
+          <Pressable
+            onPress={() => {
+              haptic('light');
+              setCurrentTab('pending');
+            }}
+            style={({ pressed }) => [
+              styles.tabPill,
+              currentTab === 'pending' ? styles.tabPillPendingSelected : styles.tabPillPendingUnselected,
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: currentTab === 'pending' ? '#000000' : GOLD },
+              ]}
+            />
+            <Text
+              style={[
+                styles.tabPillText,
+                currentTab === 'pending' ? styles.tabPillTextPendingSelected : styles.tabPillTextPendingUnselected,
+              ]}
+            >
+              Pending ({pendingOrders.length})
+            </Text>
+          </Pressable>
+        </View>
 
         <View style={[styles.liveBadge, isConnected ? styles.liveBadgeOn : styles.liveBadgeOff]}>
           {isConnected ? <Wifi size={11} color={GREEN} /> : <WifiOff size={11} color="#777" />}
@@ -51,13 +108,14 @@ export function MapStopsCarousel({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.cardsScrollContent}
       >
-        {pendingOrders.map((order) => {
+        {displayOrders.map((order) => {
           const isSelected = order.id === selectedId;
           const shortId = order.id ? order.id.slice(-6).toUpperCase() : '------';
           const initial = (order.customerName?.trim() || 'C').charAt(0).toUpperCase();
           const miles = Number(order.distanceMiles ?? 0);
           const tipAmount = Number(order.tipAmount ?? 0);
           const earnings = calcDriverEarnings(miles, tipAmount);
+          const isActive = order.status === 'accepted' || order.status === 'picked_up';
 
           return (
             <Pressable
@@ -68,18 +126,35 @@ export function MapStopsCarousel({
               }}
               style={({ pressed }) => [
                 styles.stopCard,
-                isSelected && styles.stopCardSelected,
+                displayOrders.length === 1 && styles.stopCardSingle,
+                isSelected && (isActive ? styles.stopCardSelectedActive : styles.stopCardSelectedPending),
                 pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
               ]}
             >
               <View style={styles.stopCardHeader}>
-                <View style={styles.avatarCircleSmall}>
-                  <Text style={styles.avatarTextSmall}>{initial}</Text>
+                <View
+                  style={[
+                    styles.avatarCircleSmall,
+                    isActive && { borderColor: colors.primary, backgroundColor: colors.surfaceContainerLowest },
+                  ]}
+                >
+                  <Text style={[styles.avatarTextSmall, isActive && { color: colors.primary }]}>
+                    {initial}
+                  </Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.stopCustomerName} numberOfLines={1}>
-                    {order.customerName || 'Customer'}
-                  </Text>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.stopCustomerName} numberOfLines={1}>
+                      {order.customerName || 'Customer'}
+                    </Text>
+                    {isActive && (
+                      <View style={styles.activeTag}>
+                        <Text style={styles.activeTagText}>
+                          {order.status === 'picked_up' ? 'IN TRANSIT' : 'ACCEPTED'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.stopOrderId}>#{shortId}</Text>
                 </View>
               </View>
@@ -87,8 +162,8 @@ export function MapStopsCarousel({
               <View style={styles.stopRoutesContainer}>
                 <View style={styles.stopConnectingLine} />
                 <View style={styles.stopRouteItem}>
-                  <View style={[styles.stopRouteIcon, { borderColor: '#b3c5ff' }]}>
-                    <MaterialIcons name="inventory-2" size={10} color="#b3c5ff" />
+                  <View style={[styles.stopRouteIcon, { borderColor: colors.primary }]}>
+                    <MaterialIcons name="inventory-2" size={10} color={colors.primary} />
                   </View>
                   <Text style={styles.stopRouteText} numberOfLines={1}>
                     {order.pickupAddress || APP_CONFIG.STORE_ADDRESS}
@@ -96,8 +171,8 @@ export function MapStopsCarousel({
                 </View>
 
                 <View style={styles.stopRouteItem}>
-                  <View style={[styles.stopRouteIcon, { borderColor: '#00e297' }]}>
-                    <MaterialIcons name="location-on" size={10} color="#00e297" />
+                  <View style={[styles.stopRouteIcon, { borderColor: colors.tertiary }]}>
+                    <MaterialIcons name="location-on" size={10} color={colors.tertiary} />
                   </View>
                   <Text style={styles.stopRouteText} numberOfLines={1}>
                     {order.deliveryAddress || '—'}
@@ -107,23 +182,31 @@ export function MapStopsCarousel({
 
               <View style={styles.stopCardFooter}>
                 <View style={styles.stopPriceCol}>
-                  <Text style={styles.stopPriceText}>${earnings.totalDisplay}</Text>
+                  <Text style={[styles.stopPriceText, isActive && { color: colors.onSurface }]}>
+                    ${earnings.totalDisplay}
+                  </Text>
                   <Text style={styles.stopDistanceText}>
                     {order.distanceMiles ? `${order.distanceMiles} mi` : '5.2 mi'}
                   </Text>
                 </View>
-                <View style={styles.tapDetailsBtn}>
-                  <Text style={styles.tapDetailsBtnText}>Tap details</Text>
+                <View style={[styles.tapDetailsBtn, isActive && styles.tapDetailsBtnActive]}>
+                  <Text style={styles.tapDetailsBtnText}>
+                    {isActive ? 'View Route' : 'Tap details'}
+                  </Text>
                 </View>
               </View>
             </Pressable>
           );
         })}
 
-        {pendingOrders.length === 0 && (
+        {displayOrders.length === 0 && (
           <View style={styles.emptyStopsBox}>
             <CheckCircle size={20} color={GREEN} />
-            <Text style={styles.emptyStopsText}>All pending deliveries complete!</Text>
+            <Text style={styles.emptyStopsText}>
+              {currentTab === 'active'
+                ? 'No active deliveries. Check pending tab.'
+                : 'All pending deliveries complete!'}
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -139,70 +222,85 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
     gap: 8,
-  },
-  filterScrollView: {
-    flexDirection: 'row',
   },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  filterPillPending: {
+  tabPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(229,169,60,0.12)',
-    borderColor: 'rgba(229,169,60,0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
   },
-  filterPillTextPending: {
+  tabPillActiveSelected: {
+    backgroundColor: COBALT,
+    borderColor: COBALT,
+    ...shadows.cobaltGlow,
+  },
+  tabPillActiveUnselected: {
+    backgroundColor: colors.primaryAlpha12,
+    borderColor: colors.primaryAlpha30,
+  },
+  tabPillTextActiveSelected: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  tabPillTextActiveUnselected: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  tabPillPendingSelected: {
+    backgroundColor: GOLD,
+    borderColor: GOLD,
+    ...shadows.goldGlow,
+  },
+  tabPillPendingUnselected: {
+    backgroundColor: colors.accentAlpha12,
+    borderColor: colors.accentAlpha30,
+  },
+  tabPillTextPendingSelected: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0A0E17',
+  },
+  tabPillTextPendingUnselected: {
     fontSize: 11,
     fontWeight: '700',
     color: GOLD,
   },
-  filterPillActive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0,178,255,0.12)',
-    borderColor: 'rgba(0,178,255,0.3)',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-  },
-  filterPillTextActive: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: CYAN,
+  tabPillText: {
+    letterSpacing: 0.2,
   },
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: borderRadius.full,
     borderWidth: 1,
   },
   liveBadgeOn: {
-    backgroundColor: 'rgba(34,197,94,0.12)',
-    borderColor: 'rgba(34,197,94,0.3)',
+    backgroundColor: colors.greenAlpha15,
+    borderColor: colors.greenAlpha30,
   },
   liveBadgeOff: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.glassLevel2Bg,
+    borderColor: colors.glassLevel2Border,
   },
   liveText: {
     fontSize: 10,
@@ -213,54 +311,82 @@ const styles = StyleSheet.create({
     color: GREEN,
   },
   liveTextOff: {
-    color: '#888888',
+    color: colors.outline,
   },
   cardsScrollContent: {
     gap: 12,
     paddingBottom: 4,
   },
   stopCard: {
-    width: 270,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    width: Math.min(SCREEN_WIDTH * 0.82, 300),
+    backgroundColor: colors.glassLevel2Bg,
+    borderColor: colors.glassLevel2Border,
     borderWidth: 1,
-    borderRadius: 24,
+    borderRadius: borderRadius.md,
     padding: 16,
     gap: 10,
   },
-  stopCardSelected: {
-    borderColor: '#0066FF',
-    backgroundColor: 'rgba(0, 102, 255, 0.08)',
+  stopCardSingle: {
+    width: SCREEN_WIDTH - 32,
+  },
+  stopCardSelectedPending: {
+    borderColor: GOLD,
+    backgroundColor: colors.accentAlpha12,
+  },
+  stopCardSelectedActive: {
+    borderColor: COBALT,
+    backgroundColor: colors.primaryAlpha12,
   },
   stopCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  activeTag: {
+    backgroundColor: colors.primaryAlpha20,
+    borderColor: colors.primaryAlpha40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  activeTagText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 0.5,
+  },
   avatarCircleSmall: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#0F131C',
+    backgroundColor: colors.surfaceContainerLowest,
     borderWidth: 1.5,
-    borderColor: '#FFE399',
+    borderColor: colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarTextSmall: {
-    color: '#FFE399',
+    color: colors.secondary,
     fontSize: 14,
     fontWeight: '700',
   },
   stopCustomerName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#dfe2ef',
+    color: colors.onSurface,
+    flex: 1,
   },
   stopOrderId: {
     fontSize: 11,
     fontWeight: '500',
-    color: 'rgba(194, 198, 216, 0.7)',
+    color: colors.textSecondary,
     letterSpacing: 0.5,
     marginTop: 1,
   },
@@ -276,7 +402,7 @@ const styles = StyleSheet.create({
     top: 12,
     bottom: 12,
     width: 1,
-    backgroundColor: 'rgba(66, 70, 86, 0.3)',
+    backgroundColor: colors.outlineVariant,
   },
   stopRouteItem: {
     flexDirection: 'row',
@@ -288,14 +414,14 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#0f131c',
+    backgroundColor: colors.surfaceContainerLowest,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   stopRouteText: {
     fontSize: 12,
-    color: '#C2C6D8',
+    color: colors.textSecondary,
     flex: 1,
   },
   stopCardFooter: {
@@ -304,7 +430,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    borderTopColor: colors.glassLevel2Border,
   },
   stopPriceCol: {
     flexDirection: 'row',
@@ -314,27 +440,26 @@ const styles = StyleSheet.create({
   stopPriceText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#ffe399',
+    color: colors.secondary,
   },
   stopDistanceText: {
     fontSize: 11,
-    color: 'rgba(194, 198, 216, 0.7)',
+    color: colors.textSecondary,
   },
   tapDetailsBtn: {
-    backgroundColor: '#0066FF',
-    borderRadius: 9999,
+    backgroundColor: COBALT,
+    borderRadius: borderRadius.full,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    shadowColor: 'rgba(0, 102, 255, 0.35)',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.9,
-    shadowRadius: 8,
-    elevation: 3,
+    ...shadows.cobaltGlow,
+  },
+  tapDetailsBtnActive: {
+    backgroundColor: COBALT,
   },
   tapDetailsBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#F8F7FF',
+    color: colors.onPrimaryContainer,
     letterSpacing: 0.2,
   },
   emptyStopsBox: {
@@ -349,3 +474,4 @@ const styles = StyleSheet.create({
     color: GREEN,
   },
 });
+

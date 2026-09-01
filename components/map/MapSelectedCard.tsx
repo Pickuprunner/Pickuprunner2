@@ -4,7 +4,8 @@ import { Navigation, CheckCircle } from '@blinkdotnew/mobile-ui';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Order } from '@/lib/orders';
 import { APP_CONFIG, calcDriverEarnings } from '@/lib/config';
-import { haptic, openMapsNavigation, makePhoneCall, openSmsMessage } from './mapTypes';
+import { colors, shadows, borderRadius } from '@/constants/design';
+import { haptic, openMapsNavigation, makePhoneCall, openSmsMessage, GOLD, COBALT } from './mapTypes';
 import { PhoneIcon, MessageIcon } from '@/assets/icons/MapIcons';
 import { DeliveryTimeline } from './DeliveryTimeline';
 
@@ -22,22 +23,30 @@ export function MapSelectedCard({
   const miles = Number(selectedOrder.distanceMiles ?? 0);
   const tipAmount = Number(selectedOrder.tipAmount ?? 0);
   const earnings = calcDriverEarnings(miles, tipAmount);
+  const isPending = selectedOrder.status === 'pending';
 
   return (
     <View style={styles.detailCard}>
       <View style={styles.detailCardHeader}>
         <View style={styles.userInfoCol}>
-          <View style={styles.avatarCircleLarge}>
-            <Text style={styles.avatarTextLarge}>
+          <View
+            style={[
+              styles.avatarCircleLarge,
+              !isPending && { borderColor: colors.primary, backgroundColor: colors.surfaceContainerLowest },
+            ]}
+          >
+            <Text style={[styles.avatarTextLarge, !isPending && { color: colors.primary }]}>
               {(selectedOrder.customerName || 'C').charAt(0).toUpperCase()}
             </Text>
           </View>
           <View style={styles.customerTitleCol}>
             <View style={styles.customerNameRow}>
               <Text style={styles.detailCustomerName}>{selectedOrder.customerName || 'Customer'}</Text>
-              <View style={styles.liveTag}>
-                <View style={styles.liveTagDot} />
-                <Text style={styles.liveTagText}>LIVE</Text>
+              <View style={[styles.liveTag, !isPending && styles.activeTag]}>
+                <View style={[styles.liveTagDot, !isPending && { backgroundColor: colors.primary }]} />
+                <Text style={[styles.liveTagText, !isPending && { color: colors.primary }]}>
+                  {isPending ? 'AVAILABLE' : 'ACTIVE'}
+                </Text>
               </View>
             </View>
             <Text style={styles.detailOrderId}>
@@ -59,7 +68,7 @@ export function MapSelectedCard({
         <View style={styles.priceContainer}>
           <Text style={styles.detailPriceText}>${earnings.totalDisplay}</Text>
           <Text style={styles.detailTipText}>
-            {tipAmount > 0 ? `${(tipAmount / 100).toFixed(2)} tip` : '0.00 tip'}
+            {tipAmount > 0 ? `+$${(tipAmount / 100).toFixed(2)} tip` : 'incl. tip'}
           </Text>
         </View>
 
@@ -83,11 +92,11 @@ export function MapSelectedCard({
         <View style={styles.detailConnectingLine} />
 
         <View style={styles.detailRouteItem}>
-          <View style={[styles.detailRouteIcon, { borderColor: '#b3c5ff' }]}>
-            <MaterialIcons name="inventory-2" size={12} color="#b3c5ff" />
+          <View style={[styles.detailRouteIcon, { borderColor: colors.primary }]}>
+            <MaterialIcons name="inventory-2" size={12} color={colors.primary} />
           </View>
           <View style={styles.detailRouteTextCol}>
-            <Text style={[styles.detailRouteLabel, { color: '#b3c5ff' }]}>Pick up from</Text>
+            <Text style={[styles.detailRouteLabel, { color: colors.primary }]}>Pick up from</Text>
             <Text style={styles.detailRouteAddress} numberOfLines={2}>
               {selectedOrder.pickupAddress || APP_CONFIG.STORE_ADDRESS}
             </Text>
@@ -95,11 +104,11 @@ export function MapSelectedCard({
         </View>
 
         <View style={styles.detailRouteItem}>
-          <View style={[styles.detailRouteIcon, { borderColor: '#00e297' }]}>
-            <MaterialIcons name="location-on" size={12} color="#00e297" />
+          <View style={[styles.detailRouteIcon, { borderColor: colors.tertiary }]}>
+            <MaterialIcons name="location-on" size={12} color={colors.tertiary} />
           </View>
           <View style={styles.detailRouteTextCol}>
-            <Text style={[styles.detailRouteLabel, { color: '#00e297' }]}>Deliver to</Text>
+            <Text style={[styles.detailRouteLabel, { color: colors.tertiary }]}>Deliver to</Text>
             <Text style={styles.detailRouteAddress} numberOfLines={2}>
               {selectedOrder.deliveryAddress}
             </Text>
@@ -112,16 +121,16 @@ export function MapSelectedCard({
           onPress={() => openMapsNavigation(selectedOrder.deliveryAddress)}
           style={({ pressed }) => [styles.navButton, pressed && { opacity: 0.8 }]}
         >
-          <Navigation size={15} color="#dfe2ef" />
+          <Navigation size={15} color={colors.onSurface} />
           <Text style={styles.navButtonText}>Navigation</Text>
         </Pressable>
 
-        {selectedOrder.status === 'pending' ? (
+        {isPending ? (
           <Pressable
             onPress={() => onAccept(selectedOrder)}
             style={({ pressed }) => [styles.acceptButton, pressed && { opacity: 0.85 }]}
           >
-            <MaterialIcons name="local-shipping" size={18} color="#f8f7ff" />
+            <MaterialIcons name="local-shipping" size={18} color="#FFFFFF" />
             <Text style={styles.acceptButtonText}>ACCEPT ORDER</Text>
           </Pressable>
         ) : (
@@ -130,7 +139,7 @@ export function MapSelectedCard({
             style={({ pressed }) => [styles.openOrderButton, pressed && { opacity: 0.85 }]}
           >
             <Text style={styles.openOrderButtonText}>OPEN ORDER</Text>
-            <CheckCircle size={15} color="#000000" />
+            <CheckCircle size={15} color="#FFFFFF" />
           </Pressable>
         )}
       </View>
@@ -142,12 +151,14 @@ export function MapSelectedCard({
 const styles = StyleSheet.create({
   detailCard: {
     marginHorizontal: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignSelf: 'stretch',
+    backgroundColor: colors.glassLevel2Bg,
+    borderColor: colors.glassLevel2Border,
     borderWidth: 1,
-    borderRadius: 28,
+    borderRadius: borderRadius.md,
     padding: 18,
     gap: 14,
+    ...shadows.lg,
   },
   detailCardHeader: {
     flexDirection: 'row',
@@ -164,14 +175,14 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#0F131C',
+    backgroundColor: colors.surfaceContainerLowest,
     borderWidth: 1.5,
-    borderColor: '#FFE399',
+    borderColor: colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarTextLarge: {
-    color: '#FFE399',
+    color: colors.secondary,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -186,35 +197,39 @@ const styles = StyleSheet.create({
   detailCustomerName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#dfe2ef',
+    color: colors.onSurface,
   },
   liveTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(0, 102, 255, 0.15)',
-    borderColor: 'rgba(0, 102, 255, 0.35)',
+    backgroundColor: colors.accentAlpha15,
+    borderColor: colors.accentAlpha40,
     borderWidth: 1,
     paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: borderRadius.sm,
+  },
+  activeTag: {
+    backgroundColor: colors.primaryAlpha15,
+    borderColor: colors.primaryAlpha40,
   },
   liveTagDot: {
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: '#0066FF',
+    backgroundColor: GOLD,
   },
   liveTagText: {
     fontSize: 9,
-    fontWeight: '900',
-    color: '#0066FF',
+    fontWeight: '800',
+    color: GOLD,
     letterSpacing: 0.5,
   },
   detailOrderId: {
     fontSize: 12,
     fontWeight: '500',
-    color: 'rgba(194, 198, 216, 0.7)',
+    color: colors.textSecondary,
     letterSpacing: 0.5,
     marginTop: 2,
   },
@@ -222,15 +237,15 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: colors.glassLevel3Bg,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: colors.glassLevel3Border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeButtonText: {
     fontSize: 13,
-    color: '#94A3B8',
+    color: colors.textSecondary,
     fontWeight: '700',
   },
 
@@ -241,7 +256,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomColor: colors.glassLevel2Border,
   },
   priceContainer: {
     flexDirection: 'row',
@@ -249,12 +264,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   detailPriceText: {
-    color: '#ffe399',
+    color: colors.secondary,
     fontSize: 24,
     fontWeight: '700',
   },
   detailTipText: {
-    color: '#c2c6d8',
+    color: colors.textSecondary,
     fontSize: 13,
   },
   contactActionButtons: {
@@ -265,15 +280,16 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: colors.surfaceContainer,
+    borderColor: colors.glassLevel2Border,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   contactMessageBtn: {
-    backgroundColor: '#0066ff',
-    borderColor: '#0066ff',
+    backgroundColor: COBALT,
+    borderColor: COBALT,
+    ...shadows.cobaltGlow,
   },
   detailRoutesContainer: {
     flexDirection: 'column',
@@ -286,7 +302,7 @@ const styles = StyleSheet.create({
     top: 18,
     bottom: 18,
     width: 1,
-    backgroundColor: 'rgba(66, 70, 86, 0.4)',
+    backgroundColor: colors.outlineVariant,
   },
   detailRouteItem: {
     flexDirection: 'row',
@@ -298,7 +314,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#0f131c',
+    backgroundColor: colors.surfaceContainerLowest,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -309,13 +325,13 @@ const styles = StyleSheet.create({
   },
   detailRouteLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 2,
   },
   detailRouteAddress: {
-    color: '#dfe2ef',
+    color: colors.onSurface,
     fontSize: 14,
     lineHeight: 19,
   },
@@ -327,61 +343,54 @@ const styles = StyleSheet.create({
   },
   navButton: {
     flex: 1,
-    height: 46,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: colors.surfaceContainer,
+    borderColor: colors.glassLevel2Border,
     borderWidth: 1,
-    borderRadius: 24,
+    borderRadius: borderRadius.full,
   },
   navButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#dfe2ef',
+    color: colors.onSurface,
   },
   openOrderButton: {
     flex: 1.5,
-    height: 46,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#0066ff',
-    borderRadius: 24,
-    shadowColor: 'rgba(0, 102, 255, 0.3)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    elevation: 4,
+    backgroundColor: COBALT,
+    borderRadius: borderRadius.full,
+    ...shadows.cobaltGlow,
   },
   openOrderButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#f8f7ff',
+    color: '#FFFFFF',
     letterSpacing: 0.3,
   },
   acceptButton: {
     flex: 1.5,
-    height: 46,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#0066ff',
-    borderRadius: 24,
-    shadowColor: 'rgba(0, 102, 255, 0.3)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    elevation: 4,
+    backgroundColor: COBALT,
+    borderRadius: borderRadius.full,
+    ...shadows.cobaltGlow,
   },
   acceptButtonText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#f8f7ff',
+    color: '#FFFFFF',
     letterSpacing: 0.3,
   },
 });
+

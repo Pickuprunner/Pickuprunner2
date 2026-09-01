@@ -8,6 +8,7 @@ import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useAuth } from '@/hooks/useAuth';
+import { colors } from '@/constants/design';
 
 import {
   WebMap,
@@ -15,7 +16,6 @@ import {
   MapSelectedCard,
   MapStopsCarousel,
   haptic,
-  BG,
 } from '@/components/map';
 
 export default function MapScreen() {
@@ -110,7 +110,7 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: colors.background,
     position: 'relative',
   },
   mapWrapper: {
@@ -119,10 +119,13 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   bottomSection: {
-    backgroundColor: BG,
+    width: '100%',
+    alignItems: 'stretch',
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    paddingTop: 12,
+    borderTopColor: colors.glassLevel2Border,
+    paddingTop: 14,
     paddingBottom: Platform.OS === 'ios' ? 24 : 16,
   },
 });
+
