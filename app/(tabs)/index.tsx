@@ -10,6 +10,7 @@ import {
   Platform,
   LayoutChangeEvent,
   TouchableOpacity,
+  BackHandler,
 } from 'react-native';
 import {
   Button,
@@ -17,7 +18,7 @@ import {
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MaterialIcons } from '@expo/vector-icons';
@@ -51,6 +52,7 @@ function haptic() {
 }
 
 export default function OrdersScreen() {
+  const { showToast } = useToast();
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
@@ -64,10 +66,27 @@ export default function OrdersScreen() {
   const lastDirectionChangeTime = useRef(0);
   const isHeaderVisible = useRef(true);
 
+  useFocusEffect(
+    useCallback(() => {
+      let lastBackPress = 0;
+      const onBackPress = () => {
+        const now = Date.now();
+        if (now - lastBackPress < 2000) {
+          BackHandler.exitApp();
+          return true;
+        }
+        lastBackPress = now;
+        showToast('Press back again to exit', 'info');
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [showToast])
+  );
+
   useEffect(() => {
     let isMounted = true;
-    // Hardcoded mock location commented out - live GPS used instead:
-    // const MOCK_LOCATION = { lat: 31.9505, lng: -110.9747 };
 
     async function initLocation() {
       try {
@@ -81,7 +100,6 @@ export default function OrdersScreen() {
               },
               (err) => {
                 console.warn('[OrdersScreen] Geolocation error:', err);
-                // if (isMounted) setDriverLocation(MOCK_LOCATION);
               },
               { timeout: 8000, enableHighAccuracy: true }
             );
@@ -110,7 +128,6 @@ export default function OrdersScreen() {
 
   const { user } = useAuth();
   const driverId = useDriverId();
-  const { showToast } = useToast();
   const updateStatus = useUpdateOrderStatus();
   const claimOrder = useClaimOrder();
   const { data: connectStatus, refetch: refetchConnect } = useConnectStatus(driverId);
@@ -191,7 +208,7 @@ export default function OrdersScreen() {
         driverUserId: uid,
         driverName: uname,
       });
-      await Promise.all([refetchAvailable(), refetchAll()]).catch(() => {});
+      await Promise.all([refetchAvailable(), refetchAll()]).catch(() => { });
       showToast('Order Accepted!', {
         type: 'success',
         description: `Added #${orderItem.id?.slice(-6).toUpperCase()} to your active deliveries`,
@@ -228,7 +245,6 @@ export default function OrdersScreen() {
   const { data: allOrders = [], isLoading: isLoadingAll, refetch: refetchAll } = useOrders();
   const { isConnected } = useOrdersRealtime();
 
-  // Job board displays exclusively unassigned pending jobs that are not already claimed
   const orders = useMemo(() => {
     const activeOrClaimedIds = new Set(
       (allOrders || [])
@@ -242,7 +258,6 @@ export default function OrdersScreen() {
 
   const isLoading = isLoadingAvailable && orders.length === 0;
 
-  // Active queue tracked from driver's claimed orders
   const { queueCount, atCapacity } = useDriverQueue(allOrders, driverId);
 
   const avatarInitial = useMemo(() => {
@@ -330,10 +345,6 @@ export default function OrdersScreen() {
           }
         } catch (err) {
           console.warn('[OrdersScreen] Native refresh location error:', err);
-          // Hardcoded fallback commented out:
-          // if (!driverLocation.lat) {
-          //   setDriverLocation({ lat: 31.9505, lng: -110.9747 });
-          // }
         }
       }
       const minDelay = new Promise((resolve) => setTimeout(resolve, 550));
@@ -493,7 +504,22 @@ export default function OrdersScreen() {
   ) : null;
 
   if (user?.role === 'driver' && !isApproved) {
-    return <DriverProfileStatusScreen />;
+    return (
+      <DriverProfileStatusScreen
+        onEditDocuments={() => {
+          router.push({
+            pathname: '/(auth)/driver-verification',
+            params: { edit: 'true', step: '1' },
+          } as any);
+        }}
+        onEditStep={(step) => {
+          router.push({
+            pathname: '/(auth)/driver-verification',
+            params: { edit: 'true', step: String(step) },
+          } as any);
+        }}
+      />
+    );
   }
 
   return (
@@ -569,7 +595,7 @@ export default function OrdersScreen() {
         keyboardShouldPersistTaps="handled"
       />
 
-      
+
 
       <CustomConfirmModal
         visible={showStripeModal}

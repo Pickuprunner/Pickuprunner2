@@ -1,25 +1,3 @@
-/**
- * ============================================================
- *  PICKUP RUNNER — MARKET & STORE CONFIGURATION
- * ============================================================
- *
- *  Two levels of customization:
- *
- *  1. CITY / MARKET  — which geographic area this build covers
- *  2. STORE          — which specific business this build is for
- *                      (optional — leave STORE_ID as '' for a
- *                       general city-wide runner app)
- *
- *  To sell to a new store or city:
- *    1. Remix the project in Blink
- *    2. Change the values below
- *    3. Publish — that's it
- *
- *  All orders are automatically scoped to the CITY_ID + STORE_ID
- *  combination so markets and stores never see each other's data.
- * ============================================================
- */
-
 export const APP_CONFIG = {
 
   // ── Market / City ────────────────────────────────────────────
@@ -46,7 +24,7 @@ export const APP_CONFIG = {
   STORE_PHONE: '',
 
   /** Support email shown to customers */
-  STORE_EMAIL: 'PickupRunner@gmail.com',
+  STORE_EMAIL: 'pickuprunner@gmail.com',
 
   /** Store hours shown on customer order screen */
   STORE_HOURS: 'Available Daily',

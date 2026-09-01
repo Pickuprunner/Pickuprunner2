@@ -50,6 +50,7 @@ export default function DeleteAccountScreen() {
     if (step !== 'done') return;
 
     if (countdown <= 0) {
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/(landing)/role-select');
       return;
     }
@@ -63,7 +64,7 @@ export default function DeleteAccountScreen() {
 
   const handleNext = () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => { });
     }
     setStep('confirm');
   };
@@ -78,7 +79,7 @@ export default function DeleteAccountScreen() {
     }
 
     if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => { });
     }
 
     setIsDeleting(true);
@@ -94,7 +95,7 @@ export default function DeleteAccountScreen() {
 
       setStep('done');
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
 
       await logout();
@@ -137,49 +138,48 @@ export default function DeleteAccountScreen() {
 
   const items = isDriver
     ? [
-        {
-          icon: <User size={18} color="#EF4444" />,
-          label: 'Personal Identity & Profile',
-          desc: 'Name, phone, email, credentials and authentication sessions are cleared.',
-        },
-        {
-          icon: <Shield size={18} color="#EF4444" />,
-          label: 'Accreditation & Documents',
-          desc: 'Driver license, insurance files and background authorizations are removed.',
-        },
-        {
-          icon: <Package size={18} color="#EF4444" />,
-          label: 'Orders & Deliveries',
-          desc: 'Orders are anonymized. Deletion is blocked if active orders are in progress.',
-        },
-        {
-          icon: <CreditCard size={18} color="#EF4444" />,
-          label: 'Payouts & Earnings',
-          desc: 'All pending payout transfers must be settled before closing your account.',
-        },
-      ]
+      {
+        icon: <User size={18} color="#EF4444" />,
+        label: 'Personal Identity & Profile',
+        desc: 'Name, phone, email, credentials and authentication sessions are cleared.',
+      },
+      {
+        icon: <Shield size={18} color="#EF4444" />,
+        label: 'Accreditation & Documents',
+        desc: 'Driver license, insurance files and background authorizations are removed.',
+      },
+      {
+        icon: <Package size={18} color="#EF4444" />,
+        label: 'Orders & Deliveries',
+        desc: 'Orders are anonymized. Deletion is blocked if active orders are in progress.',
+      },
+      {
+        icon: <CreditCard size={18} color="#EF4444" />,
+        label: 'Payouts & Earnings',
+        desc: 'All pending payout transfers must be settled before closing your account.',
+      },
+    ]
     : [
-        {
-          icon: <User size={18} color="#EF4444" />,
-          label: 'Personal Identity & Profile',
-          desc: 'Name, phone, email, saved addresses, and authentication sessions are cleared.',
-        },
-        {
-          icon: <Package size={18} color="#EF4444" />,
-          label: 'Orders & Deliveries',
-          desc: 'Past order history is anonymized. Deletion is blocked if active orders are in progress.',
-        },
-        {
-          icon: <CreditCard size={18} color="#EF4444" />,
-          label: 'Payment Data & Preferences',
-          desc: 'Saved payment details, receipts, and account preferences are permanently removed.',
-        },
-      ];
+      {
+        icon: <User size={18} color="#EF4444" />,
+        label: 'Personal Identity & Profile',
+        desc: 'Name, phone, email, saved addresses, and authentication sessions are cleared.',
+      },
+      {
+        icon: <Package size={18} color="#EF4444" />,
+        label: 'Orders & Deliveries',
+        desc: 'Past order history is anonymized. Deletion is blocked if active orders are in progress.',
+      },
+      {
+        icon: <CreditCard size={18} color="#EF4444" />,
+        label: 'Payment Data & Preferences',
+        desc: 'Saved payment details, receipts, and account preferences are permanently removed.',
+      },
+    ];
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* HEADER */}
       <View
         style={[
           styles.header,
@@ -203,8 +203,8 @@ export default function DeleteAccountScreen() {
             {step === 'review'
               ? 'Review impact'
               : step === 'confirm'
-              ? 'Permanent confirmation'
-              : 'Completed'}
+                ? 'Permanent confirmation'
+                : 'Completed'}
           </Text>
         </View>
 
@@ -322,7 +322,7 @@ export default function DeleteAccountScreen() {
               style={[
                 styles.finalDeleteBtn,
                 (isDeleting || confirmText.trim().toUpperCase() !== 'DELETE') &&
-                  styles.finalDeleteBtnDisabled,
+                styles.finalDeleteBtnDisabled,
               ]}
             >
               {isDeleting ? (
@@ -363,7 +363,10 @@ export default function DeleteAccountScreen() {
 
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => router.replace('/(landing)/role-select')}
+              onPress={() => {
+                if (router.canDismiss()) router.dismissAll();
+                router.replace('/(landing)/role-select');
+              }}
               style={styles.doneBtn}
             >
               <Text style={styles.doneBtnText}>Return to Welcome Screen ({countdown}s)</Text>

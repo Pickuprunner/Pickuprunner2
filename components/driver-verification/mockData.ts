@@ -1,5 +1,4 @@
 export interface DriverWizardData {
-  // Step 1: Vehicle & Address
   vehicleMake: string;
   vehicleModel: string;
   vehicleYear: string;
@@ -10,8 +9,6 @@ export interface DriverWizardData {
   city: string;
   state: string;
   zip: string;
-
-  // Step 2: Driver's License
   licenseState: string;
   licenseNumber: string;
   licenseFullName: string;
@@ -21,12 +18,8 @@ export interface DriverWizardData {
   licenseFrontName: string;
   licenseBackUrl: string;
   licenseBackName: string;
-
-  // Step 3: Background Check
   ssnLast4: string;
   fcraAgreed: boolean;
-
-  // Step 4: Insurance
   insuranceCompany: string;
   naicNumber: string;
   policyNumber: string;
@@ -36,45 +29,6 @@ export interface DriverWizardData {
   insuranceDocUrl: string;
   insuranceDocName: string;
 }
-
-export const MOCK_DRIVER_WIZARD_DATA: DriverWizardData = {
-  // Step 1
-  vehicleMake: 'Toyota',
-  vehicleModel: 'Camry Hybrid',
-  vehicleYear: '2023',
-  vehicleColor: 'Midnight Black',
-  licensePlate: '8ABC123',
-  address: '2401 E Camelback Rd',
-  apt: 'Suite 400',
-  city: 'Phoenix',
-  state: 'AZ',
-  zip: '85016',
-
-  // Step 2
-  licenseState: 'AZ',
-  licenseNumber: 'D12345678',
-  licenseFullName: 'Alex Rivera',
-  licenseDob: '1994-05-14',
-  licenseExpDate: '2028-05-14',
-  licenseFrontUrl: '',
-  licenseFrontName: '',
-  licenseBackUrl: '',
-  licenseBackName: '',
-
-  // Step 3
-  ssnLast4: '8842',
-  fcraAgreed: true,
-
-  // Step 4
-  insuranceCompany: 'State Farm Mutual',
-  naicNumber: '25178',
-  policyNumber: 'AZ-98421034-7B',
-  effectiveDate: '2026-01-01',
-  expirationDate: '2027-01-01',
-  vinNumber: '4T1B11HK5JU123456',
-  insuranceDocUrl: '',
-  insuranceDocName: '',
-};
 
 export const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Pressable, StyleSheet, Platform, View, StatusBar, ScrollView, Text } from 'react-native';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,13 +11,25 @@ import {
   ChevronRight,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '@/hooks/useAuth';
 import { saveRole, AppRole } from '@/hooks/useRole';
 import { colors, gradients, shadows, borderRadius, spacing } from '@/constants/design';
 import { APP_CONFIG } from '@/lib/config';
 
 export default function RoleSelectScreen() {
   const insets = useSafeAreaInsets();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [selecting, setSelecting] = useState<AppRole | null>(null);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      if (user.role === 'customer') {
+        router.replace('/(customer)/my-orders');
+      } else {
+        router.replace('/(tabs)');
+      }
+    }
+  }, [isAuthenticated, isLoading, user]);
 
   const handleSelect = async (role: AppRole) => {
     if (selecting) return;

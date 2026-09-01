@@ -30,7 +30,12 @@ import { useDriverAccreditation } from '@/lib/accreditation';
 import { useMyVerification } from '@/lib/verification';
 import { useToast, CustomLoading } from '@/components/core';
 
-export function DriverProfileStatusScreen() {
+export interface DriverProfileStatusScreenProps {
+  onEditDocuments?: () => void;
+  onEditStep?: (step: number) => void;
+}
+
+export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: DriverProfileStatusScreenProps = {}) {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const { data: accreditation, refetch: refetchAccred, isFetching: isFetchingAccred } = useDriverAccreditation();
@@ -39,26 +44,79 @@ export function DriverProfileStatusScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const profile = accreditation?.profile;
+  const isApproved =
+    profile?.accreditationStatus === 'approved' ||
+    verification?.status === 'approved' ||
+    accreditation?.eligibility?.eligible;
+
   const isSubmitted =
     Boolean(profile?.isSubmitted) ||
     profile?.accreditationStatus === 'under_review' ||
-    verification?.status === 'pending';
-  const isApproved = profile?.accreditationStatus === 'approved' || verification?.status === 'approved';
+    profile?.accreditationStatus === 'approved' ||
+    verification?.status === 'pending' ||
+    verification?.status === 'approved';
 
   useEffect(() => {
     if (user?.role === 'driver' && isApproved) {
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/(tabs)');
     }
   }, [user?.role, isApproved]);
 
   const hasVehicle = Boolean(profile?.vehicleMake && profile?.vehiclePlate);
-  const hasLicense = Boolean(profile?.licenseNumber);
+  const hasLicense = Boolean(profile?.licenseNumber || profile?.licenseState);
   const hasConsent = Boolean(profile?.backgroundConsentAt);
-  const hasInsurance = Boolean(profile?.insurancePolicyNumber);
+  const hasInsurance = Boolean(profile?.insurancePolicyNumber || profile?.insuranceCompany);
+
+  const rawLicenseStatus = String(profile?.licenseStatus || accreditation?.steps?.license || '');
+  const rawInsuranceStatus = String(profile?.insuranceStatus || accreditation?.steps?.insurance || '');
+  const rawBgStatus = String(profile?.backgroundStatus || accreditation?.steps?.backgroundCheck || '');
+  const rawVehicleStatus = String((profile as any)?.vehicleStatus || (profile as any)?.vehicle_status || '');
+
+  const isOverallRejected =
+    profile?.accreditationStatus === 'rejected' ||
+    verification?.status === 'rejected';
+
+  const licenseStatus: 'approved' | 'rejected' | 'in_review' =
+    isApproved || rawLicenseStatus === 'approved'
+      ? 'approved'
+      : rawLicenseStatus === 'rejected' || (isOverallRejected && rawLicenseStatus !== 'approved')
+        ? 'rejected'
+        : 'in_review';
+
+  const insuranceStatus: 'approved' | 'rejected' | 'in_review' =
+    isApproved || rawInsuranceStatus === 'approved'
+      ? 'approved'
+      : rawInsuranceStatus === 'rejected' || (isOverallRejected && rawInsuranceStatus !== 'approved')
+        ? 'rejected'
+        : 'in_review';
+
+  const bgStatus: 'approved' | 'rejected' | 'in_review' =
+    isApproved || rawBgStatus === 'approved'
+      ? 'approved'
+      : rawBgStatus === 'rejected' || (isOverallRejected && rawBgStatus !== 'approved')
+        ? 'rejected'
+        : 'in_review';
+
+  const vehicleStatus: 'approved' | 'rejected' | 'in_review' =
+    rawVehicleStatus === 'rejected' || (isOverallRejected && rawVehicleStatus !== 'approved')
+      ? 'rejected'
+      : rawVehicleStatus === 'approved' || (isApproved && hasVehicle)
+        ? 'approved'
+        : isOverallRejected
+          ? 'rejected'
+          : 'in_review';
+
+  const isAnyStepRejected =
+    isOverallRejected ||
+    licenseStatus === 'rejected' ||
+    insuranceStatus === 'rejected' ||
+    bgStatus === 'rejected' ||
+    vehicleStatus === 'rejected';
 
   const handleRefresh = async () => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
     setRefreshing(true);
     try {
@@ -67,7 +125,10 @@ export function DriverProfileStatusScreen() {
       const newStatus = accredRes.data?.profile?.accreditationStatus;
       if (newStatus === 'approved') {
         showToast('Accreditation Approved! Welcome to PickupRunner.', 'success');
+        if (router.canDismiss()) router.dismissAll();
         router.replace('/(tabs)');
+      } else if (newStatus === 'rejected') {
+        showToast('Application needs review. Please update documentation.', 'error');
       } else {
         showToast('Profile is still under review. We will notify you soon.', 'info');
       }
@@ -78,53 +139,47 @@ export function DriverProfileStatusScreen() {
     }
   };
 
-  const handleResume = () => {
+  const handleEditDocuments = (step: number = 1) => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
-    router.push('/(auth)/driver-verification');
-  };
-
-  const handleSignOut = async () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (onEditStep) {
+      onEditStep(step);
+    } else if (onEditDocuments) {
+      onEditDocuments();
+    } else {
+      router.push({
+        pathname: '/(auth)/driver-verification',
+        params: { edit: 'true', step: String(step) },
+      } as any);
     }
-    await logout();
-    router.replace('/(landing)/role-select');
   };
 
   const isChecking = isFetchingAccred || isFetchingVerif || refreshing;
 
-  const getItemVisuals = (hasData: boolean, itemStatus?: string) => {
-    if (!hasData) {
-      return {
-        iconColor: colors.onSurfaceVariant,
-        badgeNode: <Clock size={16} color={colors.onSurfaceVariant} />,
-      };
-    }
-    if (isApproved || itemStatus === 'approved') {
+  const getItemVisuals = (status: 'approved' | 'rejected' | 'in_review') => {
+    if (status === 'approved') {
       return {
         iconColor: '#22C55E',
         badgeNode: <CheckCircle size={16} color="#22C55E" />,
       };
     }
-    if (itemStatus === 'rejected') {
+    if (status === 'rejected') {
       return {
         iconColor: '#EF4444',
         badgeNode: <X size={16} color="#EF4444" />,
       };
     }
-    // Submitted and Under Review / Pending -> Amber Gold
     return {
       iconColor: '#FFE399',
       badgeNode: <Clock size={16} color="#FFE399" />,
     };
   };
 
-  const vehicleVisuals = getItemVisuals(hasVehicle);
-  const licenseVisuals = getItemVisuals(hasLicense, profile?.licenseStatus);
-  const consentVisuals = getItemVisuals(hasConsent, profile?.backgroundStatus);
-  const insuranceVisuals = getItemVisuals(hasInsurance, profile?.insuranceStatus);
+  const vehicleVisuals = getItemVisuals(vehicleStatus);
+  const licenseVisuals = getItemVisuals(licenseStatus);
+  const consentVisuals = getItemVisuals(bgStatus);
+  const insuranceVisuals = getItemVisuals(insuranceStatus);
 
   return (
     <View style={styles.root}>
@@ -150,137 +205,253 @@ export function DriverProfileStatusScreen() {
       >
         {/* HERO ICON & STATUS */}
         <View style={styles.heroSection}>
-          <View style={styles.iconGlowWrapper}>
-            <Clock size={52} color="#FFE399" />
+          <View
+            style={[
+              styles.iconGlowWrapper,
+              isApproved && styles.iconGlowWrapperApproved,
+              isAnyStepRejected && styles.iconGlowWrapperRejected,
+            ]}
+          >
+            {isApproved ? (
+              <CheckCircle size={52} color="#22C55E" />
+            ) : isAnyStepRejected ? (
+              <X size={52} color="#EF4444" />
+            ) : (
+              <Clock size={52} color="#FFE399" />
+            )}
           </View>
 
-          <View style={styles.statusPill}>
-            <Text style={styles.statusPillText}>
-              {isSubmitted ? 'UNDER REVIEW' : 'IN PROGRESS'}
+          <View
+            style={[
+              styles.statusPill,
+              isApproved && styles.statusPillApproved,
+              isAnyStepRejected && styles.statusPillRejected,
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusPillText,
+                isApproved && styles.statusPillTextApproved,
+                isAnyStepRejected && styles.statusPillTextRejected,
+              ]}
+            >
+              {isApproved
+                ? 'APPROVED'
+                : isAnyStepRejected
+                  ? 'ACTION REQUIRED'
+                  : isSubmitted
+                    ? 'UNDER REVIEW'
+                    : 'IN PROGRESS'}
             </Text>
           </View>
 
           <Text style={styles.heroTitle}>
-            {isSubmitted ? 'Accreditation Under Review' : 'Accreditation In Progress'}
+            {isApproved
+              ? 'Accreditation Approved'
+              : isAnyStepRejected
+                ? 'Accreditation Action Required'
+                : isSubmitted
+                  ? 'Accreditation Under Review'
+                  : 'Accreditation In Progress'}
           </Text>
 
           <Text style={styles.heroSubtitle}>
-            {isSubmitted
-              ? 'Our safety compliance team is reviewing your vehicle details, driver license, background check, and insurance. Most reviews complete within 2–24 hours.'
-              : 'Please complete all required steps to activate your driver account and start receiving delivery orders.'}
+            {isApproved
+              ? 'Your driver accreditation has been approved. You are ready to receive delivery orders.'
+              : isAnyStepRejected
+                ? profile?.rejectionReason ||
+                'One or more verification steps require updated documentation. Please review the checklist below and tap to update your details.'
+                : isSubmitted
+                  ? 'Our safety compliance team is reviewing your vehicle details, driver license, background check, and insurance. Most reviews complete within 2–24 hours.'
+                  : 'Please complete all required steps to activate your driver account and start receiving delivery orders.'}
           </Text>
         </View>
 
         {/* CHECKLIST ITEMS */}
         <View style={styles.checklistCard}>
-          <Text style={styles.checklistHeader}>VERIFICATION CHECKLIST</Text>
+          <View style={styles.checklistHeaderRow}>
+            <Text style={styles.checklistHeader}>VERIFICATION CHECKLIST</Text>
+            {isAnyStepRejected && (
+              <Text style={styles.tapToEditHint}>Tap any item to edit</Text>
+            )}
+          </View>
 
           {/* 1. Vehicle Info */}
-          <View style={styles.checkItem}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => handleEditDocuments(1)}
+            style={styles.checkItem}
+          >
             <View style={styles.itemIconBox}>
               <Car size={20} color={vehicleVisuals.iconColor} />
             </View>
             <View style={styles.itemTextCol}>
               <Text style={styles.itemTitle}>Vehicle & Address</Text>
               <Text style={styles.itemSubtitle}>
-                {hasVehicle
-                  ? `${profile?.vehicleYear || ''} ${profile?.vehicleMake || ''} ${profile?.vehicleModel || ''} (${profile?.vehiclePlate || ''})`
-                  : 'Incomplete'}
+                {vehicleStatus === 'rejected'
+                  ? hasVehicle
+                    ? `${profile?.vehicleYear || ''} ${profile?.vehicleMake || ''} (${profile?.vehiclePlate || ''}) • Action Required`
+                    : 'Vehicle details rejected — Tap to update'
+                  : hasVehicle
+                    ? `${profile?.vehicleYear || ''} ${profile?.vehicleMake || ''} ${profile?.vehicleModel || ''} (${profile?.vehiclePlate || ''})`.trim()
+                    : vehicleStatus === 'approved'
+                      ? 'Vehicle details verified & approved'
+                      : 'Vehicle details submitted'}
               </Text>
             </View>
             {vehicleVisuals.badgeNode}
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.divider} />
 
           {/* 2. Driver License */}
-          <View style={styles.checkItem}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => handleEditDocuments(2)}
+            style={styles.checkItem}
+          >
             <View style={styles.itemIconBox}>
               <ShieldCheck size={20} color={licenseVisuals.iconColor} />
             </View>
             <View style={styles.itemTextCol}>
               <Text style={styles.itemTitle}>Driver's License</Text>
               <Text style={styles.itemSubtitle}>
-                {hasLicense
-                  ? `${profile?.licenseState || 'AZ'} • #${profile?.licenseNumber ? '••••' + String(profile.licenseNumber).slice(-4) : '••••'}`
-                  : 'Incomplete'}
+                {licenseStatus === 'approved'
+                  ? profile?.licenseNumber
+                    ? `${profile?.licenseState || 'AZ'} • #${profile.licenseNumber}`
+                    : 'Driver License Verified & Approved'
+                  : licenseStatus === 'rejected'
+                    ? 'Action Required — Tap to re-upload license'
+                    : profile?.licenseNumber
+                      ? `${profile?.licenseState || 'AZ'} • #${'••••' + String(profile.licenseNumber).slice(-4)}`
+                      : 'Document submitted • Under Review'}
               </Text>
             </View>
             {licenseVisuals.badgeNode}
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.divider} />
 
           {/* 3. Background Check */}
-          <View style={styles.checkItem}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => handleEditDocuments(3)}
+            style={styles.checkItem}
+          >
             <View style={styles.itemIconBox}>
               <FileText size={20} color={consentVisuals.iconColor} />
             </View>
             <View style={styles.itemTextCol}>
               <Text style={styles.itemTitle}>Background Check Consent</Text>
               <Text style={styles.itemSubtitle}>
-                {hasConsent ? 'FCRA Disclosure Authorized' : 'Authorization Required'}
+                {bgStatus === 'approved'
+                  ? 'FCRA Disclosure Authorized • Cleared'
+                  : bgStatus === 'rejected'
+                    ? 'Action Required — Tap to review consent'
+                    : hasConsent
+                      ? 'FCRA Disclosure Authorized'
+                      : 'Authorization Required'}
               </Text>
             </View>
             {consentVisuals.badgeNode}
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.divider} />
 
           {/* 4. Insurance */}
-          <View style={styles.checkItem}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => handleEditDocuments(4)}
+            style={styles.checkItem}
+          >
             <View style={styles.itemIconBox}>
               <Shield size={20} color={insuranceVisuals.iconColor} />
             </View>
             <View style={styles.itemTextCol}>
               <Text style={styles.itemTitle}>Vehicle Insurance Policy</Text>
               <Text style={styles.itemSubtitle}>
-                {hasInsurance
-                  ? `${profile?.insuranceCompany || 'Insurance'} • Policy #${profile?.insurancePolicyNumber || '••••'}`
-                  : 'Incomplete'}
+                {insuranceStatus === 'approved'
+                  ? profile?.insuranceCompany
+                    ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'}`
+                    : 'Insurance Policy Verified & Approved'
+                  : insuranceStatus === 'rejected'
+                    ? 'Action Required — Tap to update insurance'
+                    : profile?.insuranceCompany
+                      ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'}`
+                      : 'Policy document submitted • Under Review'}
               </Text>
             </View>
             {insuranceVisuals.badgeNode}
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* ACTIONS */}
         <View style={styles.actionsContainer}>
-          {!isSubmitted ? (
+          {isAnyStepRejected ? (
+            <>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => handleEditDocuments(1)}
+                style={styles.editBtn}
+              >
+                <FileText size={18} color="#0F131C" />
+                <Text style={styles.editBtnText}>Update Documentation</Text>
+                <ArrowRight size={18} color="#0F131C" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleRefresh}
+                disabled={isChecking}
+                style={styles.secondaryBtn}
+              >
+                {isChecking ? (
+                  <ActivityIndicator size="small" color="#FFE399" />
+                ) : (
+                  <>
+                    <RefreshCw size={16} color="#FFE399" />
+                    <Text style={styles.secondaryBtnText}>Check Approval Status</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : !isSubmitted ? (
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={handleResume}
+              onPress={() => handleEditDocuments(1)}
               style={styles.refreshBtn}
             >
               <ArrowRight size={16} color="#0F131C" />
               <Text style={styles.refreshBtnText}>Resume Application</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleRefresh}
-              disabled={isChecking}
-              style={styles.refreshBtn}
-            >
-              {isChecking ? (
-                <ActivityIndicator size="small" color="#0F131C" />
-              ) : (
-                <>
-                  <RefreshCw size={16} color="#0F131C" />
-                  <Text style={styles.refreshBtnText}>Check Approval Status</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
+            <>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleRefresh}
+                disabled={isChecking}
+                style={styles.refreshBtn}
+              >
+                {isChecking ? (
+                  <ActivityIndicator size="small" color="#0F131C" />
+                ) : (
+                  <>
+                    <RefreshCw size={16} color="#0F131C" />
+                    <Text style={styles.refreshBtnText}>Check Approval Status</Text>
+                  </>
+                )}
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleSignOut}
-            style={styles.signOutBtn}
-          >
-            <LogOut size={16} color={colors.onSurfaceVariant} />
-            <Text style={styles.signOutBtnText}>Sign Out</Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => handleEditDocuments(1)}
+                style={styles.secondaryBtn}
+              >
+                <FileText size={16} color="rgba(255, 255, 255, 0.7)" />
+                <Text style={styles.secondaryBtnTextDim}>Edit Application Details</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </ScrollView>
       <CustomLoading visible={refreshing} variant="circle" overlay position="top" topOffset={insets.top + 24} />
@@ -303,21 +474,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
   },
-  iconGlowWrapper: {
-    marginBottom: spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   statusPill: {
     marginBottom: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 227, 153, 0.25)',
+    backgroundColor: 'rgba(255, 227, 153, 0.1)',
+  },
+  statusPillApproved: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderColor: 'rgba(34, 197, 94, 0.35)',
+  },
+  statusPillRejected: {
+    backgroundColor: 'rgba(239, 68, 68, 0.14)',
+    borderColor: 'rgba(239, 68, 68, 0.35)',
   },
   statusPillText: {
-    fontSize: 13.5,
+    fontSize: 12,
     fontWeight: '800',
     color: '#FFE399',
     letterSpacing: 1,
+  },
+  statusPillTextApproved: {
+    color: '#22C55E',
+  },
+  statusPillTextRejected: {
+    color: '#EF4444',
+  },
+  iconGlowWrapper: {
+    marginBottom: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 227, 153, 0.08)',
+  },
+  iconGlowWrapperApproved: {
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+  },
+  iconGlowWrapperRejected: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
   },
   title: {
     fontSize: 24,
@@ -357,18 +558,28 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.06)',
     gap: spacing.sm,
   },
+  checklistHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   checklistHeader: {
     fontSize: 11,
     fontWeight: '700',
     color: colors.onSurfaceVariant,
     letterSpacing: 0.8,
-    marginBottom: 4,
+  },
+  tapToEditHint: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFE399',
   },
   checkItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: 4,
   },
   itemIconBox: {
     width: 32,
@@ -441,6 +652,20 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFE399',
+    height: 50,
+    borderRadius: borderRadius.md,
+  },
+  editBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F131C',
+  },
   refreshBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -454,6 +679,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#0F131C',
+  },
+  secondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 46,
+    borderRadius: borderRadius.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  secondaryBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFE399',
+  },
+  secondaryBtnTextDim: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   signOutBtn: {
     flexDirection: 'row',

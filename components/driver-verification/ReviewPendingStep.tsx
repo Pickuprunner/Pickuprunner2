@@ -46,6 +46,7 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     }
     await logout();
+    if (router.canDismiss()) router.dismissAll();
     router.replace('/(landing)/role-select');
   };
 
@@ -53,6 +54,7 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
     if (onDone) {
       onDone();
     } else {
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/(tabs)');
     }
   };

@@ -47,7 +47,7 @@ type Mode = 'signin' | 'signup';
 export default function CustomerAuthScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { login, register, logout } = useAuth();
+  const { login, register, logout, user, isAuthenticated, isLoading } = useAuth();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,6 +56,18 @@ export default function CustomerAuthScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      if (user.role === 'customer') {
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/(customer)/my-orders');
+      } else {
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/(tabs)');
+      }
+    }
+  }, [isAuthenticated, isLoading, user]);
 
   useEffect(() => {
     return subscribeTermsAgreed((agreed) => {
@@ -150,6 +162,10 @@ export default function CustomerAuthScreen() {
 
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+
+      if (router.canDismiss()) {
+        router.dismissAll();
       }
 
       router.replace('/(customer)/my-orders');

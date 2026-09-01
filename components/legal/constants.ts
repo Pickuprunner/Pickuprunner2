@@ -13,7 +13,7 @@ export interface LegalSection {
 export const TERMS_METADATA = {
   effectiveDate: 'May 8, 2025',
   contactName: 'Pickup Runner',
-  contactEmail: 'PickupRunner@gmail.com',
+  contactEmail: 'pickuprunner@gmail.com',
   governingState: 'Arizona',
   governingCounty: 'Pima County',
 } as const;
@@ -116,7 +116,7 @@ export const TERMS_SECTIONS: LegalSection[] = [
 export const PRIVACY_METADATA = {
   lastUpdated: 'May 9, 2025',
   appName: 'Pickup Runner',
-  contactEmail: 'PickupRunner@gmail.com',
+  contactEmail: 'pickuprunner@gmail.com',
 } as const;
 
 export const PRIVACY_SECTIONS: LegalSection[] = [

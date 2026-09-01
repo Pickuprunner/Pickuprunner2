@@ -9,13 +9,15 @@ import {
   Text,
   StatusBar,
   TouchableOpacity,
+  KeyboardAvoidingView,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   X,
-  Zap,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
@@ -36,15 +38,22 @@ import {
   BackgroundCheckStep,
   InsuranceStep,
   ReviewPendingStep,
-  MOCK_DRIVER_WIZARD_DATA,
   DriverWizardData,
 } from '@/components/driver-verification';
 import { DriverProfileStatusScreen } from '@/components/driver-verification';
 
 export default function DriverVerificationScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const params = useLocalSearchParams<{ edit?: string; step?: string }>();
+  const { user, isAuthenticated, token, isLoading } = useAuth();
   const { showToast } = useToast();
+
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || !user || !token)) {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(landing)/role-select');
+    }
+  }, [isLoading, isAuthenticated, user, token]);
 
   const { data: accreditationData, isLoading: accreditationLoading } = useDriverAccreditation();
   const saveStepMutation = useSaveAccreditationStep();
@@ -55,7 +64,44 @@ export default function DriverVerificationScreen() {
   const { data: existing } = useMyVerification(user?.id);
   const submitVerification = useSubmitVerification();
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isEditing, setIsEditing] = useState(params.edit === 'true');
+  const [currentStep, setCurrentStep] = useState(params.step ? Number(params.step) : 1);
+  const [keyboardPadding, setKeyboardPadding] = useState(0);
+
+  useEffect(() => {
+    if (params.edit === 'true') {
+      setIsEditing(true);
+      setIsSubmitted(false);
+      if (params.step) {
+        setCurrentStep(Number(params.step));
+      }
+    }
+  }, [params.edit, params.step]);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        if (Platform.OS === 'android') {
+          setKeyboardPadding(e.endCoordinates.height + 24);
+        }
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        if (Platform.OS === 'android') {
+          setKeyboardPadding(0);
+        }
+      }
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const [formData, setFormData] = useState<DriverWizardData>({
     vehicleMake: '',
     vehicleModel: '',
@@ -91,9 +137,19 @@ export default function DriverVerificationScreen() {
     insuranceDocName: '',
   });
 
-  // Hydrate from backend profile or local existing data
   useEffect(() => {
     const profile = accreditationData?.profile;
+    const isProfileSubmitted =
+      Boolean(profile?.isSubmitted) ||
+      profile?.accreditationStatus === 'under_review' ||
+      profile?.accreditationStatus === 'approved' ||
+      existing?.status === 'pending' ||
+      existing?.status === 'approved';
+
+    if (isProfileSubmitted && !isEditing && params.edit !== 'true') {
+      setIsSubmitted(true);
+    }
+
     if (profile) {
       setFormData((prev) => ({
         ...prev,
@@ -124,19 +180,16 @@ export default function DriverVerificationScreen() {
         vinNumber: profile.vehicleVin || prev.vinNumber,
       }));
 
-      if (
-        profile.accreditationStatus === 'under_review' ||
-        profile.accreditationStatus === 'approved'
-      ) {
-        setCurrentStep(5);
-      } else if (profile.backgroundConsentAt) {
-        setCurrentStep(4);
-      } else if (profile.licenseNumber) {
-        setCurrentStep(3);
-      } else if (profile.vehicleMake && profile.vehiclePlate) {
-        setCurrentStep(2);
-      } else {
-        setCurrentStep(1);
+      if (!isSubmitted && !isProfileSubmitted) {
+        if (profile.backgroundConsentAt) {
+          setCurrentStep(4);
+        } else if (profile.licenseNumber) {
+          setCurrentStep(3);
+        } else if (profile.vehicleMake && profile.vehiclePlate) {
+          setCurrentStep(2);
+        } else {
+          setCurrentStep(1);
+        }
       }
     } else if (existing) {
       setFormData((prev) => ({
@@ -165,10 +218,6 @@ export default function DriverVerificationScreen() {
         expirationDate: existing.expiration_date || prev.expirationDate,
         vinNumber: existing.vin_number || prev.vinNumber,
       }));
-
-      if (existing.status === 'pending' || existing.status === 'approved') {
-        setCurrentStep(5);
-      }
     }
   }, [accreditationData?.profile, existing]);
 
@@ -253,24 +302,11 @@ export default function DriverVerificationScreen() {
     setCurrentStep(4);
   };
 
-  const handleFillMockData = () => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    }
-    setFormData({
-      ...MOCK_DRIVER_WIZARD_DATA,
-      licenseFullName: user?.displayName || MOCK_DRIVER_WIZARD_DATA.licenseFullName,
-    });
-    showToast('⚡ Mock driver data filled!', 'success');
-  };
-
   const handleSubmitAll = async () => {
     try {
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
-
-      // 1. Save Insurance step to backend
       try {
         await saveStepMutation.mutateAsync({
           step: 'insurance',
@@ -298,8 +334,6 @@ export default function DriverVerificationScreen() {
       } catch (e) {
         console.warn('[Accreditation] saveStep(insurance) fallback:', e);
       }
-
-      // 2. Submit to backend review queue
       try {
         await submitAccreditationMutation.mutateAsync();
       } catch (e) {
@@ -313,8 +347,6 @@ export default function DriverVerificationScreen() {
         driverEmail: user?.email,
         existingId: existing?.id,
         status: 'pending',
-
-        // Vehicle & Address
         vehicle_make: formData.vehicleMake,
         vehicle_model: formData.vehicleModel,
         vehicle_year: formData.vehicleYear,
@@ -325,8 +357,6 @@ export default function DriverVerificationScreen() {
         city: formData.city,
         state: formData.state,
         zip: formData.zip,
-
-        // License
         license_state: formData.licenseState,
         license_number: formData.licenseNumber,
         license_fullname: formData.licenseFullName,
@@ -336,12 +366,8 @@ export default function DriverVerificationScreen() {
         licenseFilename: formData.licenseFrontName || 'license_front.jpg',
         license_back_url: formData.licenseBackUrl,
         license_back_filename: formData.licenseBackName || 'license_back.jpg',
-
-        // Background Check
         ssn_last4: formData.ssnLast4,
         fcra_agreed: formData.fcraAgreed,
-
-        // Insurance
         insurance_company: formData.insuranceCompany,
         naic_number: formData.naicNumber,
         policy_number: formData.policyNumber,
@@ -352,7 +378,8 @@ export default function DriverVerificationScreen() {
         insuranceFilename: formData.insuranceDocName || 'insurance_card.pdf',
       });
 
-      setCurrentStep(5);
+      setIsSubmitted(true);
+      setIsEditing(false);
       showToast('Profile & documents submitted for admin approval!', 'success');
     } catch (err: any) {
       console.warn('Submission error:', err);
@@ -361,122 +388,138 @@ export default function DriverVerificationScreen() {
   };
 
   const handleHeaderBack = () => {
-    if (currentStep > 1 && currentStep < 5) {
+    if (currentStep > 1) {
       setCurrentStep((s) => s - 1);
-    } else if (router.canGoBack()) {
-      router.back();
+    } else if (isEditing) {
+      setIsEditing(false);
+      setIsSubmitted(true);
     } else {
-      router.replace('/(tabs)/profile');
+      if (router.canDismiss()) {
+        router.dismissAll();
+      }
+      router.replace('/(tabs)');
     }
   };
 
-  if (currentStep === 5) {
-    return <DriverProfileStatusScreen />;
+  const profile = accreditationData?.profile;
+  const isProfileSubmitted =
+    !isEditing &&
+    (isSubmitted ||
+      Boolean(profile?.isSubmitted) ||
+      profile?.accreditationStatus === 'under_review' ||
+      profile?.accreditationStatus === 'approved' ||
+      existing?.status === 'pending' ||
+      existing?.status === 'approved');
+
+  if (isProfileSubmitted) {
+    return (
+      <DriverProfileStatusScreen
+        onEditDocuments={() => {
+          setIsEditing(true);
+          setIsSubmitted(false);
+          setCurrentStep(1);
+        }}
+        onEditStep={(step) => {
+          setIsEditing(true);
+          setIsSubmitted(false);
+          setCurrentStep(step);
+        }}
+      />
+    );
   }
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
-      {/* CUSTOM HEADER */}
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: Math.max(
-              insets.top + spacing.xs,
-              Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + spacing.xs : spacing.md
-            ),
-          },
-        ]}
-      >
-        <Pressable
-          onPress={currentStep === 5 ? () => router.replace('/(tabs)') : handleHeaderBack}
-          style={styles.headerBtn}
-          hitSlop={10}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={styles.root}>
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <View
+          style={[
+            styles.header,
+            {
+              paddingTop: Math.max(
+                insets.top + spacing.xs,
+                Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + spacing.xs : spacing.md
+              ),
+            },
+          ]}
         >
-          {currentStep === 5 ? (
-            <X size={20} color={colors.onSurface} />
+          {currentStep > 1 || isEditing ? (
+            <Pressable
+              onPress={handleHeaderBack}
+              style={styles.headerBtn}
+              hitSlop={10}
+            >
+              <ArrowLeft size={22} color={colors.onSurface} />
+            </Pressable>
           ) : (
-            <ArrowLeft size={22} color={colors.onSurface} />
+            <View style={{ width: 38, height: 38 }} />
           )}
-        </Pressable>
 
-        <View style={styles.headerTitleCol}>
-          <Text style={styles.headerTitle}>Driver Accreditation</Text>
-          <Text style={styles.headerSubtitle}>
-            {currentStep === 5 ? 'Review & Confirmation' : `Step ${currentStep} of 4`}
-          </Text>
+          <View style={styles.headerTitleCol}>
+            <Text style={styles.headerTitle}>Driver Accreditation</Text>
+            <Text style={styles.headerSubtitle}>
+              {`Step ${currentStep} of 4`}
+            </Text>
+          </View>
+
+          <View style={{ width: 38, height: 38 }} />
         </View>
 
-        {currentStep < 5 ? (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleFillMockData}
-            style={styles.mockDataBtn}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          <ScrollView
+            contentContainerStyle={[
+              styles.scroll,
+              { paddingBottom: Math.max(insets.bottom, 20) + 16 + keyboardPadding },
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
-            <Zap size={13} color="#0F131C" />
-            <Text style={styles.mockDataBtnText}>Mock Fill</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 70 }} />
-        )}
+            <StepIndicator currentStep={currentStep} totalSteps={4} />
+
+            {currentStep === 1 && (
+              <VehicleAddressStep
+                data={formData}
+                onChange={updateFormData}
+                onNext={handleStep1Next}
+              />
+            )}
+
+            {currentStep === 2 && (
+              <DriversLicenseStep
+                data={formData}
+                onChange={updateFormData}
+                onNext={handleStep2Next}
+                onBack={() => setCurrentStep(1)}
+              />
+            )}
+
+            {currentStep === 3 && (
+              <BackgroundCheckStep
+                data={formData}
+                onChange={updateFormData}
+                onNext={handleStep3Next}
+                onBack={() => setCurrentStep(2)}
+              />
+            )}
+
+            {currentStep === 4 && (
+              <InsuranceStep
+                data={formData}
+                onChange={updateFormData}
+                onSubmit={handleSubmitAll}
+                onBack={() => setCurrentStep(3)}
+                submitting={submitVerification.isPending || submitAccreditationMutation.isPending}
+              />
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
-
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingBottom: Math.max(insets.bottom, 24) + 20 },
-        ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <StepIndicator currentStep={currentStep} totalSteps={5} />
-
-        {currentStep === 1 && (
-          <VehicleAddressStep
-            data={formData}
-            onChange={updateFormData}
-            onNext={handleStep1Next}
-          />
-        )}
-
-        {currentStep === 2 && (
-          <DriversLicenseStep
-            data={formData}
-            onChange={updateFormData}
-            onNext={handleStep2Next}
-            onBack={() => setCurrentStep(1)}
-          />
-        )}
-
-        {currentStep === 3 && (
-          <BackgroundCheckStep
-            data={formData}
-            onChange={updateFormData}
-            onNext={handleStep3Next}
-            onBack={() => setCurrentStep(2)}
-          />
-        )}
-
-        {currentStep === 4 && (
-          <InsuranceStep
-            data={formData}
-            onChange={updateFormData}
-            onSubmit={handleSubmitAll}
-            onBack={() => setCurrentStep(3)}
-            submitting={submitVerification.isPending || submitAccreditationMutation.isPending}
-          />
-        )}
-
-        {currentStep === 5 && (
-          <ReviewPendingStep
-            data={formData}
-            onDone={() => router.replace('/(tabs)')}
-          />
-        )}
-      </ScrollView>
-    </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -518,20 +561,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.onSurfaceVariant,
     marginTop: 1,
-  },
-  mockDataBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FFE399',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: borderRadius.full,
-  },
-  mockDataBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0F131C',
   },
   scroll: {
     flexGrow: 1,

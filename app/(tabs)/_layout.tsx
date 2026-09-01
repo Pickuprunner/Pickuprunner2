@@ -71,9 +71,8 @@ function ChatTabIcon({ color, size }: { color: string; size: number }) {
 }
 
 export default function TabLayout() {
-
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, isAuthenticated, token, isLoading } = useAuth();
   const { data: verification, isLoading: isVerifLoading } = useMyVerification(user?.id);
   const { data: accreditation, isLoading: isAccredLoading } = useDriverAccreditation();
 
@@ -86,7 +85,20 @@ export default function TabLayout() {
     accreditation?.profile?.accreditationStatus === 'under_review' ||
     verification?.status === 'pending';
 
+  // Guard: if unauthenticated, token not found, or user deleted, redirect to role-select
   useEffect(() => {
+    if (!isLoading && (!isAuthenticated || !user || !token)) {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(landing)/role-select');
+      return;
+    }
+
+    if (user?.role === 'customer') {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(customer)/my-orders');
+      return;
+    }
+
     if (
       user?.role === 'driver' &&
       !isVerifLoading &&
@@ -97,7 +109,18 @@ export default function TabLayout() {
     ) {
       router.replace('/(auth)/driver-verification');
     }
-  }, [user?.role, isApproved, isSubmitted, isVerifLoading, isAccredLoading, accreditation?.profile?.accreditationStatus]);
+  }, [
+    isLoading,
+    isAuthenticated,
+    user,
+    token,
+    user?.role,
+    isApproved,
+    isSubmitted,
+    isVerifLoading,
+    isAccredLoading,
+    accreditation?.profile?.accreditationStatus,
+  ]);
 
   const isLocked = user?.role === 'driver' && !isApproved;
 

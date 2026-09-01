@@ -44,7 +44,7 @@ type Mode = 'signin' | 'signup';
 export default function SignInScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { login, register, logout } = useAuth();
+  const { login, register, logout, user, isAuthenticated, isLoading } = useAuth();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,6 +53,18 @@ export default function SignInScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      if (user.role === 'customer') {
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/(customer)/my-orders');
+      } else {
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/(tabs)');
+      }
+    }
+  }, [isAuthenticated, isLoading, user]);
 
   useEffect(() => {
     return subscribeTermsAgreed((agreed) => {
@@ -125,7 +137,7 @@ export default function SignInScreen() {
           phone: normalizePhoneNumber(phoneTrimmed),
           role: 'driver',
         });
-        await saveDisplayName(nameTrimmed).catch(() => {});
+        await saveDisplayName(nameTrimmed).catch(() => { });
       } else {
         const loggedUser = await login(emailTrimmed, password);
         if (loggedUser.role !== 'driver' && loggedUser.role !== 'admin') {
@@ -136,7 +148,11 @@ export default function SignInScreen() {
       }
 
       if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+      }
+
+      if (router.canDismiss()) {
+        router.dismissAll();
       }
 
       if (isSignUp) {
@@ -200,9 +216,9 @@ export default function SignInScreen() {
                 paddingTop: isSignUp
                   ? Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 20) : 10)
                   : Math.max(
-                      insets.top + spacing.sm,
-                      Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + spacing.sm : spacing.lg
-                    ),
+                    insets.top + spacing.sm,
+                    Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + spacing.sm : spacing.lg
+                  ),
                 paddingBottom: Math.max(insets.bottom, 16),
               },
             ]}

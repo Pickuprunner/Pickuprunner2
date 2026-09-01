@@ -60,7 +60,7 @@ export interface DocStatusItemProps {
   title: string;
   subtitle: string;
   status: DocStatus;
-  onPress: () => void;
+  onPress?: () => void;
 }
 
 export function DocStatusItem({ title, subtitle, status, onPress }: DocStatusItemProps) {

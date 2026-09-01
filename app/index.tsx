@@ -25,10 +25,29 @@ export default function Index() {
           });
 
           if (state.isAuthenticated && state.user && state.token) {
-            if (state.user.role === 'customer') {
+            // Validate token & ensure user actually exists on backend
+            let validUser = state.user;
+            try {
+              const { usersApi } = await import('@/apis/users');
+              const freshUser = await usersApi.getMe();
+              if (freshUser) {
+                validUser = freshUser;
+                useAuthStore.getState().updateUser(freshUser);
+              }
+            } catch (err: any) {
+              console.warn('[App:Startup] User validation failed (token invalid or user deleted):', err?.message);
+              useAuthStore.getState().clearSession();
+              if (!unmounted) {
+                if (router.canDismiss()) router.dismissAll();
+                router.replace('/(landing)/role-select');
+              }
+              return;
+            }
+
+            if (validUser.role === 'customer') {
               console.log('[App:Startup] Routing customer to /(customer)/my-orders');
               router.replace('/(customer)/my-orders');
-            } else if (state.user.role === 'admin') {
+            } else if (validUser.role === 'admin') {
               console.log('[App:Startup] Routing admin to /(tabs)');
               router.replace('/(tabs)');
             } else {
@@ -50,6 +69,8 @@ export default function Index() {
             }
           } else {
             console.log('[App:Startup] Routing unauthenticated user to /(landing)/role-select');
+            useAuthStore.getState().clearSession();
+            if (router.canDismiss()) router.dismissAll();
             router.replace('/(landing)/role-select');
           }
         };

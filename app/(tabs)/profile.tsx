@@ -88,6 +88,13 @@ export default function ProfileScreen() {
   const webFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    if (!authLoading && (!isAuthenticated || !user)) {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(landing)/role-select');
+    }
+  }, [authLoading, isAuthenticated, user]);
+
+  useEffect(() => {
     if (authLoading) return;
     if (isAuthenticated && user?.displayName) {
       setDisplayName(user.displayName);
@@ -208,6 +215,9 @@ export default function ProfileScreen() {
       haptic('heavy');
       await logout();
       await AsyncStorage.removeItem('app_role');
+      if (router.canDismiss()) {
+        router.dismissAll();
+      }
       router.replace('/(landing)/role-select');
     } catch (err) {
       console.warn('[auth] sign out failed:', err);
@@ -357,7 +367,7 @@ export default function ProfileScreen() {
                 value={isOnline}
                 onValueChange={() => {
                   if (Platform.OS !== 'web') {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
                   }
                   toggleOnline();
                 }}
@@ -400,7 +410,6 @@ export default function ProfileScreen() {
                     : 'Upload driver license'
             }
             status={licenseStatus}
-            onPress={() => router.push('/driver-verification')}
           />
 
           <ItemDivider />
@@ -417,7 +426,6 @@ export default function ProfileScreen() {
                     : 'Upload insurance policy'
             }
             status={insuranceStatus}
-            onPress={() => router.push('/driver-verification')}
           />
 
           <ItemDivider />
@@ -434,7 +442,6 @@ export default function ProfileScreen() {
                     : 'FCRA authorization needed'
             }
             status={bgStatus}
-            onPress={() => router.push('/driver-verification')}
           />
         </ProfileSection>
 

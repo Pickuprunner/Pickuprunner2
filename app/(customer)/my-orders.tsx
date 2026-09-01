@@ -5,12 +5,11 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  Alert,
   Platform,
   View,
   Text,
   StatusBar,
-  ActivityIndicator,
+  BackHandler,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -64,6 +63,25 @@ export default function MyOrdersScreen() {
   const prevStatusMap = useRef<Map<string, string>>(new Map());
   const channelRef = useRef<any>(null);
   const sessionIdRef = useRef<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let lastBackPress = 0;
+      const onBackPress = () => {
+        const now = Date.now();
+        if (now - lastBackPress < 2000) {
+          BackHandler.exitApp();
+          return true;
+        }
+        lastBackPress = now;
+        showToast('Press back again to exit', 'info');
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [showToast])
+  );
 
   const fetchOrders = useCallback(
     async (sid?: string) => {

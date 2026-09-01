@@ -1,8 +1,9 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/hooks/useAuth';
 import { chatApi } from '@/apis/chat';
 
 const ACTIVE = '#FFE399';
@@ -50,8 +51,23 @@ function ChatTabIcon({ color, size }: { color: string; size: number }) {
 
 export default function CustomerTabLayout() {
   const insets = useSafeAreaInsets();
+  const { user, isAuthenticated, token, isLoading } = useAuth();
   const androidBottomPad = Platform.OS === 'web' ? 10 : Math.max(insets.bottom, 12);
   const hasHomeBar = insets.bottom > 0;
+
+  // Guard: if unauthenticated, token not found, or user deleted, redirect to role-select
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || !user || !token)) {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(landing)/role-select');
+      return;
+    }
+
+    if (user?.role === 'driver') {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(tabs)');
+    }
+  }, [isLoading, isAuthenticated, user, token, user?.role]);
 
   return (
     <Tabs

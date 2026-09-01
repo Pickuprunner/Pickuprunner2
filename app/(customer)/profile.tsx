@@ -51,13 +51,20 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 export default function CustomerProfileScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { user, isAuthenticated, logout, updateProfile, forgotPassword } = useAuth();
+  const { user, isAuthenticated, isLoading, logout, updateProfile, forgotPassword } = useAuth();
   const [displayName, setDisplayName] = useState('Customer');
   const [orderStats, setOrderStats] = useState({ pending: 0, delivered: 0 });
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const webFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || !user)) {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(landing)/role-select');
+    }
+  }, [isLoading, isAuthenticated, user]);
 
   useEffect(() => {
     AsyncStorage.getItem('customer_photo_url').then((url) => {
@@ -195,6 +202,9 @@ export default function CustomerProfileScreen() {
       haptic('heavy');
       await logout();
       await AsyncStorage.removeItem('app_role');
+      if (router.canDismiss()) {
+        router.dismissAll();
+      }
       router.replace('/(landing)/role-select');
     } catch (err) {
       console.warn('[auth] sign out failed:', err);

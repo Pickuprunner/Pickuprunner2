@@ -14,12 +14,11 @@ const DEFAULT_STEPS = [
   { title: 'License', subtitle: 'State & Photo' },
   { title: 'Check', subtitle: 'FCRA Consent' },
   { title: 'Insurance', subtitle: 'Policy & VIN' },
-  { title: 'Review', subtitle: 'Approval' },
 ];
 
 export function StepIndicator({
   currentStep,
-  totalSteps = 5,
+  totalSteps = 4,
   steps = DEFAULT_STEPS,
 }: StepIndicatorProps) {
   return (
