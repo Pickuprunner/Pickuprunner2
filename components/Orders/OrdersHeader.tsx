@@ -15,6 +15,8 @@ interface Props {
   queueCount: number;
   atCapacity: boolean;
   isConnected: boolean;
+  isOnline?: boolean;
+  onToggleOnline?: () => void;
   search?: string;
   onSearchChange?: (text: string) => void;
   showSearch?: boolean;
@@ -35,6 +37,8 @@ export function OrdersHeader({
   queueCount,
   atCapacity,
   isConnected,
+  isOnline = true,
+  onToggleOnline,
   search = '',
   onSearchChange,
   showSearch = false,
@@ -77,12 +81,18 @@ export function OrdersHeader({
           </Text>
         </View>
 
-        <View style={[styles.pill, isConnected ? styles.pillLive : styles.pillOffline]}>
-          <View style={[styles.liveDot, !isConnected && styles.offlineDot]} />
-          <Text style={[styles.pillText, isConnected ? styles.pillLiveText : styles.pillOfflineText]}>
-            {isConnected ? 'Live' : 'Offline'}
+        <Pressable
+          onPress={() => {
+            haptic();
+            onToggleOnline?.();
+          }}
+          style={[styles.pill, isOnline ? styles.pillLive : styles.pillOffline]}
+        >
+          <View style={[styles.liveDot, !isOnline && styles.offlineDot]} />
+          <Text style={[styles.pillText, isOnline ? styles.pillLiveText : styles.pillOfflineText]}>
+            {isOnline ? 'Online' : 'Offline'}
           </Text>
-        </View>
+        </Pressable>
       </View>
 
       {onSortChange && (
@@ -201,14 +211,15 @@ const styles = StyleSheet.create({
   pillsLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flexShrink: 1,
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
     borderRadius: 9999,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
@@ -218,8 +229,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(249, 115, 22, 0.4)',
   },
   pillText: {
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 11.5,
+    lineHeight: 15,
     fontWeight: '500',
     color: '#DFE2EF',
   },
@@ -248,16 +259,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#8C90A1',
   },
   sortToggleContainer: {
-    width: 148,
-    height: 32,
-    borderRadius: 10,
+    width: 136,
+    height: 30,
+    borderRadius: 9,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     flexDirection: 'row',
     alignItems: 'center',
     position: 'relative',
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
   },
   slidingPill: {
     position: 'absolute',
@@ -274,12 +285,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
     zIndex: 2,
     height: '100%',
   },
   sortTitle: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '600',
     color: '#8C90A1',
   },

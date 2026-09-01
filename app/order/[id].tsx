@@ -338,6 +338,7 @@ export default function OrderDetailScreen() {
     });
 
     if (order) {
+      useOrderStore.getState().updateOrder(order.id, { status: 'picked_up' });
       updateStatus.mutateAsync({ id: order.id, status: 'picked_up' }).catch(() => { });
     }
   }
@@ -359,6 +360,12 @@ export default function OrderDetailScreen() {
 
     if (order) {
       const photo = (photoUrl ?? photoUri ?? order?.deliveryPhotoUrl) || undefined;
+
+      useOrderStore.getState().updateOrder(order.id, {
+        status: 'delivered',
+        deliveryPhotoUrl: photo,
+        delivery_photo_url: photo,
+      });
 
       updateStatus.mutateAsync({
         id: order.id,
@@ -421,22 +428,21 @@ export default function OrderDetailScreen() {
 
             {earnings && (
               <CustomCard variant="glass" style={styles.earningsCard}>
-                <View style={styles.earningsRow}>
-                  <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                      <Text style={styles.earningsLabel}>YOUR EARNINGS</Text>
-                      {isPaid ? (
-                        <View style={{ backgroundColor: 'rgba(0, 226, 151, 0.15)', borderColor: 'rgba(0, 226, 151, 0.4)', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#00E297' }}>PAID ONLINE</Text>
-                        </View>
-                      ) : (
-                        <View style={{ backgroundColor: 'rgba(244, 195, 0, 0.12)', borderColor: 'rgba(244, 195, 0, 0.35)', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
-                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#F4C300' }}>PAY ON PICKUP</Text>
-                        </View>
-                      )}
+                <View style={styles.earningsHeaderRow}>
+                  <Text style={styles.earningsLabel}>YOUR EARNINGS</Text>
+                  {isPaid ? (
+                    <View style={styles.paidOnlineTag}>
+                      <Text style={styles.paidOnlineTagText}>PAID ONLINE</Text>
                     </View>
-                    <Text style={styles.earningsTotal}>{earnings.totalDisplay}</Text>
-                  </View>
+                  ) : (
+                    <View style={styles.payPickupTag}>
+                      <Text style={styles.payPickupTagText}>PAY ON PICKUP</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.earningsMainRow}>
+                  <Text style={styles.earningsTotal}>${earnings.totalDisplay}</Text>
                   <View style={styles.earningsBreakdown}>
                     {earnings.mileageCents > 0 && (
                       <Text style={styles.earningsLine}>
@@ -472,7 +478,7 @@ export default function OrderDetailScreen() {
                     Customer Paid Online
                   </Text>
                   <Text style={{ fontSize: 11, color: colors.onSurfaceVariant, lineHeight: 15 }}>
-                    Your earnings ({earnings?.totalDisplay}) are secured and will transfer directly to your Stripe account upon delivery completion.
+                    Your earnings ({earnings ? `$${earnings.totalDisplay}` : '$0.00'}) are secured and will transfer directly to your Stripe account upon delivery completion.
                   </Text>
                 </View>
               </View>
@@ -653,7 +659,39 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 12,
   },
-  earningsRow: {
+  earningsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  paidOnlineTag: {
+    backgroundColor: 'rgba(0, 226, 151, 0.15)',
+    borderColor: 'rgba(0, 226, 151, 0.4)',
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  paidOnlineTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#00E297',
+  },
+  payPickupTag: {
+    backgroundColor: 'rgba(244, 195, 0, 0.12)',
+    borderColor: 'rgba(244, 195, 0, 0.35)',
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  payPickupTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#F4C300',
+  },
+  earningsMainRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -663,7 +701,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
-    marginBottom: 4,
   },
   earningsTotal: {
     color: colors.secondary,
@@ -672,11 +709,13 @@ const styles = StyleSheet.create({
   },
   earningsBreakdown: {
     alignItems: 'flex-end',
-    gap: 4,
+    justifyContent: 'center',
+    gap: 3,
   },
   earningsLine: {
     color: colors.onSurfaceVariant,
     fontSize: 12,
+    fontWeight: '600',
   },
   sectionHead: {
     marginHorizontal: 20,

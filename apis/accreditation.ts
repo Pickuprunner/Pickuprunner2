@@ -60,6 +60,12 @@ export interface DriverProfileData {
   backgroundDisclosureVersion?: string;
   backgroundStatus?: BackgroundStatus;
 
+  serviceArea?: string;
+  hasLicenseAndInsurance?: boolean;
+  cleanDrivingRecord?: boolean;
+  attestedAt?: string;
+  applicationSource?: string;
+
   accreditationStatus?: AccreditationStatus;
   submittedAt?: string;
   reviewedAt?: string;

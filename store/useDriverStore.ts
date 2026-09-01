@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiClient } from '@/lib/apiClient';
 
 export type DocStatus = 'not_submitted' | 'pending' | 'in_review' | 'approved' | 'rejected';
 
@@ -34,6 +35,9 @@ interface DriverStoreState {
   verification: DriverVerification;
   backgroundCheck: DriverBackgroundCheck;
   earnings: DriverEarnings;
+  isOnline: boolean;
+  setIsOnline: (online: boolean) => void;
+  toggleOnline: () => void;
   submitLicense: (frontUrl: string, backUrl: string) => void;
   submitInsurance: (insuranceUrl: string) => void;
   submitBackgroundCheck: (consent: boolean, ssnLast4: string, dob?: string) => void;
@@ -69,6 +73,19 @@ export const useDriverStore = create<DriverStoreState>()(
       verification: DEFAULT_VERIFICATION,
       backgroundCheck: DEFAULT_BG_CHECK,
       earnings: DEFAULT_EARNINGS,
+      isOnline: true,
+
+      setIsOnline: (online: boolean) => {
+        set({ isOnline: online });
+        apiClient.patch('/users/me', { isOnline: online }).catch(() => {});
+      },
+      toggleOnline: () => {
+        set((state) => {
+          const nextVal = !state.isOnline;
+          apiClient.patch('/users/me', { isOnline: nextVal }).catch(() => {});
+          return { isOnline: nextVal };
+        });
+      },
 
       submitLicense: (licenseFrontUrl, licenseBackUrl) =>
         set((state) => ({

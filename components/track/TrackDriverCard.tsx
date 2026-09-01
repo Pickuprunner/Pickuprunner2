@@ -38,13 +38,7 @@ export function TrackDriverCard({
         )}
 
         <View style={styles.driverInfoCol}>
-          <View style={styles.driverNameRow}>
-            <Text style={styles.driverName}>{driverName}</Text>
-            <View style={styles.ratingBadge}>
-              <MaterialIcons name="star" size={12} color={colors.secondary} />
-              <Text style={styles.ratingText}>4.9</Text>
-            </View>
-          </View>
+          <Text style={styles.driverName}>{driverName}</Text>
           <Text style={styles.driverRole}>
             {isPickedUp ? 'Package picked up · En route to you' : 'Driver en route to store'}
           </Text>

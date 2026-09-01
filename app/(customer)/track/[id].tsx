@@ -30,8 +30,6 @@ import {
   TrackTimelineCard,
   TrackDriverCard,
   TrackRouteCard,
-  CustomerOrderChat,
-  TrackTestToolbar,
   type TrackHeroTheme,
 } from '@/components/track';
 
@@ -689,6 +687,12 @@ export default function TrackOrderScreen() {
         </View>
 
         <View style={styles.liveBadge}>
+          <MaterialIcons
+            name="near-me"
+            size={12}
+            color={isConnected ? colors.tertiary : colors.outline}
+            style={{ marginRight: 3 }}
+          />
           <View
             style={[
               styles.livePulseDot,
@@ -810,27 +814,8 @@ export default function TrackOrderScreen() {
           />
         </Animated.View>
 
-        {/* In-app Direct Driver Chat */}
-        {!!driverName && !isDelivered && (
-          <Animated.View entering={FadeInDown.delay(220).springify()}>
-            <CustomerOrderChat orderId={id!} customerName={customerName} />
-          </Animated.View>
-        )}
-
-        {/* Demo Simulation Controls */}
-        {!isDelivered && (
-          <Animated.View entering={FadeInDown.delay(260).springify()}>
-            <TrackTestToolbar
-              testBusy={testBusy}
-              hasDriver={!!driverName}
-              onAssignDriver={handleAssignTestDriver}
-              onCompleteDelivery={handleTestDeliver}
-            />
-          </Animated.View>
-        )}
-
         {/* Navigation Action Buttons */}
-        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.footerButtons}>
+        <Animated.View entering={FadeInDown.delay(220).springify()} style={styles.footerButtons}>
           <TouchableOpacity
             onPress={() => {
               haptic();

@@ -20,8 +20,10 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MaterialIcons } from '@expo/vector-icons';
 import { useOrders, useAvailableOrders, useUpdateOrderStatus, useClaimOrder } from '@/lib/orders';
 import { useOrderStore } from '@/store/useOrderStore';
+import { useDriverStore } from '@/store/useDriverStore';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useAuth } from '@/hooks/useAuth';
@@ -425,37 +427,63 @@ export default function OrdersScreen() {
     [headerHeight, isLoading]
   );
 
+  const isOnline = useDriverStore((s) => s.isOnline);
+  const toggleOnline = useDriverStore((s) => s.toggleOnline);
+  const setIsOnline = useDriverStore((s) => s.setIsOnline);
+
   const EmptyView = !isLoading ? (
-    <View style={styles.emptyContainer}>
-      <View style={styles.emptyIconWrapper}>
-        <Package size={52} color="#FFE399" />
+    !isOnline ? (
+      <View style={styles.emptyContainer}>
+        <View style={styles.emptyIconWrapper}>
+          <MaterialIcons name="cloud-off" size={48} color="#8C90A1" />
+        </View>
+        <Text style={styles.emptyTitle}>You're Offline</Text>
+        <Text style={styles.emptySubtitle}>
+          Switch to Online to view and receive available pickup requests in your area.
+        </Text>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            haptic();
+            setIsOnline(true);
+          }}
+          style={[styles.emptyActionBtn, { backgroundColor: '#00E297' }]}
+        >
+          <Text style={[styles.emptyActionBtnText, { color: '#0A0E1A', fontWeight: '700' }]}>Go Online</Text>
+        </TouchableOpacity>
       </View>
-      <Text style={styles.emptyTitle}>
-        {search.trim() ? 'No Matching Orders' : 'No Available Orders'}
-      </Text>
-      <Text style={styles.emptySubtitle}>
-        {search.trim()
-          ? 'Try adjusting your search query.'
-          : 'New incoming deliveries will appear here in real time.'}
-      </Text>
-      {search.trim() ? (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setSearch('')}
-          style={styles.emptyActionBtn}
-        >
-          <Text style={styles.emptyActionBtnText}>Clear Search</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={onRefresh}
-          style={styles.emptyActionBtn}
-        >
-          <Text style={styles.emptyActionBtnText}>Refresh Feed</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    ) : (
+      <View style={styles.emptyContainer}>
+        <View style={styles.emptyIconWrapper}>
+          <Package size={52} color="#FFE399" />
+        </View>
+        <Text style={styles.emptyTitle}>
+          {search.trim() ? 'No Matching Orders' : 'No Available Orders'}
+        </Text>
+        <Text style={styles.emptySubtitle}>
+          {search.trim()
+            ? 'Try adjusting your search query.'
+            : 'New incoming deliveries will appear here in real time.'}
+        </Text>
+        {search.trim() ? (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setSearch('')}
+            style={styles.emptyActionBtn}
+          >
+            <Text style={styles.emptyActionBtnText}>Clear Search</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onRefresh}
+            style={styles.emptyActionBtn}
+          >
+            <Text style={styles.emptyActionBtnText}>Refresh Feed</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    )
   ) : null;
 
   if (user?.role === 'driver' && !isApproved) {
@@ -485,6 +513,8 @@ export default function OrdersScreen() {
           queueCount={queueCount}
           atCapacity={atCapacity}
           isConnected={isConnected}
+          isOnline={isOnline}
+          onToggleOnline={toggleOnline}
           sortBy={sortBy}
           onSortChange={setSortBy}
         />
@@ -496,7 +526,7 @@ export default function OrdersScreen() {
       </Animated.View>
 
       <FlatList
-        data={filtered}
+        data={isOnline ? filtered : []}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <DriverOrderCard

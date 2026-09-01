@@ -482,12 +482,31 @@ export function CustomerOrderCard({
     </View>
   );
 
+  const handleCardPress = () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
+    haptic();
+    router.push({
+      pathname: `/(customer)/track/${order.id}`,
+      params: {
+        deliveryAddress: order.deliveryAddress || order.delivery_address || '123 E Test Ave, Sahuarita, AZ 85629',
+        pickupAddress: order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        items: order.items || '',
+        status: currentStatus,
+      },
+    } as any);
+  };
+
   return (
     <CustomCard
       variant="glass"
       header={headerNode}
       footer={footerNode}
-      onPress={onPress}
+      onPress={handleCardPress}
       style={[styles.cardContainer, style]}
     >
       <View style={styles.routesContainer}>

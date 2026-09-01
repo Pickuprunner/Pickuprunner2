@@ -198,7 +198,18 @@ export default function MyOrdersScreen() {
   useEffect(() => {
     if (storeOrders && storeOrders.length > 0) {
       setOrders((prev) => {
-        if (!prev || prev.length === 0) return prev;
+        if (!prev || prev.length === 0) {
+          return (storeOrders as any[]).map((so) => ({
+            ...so,
+            customer_name: so.customerName || so.customer_name,
+            customer_phone: so.customerPhone || so.customer_phone,
+            delivery_address: so.deliveryAddress || so.delivery_address,
+            pickup_address: so.pickupAddress || so.pickup_address,
+            delivery_photo_url: so.deliveryPhotoUrl || so.delivery_photo_url,
+            driver_name: so.driverName || so.driver_name,
+            payment_status: so.paymentStatus || so.payment_status,
+          }));
+        }
         const orderMap = new Map<string, CustomerOrderData>();
         prev.forEach((o) => o?.id && orderMap.set(o.id, o));
         let changed = false;
@@ -473,6 +484,7 @@ export default function MyOrdersScreen() {
           </View>
 
           <View style={styles.liveBadge}>
+            <MaterialIcons name="near-me" size={12} color="#00E297" style={{ marginRight: 3 }} />
             <View style={styles.livePulseDot} />
             <Text style={styles.liveBadgeText}>LIVE</Text>
           </View>

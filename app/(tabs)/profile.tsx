@@ -31,6 +31,8 @@ import { blink } from '@/lib/blink';
 import { APP_CONFIG } from '@/lib/config';
 import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { useDriverId } from '@/hooks/useDriverId';
+import { useDriverStore } from '@/store/useDriverStore';
+import { colors } from '@/constants/design';
 import { CustomHeader, useToast } from '@/components/core';
 
 import {
@@ -76,6 +78,9 @@ export default function ProfileScreen() {
 
   const [displayName, setDisplayName] = useState('');
   const [pushEnabled, setPushEnabled] = useState(true);
+
+  const isOnline = useDriverStore((s) => s.isOnline);
+  const toggleOnline = useDriverStore((s) => s.toggleOnline);
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -289,14 +294,12 @@ export default function ProfileScreen() {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <CustomHeader
         title="Driver Profile"
-        subtitle="Manage profile & driver status"
-        subtitleHighlight={`${APP_CONFIG.APP_NAME} •`}
-        showAvatar={false}
-        borderBottom
+        subtitle="Manage profile, status & verification"
+        showBack={false}
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 80 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
         {Platform.OS === 'web' && (
@@ -318,8 +321,11 @@ export default function ProfileScreen() {
           onSaveDisplayName={handleSaveDisplayName}
           initialsFallback="DR"
           metrics={[
-            { label: 'STATUS', value: 'Ready', color: GREEN },
-            { label: 'RATING', value: '4.9 ★', color: GOLD },
+            {
+              label: 'STATUS',
+              value: isOnline ? 'Online' : 'Offline',
+              color: isOnline ? GREEN : '#8C90A1',
+            },
             {
               label: 'PAYOUTS',
               value: isStatusLoading ? '...' : isStripeConnected ? 'Active' : isStripePending ? 'Pending' : 'Setup',
@@ -327,6 +333,32 @@ export default function ProfileScreen() {
             },
           ]}
         />
+
+        <ProfileSection title="DRIVER AVAILABILITY">
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 }}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.onSurface }}>
+                {isOnline ? 'Online & Available' : 'Offline'}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.onSurfaceVariant, marginTop: 2 }}>
+                {isOnline
+                  ? 'You are active and receiving new pickup requests'
+                  : 'You are paused and will not receive order requests'}
+              </Text>
+            </View>
+            <Switch
+              value={isOnline}
+              onValueChange={() => {
+                if (Platform.OS !== 'web') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                }
+                toggleOnline();
+              }}
+              trackColor={{ false: 'rgba(255, 255, 255, 0.1)', true: 'rgba(0, 226, 151, 0.35)' }}
+              thumbColor={isOnline ? '#00E297' : '#8C90A1'}
+            />
+          </View>
+        </ProfileSection>
 
         <ProfileSection
           title="DRIVER ACCREDITATION"
