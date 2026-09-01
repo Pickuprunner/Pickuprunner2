@@ -66,12 +66,8 @@ export default function OrdersScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    const MOCK_LOCATION = { lat: 31.9505, lng: -110.9747 };
-
-    if (__DEV__) {
-      setDriverLocation(MOCK_LOCATION);
-      return;
-    }
+    // Hardcoded mock location commented out - live GPS used instead:
+    // const MOCK_LOCATION = { lat: 31.9505, lng: -110.9747 };
 
     async function initLocation() {
       try {
@@ -83,13 +79,12 @@ export default function OrdersScreen() {
                   setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
                 }
               },
-              () => {
-                if (isMounted) setDriverLocation(MOCK_LOCATION);
+              (err) => {
+                console.warn('[OrdersScreen] Geolocation error:', err);
+                // if (isMounted) setDriverLocation(MOCK_LOCATION);
               },
-              { timeout: 4000 }
+              { timeout: 8000, enableHighAccuracy: true }
             );
-          } else if (isMounted) {
-            setDriverLocation(MOCK_LOCATION);
           }
           return;
         }
@@ -101,10 +96,10 @@ export default function OrdersScreen() {
             return;
           }
         }
-        if (isMounted) setDriverLocation(MOCK_LOCATION);
+        // if (isMounted) setDriverLocation(MOCK_LOCATION);
       } catch (err) {
-        console.log('[OrdersScreen] GPS unavailable, using mock location');
-        if (isMounted) setDriverLocation(MOCK_LOCATION);
+        console.log('[OrdersScreen] GPS unavailable:', err);
+        // if (isMounted) setDriverLocation(MOCK_LOCATION);
       }
     }
     initLocation();
@@ -313,9 +308,18 @@ export default function OrdersScreen() {
     setRefreshing(true);
     haptic();
     try {
-      if (__DEV__) {
-        setDriverLocation({ lat: 31.9505, lng: -110.9747 });
-      } else if (Platform.OS !== 'web') {
+      if (Platform.OS === 'web') {
+        if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              if (pos?.coords) {
+                setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+              }
+            },
+            (err) => console.warn('[OrdersScreen] Web refresh location error:', err)
+          );
+        }
+      } else {
         try {
           const { status } = await Location.requestForegroundPermissionsAsync();
           if (status === 'granted') {
@@ -324,10 +328,12 @@ export default function OrdersScreen() {
               setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
             }
           }
-        } catch {
-          if (!driverLocation.lat) {
-            setDriverLocation({ lat: 31.9505, lng: -110.9747 });
-          }
+        } catch (err) {
+          console.warn('[OrdersScreen] Native refresh location error:', err);
+          // Hardcoded fallback commented out:
+          // if (!driverLocation.lat) {
+          //   setDriverLocation({ lat: 31.9505, lng: -110.9747 });
+          // }
         }
       }
       const minDelay = new Promise((resolve) => setTimeout(resolve, 550));
@@ -336,7 +342,7 @@ export default function OrdersScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, [refetchAvailable, refetchAll, refetchConnect, driverLocation.lat]);
+  }, [refetchAvailable, refetchAll, refetchConnect]);
 
   const onHeaderLayout = useCallback(
     (event: LayoutChangeEvent) => {

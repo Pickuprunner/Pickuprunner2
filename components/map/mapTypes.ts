@@ -22,14 +22,21 @@ export function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
   }
 }
 
+// Hardcoded center coordinates (used only as emergency fallback)
 export const CENTER = { lat: 31.9572, lng: -110.9553 };
 
 export function getCoords(order: Order) {
-  let hash = 0;
-  for (let i = 0; i < order.id.length; i++) hash = (hash * 31 + order.id.charCodeAt(i)) | 0;
-  const lat = CENTER.lat + (((hash % 1000) - 500) / 10000) * 0.08;
-  const lng = CENTER.lng + ((((hash >> 4) % 1000) - 500) / 10000) * 0.08;
-  return { lat, lng };
+  // Use live order coordinates if available
+  if (order.pickupLat && order.pickupLng) {
+    return { lat: order.pickupLat, lng: order.pickupLng };
+  }
+  // Hardcoded mock coordinate calculation commented out:
+  // let hash = 0;
+  // for (let i = 0; i < order.id.length; i++) hash = (hash * 31 + order.id.charCodeAt(i)) | 0;
+  // const lat = CENTER.lat + (((hash % 1000) - 500) / 10000) * 0.08;
+  // const lng = CENTER.lng + ((((hash >> 4) % 1000) - 500) / 10000) * 0.08;
+  // return { lat, lng };
+  return { lat: order.pickupLat ?? CENTER.lat, lng: order.pickupLng ?? CENTER.lng };
 }
 
 export function openMapsNavigation(address: string) {

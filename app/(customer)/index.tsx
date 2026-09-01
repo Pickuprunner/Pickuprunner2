@@ -28,7 +28,7 @@ import { useOrderStore } from '@/store/useOrderStore';
 import { publishOrderChange } from '@/lib/realtime';
 import { colors, spacing } from '@/constants/design';
 import { APP_CONFIG, IS_STORE_BUILD, ORDER_SCOPE } from '@/lib/config';
-import { calcDistanceMiles } from '@/lib/distance';
+import { calcDistanceMiles, geocode } from '@/lib/distance';
 import { CustomHeader, useToast } from '@/components/core';
 import { NewOrderWizardForm } from '@/components/Orders';
 
@@ -197,6 +197,13 @@ export default function CustomerNewOrderScreen() {
       const fallbackOrderId = `ord_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       let serverOrder: any = null;
 
+      let pickupCoords: { lat: number; lon: number } | null = null;
+      try {
+        pickupCoords = await geocode(form.address.trim());
+      } catch (geoErr) {
+        console.warn('[customer-new-order] Geocoding pickup failed:', geoErr);
+      }
+
       try {
         serverOrder = await ordersApi.create({
           customerName: form.name.trim(),
@@ -204,8 +211,11 @@ export default function CustomerNewOrderScreen() {
           customerEmail: form.email.trim() || undefined,
           pickupAddress: form.address.trim(),
           deliveryAddress: form.deliveryAddress.trim(),
-          pickupLat: 31.9505,
-          pickupLng: -110.9747,
+          // Hardcoded location commented out - live geocoded location used instead:
+          // pickupLat: 31.9505,
+          // pickupLng: -110.9747,
+          pickupLat: pickupCoords?.lat,
+          pickupLng: pickupCoords?.lon,
           items: orderItems || '[LEAVE AT DOOR] Standard delivery items',
           distanceMiles: parseFloat(form.miles) || 0,
           tipAmount: finalTipCents,

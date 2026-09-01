@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useCreateOrder } from '@/lib/orders';
 import { APP_CONFIG } from '@/lib/config';
-import { calcDistanceMiles } from '@/lib/distance';
+import { calcDistanceMiles, geocode } from '@/lib/distance';
 import { useToast } from '@/components/core';
 import {
   NewOrderHeader,
@@ -140,6 +140,13 @@ export default function NewOrderScreen() {
         hasAlcohol ? '[21+ ALCOHOL ID REQUIRED] ' : ''
       }${pickupNumber.trim() ? `Order: ${pickupNumber.trim()} · ` : ''}${items.trim()}`.trim();
 
+      let pickupCoords: { lat: number; lon: number } | null = null;
+      try {
+        pickupCoords = await geocode(pickupAddress.trim());
+      } catch (geoErr) {
+        console.warn('[new-order] Geocoding pickup failed:', geoErr);
+      }
+
       const created = await createOrder.mutateAsync({
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
@@ -149,8 +156,11 @@ export default function NewOrderScreen() {
         items: formattedItems || '[LEAVE AT DOOR] Standard delivery items',
         tipAmount: tipCents,
         distanceMiles: parseFloat(miles) || 0,
-        pickupLat: 31.9505,
-        pickupLng: -110.9747,
+        // Hardcoded location commented out - live geocoded location used instead:
+        // pickupLat: 31.9505,
+        // pickupLng: -110.9747,
+        pickupLat: pickupCoords?.lat,
+        pickupLng: pickupCoords?.lon,
       } as any);
 
       if (Platform.OS !== 'web') {
