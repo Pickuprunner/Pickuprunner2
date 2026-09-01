@@ -113,7 +113,7 @@ export function MapStopsCarousel({
                   </Text>
                 </View>
                 <View style={styles.tapDetailsBtn}>
-                  <Text style={styles.tapDetailsBtnText}>Tap details →</Text>
+                  <Text style={styles.tapDetailsBtnText}>Tap details</Text>
                 </View>
               </View>
             </Pressable>
