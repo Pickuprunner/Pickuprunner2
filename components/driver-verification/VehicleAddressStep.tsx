@@ -19,6 +19,7 @@ import { colors, borderRadius, spacing } from '@/constants/design';
 import CustomInput from '@/components/core/CustomInput';
 import { useToast } from '@/components/core';
 import { US_STATES, DriverWizardData } from './mockData';
+import { validateVehicleStep } from './validation';
 
 interface VehicleAddressStepProps {
   data: DriverWizardData;
@@ -33,22 +34,13 @@ export function VehicleAddressStep({ data, onChange, onNext }: VehicleAddressSte
 
   const handleNext = () => {
     setErrorMsg('');
-    if (!data.vehicleMake.trim() || !data.vehicleModel.trim()) {
-      const msg = 'Please enter your vehicle make and model.';
-      setErrorMsg(msg);
-      showToast('Vehicle Make & Model Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.vehicleYear.trim() || !data.licensePlate.trim()) {
-      const msg = 'Please enter vehicle year and license plate number.';
-      setErrorMsg(msg);
-      showToast('Year & Plate Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.address.trim() || !data.city.trim() || !data.zip.trim()) {
-      const msg = 'Please complete your street address, city, and ZIP code.';
-      setErrorMsg(msg);
-      showToast('Address Details Required', { type: 'warning', description: msg });
+    const result = validateVehicleStep(data);
+    if (!result.isValid) {
+      setErrorMsg(result.message || 'Please fill in all required fields.');
+      showToast(result.title || 'Required Field Missing', {
+        type: 'warning',
+        description: result.message,
+      });
       return;
     }
     onNext();
@@ -94,7 +86,7 @@ export function VehicleAddressStep({ data, onChange, onNext }: VehicleAddressSte
             <CustomInput
               label="YEAR"
               value={data.vehicleYear}
-              onChangeText={(val) => onChange({ vehicleYear: val })}
+              onChangeText={(val) => onChange({ vehicleYear: val.replace(/\D/g, '').slice(0, 4) })}
               placeholder="2023"
               keyboardType="number-pad"
               maxLength={4}
@@ -104,18 +96,20 @@ export function VehicleAddressStep({ data, onChange, onNext }: VehicleAddressSte
             <CustomInput
               label="COLOR"
               value={data.vehicleColor}
-              onChangeText={(val) => onChange({ vehicleColor: val })}
+              onChangeText={(val) => onChange({ vehicleColor: val.slice(0, 30) })}
               placeholder="e.g. Black"
               autoCapitalize="words"
+              maxLength={30}
             />
           </View>
           <View style={{ flex: 1.8 }}>
             <CustomInput
               label="LICENSE PLATE"
               value={data.licensePlate}
-              onChangeText={(val) => onChange({ licensePlate: val.toUpperCase() })}
+              onChangeText={(val) => onChange({ licensePlate: val.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 16) })}
               placeholder="8ABC123"
               autoCapitalize="characters"
+              maxLength={16}
             />
           </View>
         </View>

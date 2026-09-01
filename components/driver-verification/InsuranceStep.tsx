@@ -23,13 +23,15 @@ import { colors, borderRadius, spacing } from '@/constants/design';
 import CustomInput from '@/components/core/CustomInput';
 import { useToast } from '@/components/core';
 import { POPULAR_INSURERS, DriverWizardData } from './mockData';
+import { validateInsuranceStep } from './validation';
 
-interface InsuranceStepProps {
+export interface InsuranceStepProps {
   data: DriverWizardData;
   onChange: (patch: Partial<DriverWizardData>) => void;
   onSubmit: () => void;
   onBack: () => void;
   submitting?: boolean;
+  onUploadDoc?: (type: 'insurance_card', file: { uri: string; name?: string }) => Promise<any>;
 }
 
 export function InsuranceStep({
@@ -38,6 +40,7 @@ export function InsuranceStep({
   onSubmit,
   onBack,
   submitting = false,
+  onUploadDoc,
 }: InsuranceStepProps) {
   const { showToast } = useToast();
   const [errorMsg, setErrorMsg] = useState('');
@@ -60,16 +63,24 @@ export function InsuranceStep({
 
       if (!result.canceled && result.assets?.[0]) {
         const asset = result.assets[0];
+        const fileName = asset.fileName || 'insurance_card.jpg';
         setUploadingDoc(true);
         onChange({
           insuranceDocUrl: asset.uri,
-          insuranceDocName: asset.fileName || 'insurance_card.jpg',
+          insuranceDocName: fileName,
         });
-        showToast('Insurance Card Attached', { type: 'success', description: 'Insurance card document saved.' });
+
+        if (onUploadDoc) {
+          await onUploadDoc('insurance_card', {
+            uri: asset.uri,
+            name: fileName,
+          });
+        }
+        showToast('Insurance Card Uploaded', { type: 'success', description: 'Insurance card document uploaded.' });
       }
     } catch (e) {
       console.warn('Doc pick error:', e);
-      showToast('Upload Error', { type: 'error', description: 'Failed to pick insurance card.' });
+      showToast('Upload Error', { type: 'error', description: 'Failed to pick image file.' });
     } finally {
       setUploadingDoc(false);
     }
@@ -77,46 +88,13 @@ export function InsuranceStep({
 
   const handleSubmit = () => {
     setErrorMsg('');
-    if (!data.insuranceCompany.trim()) {
-      const msg = 'Please enter your insurance company name.';
-      setErrorMsg(msg);
-      showToast('Insurance Company Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.naicNumber.trim() || data.naicNumber.length < 5) {
-      const msg = 'Please enter a valid 5-digit NAIC number.';
-      setErrorMsg(msg);
-      showToast('NAIC Code Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.policyNumber.trim()) {
-      const msg = 'Please enter your insurance policy number.';
-      setErrorMsg(msg);
-      showToast('Policy Number Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.effectiveDate.trim() || data.effectiveDate.length < 10) {
-      const msg = 'Please enter a valid Effective Date (YYYY-MM-DD or MM/DD/YYYY).';
-      setErrorMsg(msg);
-      showToast('Effective Date Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.expirationDate.trim() || data.expirationDate.length < 10) {
-      const msg = 'Please enter a valid Expiration Date (YYYY-MM-DD or MM/DD/YYYY).';
-      setErrorMsg(msg);
-      showToast('Expiration Date Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.vinNumber.trim() || data.vinNumber.length !== 17) {
-      const msg = 'Vehicle Identification Number (VIN) must be exactly 17 characters.';
-      setErrorMsg(msg);
-      showToast('Invalid VIN', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.insuranceDocUrl) {
-      const msg = 'Please upload a digital photo or scan of your insurance card.';
-      setErrorMsg(msg);
-      showToast('Insurance Card Photo Required', { type: 'warning', description: msg });
+    const result = validateInsuranceStep(data);
+    if (!result.isValid) {
+      setErrorMsg(result.message || 'Please complete all required insurance fields.');
+      showToast(result.title || 'Required Field Missing', {
+        type: 'warning',
+        description: result.message,
+      });
       return;
     }
     onSubmit();
@@ -186,9 +164,10 @@ export function InsuranceStep({
         <CustomInput
           label="POLICY NUMBER"
           value={data.policyNumber}
-          onChangeText={(val) => onChange({ policyNumber: val.toUpperCase() })}
+          onChangeText={(val) => onChange({ policyNumber: val.replace(/[^A-Za-z0-9-]/g, '').toUpperCase().slice(0, 30) })}
           placeholder="e.g. AZ-98421034-7B"
           autoCapitalize="characters"
+          maxLength={30}
         />
 
         <View style={styles.row2}>
@@ -218,7 +197,7 @@ export function InsuranceStep({
         <CustomInput
           label="VEHICLE IDENTIFICATION NUMBER (VIN - 17 CHARACTERS)"
           value={data.vinNumber}
-          onChangeText={(val) => onChange({ vinNumber: val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17) })}
+          onChangeText={(val) => onChange({ vinNumber: val.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '').slice(0, 17) })}
           placeholder="e.g. 4T1B11HK5JU123456"
           autoCapitalize="characters"
           maxLength={17}

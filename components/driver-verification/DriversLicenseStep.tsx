@@ -26,12 +26,14 @@ import { colors, borderRadius, spacing } from '@/constants/design';
 import CustomInput from '@/components/core/CustomInput';
 import { useToast } from '@/components/core';
 import { US_STATES, DriverWizardData } from './mockData';
+import { validateLicenseStep } from './validation';
 
-interface DriversLicenseStepProps {
+export interface DriversLicenseStepProps {
   data: DriverWizardData;
   onChange: (patch: Partial<DriverWizardData>) => void;
   onNext: () => void;
   onBack: () => void;
+  onUploadDoc?: (type: 'license_front' | 'license_back', file: { uri: string; name?: string }) => Promise<any>;
 }
 
 export function DriversLicenseStep({
@@ -39,6 +41,7 @@ export function DriversLicenseStep({
   onChange,
   onNext,
   onBack,
+  onUploadDoc,
 }: DriversLicenseStepProps) {
   const { showToast } = useToast();
   const [showStateModal, setShowStateModal] = useState(false);
@@ -65,23 +68,33 @@ export function DriversLicenseStep({
       if (!result.canceled && result.assets?.[0]) {
         const asset = result.assets[0];
         setUploading(true);
+        const fileName = asset.fileName || (side === 'front' ? 'drivers_license_front.jpg' : 'drivers_license_back.jpg');
         if (side === 'front') {
           onChange({
             licenseFrontUrl: asset.uri,
-            licenseFrontName: asset.fileName || 'drivers_license_front.jpg',
+            licenseFrontName: fileName,
           });
-          showToast('License Front Attached', { type: 'success', description: 'Front of driver’s license saved.' });
         } else {
           onChange({
             licenseBackUrl: asset.uri,
-            licenseBackName: asset.fileName || 'drivers_license_back.jpg',
+            licenseBackName: fileName,
           });
-          showToast('License Back Attached', { type: 'success', description: 'Back of driver’s license saved.' });
         }
+
+        if (onUploadDoc) {
+          await onUploadDoc(side === 'front' ? 'license_front' : 'license_back', {
+            uri: asset.uri,
+            name: fileName,
+          });
+        }
+        showToast(
+          side === 'front' ? 'License Front Uploaded' : 'License Back Uploaded',
+          { type: 'success', description: `${side === 'front' ? 'Front' : 'Back'} of driver’s license uploaded.` }
+        );
       }
     } catch (e) {
       console.warn('Doc pick error:', e);
-      showToast('Upload Error', { type: 'error', description: 'Failed to pick image file.' });
+      showToast('Upload Error', { type: 'error', description: 'Failed to upload image file.' });
     } finally {
       setUploading(false);
     }
@@ -89,34 +102,13 @@ export function DriversLicenseStep({
 
   const handleNext = () => {
     setErrorMsg('');
-    if (!data.licenseNumber.trim()) {
-      const msg = "Please enter your driver's license number.";
-      setErrorMsg(msg);
-      showToast('License Number Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.licenseFullName.trim()) {
-      const msg = 'Please enter your full legal name matching the license.';
-      setErrorMsg(msg);
-      showToast('Full Legal Name Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.licenseDob.trim() || data.licenseDob.length < 10) {
-      const msg = 'Please enter a valid Date of Birth (YYYY-MM-DD or MM/DD/YYYY).';
-      setErrorMsg(msg);
-      showToast('Date of Birth Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.licenseExpDate.trim() || data.licenseExpDate.length < 10) {
-      const msg = 'Please enter a valid License Expiration Date (YYYY-MM-DD or MM/DD/YYYY).';
-      setErrorMsg(msg);
-      showToast('Expiration Date Required', { type: 'warning', description: msg });
-      return;
-    }
-    if (!data.licenseFrontUrl) {
-      const msg = 'Please upload a photo of the front of your driver’s license.';
-      setErrorMsg(msg);
-      showToast('License Photo Required', { type: 'warning', description: msg });
+    const result = validateLicenseStep(data);
+    if (!result.isValid) {
+      setErrorMsg(result.message || 'Please complete all required license fields.');
+      showToast(result.title || 'Required Field Missing', {
+        type: 'warning',
+        description: result.message,
+      });
       return;
     }
     onNext();
@@ -154,9 +146,10 @@ export function DriversLicenseStep({
             <CustomInput
               label="LICENSE NUMBER"
               value={data.licenseNumber}
-              onChangeText={(val) => onChange({ licenseNumber: val.toUpperCase() })}
+              onChangeText={(val) => onChange({ licenseNumber: val.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 15) })}
               placeholder="e.g. D12345678"
               autoCapitalize="characters"
+              maxLength={15}
             />
           </View>
         </View>
@@ -164,9 +157,10 @@ export function DriversLicenseStep({
         <CustomInput
           label="FULL LEGAL NAME"
           value={data.licenseFullName}
-          onChangeText={(val) => onChange({ licenseFullName: val })}
+          onChangeText={(val) => onChange({ licenseFullName: val.slice(0, 100) })}
           placeholder="First Middle Last"
           autoCapitalize="words"
+          maxLength={100}
         />
 
         <View style={styles.row2}>

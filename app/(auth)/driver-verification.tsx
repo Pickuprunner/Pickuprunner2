@@ -27,6 +27,7 @@ import {
   useUploadAccreditationDocument,
   useRecordAccreditationConsent,
   useSubmitAccreditation,
+  useCompleteAccreditation,
 } from '@/lib/accreditation';
 import { useMyVerification, useSubmitVerification } from '@/lib/verification';
 import { colors, spacing, borderRadius } from '@/constants/design';
@@ -37,10 +38,10 @@ import {
   DriversLicenseStep,
   BackgroundCheckStep,
   InsuranceStep,
-  ReviewPendingStep,
+  DriverProfileStatusScreen,
   DriverWizardData,
+  normalizeDateToISO,
 } from '@/components/driver-verification';
-import { DriverProfileStatusScreen } from '@/components/driver-verification';
 
 export default function DriverVerificationScreen() {
   const insets = useSafeAreaInsets();
@@ -60,6 +61,7 @@ export default function DriverVerificationScreen() {
   const uploadDocMutation = useUploadAccreditationDocument();
   const recordConsentMutation = useRecordAccreditationConsent();
   const submitAccreditationMutation = useSubmitAccreditation();
+  const completeAccreditationMutation = useCompleteAccreditation();
 
   const { data: existing } = useMyVerification(user?.id);
   const submitVerification = useSubmitVerification();
@@ -151,72 +153,61 @@ export default function DriverVerificationScreen() {
     }
 
     if (profile) {
+      const p = profile as any;
       setFormData((prev) => ({
         ...prev,
-        vehicleMake: profile.vehicleMake || prev.vehicleMake,
-        vehicleModel: profile.vehicleModel || prev.vehicleModel,
-        vehicleYear: profile.vehicleYear ? String(profile.vehicleYear) : prev.vehicleYear,
-        vehicleColor: profile.vehicleColor || prev.vehicleColor,
-        licensePlate: profile.vehiclePlate || prev.licensePlate,
-        address: profile.streetAddress || prev.address,
-        apt: profile.aptSuite || prev.apt,
-        city: profile.city || prev.city,
-        state: profile.state || prev.state,
-        zip: profile.postalCode || prev.zip,
+        vehicleMake: prev.vehicleMake || p.vehicleMake || p.vehicle_make || '',
+        vehicleModel: prev.vehicleModel || p.vehicleModel || p.vehicle_model || '',
+        vehicleYear: prev.vehicleYear || (p.vehicleYear ? String(p.vehicleYear) : (p.vehicle_year ? String(p.vehicle_year) : '')),
+        vehicleColor: prev.vehicleColor || p.vehicleColor || p.vehicle_color || '',
+        licensePlate: prev.licensePlate || p.vehiclePlate || p.vehicle_plate || p.licensePlate || p.license_plate || '',
+        address: prev.address || p.streetAddress || p.street_address || p.address || '',
+        apt: prev.apt || p.aptSuite || p.apt_suite || p.apt || '',
+        city: prev.city || p.city || '',
+        state: prev.state || p.state || 'AZ',
+        zip: prev.zip || p.postalCode || p.postal_code || p.zip || '',
 
-        licenseState: profile.licenseState || prev.licenseState,
-        licenseNumber: profile.licenseNumber || prev.licenseNumber,
-        licenseFullName: profile.legalName || prev.licenseFullName,
-        licenseDob: profile.dateOfBirth || prev.licenseDob,
-        licenseExpDate: profile.licenseExpirationDate || prev.licenseExpDate,
+        licenseState: prev.licenseState || p.licenseState || p.license_state || 'AZ',
+        licenseNumber: prev.licenseNumber || p.licenseNumber || p.license_number || '',
+        licenseFullName: prev.licenseFullName || p.legalName || p.legal_name || p.licenseFullName || user?.displayName || '',
+        licenseDob: prev.licenseDob || p.dateOfBirth || p.date_of_birth || p.licenseDob || '',
+        licenseExpDate: prev.licenseExpDate || p.licenseExpirationDate || p.license_expiration_date || p.licenseExpDate || '',
 
-        fcraAgreed: !!profile.backgroundConsentAt || prev.fcraAgreed,
+        fcraAgreed: prev.fcraAgreed || Boolean(p.backgroundConsentAt || p.background_consent_at),
 
-        insuranceCompany: profile.insuranceCompany || prev.insuranceCompany,
-        naicNumber: profile.insuranceNaicNumber || prev.naicNumber,
-        policyNumber: profile.insurancePolicyNumber || prev.policyNumber,
-        effectiveDate: profile.insuranceEffectiveDate || prev.effectiveDate,
-        expirationDate: profile.insuranceExpirationDate || prev.expirationDate,
-        vinNumber: profile.vehicleVin || prev.vinNumber,
+        insuranceCompany: prev.insuranceCompany || p.insuranceCompany || p.insurance_company || '',
+        naicNumber: prev.naicNumber || p.insuranceNaicNumber || p.insurance_naic_number || p.naicNumber || '',
+        policyNumber: prev.policyNumber || p.insurancePolicyNumber || p.insurance_policy_number || p.policyNumber || '',
+        effectiveDate: prev.effectiveDate || p.insuranceEffectiveDate || p.insurance_effective_date || p.effectiveDate || '',
+        expirationDate: prev.expirationDate || p.insuranceExpirationDate || p.insurance_expiration_date || p.expirationDate || '',
+        vinNumber: prev.vinNumber || p.vehicleVin || p.vehicle_vin || p.vinNumber || '',
       }));
-
-      if (!isSubmitted && !isProfileSubmitted) {
-        if (profile.backgroundConsentAt) {
-          setCurrentStep(4);
-        } else if (profile.licenseNumber) {
-          setCurrentStep(3);
-        } else if (profile.vehicleMake && profile.vehiclePlate) {
-          setCurrentStep(2);
-        } else {
-          setCurrentStep(1);
-        }
-      }
     } else if (existing) {
       setFormData((prev) => ({
         ...prev,
-        vehicleMake: existing.vehicle_make || prev.vehicleMake,
-        vehicleModel: existing.vehicle_model || prev.vehicleModel,
-        vehicleYear: existing.vehicle_year || prev.vehicleYear,
-        vehicleColor: existing.vehicle_color || prev.vehicleColor,
-        licensePlate: existing.license_plate || prev.licensePlate,
-        address: existing.address || prev.address,
-        apt: existing.apt || prev.apt,
-        city: existing.city || prev.city,
-        state: existing.state || prev.state,
-        zip: existing.zip || prev.zip,
-        licenseState: existing.license_state || prev.licenseState,
-        licenseNumber: existing.license_number || prev.licenseNumber,
-        licenseFullName: existing.license_fullname || prev.licenseFullName,
-        licenseDob: existing.license_dob || prev.licenseDob,
-        licenseExpDate: existing.license_exp_date || prev.licenseExpDate,
-        ssnLast4: existing.ssn_last4 || prev.ssnLast4,
-        fcraAgreed: existing.fcra_agreed ?? prev.fcraAgreed,
-        insuranceCompany: existing.insurance_company || prev.insuranceCompany,
-        naicNumber: existing.naic_number || prev.naicNumber,
-        policyNumber: existing.policy_number || prev.policyNumber,
-        effectiveDate: existing.effective_date || prev.effectiveDate,
-        expirationDate: existing.expiration_date || prev.expirationDate,
-        vinNumber: existing.vin_number || prev.vinNumber,
+        vehicleMake: prev.vehicleMake || existing.vehicle_make || '',
+        vehicleModel: prev.vehicleModel || existing.vehicle_model || '',
+        vehicleYear: prev.vehicleYear || existing.vehicle_year || '',
+        vehicleColor: prev.vehicleColor || existing.vehicle_color || '',
+        licensePlate: prev.licensePlate || existing.license_plate || '',
+        address: prev.address || existing.address || '',
+        apt: prev.apt || existing.apt || '',
+        city: prev.city || existing.city || '',
+        state: prev.state || existing.state || 'AZ',
+        zip: prev.zip || existing.zip || '',
+        licenseState: prev.licenseState || existing.license_state || 'AZ',
+        licenseNumber: prev.licenseNumber || existing.license_number || '',
+        licenseFullName: prev.licenseFullName || existing.license_fullname || user?.displayName || '',
+        licenseDob: prev.licenseDob || existing.license_dob || '',
+        licenseExpDate: prev.licenseExpDate || existing.license_exp_date || '',
+        ssnLast4: prev.ssnLast4 || existing.ssn_last4 || '',
+        fcraAgreed: prev.fcraAgreed || Boolean(existing.fcra_agreed),
+        insuranceCompany: prev.insuranceCompany || existing.insurance_company || '',
+        naicNumber: prev.naicNumber || existing.naic_number || '',
+        policyNumber: prev.policyNumber || existing.policy_number || '',
+        effectiveDate: prev.effectiveDate || existing.effective_date || '',
+        expirationDate: prev.expirationDate || existing.expiration_date || '',
+        vinNumber: prev.vinNumber || existing.vin_number || '',
       }));
     }
   }, [accreditationData?.profile, existing]);
@@ -242,10 +233,12 @@ export default function DriverVerificationScreen() {
           postalCode: formData.zip.trim(),
         },
       });
-    } catch (e) {
-      console.warn('[Accreditation] saveStep(vehicle) fallback:', e);
+      setCurrentStep(2);
+    } catch (e: any) {
+      console.warn('[Accreditation] saveStep(vehicle) error:', e);
+      showToast('Save Failed', { type: 'error', description: e?.message || 'Could not save vehicle info.' });
+      setCurrentStep(2);
     }
-    setCurrentStep(2);
   };
 
   const handleStep2Next = async () => {
@@ -256,8 +249,8 @@ export default function DriverVerificationScreen() {
           licenseState: formData.licenseState.trim().toUpperCase(),
           licenseNumber: formData.licenseNumber.trim(),
           legalName: formData.licenseFullName.trim(),
-          dateOfBirth: formData.licenseDob.trim(),
-          licenseExpirationDate: formData.licenseExpDate.trim(),
+          dateOfBirth: normalizeDateToISO(formData.licenseDob),
+          licenseExpirationDate: normalizeDateToISO(formData.licenseExpDate),
         },
       });
 
@@ -284,10 +277,12 @@ export default function DriverVerificationScreen() {
           })
           .catch((e) => console.warn('[Accreditation] upload license_back error:', e));
       }
-    } catch (e) {
-      console.warn('[Accreditation] saveStep(license) fallback:', e);
+      setCurrentStep(3);
+    } catch (e: any) {
+      console.warn('[Accreditation] saveStep(license) error:', e);
+      showToast('Save Failed', { type: 'error', description: e?.message || 'Could not save license info.' });
+      setCurrentStep(3);
     }
-    setCurrentStep(3);
   };
 
   const handleStep3Next = async () => {
@@ -296,10 +291,12 @@ export default function DriverVerificationScreen() {
         authorized: formData.fcraAgreed,
         legalName: formData.licenseFullName.trim() || user?.displayName || undefined,
       });
-    } catch (e) {
-      console.warn('[Accreditation] recordConsent fallback:', e);
+      setCurrentStep(4);
+    } catch (e: any) {
+      console.warn('[Accreditation] recordConsent error:', e);
+      showToast('Consent Error', { type: 'error', description: e?.message || 'Could not record consent.' });
+      setCurrentStep(4);
     }
-    setCurrentStep(4);
   };
 
   const handleSubmitAll = async () => {
@@ -307,18 +304,54 @@ export default function DriverVerificationScreen() {
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
+
+      // Try bulk /complete endpoint first, with fallback to step-by-step
       try {
+        await completeAccreditationMutation.mutateAsync({
+          fields: {
+            vehicleMake: formData.vehicleMake.trim(),
+            vehicleModel: formData.vehicleModel.trim(),
+            vehicleYear: parseInt(formData.vehicleYear, 10) || undefined,
+            vehicleColor: formData.vehicleColor.trim(),
+            vehiclePlate: formData.licensePlate.trim(),
+            streetAddress: formData.address.trim(),
+            aptSuite: formData.apt.trim() || undefined,
+            city: formData.city.trim(),
+            state: formData.state.trim().toUpperCase(),
+            postalCode: formData.zip.trim(),
+            legalName: formData.licenseFullName.trim(),
+            licenseState: formData.licenseState.trim().toUpperCase(),
+            licenseNumber: formData.licenseNumber.trim(),
+            dateOfBirth: normalizeDateToISO(formData.licenseDob),
+            licenseExpirationDate: normalizeDateToISO(formData.licenseExpDate),
+            insuranceCompany: formData.insuranceCompany.trim(),
+            insuranceNaicNumber: formData.naicNumber.trim() || undefined,
+            insurancePolicyNumber: formData.policyNumber.trim(),
+            insuranceEffectiveDate: normalizeDateToISO(formData.effectiveDate),
+            insuranceExpirationDate: normalizeDateToISO(formData.expirationDate),
+            vehicleVin: formData.vinNumber.trim() || undefined,
+            authorized: formData.fcraAgreed ? 'true' : 'false',
+            submit: 'true',
+          },
+          files: {
+            license_front: formData.licenseFrontUrl ? { uri: formData.licenseFrontUrl, name: formData.licenseFrontName } : undefined,
+            license_back: formData.licenseBackUrl ? { uri: formData.licenseBackUrl, name: formData.licenseBackName } : undefined,
+            insurance_card: formData.insuranceDocUrl ? { uri: formData.insuranceDocUrl, name: formData.insuranceDocName } : undefined,
+          },
+        });
+      } catch (bulkErr) {
+        console.warn('[Accreditation] bulk /complete fallback to step-by-step:', bulkErr);
         await saveStepMutation.mutateAsync({
           step: 'insurance',
           payload: {
             insuranceCompany: formData.insuranceCompany.trim(),
             insuranceNaicNumber: formData.naicNumber.trim() || undefined,
             insurancePolicyNumber: formData.policyNumber.trim(),
-            insuranceEffectiveDate: formData.effectiveDate.trim(),
-            insuranceExpirationDate: formData.expirationDate.trim(),
+            insuranceEffectiveDate: normalizeDateToISO(formData.effectiveDate),
+            insuranceExpirationDate: normalizeDateToISO(formData.expirationDate),
             vehicleVin: formData.vinNumber.trim() || undefined,
           },
-        });
+        }).catch(() => {});
 
         if (formData.insuranceDocUrl) {
           await uploadDocMutation
@@ -331,13 +364,8 @@ export default function DriverVerificationScreen() {
             })
             .catch((e) => console.warn('[Accreditation] upload insurance_card error:', e));
         }
-      } catch (e) {
-        console.warn('[Accreditation] saveStep(insurance) fallback:', e);
-      }
-      try {
-        await submitAccreditationMutation.mutateAsync();
-      } catch (e) {
-        console.warn('[Accreditation] submit backend fallback:', e);
+
+        await submitAccreditationMutation.mutateAsync().catch(() => {});
       }
 
       // 3. Keep local verification store in sync
@@ -495,6 +523,9 @@ export default function DriverVerificationScreen() {
                 onChange={updateFormData}
                 onNext={handleStep2Next}
                 onBack={() => setCurrentStep(1)}
+                onUploadDoc={(type, file) =>
+                  uploadDocMutation.mutateAsync({ type, file })
+                }
               />
             )}
 
@@ -513,6 +544,9 @@ export default function DriverVerificationScreen() {
                 onChange={updateFormData}
                 onSubmit={handleSubmitAll}
                 onBack={() => setCurrentStep(3)}
+                onUploadDoc={(type, file) =>
+                  uploadDocMutation.mutateAsync({ type, file })
+                }
                 submitting={submitVerification.isPending || submitAccreditationMutation.isPending}
               />
             )}

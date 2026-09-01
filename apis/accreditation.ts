@@ -237,4 +237,64 @@ export const accreditationApi = {
   submit: async (payload?: { autoApprove?: boolean }): Promise<AccreditationApiResponse> => {
     return apiClient.post<AccreditationApiResponse>('/driver/accreditation/submit', payload || {});
   },
+
+  completeAccreditation: async (data: {
+    fields: Record<string, any>;
+    files?: {
+      license_front?: { uri: string; name?: string; type?: string };
+      license_back?: { uri: string; name?: string; type?: string };
+      insurance_card?: { uri: string; name?: string; type?: string };
+    };
+  }): Promise<AccreditationApiResponse> => {
+    const baseUrl = getApiBaseUrl();
+    const token = useAuthStore.getState().token;
+    const formData = new FormData();
+
+    Object.entries(data.fields).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        formData.append(key, String(val));
+      }
+    });
+
+    if (data.files) {
+      for (const [key, file] of Object.entries(data.files)) {
+        if (!file?.uri) continue;
+        const fileName = file.name || `${key}_${Date.now()}.jpg`;
+        const mimeType = file.type || (fileName.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+
+        if (Platform.OS === 'web') {
+          try {
+            const resp = await fetch(file.uri);
+            const blob = await resp.blob();
+            formData.append(key, blob, fileName);
+          } catch {
+            // fallback
+          }
+        } else {
+          formData.append(key, {
+            uri: file.uri,
+            name: fileName,
+            type: mimeType,
+          } as any);
+        }
+      }
+    }
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${baseUrl}/driver/accreditation/complete`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const resJson = await response.json();
+    if (!response.ok) {
+      throw new Error(resJson?.error || resJson?.message || 'Failed to complete accreditation');
+    }
+    return resJson as AccreditationApiResponse;
+  },
 };
