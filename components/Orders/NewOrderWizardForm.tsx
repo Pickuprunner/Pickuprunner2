@@ -14,7 +14,6 @@ import { useToast } from '@/components/core';
 import { colors, spacing, borderRadius, shadows } from '@/constants/design';
 import { isValidEmail } from '@/lib/validation';
 
-import { CustomerDetailsCard } from './CustomerDetailsCard';
 import { RouteItemsCard } from './RouteItemsCard';
 import { PricingSummaryCard } from './PricingSummaryCard';
 
@@ -29,12 +28,12 @@ function fmt(cents: number) {
 }
 
 interface NewOrderWizardFormProps {
-  customerName: string;
-  onCustomerNameChange: (v: string) => void;
-  customerPhone: string;
-  onCustomerPhoneChange: (v: string) => void;
-  customerEmail: string;
-  onCustomerEmailChange: (v: string) => void;
+  customerName?: string;
+  onCustomerNameChange?: (v: string) => void;
+  customerPhone?: string;
+  onCustomerPhoneChange?: (v: string) => void;
+  customerEmail?: string;
+  onCustomerEmailChange?: (v: string) => void;
 
   pickupAddress: string;
   onPickupAddressChange: (v: string) => void;
@@ -74,17 +73,16 @@ interface NewOrderWizardFormProps {
 }
 
 const STEPS = [
-  { id: 1, label: 'Customer', icon: 'person-outline' as const, activeIcon: 'person' as const },
-  { id: 2, label: 'Route & Items', icon: 'inventory-2' as const, activeIcon: 'inventory-2' as const },
-  { id: 3, label: 'Pricing & Review', icon: 'receipt-long' as const, activeIcon: 'receipt-long' as const },
+  { id: 1, label: 'Route & Items', icon: 'inventory-2' as const, activeIcon: 'inventory-2' as const },
+  { id: 2, label: 'Pricing & Review', icon: 'receipt-long' as const, activeIcon: 'receipt-long' as const },
 ];
 
 export function NewOrderWizardForm({
-  customerName,
+  customerName = '',
   onCustomerNameChange,
-  customerPhone,
+  customerPhone = '',
   onCustomerPhoneChange,
-  customerEmail,
+  customerEmail = '',
   onCustomerEmailChange,
   pickupAddress,
   onPickupAddressChange,
@@ -130,21 +128,6 @@ export function NewOrderWizardForm({
 
   const handleNext = () => {
     if (currentStep === 1) {
-      if (!customerName.trim() || !customerPhone.trim()) {
-        showToast('Missing Details', {
-          description: 'Customer name and phone number are required',
-          type: 'warning',
-        });
-        return;
-      }
-      if (customerEmail.trim() && !isValidEmail(customerEmail.trim())) {
-        showToast('Invalid Email', {
-          description: 'Please enter a valid email address',
-          type: 'warning',
-        });
-        return;
-      }
-    } else if (currentStep === 2) {
       if (!pickupAddress.trim() || !deliveryAddress.trim() || !items.trim()) {
         showToast('Missing Route Info', {
           description: 'Pickup address, delivery address, and items are required',
@@ -154,7 +137,7 @@ export function NewOrderWizardForm({
       }
     }
     haptic();
-    setCurrentStep(Math.min(currentStep + 1, 3));
+    setCurrentStep(Math.min(currentStep + 1, 2));
   };
 
   const handleBack = () => {
@@ -212,21 +195,6 @@ export function NewOrderWizardForm({
 
       <View style={styles.stepContent}>
         {currentStep === 1 && (
-          <CustomerDetailsCard
-            name={customerName}
-            onNameChange={onCustomerNameChange}
-            phone={customerPhone}
-            onPhoneChange={onCustomerPhoneChange}
-            email={customerEmail}
-            onEmailChange={onCustomerEmailChange}
-            pickupNumber={pickupNumber}
-            onPickupNumberChange={onPickupNumberChange}
-            deliveryType={deliveryType}
-            onDeliveryTypeChange={onDeliveryTypeChange}
-          />
-        )}
-
-        {currentStep === 2 && (
           <RouteItemsCard
             pickupAddress={pickupAddress}
             onPickupAddressChange={onPickupAddressChange}
@@ -239,10 +207,14 @@ export function NewOrderWizardForm({
             miles={miles}
             mileageCents={mileageCents}
             calculating={calculating}
+            deliveryType={deliveryType}
+            onDeliveryTypeChange={onDeliveryTypeChange}
+            pickupNumber={pickupNumber}
+            onPickupNumberChange={onPickupNumberChange}
           />
         )}
 
-        {currentStep === 3 && (
+        {currentStep === 2 && (
           <PricingSummaryCard
             miles={miles}
             onMilesChange={onMilesChange}
@@ -254,6 +226,11 @@ export function NewOrderWizardForm({
             deliveryAddress={deliveryAddress}
             pickupNumber={pickupNumber}
             deliveryType={deliveryType}
+            itemsDescription={items}
+            hasAlcohol={hasAlcohol}
+            customerName={customerName}
+            customerPhone={customerPhone}
+            customerEmail={customerEmail}
             showCustomTip={showCustomTip}
             setShowCustomTip={setShowCustomTip}
             customTipText={customTipText}
@@ -278,12 +255,12 @@ export function NewOrderWizardForm({
           </Pressable>
         )}
 
-        {currentStep < 3 ? (
+        {currentStep < 2 ? (
           <Pressable
             onPress={handleNext}
             style={({ pressed }) => [
               styles.nextNavBtn,
-              currentStep === 1 && { flex: 1 },
+              { flex: 1 },
               pressed && styles.btnPressed,
             ]}
           >
@@ -294,7 +271,7 @@ export function NewOrderWizardForm({
               style={styles.nextNavGradient}
             >
               <Text style={styles.nextNavText}>
-                {currentStep === 1 ? 'Next: Route & Items' : 'Next: Pricing & Review'}
+                Next: Pricing & Review
               </Text>
               <MaterialIcons name="arrow-forward" size={18} color={colors.onPrimaryContainer} />
             </LinearGradient>

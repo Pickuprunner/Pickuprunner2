@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { CustomInput } from '@/components/core';
 import { APP_CONFIG } from '@/lib/config';
-import { colors, spacing, borderRadius, typography } from '@/constants/design';
+import { colors, spacing } from '@/constants/design';
 
 const TIP_OPTIONS = [
   { label: '$5', cents: 500 },
@@ -17,10 +17,20 @@ const TIP_OPTIONS = [
 
 const GOLD = '#FFE399';
 const GREEN = '#00E297';
+const BLUE = '#1E75FF';
 const DELIVERY_FEE = APP_CONFIG.DELIVERY_FEE_CENTS;
 
 function fmt(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
+}
+
+function cleanAddress(addr: string): string {
+  if (!addr) return '';
+  return addr
+    .replace(/^[A-Z0-9]{4,8}\+[A-Z0-9]{2,4},\s*/i, '')
+    .replace(/^[A-Z0-9]{4,8}\+[A-Z0-9]{2,4}\s+/i, '')
+    .replace(/^unnamed road,\s*/i, '')
+    .trim();
 }
 
 interface PricingSummaryCardProps {
@@ -34,6 +44,11 @@ interface PricingSummaryCardProps {
   deliveryAddress?: string;
   pickupNumber?: string;
   deliveryType?: 'door' | 'meet';
+  itemsDescription?: string;
+  hasAlcohol?: boolean;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
   showCustomTip?: boolean;
   setShowCustomTip?: (val: boolean) => void;
   customTipText?: string;
@@ -53,6 +68,11 @@ export function PricingSummaryCard({
   deliveryAddress = '',
   pickupNumber = '',
   deliveryType = 'door',
+  itemsDescription = '',
+  hasAlcohol = false,
+  customerName = '',
+  customerPhone = '',
+  customerEmail = '',
   showCustomTip: externalShowCustomTip,
   setShowCustomTip: externalSetShowCustomTip,
   customTipText: externalCustomTipText,
@@ -68,8 +88,6 @@ export function PricingSummaryCard({
   const customText = externalCustomTipText !== undefined ? externalCustomTipText : internalCustomTipText;
   const setCustomText = externalSetCustomTipText || setInternalCustomTipText;
 
-  const milesNum = parseFloat(miles);
-
   const haptic = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -83,71 +101,135 @@ export function PricingSummaryCard({
     onTipChange(amount);
   };
 
+  const cleanPickup = cleanAddress(pickupAddress);
+  const cleanDelivery = cleanAddress(deliveryAddress);
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>PRICING & REVIEW</Text>
 
       <View style={styles.content}>
-        {/* Route Summary Card (if addresses provided) */}
-        {(pickupAddress || deliveryAddress) && (
-          <View style={styles.summaryCard}>
-            {pickupAddress ? (
-              <View style={styles.summaryAddressItem}>
-                <View style={styles.summaryDotGreen} />
+        {/* Structured Route Summary Card */}
+        <View style={styles.summaryCard}>
+          {/* 1. Delivery Preference Header */}
+          <View style={styles.prefHeader}>
+            <View style={styles.prefIconCircle}>
+              <MaterialIcons
+                name={deliveryType === 'door' ? 'door-front' : 'people'}
+                size={16}
+                color={deliveryType === 'door' ? GOLD : GREEN}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.prefLabel}>DELIVERY PREFERENCE</Text>
+              <Text style={styles.prefValue}>
+                {deliveryType === 'door' ? 'Leave at Door · Photo on delivery' : 'Meet at Door · Hand off directly'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.summaryDivider} />
+
+          {/* 2. Locations: Pickup & Delivery */}
+          {cleanPickup ? (
+            <View style={styles.summaryRow}>
+              <View style={styles.dotGreen} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowLabel}>PICKUP FROM</Text>
+                <Text style={styles.rowValue}>{cleanPickup}</Text>
+              </View>
+            </View>
+          ) : null}
+
+          {cleanPickup && cleanDelivery ? <View style={styles.summaryDivider} /> : null}
+
+          {cleanDelivery ? (
+            <View style={styles.summaryRow}>
+              <View style={styles.dotBlue} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowLabel}>DELIVER TO</Text>
+                <Text style={styles.rowValue}>{cleanDelivery}</Text>
+              </View>
+            </View>
+          ) : null}
+
+          {/* 3. Order & Pickup Info */}
+          {(pickupNumber || itemsDescription || hasAlcohol) ? (
+            <>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <View style={styles.dotPurple} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.summaryAddressLabel}>PICKUP FROM</Text>
-                  <Text style={styles.summaryAddressValue}>{pickupAddress}</Text>
+                  <Text style={styles.rowLabel}>ORDER & PICKUP DETAILS</Text>
                   {pickupNumber ? (
-                    <Text style={styles.summaryAddressNote}>Order Info: {pickupNumber}</Text>
+                    <Text style={styles.rowValueHighlight}>
+                      Order / Pickup #: <Text style={{ color: '#FFFFFF', fontWeight: '500' }}>{pickupNumber}</Text>
+                    </Text>
+                  ) : null}
+                  {itemsDescription ? (
+                    <Text style={styles.rowSubValue} numberOfLines={2}>
+                      Items: {itemsDescription}
+                    </Text>
+                  ) : null}
+                  {hasAlcohol ? (
+                    <View style={styles.alcoholBadge}>
+                      <MaterialIcons name="no-drinks" size={13} color="#FF6B6B" />
+                      <Text style={styles.alcoholText}>Includes Alcohol (21+ ID Required)</Text>
+                    </View>
                   ) : null}
                 </View>
               </View>
-            ) : null}
+            </>
+          ) : null}
 
-            {pickupAddress && deliveryAddress ? (
-              <View style={styles.summaryAddressDivider} />
-            ) : null}
-
-            {deliveryAddress ? (
-              <View style={styles.summaryAddressItem}>
-                <View style={styles.summaryDotBlue} />
+          {/* 4. Customer Contact */}
+          {(customerName || customerPhone) ? (
+            <>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <View style={styles.dotGold} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.summaryAddressLabel}>DELIVER TO</Text>
-                  <Text style={styles.summaryAddressValue}>{deliveryAddress}</Text>
-                  <View style={styles.summaryDeliveryBadge}>
-                    <MaterialIcons
-                      name={deliveryType === 'door' ? 'door-front' : 'people'}
-                      size={13}
-                      color={deliveryType === 'door' ? GOLD : GREEN}
-                    />
-                    <Text style={styles.summaryDeliveryBadgeText}>
-                      {deliveryType === 'door' ? 'Leave at Door' : 'Meet at Door'}
-                    </Text>
-                  </View>
+                  <Text style={styles.rowLabel}>CUSTOMER CONTACT</Text>
+                  <Text style={styles.rowValue}>
+                    {customerName}{customerPhone ? ` · ${customerPhone}` : ''}
+                  </Text>
+                  {customerEmail ? (
+                    <Text style={styles.rowSubValue}>{customerEmail}</Text>
+                  ) : null}
                 </View>
               </View>
-            ) : null}
+            </>
+          ) : null}
+        </View>
+
+        {/* 5. Estimated Distance */}
+        <View style={styles.distanceCard}>
+          <View style={styles.distanceLeftCol}>
+            <View style={styles.distanceIconCircle}>
+              <MaterialIcons name="navigation" size={16} color={GOLD} />
+            </View>
+            <View>
+              <Text style={styles.distanceCardLabel}>
+                ESTIMATED DISTANCE {APP_CONFIG.FREE_MILES > 0 ? `· Free up to ${APP_CONFIG.FREE_MILES} mi` : ''}
+              </Text>
+              <Text style={styles.distanceCardValue}>
+                {miles && parseFloat(miles) > 0 ? `${miles} miles` : 'Calculating distance…'}
+              </Text>
+            </View>
           </View>
-        )}
 
-        {/* Distance Input */}
-        <CustomInput
-          label={`DISTANCE (MILES) · free up to ${APP_CONFIG.FREE_MILES} mi`}
-          placeholder="e.g. 4.5"
-          value={miles}
-          onChangeText={onMilesChange}
-          keyboardType="decimal-pad"
-          leftIcon={<MaterialIcons name="navigation" size={18} color={colors.outline} />}
-          rightIcon={
-            mileageCents > 0 ? (
-              <View style={styles.mileagePill}>
-                <Text style={styles.mileageText}>+{fmt(mileageCents)}</Text>
-              </View>
-            ) : undefined
-          }
-        />
+          {mileageCents > 0 ? (
+            <View style={styles.mileagePill}>
+              <Text style={styles.mileageText}>+{fmt(mileageCents)}</Text>
+            </View>
+          ) : (
+            <View style={styles.freeMileageBadge}>
+              <Text style={styles.freeMileageText}>Included</Text>
+            </View>
+          )}
+        </View>
 
-        {/* Tip Selector */}
+        {/* 6. Driver Tip */}
         <View style={styles.tipSection}>
           <View style={styles.tipHeaderRow}>
             <Text style={styles.sectionLabel}>DRIVER TIP</Text>
@@ -204,7 +286,7 @@ export function PricingSummaryCard({
           )}
         </View>
 
-        {/* Price Breakdown Drawer */}
+        {/* 7. Price Breakdown */}
         <View style={styles.breakdownCard}>
           <Text style={styles.breakdownTitle}>PRICE BREAKDOWN</Text>
 
@@ -216,58 +298,25 @@ export function PricingSummaryCard({
           {mileageCents > 0 && (
             <View style={styles.breakdownRow}>
               <Text style={styles.breakdownLabel}>
-                Mileage surcharge ({isFinite(milesNum) ? milesNum.toFixed(1) : '0'} mi)
+                Mileage surcharge ({miles} mi @ {fmt(APP_CONFIG.MILEAGE_RATE_CENTS)}/mi)
               </Text>
-              <Text style={[styles.breakdownValue, { color: GOLD }]}>
-                {fmt(mileageCents)}
-              </Text>
+              <Text style={styles.breakdownValue}>{fmt(mileageCents)}</Text>
             </View>
           )}
 
-          <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Driver tip</Text>
-            <Text style={[styles.breakdownValue, { color: GREEN }]}>
-              {fmt(tipCents)}
-            </Text>
-          </View>
+          {tipCents > 0 && (
+            <View style={styles.breakdownRow}>
+              <Text style={styles.breakdownLabel}>Driver tip</Text>
+              <Text style={[styles.breakdownValue, { color: GOLD }]}>{fmt(tipCents)}</Text>
+            </View>
+          )}
 
           <View style={styles.breakdownDivider} />
 
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Estimated Total</Text>
-            <Text style={styles.totalAmount}>{fmt(totalCents)}</Text>
+          <View style={styles.breakdownTotalRow}>
+            <Text style={styles.breakdownTotalLabel}>TOTAL</Text>
+            <Text style={styles.breakdownTotalValue}>{fmt(totalCents)}</Text>
           </View>
-        </View>
-
-        {/* What to Expect Card */}
-        <View style={styles.expectCard}>
-          <Text style={styles.expectTitle}>WHAT TO EXPECT</Text>
-          <View style={styles.expectItem}>
-            <Text style={styles.expectNumber}>1.</Text>
-            <Text style={styles.expectText}>
-              A driver accepts and picks up your order from the store.
-            </Text>
-          </View>
-          <View style={styles.expectItem}>
-            <Text style={styles.expectNumber}>2.</Text>
-            <Text style={styles.expectText}>
-              They deliver directly to your address — usually within the hour.
-            </Text>
-          </View>
-          <View style={styles.expectItem}>
-            <Text style={styles.expectNumber}>3.</Text>
-            <Text style={styles.expectText}>
-              You'll receive a secure Stripe payment link once picked up.
-            </Text>
-          </View>
-        </View>
-
-        {/* Payment Policy Notice */}
-        <View style={styles.paymentNoticeBox}>
-          <MaterialIcons name="credit-card" size={18} color={GREEN} />
-          <Text style={styles.paymentNoticeText}>
-            No payment required now. A secure Stripe link will be sent when your delivery is picked up.
-          </Text>
         </View>
 
         {/* Terms Agreement Checkbox */}
@@ -279,23 +328,26 @@ export function PricingSummaryCard({
             }}
             style={styles.termsRow}
           >
-            <View style={[styles.checkbox, agreedToTerms && styles.checkboxActive]}>
+            <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
               {agreedToTerms && (
-                <Ionicons name="checkmark" size={14} color="#0F131C" />
+                <MaterialIcons name="check" size={14} color="#0D111A" />
               )}
             </View>
             <Text style={styles.termsText}>
               I agree to the{' '}
               <Text
                 style={styles.termsLink}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  router.push('/terms');
-                }}
+                onPress={() => router.push('/terms')}
               >
-                Terms of Use
-              </Text>{' '}
-              and delivery policies.
+                Terms of Service
+              </Text>
+              {' '}and{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={() => router.push('/privacy-policy')}
+              >
+                Privacy Policy
+              </Text>
             </Text>
           </Pressable>
         )}
@@ -306,88 +358,188 @@ export function PricingSummaryCard({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
   },
   sectionTitle: {
-    ...typography.labelMd,
+    fontSize: 11,
+    fontWeight: '700',
     color: colors.outline,
-    marginBottom: spacing.md,
-    marginLeft: 2,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   content: {
-    gap: spacing.md,
+    gap: 12,
   },
   summaryCard: {
     backgroundColor: '#121622',
-    borderRadius: 18,
-    padding: 16,
-    gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  summaryAddressItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 14,
     gap: 12,
   },
-  summaryDotGreen: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: GREEN,
-    marginTop: 4,
+  prefHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    padding: 10,
+    borderRadius: 12,
   },
-  summaryDotBlue: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primaryContainer,
-    marginTop: 4,
+  prefIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  summaryAddressLabel: {
+  prefLabel: {
     fontSize: 10,
     fontWeight: '700',
     color: colors.outline,
     letterSpacing: 0.8,
   },
-  summaryAddressValue: {
-    fontSize: 13.5,
+  prefValue: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginTop: 1,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  dotGreen: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: GREEN,
+    marginTop: 5,
+  },
+  dotBlue: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: BLUE,
+    marginTop: 5,
+  },
+  dotPurple: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#B57EDC',
+    marginTop: 5,
+  },
+  dotGold: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: GOLD,
+    marginTop: 5,
+  },
+  rowLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.outline,
+    letterSpacing: 0.8,
+  },
+  rowValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginTop: 2,
+    lineHeight: 18,
+  },
+  rowValueHighlight: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: GOLD,
+    marginTop: 2,
+  },
+  rowSubValue: {
+    fontSize: 12,
+    color: '#8C90A1',
+    marginTop: 2,
+  },
+  alcoholBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+    backgroundColor: 'rgba(255, 107, 107, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  alcoholText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FF6B6B',
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  distanceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  distanceLeftCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  distanceIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(244, 195, 0, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  distanceCardLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.outline,
+    letterSpacing: 0.8,
+  },
+  distanceCardValue: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
     marginTop: 2,
   },
-  summaryAddressNote: {
-    fontSize: 12,
-    color: GOLD,
-    marginTop: 2,
-  },
-  summaryAddressDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    marginVertical: 2,
-  },
-  summaryDeliveryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 4,
-  },
-  summaryDeliveryBadgeText: {
-    fontSize: 12,
-    color: '#C2C6D8',
-    fontWeight: '500',
-  },
   mileagePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
     backgroundColor: 'rgba(244, 195, 0, 0.15)',
   },
   mileageText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: GOLD,
+  },
+  freeMileageBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+  },
+  freeMileageText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: GREEN,
   },
   tipSection: {
     gap: spacing.sm,
@@ -414,40 +566,40 @@ const styles = StyleSheet.create({
   },
   tipPill: {
     flex: 1,
-    paddingVertical: 11,
+    paddingVertical: 10,
     borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   tipPillActive: {
-    backgroundColor: 'rgba(255, 227, 153, 0.14)',
-    borderColor: GOLD,
+    backgroundColor: 'rgba(244, 195, 0, 0.15)',
+    borderColor: '#F4C300',
   },
   tipPillText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#C2C6D8',
+    color: colors.onSurfaceVariant,
   },
   tipPillTextActive: {
-    color: GOLD,
-    fontWeight: '800',
+    color: '#F4C300',
+    fontWeight: '700',
   },
   breakdownCard: {
     backgroundColor: '#121622',
-    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
     padding: 16,
     gap: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   breakdownTitle: {
     fontSize: 11,
     fontWeight: '700',
     color: colors.outline,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     marginBottom: 4,
   },
   breakdownRow: {
@@ -457,110 +609,62 @@ const styles = StyleSheet.create({
   },
   breakdownLabel: {
     fontSize: 13,
-    color: '#C2C6D8',
+    color: '#8C90A1',
   },
   breakdownValue: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '600',
     color: '#FFFFFF',
   },
   breakdownDivider: {
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     marginVertical: 4,
   },
-  totalRow: {
+  breakdownTotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 2,
   },
-  totalLabel: {
-    fontSize: 14,
+  breakdownTotalLabel: {
+    fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+    letterSpacing: 0.8,
   },
-  totalAmount: {
+  breakdownTotalValue: {
     fontSize: 18,
     fontWeight: '800',
     color: GOLD,
-  },
-  expectCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: 16,
-    padding: 14,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-  },
-  expectTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.outline,
-    letterSpacing: 1,
-    marginBottom: 2,
-  },
-  expectItem: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'flex-start',
-  },
-  expectNumber: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  expectText: {
-    fontSize: 12.5,
-    color: '#C2C6D8',
-    flex: 1,
-    lineHeight: 18,
-  },
-  paymentNoticeBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(0, 226, 151, 0.08)',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 226, 151, 0.25)',
-  },
-  paymentNoticeText: {
-    fontSize: 12,
-    color: '#DFE2EF',
-    flex: 1,
-    lineHeight: 17,
   },
   termsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 2,
+    marginTop: 4,
   },
   checkbox: {
-    width: 22,
-    height: 22,
+    width: 20,
+    height: 20,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: colors.outline,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
-  checkboxActive: {
-    backgroundColor: GREEN,
-    borderColor: GREEN,
+  checkboxChecked: {
+    backgroundColor: GOLD,
+    borderColor: GOLD,
   },
   termsText: {
-    fontSize: 12.5,
-    color: '#8C90A1',
     flex: 1,
-    lineHeight: 18,
+    fontSize: 12,
+    color: '#8C90A1',
+    lineHeight: 16,
   },
   termsLink: {
-    color: colors.primary,
+    color: GOLD,
     fontWeight: '600',
   },
 });

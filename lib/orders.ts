@@ -42,10 +42,12 @@ export function useAvailableOrders(params?: AvailableOrdersParams) {
  * Hook to query the full list of active/all orders.
  */
 export function useOrders() {
+  const token = useAuthStore((state) => state.token);
   const storeOrders = useOrderStore((state) => state.orders);
 
   return useQuery<Order[]>({
-    queryKey: ['orders', APP_CONFIG.CITY_ID],
+    queryKey: ['orders', APP_CONFIG.CITY_ID, token],
+    enabled: Boolean(token),
     queryFn: async () => {
       try {
         const mine = await ordersApi.getMine();

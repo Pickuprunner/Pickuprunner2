@@ -21,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 
+import { useAuth } from '@/hooks/useAuth';
 import { blink } from '@/lib/blink';
 import { ordersApi } from '@/apis/orders';
 import { createCheckoutForOrder } from '@/apis/checkout';
@@ -92,9 +93,21 @@ const EMPTY_FORM: FormState = {
 };
 
 export default function CustomerNewOrderScreen() {
+  const { user } = useAuth();
   const { showToast } = useToast();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+
+  useEffect(() => {
+    if (user) {
+      setForm((f) => ({
+        ...f,
+        name: f.name || user.displayName || '',
+        phone: f.phone || user.phone || '',
+        email: f.email || user.email || '',
+      }));
+    }
+  }, [user]);
 
   useEffect(() => {
     AsyncStorage.getItem(NAME_KEY).then((saved) => {
@@ -135,7 +148,7 @@ export default function CustomerNewOrderScreen() {
         }
       } catch { }
       setCalculating(false);
-    }, 1200);
+    }, 400);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -157,23 +170,6 @@ export default function CustomerNewOrderScreen() {
     }
   };
 
-  const fillTestData = () => {
-    setForm({
-      name: 'Jamie Test',
-      phone: '(520) 555-1234',
-      pickupNumber: '#1042',
-      email: 'test@example.com',
-      address: '5765 S Camino del Sol, Green Valley, AZ 85622',
-      deliveryAddress: '123 E Test Ave, Sahuarita, AZ 85629',
-      items: '2 bags of groceries & deli counter order',
-      hasAlcohol: false,
-      miles: '3.5',
-      deliveryType: 'door',
-    });
-    setTipCents(500);
-    haptic('medium');
-    showToast('Customer test data filled', { type: 'info' });
-  };
 
   const handleSubmitOrder = async () => {
     if (!agreedToTerms) {
@@ -204,16 +200,17 @@ export default function CustomerNewOrderScreen() {
         console.warn('[customer-new-order] Geocoding pickup failed:', geoErr);
       }
 
+      const resolvedName = form.name.trim() || user?.displayName || 'Customer';
+      const resolvedPhone = form.phone.trim() || user?.phone || '';
+      const resolvedEmail = form.email.trim() || user?.email || undefined;
+
       try {
         serverOrder = await ordersApi.create({
-          customerName: form.name.trim(),
-          customerPhone: form.phone.trim(),
-          customerEmail: form.email.trim() || undefined,
+          customerName: resolvedName,
+          customerPhone: resolvedPhone,
+          customerEmail: resolvedEmail,
           pickupAddress: form.address.trim(),
           deliveryAddress: form.deliveryAddress.trim(),
-          // Hardcoded location commented out - live geocoded location used instead:
-          // pickupLat: 31.9505,
-          // pickupLng: -110.9747,
           pickupLat: pickupCoords?.lat,
           pickupLng: pickupCoords?.lon,
           items: orderItems || '[LEAVE AT DOOR] Standard delivery items',
@@ -230,9 +227,9 @@ export default function CustomerNewOrderScreen() {
 
       const finalOrder = serverOrder || {
         id: fallbackOrderId,
-        customerName: form.name.trim(),
-        customerPhone: form.phone.trim(),
-        customerEmail: form.email.trim(),
+        customerName: resolvedName,
+        customerPhone: resolvedPhone,
+        customerEmail: resolvedEmail || '',
         pickupAddress: form.address.trim(),
         deliveryAddress: form.deliveryAddress.trim(),
         items: orderItems || '[LEAVE AT DOOR] Standard delivery items',
@@ -473,15 +470,6 @@ export default function CustomerNewOrderScreen() {
         title={titleNode}
         subtitle="Schedule a grocery or package pickup"
         showAvatar={false}
-        rightContent={
-          <Pressable
-            onPress={fillTestData}
-            style={({ pressed }) => [styles.testBtn, pressed && styles.btnPressed]}
-          >
-            <MaterialIcons name="bolt" size={14} color={GOLD_ACCENT} />
-            <Text style={styles.testBtnText}>Fill Form</Text>
-          </Pressable>
-        }
       />
 
       <KeyboardAvoidingView
@@ -566,22 +554,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.3,
   },
-  testBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: 'rgba(245, 196, 0, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 196, 0, 0.3)',
-  },
-  testBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: GOLD_ACCENT,
-  },
+
   btnPressed: {
     opacity: 0.8,
     transform: [{ scale: 0.98 }],

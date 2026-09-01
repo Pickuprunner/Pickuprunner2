@@ -29,6 +29,9 @@ export { RouteItemsCard } from './RouteItemsCard';
 export { PricingSummaryCard } from './PricingSummaryCard';
 export { NewOrderSubmitButton } from './NewOrderSubmitButton';
 export { NewOrderWizardForm } from './NewOrderWizardForm';
+export { AddressAutocompleteInput } from './AddressAutocompleteInput';
+export { MapLocationPickerModal } from './MapLocationPickerModal';
 
 // Order Detail Screen Components
 export * from './detail';
+

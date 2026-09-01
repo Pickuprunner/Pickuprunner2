@@ -1,8 +1,19 @@
-import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Pressable, Switch, Platform } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  Pressable,
+  Switch,
+  Platform,
+  Animated,
+} from 'react-native';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { CustomInput } from '@/components/core';
+import { AddressAutocompleteInput } from './AddressAutocompleteInput';
 import { APP_CONFIG, IS_STORE_BUILD } from '@/lib/config';
 import { colors, spacing, typography } from '@/constants/design';
 
@@ -25,6 +36,10 @@ interface RouteItemsCardProps {
   miles?: string;
   mileageCents?: number;
   calculating?: boolean;
+  deliveryType?: 'door' | 'meet';
+  onDeliveryTypeChange?: (val: 'door' | 'meet') => void;
+  pickupNumber?: string;
+  onPickupNumberChange?: (val: string) => void;
 }
 
 export function RouteItemsCard({
@@ -39,10 +54,26 @@ export function RouteItemsCard({
   miles = '',
   mileageCents = 0,
   calculating = false,
+  deliveryType = 'door',
+  onDeliveryTypeChange,
+  pickupNumber = '',
+  onPickupNumberChange,
 }: RouteItemsCardProps) {
   const isPickupLocked = APP_CONFIG.LOCK_PICKUP_ADDRESS && IS_STORE_BUILD;
   const milesNum = parseFloat(miles);
   const hasValidMiles = isFinite(milesNum) && milesNum > 0;
+
+  const [toggleWidth, setToggleWidth] = useState(0);
+  const slideAnim = useRef(new Animated.Value(deliveryType === 'meet' ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(slideAnim, {
+      toValue: deliveryType === 'meet' ? 1 : 0,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 50,
+    }).start();
+  }, [deliveryType]);
 
   const haptic = () => {
     if (Platform.OS !== 'web') {
@@ -52,9 +83,99 @@ export function RouteItemsCard({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>ROUTE & ITEMS</Text>
 
       <View style={styles.content}>
+        {/* Delivery Preference Toggle */}
+        <View style={styles.prefContainer}>
+          <Text style={styles.inputSectionLabel}>DELIVERY PREFERENCE</Text>
+          <View
+            style={styles.prefToggleContainer}
+            onLayout={(e) => setToggleWidth(e.nativeEvent.layout.width)}
+          >
+            {toggleWidth > 0 && (
+              <Animated.View
+                style={[
+                  styles.slidingPill,
+                  {
+                    width: (toggleWidth - 12) / 2,
+                    left: slideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [4, toggleWidth - 4 - (toggleWidth - 12) / 2],
+                    }),
+                    borderColor:
+                      deliveryType === 'door'
+                        ? 'rgba(255, 227, 153, 0.5)'
+                        : 'rgba(0, 226, 151, 0.5)',
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={
+                    deliveryType === 'door'
+                      ? ['rgba(255, 227, 153, 0.18)', 'rgba(255, 227, 153, 0.04)']
+                      : ['rgba(0, 226, 151, 0.20)', 'rgba(0, 226, 151, 0.04)']
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.slidingGradient}
+                />
+              </Animated.View>
+            )}
+
+            {/* Option 1: Leave at Door */}
+            <Pressable
+              onPress={() => {
+                onDeliveryTypeChange?.('door');
+                haptic();
+              }}
+              style={styles.prefTab}
+            >
+              <MaterialIcons
+                name="door-front"
+                size={20}
+                color={deliveryType === 'door' ? GOLD : '#8C90A1'}
+              />
+              <View style={styles.prefTextCol}>
+                <Text
+                  style={[
+                    styles.prefTitle,
+                    deliveryType === 'door' && styles.prefTitleActiveDoor,
+                  ]}
+                >
+                  Leave at Door
+                </Text>
+                <Text style={styles.prefDesc}>Photo on delivery</Text>
+              </View>
+            </Pressable>
+
+            {/* Option 2: Meet at Door */}
+            <Pressable
+              onPress={() => {
+                onDeliveryTypeChange?.('meet');
+                haptic();
+              }}
+              style={styles.prefTab}
+            >
+              <Ionicons
+                name="people-outline"
+                size={20}
+                color={deliveryType === 'meet' ? GREEN : '#8C90A1'}
+              />
+              <View style={styles.prefTextCol}>
+                <Text
+                  style={[
+                    styles.prefTitle,
+                    deliveryType === 'meet' && styles.prefTitleActiveMeet,
+                  ]}
+                >
+                  Meet at Door
+                </Text>
+                <Text style={styles.prefDesc}>Hand off directly</Text>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+
         {IS_STORE_BUILD && (
           <View style={styles.storeBanner}>
             <View style={styles.storeHeaderRow}>
@@ -73,33 +194,52 @@ export function RouteItemsCard({
           </View>
         )}
 
-        <CustomInput
-          label={isPickupLocked ? 'PICKUP ADDRESS (STORE DEFAULT)' : 'PICKUP ADDRESS'}
-          placeholder="Where to pick up"
-          value={pickupAddress}
-          onChangeText={isPickupLocked ? undefined : onPickupAddressChange}
-          editable={!isPickupLocked}
-          autoCapitalize="words"
-          returnKeyType="next"
-          leftIcon={<MaterialIcons name="place" size={18} color={colors.secondaryContainer} />}
-          rightIcon={
-            isPickupLocked ? (
-              <MaterialIcons name="lock-outline" size={16} color={colors.outline} />
-            ) : undefined
-          }
-          status={pickupAddress.trim().length >= 5 ? 'success' : 'default'}
-        />
+        {isPickupLocked ? (
+          <CustomInput
+            label="PICKUP ADDRESS"
+            placeholder="Where to pick up"
+            value={pickupAddress}
+            editable={false}
+            leftIcon={<MaterialIcons name="place" size={18} color={colors.secondaryContainer} />}
+            rightIcon={<MaterialIcons name="lock-outline" size={16} color={colors.outline} />}
+            status={pickupAddress.trim().length >= 5 ? 'success' : 'default'}
+          />
+        ) : (
+          <AddressAutocompleteInput
+            label="PICKUP ADDRESS"
+            placeholder="Where to pick up"
+            value={pickupAddress}
+            onChangeText={onPickupAddressChange}
+            nearbyAddress={deliveryAddress}
+            leftIcon={<MaterialIcons name="place" size={18} color={colors.secondaryContainer} />}
+            status={pickupAddress.trim().length >= 5 ? 'success' : 'default'}
+          />
+        )}
 
-        <CustomInput
+        <AddressAutocompleteInput
           label="DELIVERY ADDRESS *"
           placeholder="Where to drop off"
           value={deliveryAddress}
           onChangeText={onDeliveryAddressChange}
-          autoCapitalize="words"
-          returnKeyType="next"
+          nearbyAddress={pickupAddress}
           leftIcon={<MaterialIcons name="navigation" size={18} color={colors.primaryContainer} />}
           status={deliveryAddress.trim().length >= 5 ? 'success' : 'default'}
         />
+
+
+      
+        {onPickupNumberChange && (
+          <CustomInput
+            label="PICKUP INFO / ORDER # (OPTIONAL)"
+            placeholder="e.g. #1042 or 'Deli Counter'"
+            value={pickupNumber}
+            onChangeText={onPickupNumberChange}
+            autoCapitalize="none"
+            returnKeyType="next"
+            leftIcon={<MaterialIcons name="tag" size={18} color={colors.outline} />}
+          />
+        )}
+
 
         <CustomInput
           label="ORDER ITEMS *"
@@ -201,6 +341,57 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: spacing.md,
+  },
+  prefContainer: {
+    gap: 8,
+  },
+  prefToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#0D111A',
+    borderRadius: 14,
+    padding: 4,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  slidingPill: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  slidingGradient: {
+    flex: 1,
+  },
+  prefTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    zIndex: 1,
+  },
+  prefTextCol: {
+    alignItems: 'flex-start',
+  },
+  prefTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#8C90A1',
+  },
+  prefTitleActiveDoor: {
+    color: GOLD,
+  },
+  prefTitleActiveMeet: {
+    color: GREEN,
+  },
+  prefDesc: {
+    fontSize: 10,
+    color: '#8C90A1',
   },
   storeBanner: {
     backgroundColor: '#141824',
