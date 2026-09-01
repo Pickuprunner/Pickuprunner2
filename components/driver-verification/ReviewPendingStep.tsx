@@ -24,6 +24,7 @@ import { colors, borderRadius, spacing } from '@/constants/design';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { useMyVerification } from '@/lib/verification';
+import { isAccreditationFullyApproved } from '@/apis/accreditation';
 import { DriverWizardData } from './mockData';
 
 interface ReviewPendingStepProps {
@@ -37,9 +38,7 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
 
   const { data: verification } = useMyVerification(user?.id);
 
-  const isApproved =
-    accreditation?.profile?.accreditationStatus === 'approved' ||
-    verification?.status === 'approved';
+  const isApproved = isAccreditationFullyApproved(accreditation);
 
   const handleSignOut = async () => {
     if (Platform.OS !== 'web') {

@@ -30,6 +30,8 @@ import { useDriverAccreditation } from '@/lib/accreditation';
 import { useMyVerification } from '@/lib/verification';
 import { useToast, CustomLoading } from '@/components/core';
 
+import { isAccreditationFullyApproved } from '@/apis/accreditation';
+
 export interface DriverProfileStatusScreenProps {
   onEditDocuments?: () => void;
   onEditStep?: (step: number) => void;
@@ -44,15 +46,63 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
   const [refreshing, setRefreshing] = useState(false);
 
   const profile = accreditation?.profile;
+
+  const rawLicenseStatus = String(profile?.licenseStatus || accreditation?.steps?.license || '');
+  const rawInsuranceStatus = String(profile?.insuranceStatus || accreditation?.steps?.insurance || '');
+  const rawBgStatus = String(profile?.backgroundStatus || accreditation?.steps?.backgroundCheck || '');
+  const rawVehicleStatus = String((profile as any)?.vehicleStatus || (profile as any)?.vehicle_status || '');
+  const rawAccredStatus = String(profile?.accreditationStatus || '');
+
+  const hasVehicle = Boolean(profile?.vehicleMake && profile?.vehiclePlate);
+  const hasLicense = Boolean(profile?.licenseNumber || profile?.licenseState);
+  const hasConsent = Boolean(profile?.backgroundConsentAt);
+  const hasInsurance = Boolean(profile?.insurancePolicyNumber || profile?.insuranceCompany);
+
+  const vehicleStatus: 'approved' | 'rejected' | 'in_review' =
+    rawAccredStatus === 'approved' || rawVehicleStatus === 'approved'
+      ? 'approved'
+      : rawAccredStatus === 'rejected' || rawVehicleStatus === 'rejected'
+        ? 'rejected'
+        : 'in_review';
+
+  const licenseStatus: 'approved' | 'rejected' | 'in_review' =
+    rawLicenseStatus === 'approved'
+      ? 'approved'
+      : rawLicenseStatus === 'rejected'
+        ? 'rejected'
+        : 'in_review';
+
+  const bgStatus: 'approved' | 'rejected' | 'in_review' =
+    rawBgStatus === 'approved'
+      ? 'approved'
+      : rawBgStatus === 'rejected'
+        ? 'rejected'
+        : 'in_review';
+
+  const insuranceStatus: 'approved' | 'rejected' | 'in_review' =
+    rawInsuranceStatus === 'approved'
+      ? 'approved'
+      : rawInsuranceStatus === 'rejected'
+        ? 'rejected'
+        : 'in_review';
+
   const isApproved =
-    profile?.accreditationStatus === 'approved' ||
-    verification?.status === 'approved' ||
-    accreditation?.eligibility?.eligible;
+    vehicleStatus === 'approved' &&
+    licenseStatus === 'approved' &&
+    bgStatus === 'approved' &&
+    insuranceStatus === 'approved';
+
+  const isAnyStepRejected =
+    vehicleStatus === 'rejected' ||
+    licenseStatus === 'rejected' ||
+    bgStatus === 'rejected' ||
+    insuranceStatus === 'rejected';
 
   const isSubmitted =
     Boolean(profile?.isSubmitted) ||
-    profile?.accreditationStatus === 'under_review' ||
-    profile?.accreditationStatus === 'approved' ||
+    rawAccredStatus === 'under_review' ||
+    rawAccredStatus === 'approved' ||
+    rawAccredStatus === 'in_progress' ||
     verification?.status === 'pending' ||
     verification?.status === 'approved';
 
@@ -63,57 +113,6 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
     }
   }, [user?.role, isApproved]);
 
-  const hasVehicle = Boolean(profile?.vehicleMake && profile?.vehiclePlate);
-  const hasLicense = Boolean(profile?.licenseNumber || profile?.licenseState);
-  const hasConsent = Boolean(profile?.backgroundConsentAt);
-  const hasInsurance = Boolean(profile?.insurancePolicyNumber || profile?.insuranceCompany);
-
-  const rawLicenseStatus = String(profile?.licenseStatus || accreditation?.steps?.license || '');
-  const rawInsuranceStatus = String(profile?.insuranceStatus || accreditation?.steps?.insurance || '');
-  const rawBgStatus = String(profile?.backgroundStatus || accreditation?.steps?.backgroundCheck || '');
-  const rawVehicleStatus = String((profile as any)?.vehicleStatus || (profile as any)?.vehicle_status || '');
-
-  const isOverallRejected =
-    profile?.accreditationStatus === 'rejected' ||
-    verification?.status === 'rejected';
-
-  const licenseStatus: 'approved' | 'rejected' | 'in_review' =
-    isApproved || rawLicenseStatus === 'approved'
-      ? 'approved'
-      : rawLicenseStatus === 'rejected' || (isOverallRejected && rawLicenseStatus !== 'approved')
-        ? 'rejected'
-        : 'in_review';
-
-  const insuranceStatus: 'approved' | 'rejected' | 'in_review' =
-    isApproved || rawInsuranceStatus === 'approved'
-      ? 'approved'
-      : rawInsuranceStatus === 'rejected' || (isOverallRejected && rawInsuranceStatus !== 'approved')
-        ? 'rejected'
-        : 'in_review';
-
-  const bgStatus: 'approved' | 'rejected' | 'in_review' =
-    isApproved || rawBgStatus === 'approved'
-      ? 'approved'
-      : rawBgStatus === 'rejected' || (isOverallRejected && rawBgStatus !== 'approved')
-        ? 'rejected'
-        : 'in_review';
-
-  const vehicleStatus: 'approved' | 'rejected' | 'in_review' =
-    rawVehicleStatus === 'rejected' || (isOverallRejected && rawVehicleStatus !== 'approved')
-      ? 'rejected'
-      : rawVehicleStatus === 'approved' || (isApproved && hasVehicle)
-        ? 'approved'
-        : isOverallRejected
-          ? 'rejected'
-          : 'in_review';
-
-  const isAnyStepRejected =
-    isOverallRejected ||
-    licenseStatus === 'rejected' ||
-    insuranceStatus === 'rejected' ||
-    bgStatus === 'rejected' ||
-    vehicleStatus === 'rejected';
-
   const handleRefresh = async () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
@@ -122,12 +121,12 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
     try {
       const minDelay = new Promise((resolve) => setTimeout(resolve, 550));
       const [accredRes] = await Promise.all([refetchAccred(), refetchVerif(), minDelay]);
-      const newStatus = accredRes.data?.profile?.accreditationStatus;
-      if (newStatus === 'approved') {
+      const isNowFullyApproved = isAccreditationFullyApproved(accredRes.data);
+      if (isNowFullyApproved) {
         showToast('Accreditation Approved! Welcome to PickupRunner.', 'success');
         if (router.canDismiss()) router.dismissAll();
         router.replace('/(tabs)');
-      } else if (newStatus === 'rejected') {
+      } else if (accredRes.data?.profile?.accreditationStatus === 'rejected') {
         showToast('Application needs review. Please update documentation.', 'error');
       } else {
         showToast('Profile is still under review. We will notify you soon.', 'info');
@@ -292,11 +291,13 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
                   ? hasVehicle
                     ? `${profile?.vehicleYear || ''} ${profile?.vehicleMake || ''} (${profile?.vehiclePlate || ''}) • Action Required`
                     : 'Vehicle details rejected — Tap to update'
-                  : hasVehicle
-                    ? `${profile?.vehicleYear || ''} ${profile?.vehicleMake || ''} ${profile?.vehicleModel || ''} (${profile?.vehiclePlate || ''})`.trim()
-                    : vehicleStatus === 'approved'
-                      ? 'Vehicle details verified & approved'
-                      : 'Vehicle details submitted'}
+                  : vehicleStatus === 'approved'
+                    ? hasVehicle
+                      ? `${profile?.vehicleYear || ''} ${profile?.vehicleMake || ''} ${profile?.vehicleModel || ''} (${profile?.vehiclePlate || ''})`.trim()
+                      : 'Vehicle details verified & approved'
+                    : hasVehicle
+                      ? `${profile?.vehicleYear || ''} ${profile?.vehicleMake || ''} (${profile?.vehiclePlate || ''}) • Under Review`.trim()
+                      : 'Vehicle details submitted • Under Review'}
               </Text>
             </View>
             {vehicleVisuals.badgeNode}
@@ -323,7 +324,7 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
                   : licenseStatus === 'rejected'
                     ? 'Action Required — Tap to re-upload license'
                     : profile?.licenseNumber
-                      ? `${profile?.licenseState || 'AZ'} • #${'••••' + String(profile.licenseNumber).slice(-4)}`
+                      ? `${profile?.licenseState || 'AZ'} • #${'••••' + String(profile.licenseNumber).slice(-4)} (Under Review)`
                       : 'Document submitted • Under Review'}
               </Text>
             </View>
@@ -349,7 +350,7 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
                   : bgStatus === 'rejected'
                     ? 'Action Required — Tap to review consent'
                     : hasConsent
-                      ? 'FCRA Disclosure Authorized'
+                      ? 'FCRA Disclosure Authorized • Under Review'
                       : 'Authorization Required'}
               </Text>
             </View>
@@ -377,7 +378,7 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
                   : insuranceStatus === 'rejected'
                     ? 'Action Required — Tap to update insurance'
                     : profile?.insuranceCompany
-                      ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'}`
+                      ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'} (Under Review)`
                       : 'Policy document submitted • Under Review'}
               </Text>
             </View>
@@ -387,71 +388,33 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
 
         {/* ACTIONS */}
         <View style={styles.actionsContainer}>
-          {isAnyStepRejected ? (
-            <>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => handleEditDocuments(1)}
-                style={styles.editBtn}
-              >
-                <FileText size={18} color="#0F131C" />
-                <Text style={styles.editBtnText}>Update Documentation</Text>
-                <ArrowRight size={18} color="#0F131C" />
-              </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => handleEditDocuments(1)}
+            style={styles.primaryActionBtn}
+          >
+            <FileText size={18} color="#0F131C" />
+            <Text style={styles.primaryActionBtnText}>
+              {isAnyStepRejected ? 'Update Documentation' : 'Edit Application Details'}
+            </Text>
+            <ArrowRight size={18} color="#0F131C" />
+          </TouchableOpacity>
 
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleRefresh}
-                disabled={isChecking}
-                style={styles.secondaryBtn}
-              >
-                {isChecking ? (
-                  <ActivityIndicator size="small" color="#FFE399" />
-                ) : (
-                  <>
-                    <RefreshCw size={16} color="#FFE399" />
-                    <Text style={styles.secondaryBtnText}>Check Approval Status</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </>
-          ) : !isSubmitted ? (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => handleEditDocuments(1)}
-              style={styles.refreshBtn}
-            >
-              <ArrowRight size={16} color="#0F131C" />
-              <Text style={styles.refreshBtnText}>Resume Application</Text>
-            </TouchableOpacity>
-          ) : (
-            <>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleRefresh}
-                disabled={isChecking}
-                style={styles.refreshBtn}
-              >
-                {isChecking ? (
-                  <ActivityIndicator size="small" color="#0F131C" />
-                ) : (
-                  <>
-                    <RefreshCw size={16} color="#0F131C" />
-                    <Text style={styles.refreshBtnText}>Check Approval Status</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => handleEditDocuments(1)}
-                style={styles.secondaryBtn}
-              >
-                <FileText size={16} color="rgba(255, 255, 255, 0.7)" />
-                <Text style={styles.secondaryBtnTextDim}>Edit Application Details</Text>
-              </TouchableOpacity>
-            </>
-          )}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handleRefresh}
+            disabled={refreshing}
+            style={styles.secondaryActionBtn}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color="#FFE399" />
+            ) : (
+              <>
+                <RefreshCw size={16} color="#FFE399" />
+                <Text style={styles.secondaryActionBtnText}>Check Approval Status</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </ScrollView>
       <CustomLoading visible={refreshing} variant="circle" overlay position="top" topOffset={insets.top + 24} />
@@ -652,7 +615,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
-  editBtn: {
+  primaryActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -661,45 +624,26 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: borderRadius.md,
   },
-  editBtnText: {
+  primaryActionBtnText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#0F131C',
   },
-  refreshBtn: {
+  secondaryActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#FFE399',
     height: 48,
-    borderRadius: borderRadius.md,
-  },
-  refreshBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F131C',
-  },
-  secondaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 46,
     borderRadius: borderRadius.md,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  secondaryBtnText: {
-    fontSize: 13,
+  secondaryActionBtnText: {
+    fontSize: 14,
     fontWeight: '700',
     color: '#FFE399',
-  },
-  secondaryBtnTextDim: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.7)',
   },
   signOutBtn: {
     flexDirection: 'row',

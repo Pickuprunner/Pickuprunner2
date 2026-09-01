@@ -98,6 +98,24 @@ export interface AccreditationApiResponse {
   message?: string;
 }
 
+export function isAccreditationFullyApproved(data?: AccreditationResponseData | null): boolean {
+  if (!data) return false;
+  const profile = data.profile;
+  const steps = data.steps;
+
+  const accredStatus = String(profile?.accreditationStatus || '');
+  const licenseStatus = String(profile?.licenseStatus || steps?.license || '');
+  const bgStatus = String(profile?.backgroundStatus || steps?.backgroundCheck || '');
+  const insuranceStatus = String(profile?.insuranceStatus || steps?.insurance || '');
+
+  const isStep1Approved = accredStatus === 'approved';
+  const isStep2Approved = licenseStatus === 'approved';
+  const isStep3Approved = bgStatus === 'approved';
+  const isStep4Approved = insuranceStatus === 'approved';
+
+  return isStep1Approved && isStep2Approved && isStep3Approved && isStep4Approved;
+}
+
 export interface SaveStepResponse {
   success: boolean;
   message?: string;

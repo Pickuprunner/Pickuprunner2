@@ -8,6 +8,7 @@ import { useDriverId } from '@/hooks/useDriverId';
 import { useAuth } from '@/hooks/useAuth';
 import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
+import { isAccreditationFullyApproved } from '@/apis/accreditation';
 import { chatApi } from '@/apis/chat';
 
 const ACTIVE = '#FFE399';
@@ -45,11 +46,10 @@ function ChatTabIcon({ color, size }: { color: string; size: number }) {
         if (!isMounted) return;
         const count = res.totalUnread ?? res.chats?.reduce((sum, c) => sum + (c.unread || 0), 0) ?? 0;
         setUnreadCount(count);
-      } catch { }
+      } catch {}
     };
-
     fetchUnread();
-    const interval = setInterval(fetchUnread, 4000);
+    const interval = setInterval(fetchUnread, 15000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -58,12 +58,10 @@ function ChatTabIcon({ color, size }: { color: string; size: number }) {
 
   return (
     <View style={styles.iconWrapper}>
-      <MaterialIcons name="chat-bubble-outline" size={size || 22} color={color} />
+      <MaterialIcons name="chat" size={size} color={color} />
       {unreadCount > 0 && (
-        <View style={[styles.badge, { backgroundColor: '#FFE399' }]}>
-          <Text style={[styles.badgeText, { color: '#000' }]}>
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </Text>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
         </View>
       )}
     </View>
@@ -76,13 +74,12 @@ export default function TabLayout() {
   const { data: verification, isLoading: isVerifLoading } = useMyVerification(user?.id);
   const { data: accreditation, isLoading: isAccredLoading } = useDriverAccreditation();
 
-  const isApproved =
-    verification?.status === 'approved' ||
-    accreditation?.profile?.accreditationStatus === 'approved';
+  const isApproved = isAccreditationFullyApproved(accreditation);
 
   const isSubmitted =
     Boolean(accreditation?.profile?.isSubmitted) ||
     accreditation?.profile?.accreditationStatus === 'under_review' ||
+    accreditation?.profile?.accreditationStatus === 'approved' ||
     verification?.status === 'pending';
 
   // Guard: if unauthenticated, token not found, or user deleted, redirect to role-select

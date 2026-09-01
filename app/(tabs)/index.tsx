@@ -33,10 +33,9 @@ import { useDriverId } from '@/hooks/useDriverId';
 import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
-import { calcDriverEarnings } from '@/lib/config';
-import { colors } from '@/constants/design';
 import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast, CustomLoading } from '@/components/core';
 
+import { isAccreditationFullyApproved } from '@/apis/accreditation';
 import {
   OrdersHeader,
   OrdersSearchBar,
@@ -140,13 +139,12 @@ export default function OrdersScreen() {
   const { data: verification, isLoading: isLoadingVerif } = useMyVerification(user?.id);
   const { data: accreditation, isLoading: isLoadingAccred } = useDriverAccreditation();
 
-  const isApproved =
-    verification?.status === 'approved' ||
-    accreditation?.profile?.accreditationStatus === 'approved';
+  const isApproved = isAccreditationFullyApproved(accreditation);
 
   const isSubmitted =
     Boolean(accreditation?.profile?.isSubmitted) ||
     accreditation?.profile?.accreditationStatus === 'under_review' ||
+    accreditation?.profile?.accreditationStatus === 'approved' ||
     verification?.status === 'pending';
 
   useEffect(() => {
