@@ -31,18 +31,10 @@ function haptic(type: 'light' | 'medium' | 'success' = 'medium') {
   else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
 }
 
-function openMaps(address: string) {
-  if (!address) return;
-  const encoded = encodeURIComponent(address);
-  const url = Platform.OS === 'ios'
-    ? `maps://maps.apple.com/?daddr=${encoded}`
-    : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-  Linking.openURL(url);
-}
+import { openMapsNavigation } from '@/lib/maps';
 
-// ── Reusable address block ────────────────────────────────────────────────────
-function AddressBlock({ title, address, accent }: {
-  title: string; address: string; accent: string;
+function AddressBlock({ title, address, accent, lat, lng }: {
+  title: string; address: string; accent: string; lat?: number; lng?: number;
 }) {
   return (
     <View style={[styles.addrBlock, { borderLeftColor: accent }]}>
@@ -51,7 +43,7 @@ function AddressBlock({ title, address, accent }: {
       {!!address && (
         <Pressable
           style={[styles.mapsChip, { borderColor: accent + '66', backgroundColor: accent + '18' }]}
-          onPress={() => openMaps(address)}
+          onPress={() => openMapsNavigation(address, lat, lng)}
         >
           <Text style={[styles.mapsChipText, { color: accent }]}>Open in Maps →</Text>
         </Pressable>
@@ -78,7 +70,6 @@ function BigButton({ label, bg, fg = '#000', icon, loading, onPress }: {
   );
 }
 
-// ── Outlined nav button ───────────────────────────────────────────────────────
 function NavButton({ label, accent, onPress }: { label: string; accent: string; onPress: () => void }) {
   return (
     <Pressable
@@ -91,7 +82,6 @@ function NavButton({ label, accent, onPress }: { label: string; accent: string; 
   );
 }
 
-// ── Step indicator ────────────────────────────────────────────────────────────
 function StepBadge({ step, label, active, done }: { step: number; label: string; active: boolean; done: boolean }) {
   const bg = done ? GREEN : active ? YELLOW : 'rgba(255,255,255,0.08)';
   const col = done || active ? '#000' : 'rgba(255,255,255,0.3)';
@@ -106,7 +96,6 @@ function StepBadge({ step, label, active, done }: { step: number; label: string;
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
 interface Props {
   order: Order | null;
   onClose: () => void;
@@ -140,7 +129,6 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
       status === 'picked_up' ? 'PICKED UP' :
         status === 'accepted' ? 'ACCEPTED' : 'PENDING';
 
-  // Step progress: 1=accept, 2=pick up, 3=deliver
   const step1done = status !== 'pending';
   const step2done = status === 'picked_up' || status === 'delivered';
   const step3done = status === 'delivered';
@@ -166,8 +154,6 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
 
   function doDeliver() {
     if (!order) return;
-    // This legacy sheet has no camera/upload UI. Route the driver through the
-    // canonical detail screen so the delivery photo and customer MMS are never skipped.
     setSelectedOrder(order);
     onClose();
     router.push(`/order/${order.id}`);
@@ -222,10 +208,22 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
           </View>
 
           <Text style={styles.sectionHead}>PICK UP FROM</Text>
-          <AddressBlock title="Pickup Location" address={order.pickupAddress} accent={YELLOW} />
+          <AddressBlock
+            title="Pickup Location"
+            address={order.pickupAddress}
+            accent={YELLOW}
+            lat={order.pickupLat ?? (order as any).pickup_lat}
+            lng={order.pickupLng ?? (order as any).pickup_lng}
+          />
 
           <Text style={styles.sectionHead}>DELIVER TO</Text>
-          <AddressBlock title="Delivery Address" address={order.deliveryAddress} accent="#60A5FA" />
+          <AddressBlock
+            title="Delivery Address"
+            address={order.deliveryAddress}
+            accent="#60A5FA"
+            lat={(order as any).deliveryLat ?? (order as any).delivery_lat}
+            lng={(order as any).deliveryLng ?? (order as any).delivery_lng}
+          />
 
           {(!!order.customerPhone || !!order.customerEmail) && (
             <View style={styles.customerCard}>
@@ -262,7 +260,14 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
               <NavButton
                 label="Navigate to Pickup"
                 accent={YELLOW}
-                onPress={() => { haptic('light'); openMaps(order.pickupAddress || order.deliveryAddress); }}
+                onPress={() => {
+                  haptic('light');
+                  openMapsNavigation(
+                    order.pickupAddress || order.deliveryAddress,
+                    order.pickupLat ?? (order as any).pickup_lat,
+                    order.pickupLng ?? (order as any).pickup_lng
+                  );
+                }}
               />
               <View style={{ height: 12 }} />
               <BigButton label="Order Picked Up" bg={ORANGE} icon="🛍️" loading={pickingUp} onPress={doPickUp} />
@@ -275,7 +280,14 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
               <NavButton
                 label="Navigate to Delivery"
                 accent="#60A5FA"
-                onPress={() => { haptic('light'); openMaps(order.deliveryAddress); }}
+                onPress={() => {
+                  haptic('light');
+                  openMapsNavigation(
+                    order.deliveryAddress,
+                    (order as any).deliveryLat ?? (order as any).delivery_lat,
+                    (order as any).deliveryLng ?? (order as any).delivery_lng
+                  );
+                }}
               />
               <View style={{ height: 12 }} />
               <BigButton label="Complete with Photo" bg={GREEN} icon="📸" loading={delivering} onPress={doDeliver} />

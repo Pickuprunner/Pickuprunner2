@@ -1,11 +1,22 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { StyleSheet, View, Text, Pressable, Platform, StatusBar } from 'react-native';
 import { YStack, SizableText, Button, MapPin, Navigation } from '@blinkdotnew/mobile-ui';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Order } from '@/lib/orders';
 import { APP_CONFIG } from '@/lib/config';
 import { colors, shadows } from '@/constants/design';
-import { CENTER, getCoords, openMapsNavigation, GOLD, COBALT, DARK_MAP_STYLE, haptic } from './mapTypes';
+import {
+  CENTER,
+  getCoords,
+  getPickupCoords,
+  getDeliveryCoords,
+  openMapsNavigation,
+  GOLD,
+  COBALT,
+  DARK_MAP_STYLE,
+  haptic,
+} from './mapTypes';
+import { geocode } from '@/lib/distance';
 
 function NativeFallbackMap({
   orders,
@@ -30,7 +41,7 @@ function NativeFallbackMap({
         <MapPin size={30} color={GOLD} />
       </YStack>
       <SizableText size="$5" fontWeight="800" textAlign="center" color={colors.onSurface}>
-        Sahuarita Delivery Routes
+        Delivery Routes
       </SizableText>
       <SizableText size="$2" color={colors.textSecondary} textAlign="center" paddingHorizontal="$4">
         {pending.length} pending deliveries available. Tap any order below to view route details or open in maps.
@@ -61,6 +72,8 @@ export function NativeMap({
   onSelect: (id: string | null) => void;
 }) {
   const mapRef = useRef<any>(null);
+  const [, setGeocodeTick] = useState(0);
+
   let MapView: any = null;
   let Marker: any = null;
   let Callout: any = null;
@@ -76,36 +89,81 @@ export function NativeMap({
     console.warn('[map] react-native-maps not available, using fallback view');
   }
 
+  // Pre-geocode any orders missing coordinates in the background
+  useEffect(() => {
+    let mounted = true;
+    orders.forEach((o) => {
+      if (o.pickupAddress && !getPickupCoords(o)) {
+        geocode(o.pickupAddress).then(() => {
+          if (mounted) setGeocodeTick((n) => n + 1);
+        }).catch(() => {});
+      }
+      if (o.deliveryAddress && !getDeliveryCoords(o)) {
+        geocode(o.deliveryAddress).then(() => {
+          if (mounted) setGeocodeTick((n) => n + 1);
+        }).catch(() => {});
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [orders]);
+
+  const active = orders.filter((o) => o.status === 'accepted' || o.status === 'picked_up');
+  const pending = orders.filter((o) => o.status === 'pending');
+
+  const focusedOrder = orders.find((o) => o.id === selectedId) || active[0] || pending[0] || orders[0] || null;
+  const focusedPickup = getPickupCoords(focusedOrder);
+  const focusedDelivery = getDeliveryCoords(focusedOrder);
+
+  const initialCenter = focusedPickup || focusedDelivery || getPickupCoords(orders[0]) || getDeliveryCoords(orders[0]) || CENTER;
+
+  // Auto-fit or zoom to focused order coordinates on selection or load
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const coordsToFit: { latitude: number; longitude: number }[] = [];
+    if (focusedPickup) coordsToFit.push({ latitude: focusedPickup.lat, longitude: focusedPickup.lng });
+    if (focusedDelivery) coordsToFit.push({ latitude: focusedDelivery.lat, longitude: focusedDelivery.lng });
+
+    if (coordsToFit.length >= 2) {
+      mapRef.current.fitToCoordinates(coordsToFit, {
+        edgePadding: { top: 90, right: 60, bottom: 130, left: 60 },
+        animated: true,
+      });
+    } else if (coordsToFit.length === 1) {
+      mapRef.current.animateToRegion({
+        latitude: coordsToFit[0].latitude,
+        longitude: coordsToFit[0].longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      });
+    }
+  }, [selectedId, focusedOrder?.id, focusedPickup?.lat, focusedDelivery?.lat]);
+
   if (!MapView || !Marker) {
     return <NativeFallbackMap orders={orders} selectedId={selectedId} onSelect={onSelect} />;
   }
 
-  const pending = orders.filter((o) => o.status === 'pending');
-  const active = orders.filter((o) => o.status === 'accepted' || o.status === 'picked_up');
-
-  const focusedOrder = orders.find((o) => o.id === selectedId) || active[0] || null;
-  const focusedCoords = focusedOrder ? getCoords(focusedOrder) : null;
-
   const handleFitAllStops = () => {
     haptic('light');
     if (!mapRef.current) return;
-    const allCoords = [
-      { latitude: CENTER.lat, longitude: CENTER.lng },
-      ...orders.map((o) => {
-        const { lat, lng } = getCoords(o);
-        return { latitude: lat, longitude: lng };
-      }),
-    ];
+    const allCoords: { latitude: number; longitude: number }[] = [];
+    orders.forEach((o) => {
+      const p = getPickupCoords(o);
+      const d = getDeliveryCoords(o);
+      if (p) allCoords.push({ latitude: p.lat, longitude: p.lng });
+      if (d) allCoords.push({ latitude: d.lat, longitude: d.lng });
+    });
 
     if (allCoords.length > 0) {
       mapRef.current.fitToCoordinates(allCoords, {
-        edgePadding: { top: 70, right: 40, bottom: 90, left: 40 },
+        edgePadding: { top: 70, right: 40, bottom: 130, left: 40 },
         animated: true,
       });
     } else {
       mapRef.current.animateToRegion({
-        latitude: CENTER.lat,
-        longitude: CENTER.lng,
+        latitude: initialCenter.lat,
+        longitude: initialCenter.lng,
         latitudeDelta: 0.08,
         longitudeDelta: 0.08,
       });
@@ -115,11 +173,12 @@ export function NativeMap({
   const handleRecenterStore = () => {
     haptic('light');
     if (!mapRef.current) return;
+    const target = focusedPickup || initialCenter;
     mapRef.current.animateToRegion({
-      latitude: CENTER.lat,
-      longitude: CENTER.lng,
-      latitudeDelta: 0.05,
-      longitudeDelta: 0.05,
+      latitude: target.lat,
+      longitude: target.lng,
+      latitudeDelta: 0.04,
+      longitudeDelta: 0.04,
     });
   };
 
@@ -131,80 +190,40 @@ export function NativeMap({
         customMapStyle={DARK_MAP_STYLE}
         userInterfaceStyle="dark"
         initialRegion={{
-          latitude: CENTER.lat,
-          longitude: CENTER.lng,
-          latitudeDelta: 0.12,
-          longitudeDelta: 0.12,
+          latitude: initialCenter.lat,
+          longitude: initialCenter.lng,
+          latitudeDelta: 0.08,
+          longitudeDelta: 0.08,
         }}
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
       >
-        {/* Dashed Route Line from Store to Focused Order Destination */}
-        {Polyline && focusedCoords && (
-          <Polyline
-            coordinates={[
-              { latitude: CENTER.lat, longitude: CENTER.lng },
-              { latitude: focusedCoords.lat, longitude: focusedCoords.lng },
-            ]}
-            strokeColor={COBALT}
-            strokeWidth={3.5}
-            lineDashPattern={[8, 6]}
-          />
-        )}
 
-        {/* Store Hub Pickup Pin (Matches 'Pick up from' node) */}
-        <Marker
-          coordinate={{ latitude: CENTER.lat, longitude: CENTER.lng }}
-          title="Pickup Hub"
-          description={APP_CONFIG.STORE_ADDRESS}
-          onPress={handleRecenterStore}
-        >
-          <View style={styles.pickupHubPinContainer}>
-            <MaterialIcons name="inventory-2" size={15} color={colors.primary} />
-          </View>
-          {Callout ? (
-            <Callout tooltip style={{ width: 170, alignItems: 'center' }}>
-              <View style={styles.calloutCard}>
-                <Text style={styles.calloutTitle} numberOfLines={1}>
-                  Pickup: Store Hub
-                </Text>
-                <Text style={styles.calloutSub} numberOfLines={1}>
-                  {APP_CONFIG.STORE_ADDRESS}
-                </Text>
-              </View>
-              <View style={styles.calloutArrow} />
-            </Callout>
-          ) : null}
-        </Marker>
-
-        {/* Pending Order Delivery Destination Pins (Matches 'Deliver to' node) */}
-        {pending.map((order) => {
-          const { lat, lng } = getCoords(order);
-          const isSelected = order.id === selectedId;
+        {/* Pickup Pins (Matches Store / 'Pick up from' location) */}
+        {orders.map((order) => {
+          const pCoords = getPickupCoords(order);
+          if (!pCoords) return null;
+          const isSelected = order.id === selectedId || order.id === focusedOrder?.id;
           return (
             <Marker
-              key={order.id}
-              coordinate={{ latitude: lat, longitude: lng }}
-              title={order.customerName || 'Customer'}
-              description={order.deliveryAddress}
+              key={`pickup-${order.id}`}
+              coordinate={{ latitude: pCoords.lat, longitude: pCoords.lng }}
+              title="Pickup Store"
+              description={order.pickupAddress || 'Store Pickup'}
               onPress={() => onSelect(order.id)}
             >
-              <View style={[styles.deliveryPinContainer, isSelected && styles.deliveryPinSelectedPending]}>
-                <MaterialIcons
-                  name="location-on"
-                  size={15}
-                  color={isSelected ? '#0A0E17' : GOLD}
-                />
+              <View style={[styles.pickupHubPinContainer, isSelected && styles.pickupHubPinSelected]}>
+                <MaterialIcons name="storefront" size={16} color={colors.primary} />
               </View>
               {Callout ? (
                 <Callout tooltip onPress={() => onSelect(order.id)} style={{ width: 200, alignItems: 'center' }}>
                   <View style={styles.calloutCard}>
                     <Text style={styles.calloutTitle} numberOfLines={1}>
-                      {order.customerName || 'Customer'}
+                      Pickup: Store
                     </Text>
                     <Text style={styles.calloutSub} numberOfLines={2}>
-                      {order.deliveryAddress}
+                      {order.pickupAddress || APP_CONFIG.STORE_ADDRESS}
                     </Text>
                   </View>
                   <View style={styles.calloutArrow} />
@@ -214,32 +233,38 @@ export function NativeMap({
           );
         })}
 
-        {/* Active Order Delivery Destination Pins (Matches 'Deliver to' node) */}
-        {active.map((order) => {
-          const { lat, lng } = getCoords(order);
-          const isSelected = order.id === selectedId;
+        {/* Delivery Destination Pins (Matches 'Deliver to' location) */}
+        {orders.map((order) => {
+          const dCoords = getDeliveryCoords(order);
+          if (!dCoords) return null;
+          const isSelected = order.id === selectedId || order.id === focusedOrder?.id;
+          const isActive = order.status === 'accepted' || order.status === 'picked_up';
           return (
             <Marker
-              key={order.id}
-              coordinate={{ latitude: lat, longitude: lng }}
-              title={order.customerName || 'Customer'}
+              key={`delivery-${order.id}`}
+              coordinate={{ latitude: dCoords.lat, longitude: dCoords.lng }}
+              title={order.customerName || 'Customer Destination'}
               description={order.deliveryAddress}
               onPress={() => onSelect(order.id)}
             >
               <View
                 style={[
                   styles.deliveryPinContainer,
-                  styles.deliveryPinActive,
-                  isSelected && styles.deliveryPinSelectedActive,
+                  isActive && styles.deliveryPinActive,
+                  isSelected && (isActive ? styles.deliveryPinSelectedActive : styles.deliveryPinSelectedPending),
                 ]}
               >
-                <MaterialIcons name="location-on" size={15} color={colors.tertiary} />
+                <MaterialIcons
+                  name="location-on"
+                  size={15}
+                  color={isSelected && !isActive ? '#0A0E17' : isActive ? colors.tertiary : GOLD}
+                />
               </View>
               {Callout ? (
                 <Callout tooltip onPress={() => onSelect(order.id)} style={{ width: 200, alignItems: 'center' }}>
                   <View style={styles.calloutCard}>
                     <Text style={styles.calloutTitle} numberOfLines={1}>
-                      {order.customerName || 'Active Order'}
+                      {order.customerName || (isActive ? 'Active Order' : 'Delivery')}
                     </Text>
                     <Text style={styles.calloutSub} numberOfLines={2}>
                       {order.deliveryAddress}
@@ -265,7 +290,7 @@ export function NativeMap({
           style={({ pressed }) => [styles.mapFab, pressed && { opacity: 0.8 }]}
           onPress={handleRecenterStore}
         >
-          <MaterialIcons name="inventory-2" size={18} color={colors.primary} />
+          <MaterialIcons name="storefront" size={18} color={colors.primary} />
         </Pressable>
       </View>
     </View>
@@ -305,6 +330,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.cobaltGlow,
+  },
+  pickupHubPinSelected: {
+    backgroundColor: colors.primaryAlpha25,
+    borderColor: '#FFFFFF',
+    transform: [{ scale: 1.18 }],
   },
   deliveryPinContainer: {
     width: 30,
@@ -368,4 +398,3 @@ const styles = StyleSheet.create({
     borderColor: colors.glassLevel2Border,
   },
 });
-

@@ -65,6 +65,10 @@ export interface OrderItem {
   pickupLng?: number;
   pickup_lat?: number;
   pickup_lng?: number;
+  deliveryLat?: number;
+  deliveryLng?: number;
+  delivery_lat?: number;
+  delivery_lng?: number;
   pickupDistanceMiles?: number;
   pickup_distance_miles?: number;
   earningsCents?: number;
@@ -129,6 +133,8 @@ function unwrapOrder(res: any): OrderItem {
     deliveryAddress: raw.deliveryAddress || raw.delivery_address || '',
     pickupLat: raw.pickupLat != null ? Number(raw.pickupLat) : raw.pickup_lat != null ? Number(raw.pickup_lat) : undefined,
     pickupLng: raw.pickupLng != null ? Number(raw.pickupLng) : raw.pickup_lng != null ? Number(raw.pickup_lng) : undefined,
+    deliveryLat: raw.deliveryLat != null ? Number(raw.deliveryLat) : raw.delivery_lat != null ? Number(raw.delivery_lat) : undefined,
+    deliveryLng: raw.deliveryLng != null ? Number(raw.deliveryLng) : raw.delivery_lng != null ? Number(raw.delivery_lng) : undefined,
     pickupDistanceMiles: raw.pickupDistanceMiles ?? raw.pickup_distance_miles,
     earningsCents: raw.earningsCents ?? raw.earnings_cents,
     items: raw.items || '',

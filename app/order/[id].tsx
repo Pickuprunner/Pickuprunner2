@@ -40,6 +40,8 @@ import {
   type DeliveryState,
 } from '@/components/Orders';
 
+import { openMapsNavigation } from '@/lib/maps';
+
 function haptic(type: 'medium' | 'success' = 'medium') {
   if (Platform.OS === 'web') return;
   if (type === 'success') {
@@ -49,15 +51,6 @@ function haptic(type: 'medium' | 'success' = 'medium') {
   }
 }
 
-function openMaps(address: string) {
-  if (!address) return;
-  const encoded = encodeURIComponent(address);
-  const url =
-    Platform.OS === 'ios'
-      ? `maps://maps.apple.com/?daddr=${encoded}`
-      : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-  Linking.openURL(url);
-}
 
 export default function OrderDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -100,6 +93,7 @@ export default function OrderDetailScreen() {
 
   const liveStoreOrder = useOrderStore((state) => state.orders.find((o) => o.id === fetchId));
   const currentOrder = order ? ({ ...(liveStoreOrder || {}), ...order } as any) : liveStoreOrder;
+  const activeOrder = currentOrder || order || liveStoreOrder || getSelectedOrder();
 
   useEffect(() => {
     if (fetchId) {
@@ -506,18 +500,30 @@ export default function OrderDetailScreen() {
               <Text style={styles.sectionHeadText}>ROUTE & STOPS</Text>
             </View>
             <RouteTimelineCard
-              pickupAddress={order?.pickupAddress ?? ''}
-              deliveryAddress={order?.deliveryAddress ?? ''}
+              pickupAddress={activeOrder?.pickupAddress ?? order?.pickupAddress ?? ''}
+              deliveryAddress={activeOrder?.deliveryAddress ?? order?.deliveryAddress ?? ''}
               distanceMiles={miles}
               status={status}
-              onNavigatePickup={() => openMaps(order?.pickupAddress ?? '')}
-              onNavigateDelivery={() => openMaps(order?.deliveryAddress ?? '')}
+              onNavigatePickup={() =>
+                openMapsNavigation(
+                  activeOrder?.pickupAddress || order?.pickupAddress || '',
+                  activeOrder?.pickupLat ?? (order as any)?.pickupLat ?? (order as any)?.pickup_lat,
+                  activeOrder?.pickupLng ?? (order as any)?.pickupLng ?? (order as any)?.pickup_lng
+                )
+              }
+              onNavigateDelivery={() =>
+                openMapsNavigation(
+                  activeOrder?.deliveryAddress || order?.deliveryAddress || '',
+                  activeOrder?.deliveryLat ?? (activeOrder as any)?.delivery_lat ?? (order as any)?.deliveryLat,
+                  activeOrder?.deliveryLng ?? (activeOrder as any)?.delivery_lng ?? (order as any)?.deliveryLng
+                )
+              }
             />
 
             <View style={styles.sectionHead}>
               <Text style={styles.sectionHeadText}>CUSTOMER DETAILS</Text>
             </View>
-            <CustomerInfoCard order={order} />
+            <CustomerInfoCard order={activeOrder || order} />
 
             {status === 'picked_up' && (
               <View style={{ marginHorizontal: 20, marginTop: 12 }}>

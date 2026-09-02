@@ -28,7 +28,7 @@ export async function geocode(address: string): Promise<LocationCoords | null> {
         return coords;
       }
     }
-  } catch {}
+  } catch { }
 
   try {
     const findUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(cleanAddr)}&inputtype=textquery&fields=geometry,formatted_address&key=${GOOGLE_MAPS_KEY}`;
@@ -44,7 +44,7 @@ export async function geocode(address: string): Promise<LocationCoords | null> {
         }
       }
     }
-  } catch {}
+  } catch { }
 
   try {
     const autoUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(cleanAddr)}&key=${GOOGLE_MAPS_KEY}`;
@@ -59,7 +59,7 @@ export async function geocode(address: string): Promise<LocationCoords | null> {
         }
       }
     }
-  } catch {}
+  } catch { }
 
   try {
     const results = await Location.geocodeAsync(cleanAddr);
@@ -68,7 +68,7 @@ export async function geocode(address: string): Promise<LocationCoords | null> {
       useLocationStore.getState().setCachedCoords(cleanAddr, coords);
       return coords;
     }
-  } catch {}
+  } catch { }
 
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(cleanAddr)}`;
@@ -83,7 +83,7 @@ export async function geocode(address: string): Promise<LocationCoords | null> {
         return coords;
       }
     }
-  } catch {}
+  } catch { }
 
   return null;
 }
@@ -134,7 +134,7 @@ export async function calcDistanceMiles(
         calculatedMiles = Math.max(0.1, Math.round((meters / 1609.344) * 10) / 10);
       }
     }
-  } catch {}
+  } catch { }
 
   if (calculatedMiles === null) {
     try {
@@ -147,7 +147,7 @@ export async function calcDistanceMiles(
           calculatedMiles = Math.max(0.1, Math.round((meters / 1609.344) * 10) / 10);
         }
       }
-    } catch {}
+    } catch { }
   }
 
   if (calculatedMiles === null) {
@@ -178,7 +178,7 @@ export async function getPlaceCoordinates(placeId: string, addressName?: string)
         return coords;
       }
     }
-  } catch {}
+  } catch { }
   return null;
 }
 
@@ -221,7 +221,7 @@ export async function searchAddressSuggestions(
         return results;
       }
     }
-  } catch {}
+  } catch { }
 
   try {
     let url = `https://nominatim.openstreetmap.org/search?format=json&limit=${limit}&addressdetails=1&q=${encodeURIComponent(query.trim())}`;
@@ -264,7 +264,7 @@ export async function searchAddressSuggestions(
         return results;
       }
     }
-  } catch {}
+  } catch { }
 
   return [];
 }
@@ -306,7 +306,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string |
         }
       }
     }
-  } catch {}
+  } catch { }
 
   try {
     const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
@@ -329,7 +329,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string |
         return addr;
       }
     }
-  } catch {}
+  } catch { }
 
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`;
@@ -344,7 +344,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string |
         return data.display_name;
       }
     }
-  } catch {}
+  } catch { }
 
   return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
 }

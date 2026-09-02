@@ -24,6 +24,10 @@ export interface Order {
   pickupLng?: number;
   pickup_lat?: number;
   pickup_lng?: number;
+  deliveryLat?: number;
+  deliveryLng?: number;
+  delivery_lat?: number;
+  delivery_lng?: number;
   pickupDistanceMiles?: number;
   earningsCents?: number;
   items: string;

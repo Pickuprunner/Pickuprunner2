@@ -21,15 +21,8 @@ function haptic() {
   }
 }
 
-function openNav(address: string) {
-  if (!address) return;
-  const encoded = encodeURIComponent(address);
-  const url =
-    Platform.OS === 'ios'
-      ? `maps://?daddr=${encoded}`
-      : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-  Linking.openURL(url);
-}
+import { openMapsNavigation } from '@/lib/maps';
+
 
 export interface DriverOrderCardProps {
   order: Order;
@@ -143,8 +136,9 @@ export function DriverOrderCard({
       <View style={styles.actionsContainer}>
         <TouchableOpacity
           onPress={() => {
-            haptic();
-            openNav(navAddress);
+            const lat = order.pickupLat ?? (order as any).pickup_lat;
+            const lng = order.pickupLng ?? (order as any).pickup_lng;
+            openMapsNavigation(navAddress, lat, lng);
           }}
           style={styles.mapButton}
         >

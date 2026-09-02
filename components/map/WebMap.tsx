@@ -2,7 +2,7 @@ import React, { useMemo, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Svg, { Circle, Path, Line, Rect, G, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Order } from '@/lib/orders';
-import { CENTER, getCoords, haptic, CYAN, GOLD } from './mapTypes';
+import { CENTER, getCoords, getPickupCoords, getDeliveryCoords, haptic, CYAN, GOLD } from './mapTypes';
 import { TargetIcon } from '@/assets/icons/MapIcons';
 
 export function WebMap({
@@ -14,7 +14,8 @@ export function WebMap({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }) {
-  const selectedOrder = orders.find((o) => o.id === selectedId);
+  const selectedOrder = orders.find((o) => o.id === selectedId) || orders[0];
+  const originCenter = getPickupCoords(selectedOrder) || getPickupCoords(orders[0]) || CENTER;
 
   const width = 400;
   const height = 320;
@@ -22,13 +23,13 @@ export function WebMap({
   const storeY = 160;
 
   const getCanvasCoords = useCallback((order: Order) => {
-    const c = getCoords(order);
-    const x = storeX + (c.lng - CENTER.lng) * 4500;
-    const y = storeY - (c.lat - CENTER.lat) * 4500;
+    const c = getDeliveryCoords(order) || getCoords(order);
+    const x = storeX + (c.lng - originCenter.lng) * 4500;
+    const y = storeY - (c.lat - originCenter.lat) * 4500;
     const boundedX = Math.max(30, Math.min(width - 30, x));
     const boundedY = Math.max(40, Math.min(height - 40, y));
     return { x: boundedX, y: boundedY };
-  }, []);
+  }, [originCenter]);
 
   const selectedCoords = selectedOrder ? getCanvasCoords(selectedOrder) : null;
 
@@ -89,29 +90,7 @@ export function WebMap({
           strokeDasharray="8,8"
         />
 
-        {selectedCoords && (
-          <G>
-            <Line
-              x1={storeX}
-              y1={storeY}
-              x2={selectedCoords.x}
-              y2={selectedCoords.y}
-              stroke="url(#routeGrad)"
-              strokeWidth={4}
-              strokeDasharray="6,4"
-              strokeLinecap="round"
-            />
-            <Circle
-              cx={selectedCoords.x}
-              cy={selectedCoords.y}
-              r={24}
-              fill="none"
-              stroke="#00B2FF"
-              strokeWidth={2}
-              opacity={0.5}
-            />
-          </G>
-        )}
+
 
         <G transform={`translate(${storeX}, ${storeY})`}>
           <Circle r={18} fill="rgba(0, 178, 255, 0.18)" />

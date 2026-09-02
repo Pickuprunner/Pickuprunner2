@@ -22,15 +22,8 @@ function haptic() {
   }
 }
 
-function openNav(address: string) {
-  if (!address) return;
-  const encoded = encodeURIComponent(address);
-  const url =
-    Platform.OS === 'ios'
-      ? `maps://?daddr=${encoded}`
-      : `https://www.google.com/maps/dir/?api=1&destination=${encoded}`;
-  Linking.openURL(url);
-}
+import { openMapsNavigation } from '@/lib/maps';
+
 
 function callPhone(phone: string) {
   if (!phone) return;
@@ -190,8 +183,10 @@ export function DriverMyOrderCard({
 
         <TouchableOpacity
           onPress={() => {
-            haptic();
-            openNav(navAddress ?? '');
+            const isPickup = status === 'assigned' || status === 'accepted' || status === 'shopping';
+            const lat = isPickup ? (order.pickupLat ?? order.pickup_lat) : ((order as any).deliveryLat ?? (order as any).delivery_lat);
+            const lng = isPickup ? (order.pickupLng ?? order.pickup_lng) : ((order as any).deliveryLng ?? (order as any).delivery_lng);
+            openMapsNavigation(navAddress ?? '', lat, lng);
           }}
           style={styles.mapButton}
         >

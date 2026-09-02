@@ -118,7 +118,13 @@ export function MapSelectedCard({
 
       <View style={styles.actionRow}>
         <Pressable
-          onPress={() => openMapsNavigation(selectedOrder.deliveryAddress)}
+          onPress={() =>
+            openMapsNavigation(
+              selectedOrder.deliveryAddress,
+              (selectedOrder as any).deliveryLat ?? (selectedOrder as any).delivery_lat,
+              (selectedOrder as any).deliveryLng ?? (selectedOrder as any).delivery_lng
+            )
+          }
           style={({ pressed }) => [styles.navButton, pressed && { opacity: 0.8 }]}
         >
           <Navigation size={15} color={colors.onSurface} />
