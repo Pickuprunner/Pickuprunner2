@@ -53,7 +53,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
   const shortId = order.id ? order.id.slice(-6).toUpperCase() : '------';
   const isClosed = order.status === 'delivered' || order.status === 'cancelled';
 
-  const { messages, isConnected, sendMessage } = useOrderChat({
+  const { messages, isLoading, isConnected, sendMessage } = useOrderChat({
     orderId: order.id,
     orderStatus: order.status,
     displayName: displayName || 'Driver',
@@ -112,7 +112,11 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        {messages.length === 0 ? (
+        {isLoading && messages.length === 0 ? (
+          <YStack flex={1} alignItems="center" justifyContent="center">
+            <Spinner size="large" color="$color9" />
+          </YStack>
+        ) : messages.length === 0 ? (
           <ChatEmptyState
             title="No messages yet"
             subtitle="Message your customer about pickup time, drop-off updates, or gate codes."

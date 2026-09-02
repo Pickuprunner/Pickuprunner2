@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { chatApi, ApiChatMessage } from '@/apis/chat';
-import { notifyChatMessage } from '@/lib/notifications';
+import { useChatStore } from '@/store/useChatStore';
 
 const SESSION_KEY = 'chat_session_id';
 const NAME_KEY = 'chat_display_name';
@@ -49,39 +49,8 @@ export async function saveDisplayName(name: string): Promise<void> {
   }
 }
 
-import { useChatStore } from '@/store/useChatStore';
-
 function chatStorageKey(orderId: string): string {
   return `@pickuprunner_chat_${orderId}`;
-}
-
-async function getStoredMessages(orderId: string): Promise<ChatMessage[]> {
-  const storeMsgs = useChatStore.getState().getMessages(orderId);
-  if (storeMsgs && storeMsgs.length > 0) {
-    return storeMsgs;
-  }
-  try {
-    const raw = await AsyncStorage.getItem(chatStorageKey(orderId));
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        useChatStore.getState().setMessages(orderId, parsed);
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('[chat] Error reading cached messages:', err);
-  }
-  return [];
-}
-
-async function saveStoredMessages(orderId: string, msgs: ChatMessage[]): Promise<void> {
-  try {
-    useChatStore.getState().setMessages(orderId, msgs);
-    await AsyncStorage.setItem(chatStorageKey(orderId), JSON.stringify(msgs));
-  } catch (err) {
-    console.warn('[chat] Error saving cached messages:', err);
-  }
 }
 
 function mapApiToChatMessage(msg: ApiChatMessage, currentRole: 'driver' | 'customer'): ChatMessage {
@@ -115,12 +84,26 @@ interface UseOrderChatOptions {
 }
 
 export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrderChatOptions) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const storeMessages = useChatStore((state) => (orderId ? state.conversations[orderId] || [] : []));
+  const [isLoading, setIsLoading] = useState(() => {
+    if (!orderId) return false;
+    const existing = useChatStore.getState().getMessages(orderId);
+    return !existing || existing.length === 0;
+  });
   const [isConnected, setIsConnected] = useState(true);
   const [sessionId, setSessionId] = useState<string>('static-session');
   const sessionIdRef = useRef<string>('static-session');
   const orderIdRef = useRef<string>(orderId);
   orderIdRef.current = orderId;
+
+  useEffect(() => {
+    if (!orderId) {
+      setIsLoading(false);
+      return;
+    }
+    const cached = useChatStore.getState().getMessages(orderId);
+    setIsLoading(!cached || cached.length === 0);
+  }, [orderId]);
 
   const fetchAndSyncMessages = useCallback(async () => {
     if (!orderIdRef.current) return;
@@ -132,22 +115,16 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
 
       if (res.messages && Array.isArray(res.messages)) {
         const mapped = res.messages.map((m) => mapApiToChatMessage(m, role));
+        const prev = useChatStore.getState().getMessages(currentOrderId);
+        const existingIds = new Set(prev.map((p) => p.id));
+        const newIncoming = mapped.filter((m) => !m.mine && !existingIds.has(m.id));
 
-        setMessages((prev) => {
-          if (prev.length > 0) {
-            const existingIds = new Set(prev.map((p) => p.id));
-            const newIncomingMessages = mapped.filter((m) => !m.mine && !existingIds.has(m.id));
+        if (newIncoming.length > 0 && Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+        }
 
-            if (newIncomingMessages.length > 0) {
-              if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
-              }
-            }
-          }
-          return mapped;
-        });
-
-        saveStoredMessages(currentOrderId, mapped);
+        useChatStore.getState().setMessages(currentOrderId, mapped);
+        AsyncStorage.setItem(chatStorageKey(currentOrderId), JSON.stringify(mapped)).catch(() => { });
       }
 
       if (res.unread && res.unread > 0) {
@@ -156,6 +133,8 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
     } catch (err) {
       console.warn('[chat] Failed to fetch live messages:', err);
       setIsConnected(false);
+    } finally {
+      setIsLoading(false);
     }
   }, [role]);
 
@@ -169,15 +148,34 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
       setSessionId(sid);
       sessionIdRef.current = sid;
 
-      if (!orderId) return;
-
-      const cached = await getStoredMessages(orderId);
-      if (isMounted && cached.length > 0) {
-        setMessages(cached);
+      if (!orderId) {
+        setIsLoading(false);
+        return;
       }
+
+      const storeMsgs = useChatStore.getState().getMessages(orderId);
+      if (!storeMsgs || storeMsgs.length === 0) {
+        try {
+          const raw = await AsyncStorage.getItem(chatStorageKey(orderId));
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0 && isMounted) {
+              useChatStore.getState().setMessages(orderId, parsed);
+              setIsLoading(false);
+            }
+          }
+        } catch { }
+      } else {
+        setIsLoading(false);
+      }
+
       await fetchAndSyncMessages();
+      if (isMounted) {
+        setIsLoading(false);
+      }
       chatApi.markAsRead(orderId).catch(() => { });
     })();
+
     let intervalId: any = null;
     if (isActive) {
       intervalId = setInterval(() => {
@@ -214,23 +212,22 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
         role,
         mine: true,
       };
-      setMessages((prev) => {
-        const next = [...prev, tempMsg];
-        saveStoredMessages(orderId, next);
-        return next;
-      });
+
+      const current = useChatStore.getState().getMessages(orderId);
+      const next = [...current, tempMsg];
+      useChatStore.getState().setMessages(orderId, next);
+      AsyncStorage.setItem(chatStorageKey(orderId), JSON.stringify(next)).catch(() => { });
 
       try {
         const sent = await chatApi.sendMessage(orderId, trimmed, role);
         setIsConnected(true);
         const mappedSent = mapApiToChatMessage(sent, role);
 
-        setMessages((prev) => {
-          const filtered = prev.filter((m) => m.id !== tempMsg.id);
-          const next = [...filtered, mappedSent];
-          saveStoredMessages(orderId, next);
-          return next;
-        });
+        const currentAfter = useChatStore.getState().getMessages(orderId);
+        const filtered = currentAfter.filter((m) => m.id !== tempMsg.id);
+        const updated = [...filtered, mappedSent];
+        useChatStore.getState().setMessages(orderId, updated);
+        AsyncStorage.setItem(chatStorageKey(orderId), JSON.stringify(updated)).catch(() => { });
 
         fetchAndSyncMessages();
       } catch (err) {
@@ -241,7 +238,14 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
     [orderId, displayName, role, fetchAndSyncMessages]
   );
 
-  return { messages, isConnected, sessionId, sendMessage, refreshMessages: fetchAndSyncMessages };
+  return {
+    messages: storeMessages,
+    isLoading: isLoading && storeMessages.length === 0,
+    isConnected,
+    sessionId,
+    sendMessage,
+    refreshMessages: fetchAndSyncMessages,
+  };
 }
 
 export interface IncomingChatMessage {

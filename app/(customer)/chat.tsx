@@ -10,6 +10,7 @@ import {
   StatusBar,
   RefreshControl,
   BackHandler,
+  ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
@@ -68,7 +69,7 @@ function CustomerOrderChatView({
   const driverDisplayName = order.driverName || order.driver_name || 'Assigned Driver';
   const isClosed = order.status === 'delivered' || order.status === 'cancelled';
 
-  const { messages, isConnected, sendMessage } = useOrderChat({
+  const { messages, isLoading, isConnected, sendMessage } = useOrderChat({
     orderId: order.id,
     orderStatus: order.status,
     displayName: customerName || 'Customer',
@@ -141,7 +142,11 @@ function CustomerOrderChatView({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        {messages.length === 0 ? (
+        {isLoading && messages.length === 0 ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color="#FFE399" />
+          </View>
+        ) : messages.length === 0 ? (
           <ChatEmptyState
             title="Direct Driver Chat"
             subtitle="Ask about pickup time, provide gate codes, or leave drop-off instructions."
@@ -198,7 +203,6 @@ export default function CustomerChatScreen() {
   const [customerName, setCustomerName] = useState('Customer');
   const [chatsLoaded, setChatsLoaded] = useState(false);
 
-  // Auto-open specific chat if orderId is provided in URL
   useEffect(() => {
     if (!orderId) return;
     const match = orders.find((o) => o.id === orderId);
