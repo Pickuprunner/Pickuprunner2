@@ -7,6 +7,8 @@ export * from './checkout';
 export * from './accreditation';
 export * from './chat';
 export * from './device';
+export * from './availability';
+
 
 
 

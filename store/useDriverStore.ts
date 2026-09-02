@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiClient } from '@/lib/apiClient';
+import { driverAvailabilityApi } from '@/apis/availability';
 
 export type DocStatus = 'not_submitted' | 'pending' | 'in_review' | 'approved' | 'rejected';
 
@@ -73,16 +73,16 @@ export const useDriverStore = create<DriverStoreState>()(
       verification: DEFAULT_VERIFICATION,
       backgroundCheck: DEFAULT_BG_CHECK,
       earnings: DEFAULT_EARNINGS,
-      isOnline: true,
+      isOnline: false,
 
       setIsOnline: (online: boolean) => {
         set({ isOnline: online });
-        apiClient.patch('/users/me', { isOnline: online }).catch(() => {});
+        driverAvailabilityApi.setAvailability(online).catch(() => {});
       },
       toggleOnline: () => {
         set((state) => {
           const nextVal = !state.isOnline;
-          apiClient.patch('/users/me', { isOnline: nextVal }).catch(() => {});
+          driverAvailabilityApi.setAvailability(nextVal).catch(() => {});
           return { isOnline: nextVal };
         });
       },

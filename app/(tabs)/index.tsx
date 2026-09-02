@@ -13,15 +13,14 @@ import {
   BackHandler,
 } from 'react-native';
 import {
-  Button,
   Package,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { MaterialIcons } from '@expo/vector-icons';
+
 import { useOrders, useAvailableOrders, useUpdateOrderStatus, useClaimOrder } from '@/lib/orders';
 import { useOrderStore } from '@/store/useOrderStore';
 import { useDriverStore } from '@/store/useDriverStore';
@@ -32,6 +31,7 @@ import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
+import { useDriverAvailability, useSetDriverAvailability } from '@/lib/availability';
 import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast, CustomLoading } from '@/components/core';
 
@@ -43,6 +43,7 @@ import {
   ActiveDeliveriesBanner,
 } from '@/components/Orders';
 import { DriverProfileStatusScreen } from '@/components/driver-verification';
+import { DriverOfflineView } from '@/components/driver';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -64,6 +65,10 @@ export default function OrdersScreen() {
   const accumDelta = useRef(0);
   const lastDirectionChangeTime = useRef(0);
   const isHeaderVisible = useRef(true);
+
+  // Sync duty availability with backend
+  useDriverAvailability();
+  const setAvailabilityMutation = useSetDriverAvailability();
 
   useFocusEffect(
     useCallback(() => {
@@ -113,10 +118,8 @@ export default function OrdersScreen() {
             return;
           }
         }
-        // if (isMounted) setDriverLocation(MOCK_LOCATION);
       } catch (err) {
         console.log('[OrdersScreen] GPS unavailable:', err);
-        // if (isMounted) setDriverLocation(MOCK_LOCATION);
       }
     }
     initLocation();
@@ -158,7 +161,6 @@ export default function OrdersScreen() {
       router.replace('/(auth)/driver-verification');
     }
   }, [user?.role, isApproved, isSubmitted, isLoadingVerif, isLoadingAccred]);
-
 
   const handleSetupPayouts = async () => {
     setOnboardingLoading(true);
@@ -408,8 +410,7 @@ export default function OrdersScreen() {
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }).start();
-      }
-      else if (accumDelta.current < -60 && !isHeaderVisible.current) {
+      } else if (accumDelta.current < -60 && !isHeaderVisible.current) {
         isHeaderVisible.current = true;
         Animated.timing(headerTranslateY, {
           toValue: 0,
@@ -443,62 +444,53 @@ export default function OrdersScreen() {
   );
 
   const isOnline = useDriverStore((s) => s.isOnline);
-  const toggleOnline = useDriverStore((s) => s.toggleOnline);
-  const setIsOnline = useDriverStore((s) => s.setIsOnline);
+
+  const handleToggleDuty = (targetOnline: boolean) => {
+    haptic();
+    setAvailabilityMutation.mutate(targetOnline, {
+      onSuccess: () => {
+        showToast(
+          targetOnline ? "You're now Online" : "You're now Offline",
+          targetOnline ? 'success' : 'info'
+        );
+      },
+      onError: () => {
+        showToast('Failed to update duty availability', 'error');
+      },
+    });
+  };
 
   const EmptyView = !isLoading ? (
-    !isOnline ? (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIconWrapper}>
-          <MaterialIcons name="cloud-off" size={48} color="#8C90A1" />
-        </View>
-        <Text style={styles.emptyTitle}>You're Offline</Text>
-        <Text style={styles.emptySubtitle}>
-          Switch to Online to view and receive available pickup requests in your area.
-        </Text>
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIconWrapper}>
+        <Package size={52} color="#FFE399" />
+      </View>
+      <Text style={styles.emptyTitle}>
+        {search.trim() ? 'No Matching Orders' : 'No Available Orders'}
+      </Text>
+      <Text style={styles.emptySubtitle}>
+        {search.trim()
+          ? 'Try adjusting your search query.'
+          : 'New incoming deliveries will appear here in real time.'}
+      </Text>
+      {search.trim() ? (
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => {
-            haptic();
-            setIsOnline(true);
-          }}
-          style={[styles.emptyActionBtn, { backgroundColor: '#00E297' }]}
+          onPress={() => setSearch('')}
+          style={styles.emptyActionBtn}
         >
-          <Text style={[styles.emptyActionBtnText, { color: '#0A0E1A', fontWeight: '700' }]}>Go Online</Text>
+          <Text style={styles.emptyActionBtnText}>Clear Search</Text>
         </TouchableOpacity>
-      </View>
-    ) : (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIconWrapper}>
-          <Package size={52} color="#FFE399" />
-        </View>
-        <Text style={styles.emptyTitle}>
-          {search.trim() ? 'No Matching Orders' : 'No Available Orders'}
-        </Text>
-        <Text style={styles.emptySubtitle}>
-          {search.trim()
-            ? 'Try adjusting your search query.'
-            : 'New incoming deliveries will appear here in real time.'}
-        </Text>
-        {search.trim() ? (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setSearch('')}
-            style={styles.emptyActionBtn}
-          >
-            <Text style={styles.emptyActionBtnText}>Clear Search</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={onRefresh}
-            style={styles.emptyActionBtn}
-          >
-            <Text style={styles.emptyActionBtnText}>Refresh Feed</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    )
+      ) : (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={onRefresh}
+          style={styles.emptyActionBtn}
+        >
+          <Text style={styles.emptyActionBtnText}>Refresh Feed</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   ) : null;
 
   if (user?.role === 'driver' && !isApproved) {
@@ -520,6 +512,21 @@ export default function OrdersScreen() {
     );
   }
 
+  // If driver is Offline -> Render Offline UI (Screenshot 1)
+  if (!isOnline) {
+    return (
+      <DriverOfflineView
+        onGoOnline={() => handleToggleDuty(true)}
+        isLoading={setAvailabilityMutation.isPending}
+        onOpenPreferences={() => router.push('/(tabs)/profile')}
+        driverLocation={driverLocation}
+        availableCount={orders.length}
+        orders={orders}
+      />
+    );
+  }
+
+  // If driver is Online -> Directly render Orders Feed
   return (
     <View style={styles.root}>
       <Animated.View
@@ -544,10 +551,11 @@ export default function OrdersScreen() {
           atCapacity={atCapacity}
           isConnected={isConnected}
           isOnline={isOnline}
-          onToggleOnline={toggleOnline}
+          onToggleOnline={() => handleToggleDuty(!isOnline)}
           sortBy={sortBy}
           onSortChange={setSortBy}
         />
+
         <OrdersSearchBar
           search={search}
           onSearchChange={setSearch}
@@ -556,7 +564,7 @@ export default function OrdersScreen() {
       </Animated.View>
 
       <FlatList
-        data={isOnline ? filtered : []}
+        data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <DriverOrderCard
@@ -592,8 +600,6 @@ export default function OrdersScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       />
-
-
 
       <CustomConfirmModal
         visible={showStripeModal}
