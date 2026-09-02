@@ -20,6 +20,7 @@ import {
 } from '@/lib/distance';
 import { MapLocationPickerModal } from './MapLocationPickerModal';
 import { CustomInput, useToast } from '@/components/core';
+import { useLocationStore } from '@/store/useLocationStore';
 
 const GOLD = '#FFE399';
 const PRIMARY_BLUE = '#1E75FF';
@@ -57,6 +58,11 @@ export function AddressAutocompleteInput({
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSelectingRef = useRef(false);
 
+  const hasCachedCoords = useLocationStore((state) => {
+    const key = value ? value.trim().toLowerCase() : '';
+    return Boolean(key.length >= 5 && state.geocodeCache[key]);
+  });
+
   useEffect(() => {
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -88,11 +94,9 @@ export function AddressAutocompleteInput({
       return;
     }
 
-    setLoadingSuggestions(true);
-    setShowDropdown(true);
-
     debounceTimer.current = setTimeout(async () => {
       try {
+        setLoadingSuggestions(true);
         let nearbyCoords: { lat: number; lon: number } | null = null;
         if (nearbyAddress && nearbyAddress.trim().length >= 3) {
           nearbyCoords = await geocode(nearbyAddress.trim());
@@ -102,6 +106,7 @@ export function AddressAutocompleteInput({
         setShowDropdown(results.length > 0);
       } catch {
         setSuggestions([]);
+        setShowDropdown(false);
       } finally {
         setLoadingSuggestions(false);
       }
@@ -125,8 +130,6 @@ export function AddressAutocompleteInput({
       }
     } catch {}
   };
-
-  const hasValidValue = value && value.trim().length >= 5;
 
   return (
     <View style={[styles.container, showDropdown && { zIndex: 9999, elevation: 25 }]}>
@@ -161,7 +164,7 @@ export function AddressAutocompleteInput({
         autoCorrect={false}
         returnKeyType="done"
         leftIcon={leftIcon}
-        status={hasValidValue && status === 'success' ? 'success' : 'default'}
+        status={hasCachedCoords ? 'success' : 'default'}
         loading={loadingSuggestions}
         focusBorderColor="#F4C300"
         focusGlowColor="rgba(244, 195, 0, 0.35)"
@@ -169,7 +172,12 @@ export function AddressAutocompleteInput({
           if (suggestions.length > 0) setShowDropdown(true);
         }}
         onBlur={() => {
-          setTimeout(() => setShowDropdown(false), 250);
+          setTimeout(() => {
+            setShowDropdown(false);
+            if (value && value.trim().length >= 5 && !useLocationStore.getState().getCachedCoords(value.trim())) {
+              geocode(value.trim()).catch(() => {});
+            }
+          }, 250);
         }}
       />
 

@@ -120,7 +120,7 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
     };
 
     const handleWrapperPress = () => {
-      if (isEditable && inputRef.current) {
+      if (isEditable && inputRef.current && !isFocused) {
         inputRef.current.focus();
       }
     };

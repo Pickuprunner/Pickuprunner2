@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { CustomCard } from '@/components/core';
 import { colors } from '@/constants/design';
+import { formatMiles } from '@/lib/distance';
 
 export interface RouteTimelineCardProps {
   pickupAddress: string;
@@ -35,7 +36,7 @@ export function RouteTimelineCard({
         {distanceMiles > 0 && (
           <View style={styles.distanceBadge}>
             <MaterialIcons name="straighten" size={13} color={colors.onSurface} />
-            <Text style={styles.distanceBadgeText}>{distanceMiles.toFixed(1)} mi total</Text>
+            <Text style={styles.distanceBadgeText}>{formatMiles(distanceMiles)} total</Text>
           </View>
         )}
       </View>

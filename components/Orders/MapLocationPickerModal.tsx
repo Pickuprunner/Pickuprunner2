@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/constants/design';
-import { reverseGeocode, geocode, searchAddressSuggestions, AddressSuggestion } from '@/lib/distance';
+import { reverseGeocode, geocode, searchAddressSuggestions, getPlaceCoordinates, AddressSuggestion } from '@/lib/distance';
 
 let MapView: any = null;
 if (Platform.OS !== 'web') {
@@ -49,8 +49,8 @@ export function MapLocationPickerModal({
   const [initialRegion, setInitialRegion] = useState({
     latitude: 21.1702,
     longitude: 72.8311,
-    latitudeDelta: 0.015,
-    longitudeDelta: 0.015,
+    latitudeDelta: 0.005,
+    longitudeDelta: 0.005,
   });
 
   const [selectedAddress, setSelectedAddress] = useState(initialAddress);
@@ -78,8 +78,8 @@ export function MapLocationPickerModal({
           const target = {
             latitude: coords.lat,
             longitude: coords.lon,
-            latitudeDelta: 0.012,
-            longitudeDelta: 0.012,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
           };
           setInitialRegion(target);
           setTimeout(() => {
@@ -111,7 +111,7 @@ export function MapLocationPickerModal({
         return;
       }
       const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Highest,
       });
       const coords = { lat: loc.coords.latitude, lon: loc.coords.longitude };
       coordsRef.current = coords;
@@ -119,8 +119,8 @@ export function MapLocationPickerModal({
       const target = {
         latitude: coords.lat,
         longitude: coords.lon,
-        latitudeDelta: 0.012,
-        longitudeDelta: 0.012,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
       };
       setInitialRegion(target);
       if (mapRef.current?.animateToRegion) {
@@ -181,25 +181,33 @@ export function MapLocationPickerModal({
     setIsSearching(true);
     searchDebounce.current = setTimeout(async () => {
       try {
-        const results = await searchAddressSuggestions(text, 4);
+        const results = await searchAddressSuggestions(text, 5, coordsRef.current);
         setSearchSuggestions(results);
       } catch {
         setSearchSuggestions([]);
       } finally {
         setIsSearching(false);
       }
-    }, 300);
+    }, 250);
   };
 
   const handleSelectSearchSuggestion = async (item: AddressSuggestion) => {
     haptic();
     Keyboard.dismiss();
-    setSearchQuery('');
+    setSearchQuery(item.primaryText || item.displayName);
     setSearchSuggestions([]);
     setSelectedAddress(item.displayName);
 
     let lat = item.lat;
     let lon = item.lon;
+
+    if (item.placeId) {
+      const pCoords = await getPlaceCoordinates(item.placeId, item.displayName);
+      if (pCoords) {
+        lat = pCoords.lat;
+        lon = pCoords.lon;
+      }
+    }
 
     if (!lat || !lon) {
       const coords = await geocode(item.displayName);
@@ -214,8 +222,8 @@ export function MapLocationPickerModal({
       const target = {
         latitude: lat,
         longitude: lon,
-        latitudeDelta: 0.012,
-        longitudeDelta: 0.012,
+        latitudeDelta: 0.008,
+        longitudeDelta: 0.008,
       };
       if (mapRef.current?.animateToRegion) {
         mapRef.current.animateToRegion(target, 450);
@@ -315,19 +323,21 @@ export function MapLocationPickerModal({
             </View>
 
             {searchSuggestions.length > 0 && (
-              <View style={styles.searchSuggestionsDropdown}>
+              <View style={styles.floatingDropdown}>
                 {searchSuggestions.map((item, idx) => (
                   <Pressable
                     key={`${item.displayName}-${idx}`}
                     onPress={() => handleSelectSearchSuggestion(item)}
                     style={({ pressed }) => [
-                      styles.searchSuggestionItem,
+                      styles.suggestionItem,
                       idx < searchSuggestions.length - 1 && styles.suggestionBorder,
                       pressed && styles.suggestionPressed,
                     ]}
                   >
-                    <MaterialIcons name="place" size={16} color={GOLD} />
-                    <View style={{ flex: 1 }}>
+                    <View style={styles.suggestionIconCircle}>
+                      <MaterialIcons name="place" size={16} color={GOLD} />
+                    </View>
+                    <View style={styles.suggestionTextCol}>
                       <Text style={styles.suggestionPrimary} numberOfLines={1}>
                         {item.primaryText}
                       </Text>
@@ -350,8 +360,12 @@ export function MapLocationPickerModal({
                 style={styles.map}
                 initialRegion={initialRegion}
                 onRegionChangeComplete={handleRegionChangeComplete}
-                showsUserLocation
+                showsUserLocation={true}
                 showsMyLocationButton={false}
+                showsCompass={false}
+                showsBuildings={true}
+                showsIndoors={true}
+                showsPointsOfInterest={true}
               />
             ) : (
               <View style={styles.webFallbackContainer}>
@@ -529,20 +543,29 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     padding: 0,
   },
-  searchSuggestionsDropdown: {
-    marginTop: 6,
+  floatingDropdown: {
+    position: 'absolute',
+    top: 92,
+    left: 16,
+    right: 16,
     backgroundColor: '#181D2C',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    zIndex: 99999,
+    elevation: 50,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
   },
-  searchSuggestionItem: {
+  suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
   },
   suggestionBorder: {
     borderBottomWidth: 1,
@@ -550,6 +573,17 @@ const styles = StyleSheet.create({
   },
   suggestionPressed: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  suggestionIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(245, 196, 0, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestionTextCol: {
+    flex: 1,
   },
   suggestionPrimary: {
     fontSize: 13,

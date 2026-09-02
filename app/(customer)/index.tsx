@@ -32,6 +32,8 @@ import { APP_CONFIG, IS_STORE_BUILD, ORDER_SCOPE } from '@/lib/config';
 import { calcDistanceMiles, geocode } from '@/lib/distance';
 import { CustomHeader, useToast } from '@/components/core';
 import { NewOrderWizardForm } from '@/components/Orders';
+import * as Location from 'expo-location';
+import { useLocationStore } from '@/store/useLocationStore';
 
 const SESSION_KEY = 'customer_session_id';
 const NAME_KEY = 'customer_display_name';
@@ -113,6 +115,21 @@ export default function CustomerNewOrderScreen() {
     AsyncStorage.getItem(NAME_KEY).then((saved) => {
       if (saved) setForm((f) => ({ ...f, name: f.name || saved }));
     });
+
+    (async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getLastKnownPositionAsync();
+          if (loc?.coords) {
+            useLocationStore.getState().setCurrentLocation({
+              lat: loc.coords.latitude,
+              lon: loc.coords.longitude,
+            });
+          }
+        }
+      } catch {}
+    })();
   }, []);
 
   const [tipCents, setTipCents] = useState(500);
