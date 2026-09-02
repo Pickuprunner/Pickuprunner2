@@ -66,20 +66,38 @@ export default function DriverVerificationScreen() {
   const { data: existing } = useMyVerification(user?.id);
   const submitVerification = useSubmitVerification();
 
+  const profile = accreditationData?.profile;
+  const rawLicenseStatus = String(profile?.licenseStatus || accreditationData?.steps?.license || '');
+  const rawInsuranceStatus = String(profile?.insuranceStatus || accreditationData?.steps?.insurance || '');
+  const rawBgStatus = String(profile?.backgroundStatus || accreditationData?.steps?.backgroundCheck || '');
+  const rawVehicleStatus = String((profile as any)?.vehicleStatus || (profile as any)?.vehicle_status || '');
+  const isAnyStepRejected =
+    profile?.accreditationStatus === 'rejected' ||
+    rawVehicleStatus === 'rejected' ||
+    rawLicenseStatus === 'rejected' ||
+    rawInsuranceStatus === 'rejected' ||
+    rawBgStatus === 'rejected';
+
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isEditing, setIsEditing] = useState(params.edit === 'true');
+  const [isEditing, setIsEditing] = useState(false);
   const [currentStep, setCurrentStep] = useState(params.step ? Number(params.step) : 1);
   const [keyboardPadding, setKeyboardPadding] = useState(0);
 
   useEffect(() => {
     if (params.edit === 'true') {
-      setIsEditing(true);
-      setIsSubmitted(false);
-      if (params.step) {
-        setCurrentStep(Number(params.step));
+      const isUnderReviewLocked = profile?.accreditationStatus === 'under_review' && !isAnyStepRejected;
+      if (isUnderReviewLocked) {
+        setIsEditing(false);
+        setIsSubmitted(true);
+      } else {
+        setIsEditing(true);
+        setIsSubmitted(false);
+        if (params.step) {
+          setCurrentStep(Number(params.step));
+        }
       }
     }
-  }, [params.edit, params.step]);
+  }, [params.edit, params.step, profile?.accreditationStatus, isAnyStepRejected]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
@@ -339,7 +357,14 @@ export default function DriverVerificationScreen() {
             insurance_card: formData.insuranceDocUrl ? { uri: formData.insuranceDocUrl, name: formData.insuranceDocName } : undefined,
           },
         });
-      } catch (bulkErr) {
+      } catch (bulkErr: any) {
+        if (bulkErr?.message?.includes('already been submitted') || bulkErr?.message?.includes('under review')) {
+          setIsSubmitted(true);
+          setIsEditing(false);
+          showToast('Profile is currently under review by compliance team.', 'info');
+          return;
+        }
+
         console.warn('[Accreditation] bulk /complete fallback to step-by-step:', bulkErr);
         await saveStepMutation.mutateAsync({
           step: 'insurance',
@@ -365,7 +390,13 @@ export default function DriverVerificationScreen() {
             .catch((e) => console.warn('[Accreditation] upload insurance_card error:', e));
         }
 
-        await submitAccreditationMutation.mutateAsync().catch(() => {});
+        await submitAccreditationMutation.mutateAsync().catch((submitErr: any) => {
+          if (submitErr?.message?.includes('already been submitted') || submitErr?.message?.includes('under review')) {
+            console.log('[Accreditation] Already submitted / under review');
+          } else {
+            throw submitErr;
+          }
+        });
       }
 
       // 3. Keep local verification store in sync
@@ -404,7 +435,7 @@ export default function DriverVerificationScreen() {
         vin_number: formData.vinNumber,
         insuranceUrl: formData.insuranceDocUrl,
         insuranceFilename: formData.insuranceDocName || 'insurance_card.pdf',
-      });
+      }).catch(() => {});
 
       setIsSubmitted(true);
       setIsEditing(false);
@@ -429,7 +460,6 @@ export default function DriverVerificationScreen() {
     }
   };
 
-  const profile = accreditationData?.profile;
   const isProfileSubmitted =
     !isEditing &&
     (isSubmitted ||
@@ -443,11 +473,19 @@ export default function DriverVerificationScreen() {
     return (
       <DriverProfileStatusScreen
         onEditDocuments={() => {
+          if (profile?.accreditationStatus === 'under_review' && !isAnyStepRejected) {
+            showToast('Application is locked while under review.', 'info');
+            return;
+          }
           setIsEditing(true);
           setIsSubmitted(false);
           setCurrentStep(1);
         }}
         onEditStep={(step) => {
+          if (profile?.accreditationStatus === 'under_review' && !isAnyStepRejected) {
+            showToast('Application is locked while under review.', 'info');
+            return;
+          }
           setIsEditing(true);
           setIsSubmitted(false);
           setCurrentStep(step);

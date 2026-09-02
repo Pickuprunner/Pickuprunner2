@@ -86,26 +86,16 @@ export function BackgroundCheckStep({
           autoCapitalize="words"
         />
 
-        <View style={styles.row2}>
-          <View style={{ flex: 1 }}>
-            <CustomInput
-              label="LAST 4 DIGITS OF SSN"
-              value={data.ssnLast4}
-              onChangeText={(val) => onChange({ ssnLast4: val.replace(/\D/g, '').slice(0, 4) })}
-              placeholder="••••"
-              keyboardType="number-pad"
-              maxLength={4}
-              secureTextEntry
-              leftIcon={<Lock size={16} color={colors.outline} />}
-            />
-          </View>
-          <View style={styles.securityBadgeCol}>
-            <View style={styles.securityBadge}>
-              <CheckCircle size={14} color="#22C55E" />
-              <Text style={styles.securityBadgeText}>256-Bit Encrypted</Text>
-            </View>
-          </View>
-        </View>
+        <CustomInput
+          label="LAST 4 DIGITS OF SSN"
+          value={data.ssnLast4}
+          onChangeText={(val) => onChange({ ssnLast4: val.replace(/\D/g, '').slice(0, 4) })}
+          placeholder="••••"
+          keyboardType="number-pad"
+          maxLength={4}
+          secureTextEntry
+          leftIcon={<Lock size={16} color={colors.outline} />}
+        />
 
         {/* FCRA CONSENT CHECKBOX */}
         <TouchableOpacity
@@ -197,31 +187,7 @@ const styles = StyleSheet.create({
   formGrid: {
     gap: 12,
   },
-  row2: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-end',
-  },
-  securityBadgeCol: {
-    flex: 1,
-    paddingBottom: 8,
-  },
-  securityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.25)',
-  },
-  securityBadgeText: {
-    color: '#22C55E',
-    fontSize: 12,
-    fontWeight: '700',
-  },
+
   consentBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',

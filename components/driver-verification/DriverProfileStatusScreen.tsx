@@ -142,6 +142,18 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
+
+    if (isApproved) {
+      showToast('Accreditation is already approved.', 'success');
+      return;
+    }
+
+    // Backend locks accreditation when under review unless a specific item is rejected
+    if (!isAnyStepRejected && rawAccredStatus === 'under_review') {
+      showToast('Application is locked while under review by our compliance team.', 'info');
+      return;
+    }
+
     if (onEditStep) {
       onEditStep(step);
     } else if (onEditDocuments) {
@@ -388,30 +400,49 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
 
         {/* ACTIONS */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => handleEditDocuments(1)}
-            style={styles.primaryActionBtn}
-          >
-            <FileText size={18} color="#0F131C" />
-            <Text style={styles.primaryActionBtnText}>
-              {isAnyStepRejected ? 'Update Documentation' : 'Edit Application Details'}
-            </Text>
-            <ArrowRight size={18} color="#0F131C" />
-          </TouchableOpacity>
+          {isAnyStepRejected ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => handleEditDocuments(1)}
+              style={styles.primaryActionBtn}
+            >
+              <FileText size={18} color="#0F131C" />
+              <Text style={styles.primaryActionBtnText}>Update Documentation</Text>
+              <ArrowRight size={18} color="#0F131C" />
+            </TouchableOpacity>
+          ) : rawAccredStatus === 'under_review' ? (
+            <View style={styles.lockedNoticeBox}>
+              <Clock size={16} color="#FFE399" />
+              <Text style={styles.lockedNoticeText}>
+                Application locked during safety & compliance review
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => handleEditDocuments(1)}
+              style={styles.primaryActionBtn}
+            >
+              <FileText size={18} color="#0F131C" />
+              <Text style={styles.primaryActionBtnText}>Edit Application Details</Text>
+              <ArrowRight size={18} color="#0F131C" />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={handleRefresh}
             disabled={refreshing}
-            style={styles.secondaryActionBtn}
+            style={rawAccredStatus === 'under_review' && !isAnyStepRejected ? styles.primaryActionBtn : styles.secondaryActionBtn}
           >
             {refreshing ? (
-              <ActivityIndicator size="small" color="#FFE399" />
+              <ActivityIndicator size="small" color={rawAccredStatus === 'under_review' && !isAnyStepRejected ? '#0F131C' : '#FFE399'} />
             ) : (
               <>
-                <RefreshCw size={16} color="#FFE399" />
-                <Text style={styles.secondaryActionBtnText}>Check Approval Status</Text>
+                <RefreshCw size={16} color={rawAccredStatus === 'under_review' && !isAnyStepRejected ? '#0F131C' : '#FFE399'} />
+                <Text style={rawAccredStatus === 'under_review' && !isAnyStepRejected ? styles.primaryActionBtnText : styles.secondaryActionBtnText}>
+                  Check Approval Status
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -614,6 +645,24 @@ const styles = StyleSheet.create({
   actionsContainer: {
     gap: spacing.sm,
     marginTop: spacing.xs,
+  },
+  lockedNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 227, 153, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 227, 153, 0.2)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: borderRadius.md,
+  },
+  lockedNoticeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFE399',
+    textAlign: 'center',
   },
   primaryActionBtn: {
     flexDirection: 'row',

@@ -151,7 +151,7 @@ export function InsuranceStep({
           </View>
           <View style={{ flex: 1.2 }}>
             <CustomInput
-              label="NAIC NUMBER (5-DIGIT)"
+              label="NAIC NUMBER"
               value={data.naicNumber}
               onChangeText={(val) => onChange({ naicNumber: val.replace(/\D/g, '').slice(0, 5) })}
               placeholder="25178"
