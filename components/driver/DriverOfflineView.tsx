@@ -10,11 +10,11 @@ import {
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, shadows } from '@/constants/design';
-import { reverseGeocode } from '@/lib/distance';
 import { Order } from '@/lib/orders';
+import { useAuthStore } from '@/store/useAuthStore';
+import { DARK_MAP_STYLE } from '@/components/map/mapTypes';
 
 interface DriverOfflineViewProps {
   onGoOnline: () => void;
@@ -26,6 +26,7 @@ interface DriverOfflineViewProps {
   driverCity?: string;
   availableCount?: number;
   orders?: Order[];
+  avatar?: string;
 }
 
 export function DriverOfflineView({
@@ -37,170 +38,30 @@ export function DriverOfflineView({
   driverCity: initialCity,
   availableCount = 0,
   orders = [],
+  avatar,
 }: DriverOfflineViewProps) {
   const insets = useSafeAreaInsets();
+  const user = useAuthStore((s) => s.user);
+  const resolvedAvatar = avatar || (user?.displayName || user?.email || 'D').charAt(0).toUpperCase();
   const mapRef = useRef<any>(null);
-  const hasAnimatedToUser = useRef(false);
 
-  const [currentCoords, setCurrentCoords] = useState<{
-    latitude: number;
-    longitude: number;
-    latitudeDelta: number;
-    longitudeDelta: number;
-  }>({
+  const currentCoords = {
     latitude: driverLocation?.lat || 37.422,
     longitude: driverLocation?.lng || -122.084,
     latitudeDelta: 0.035,
     longitudeDelta: 0.035,
-  });
+  };
 
-  const [city, setCity] = useState(initialCity || 'Your City');
+  const city = initialCity || 'San Francisco';
   const totalOrdersCount = orders.length > 0 ? orders.length : availableCount;
 
-  // Real-time GPS Tracking with live updates
-  useEffect(() => {
-    let isMounted = true;
-    let locationSubscription: Location.LocationSubscription | null = null;
-
-    async function startLiveLocation() {
-      try {
-        // If parent passed valid GPS coords, use them first
-        if (driverLocation?.lat && driverLocation?.lng) {
-          const coords = {
-            latitude: driverLocation.lat,
-            longitude: driverLocation.lng,
-            latitudeDelta: 0.035,
-            longitudeDelta: 0.035,
-          };
-          if (isMounted) {
-            setCurrentCoords(coords);
-            if (!hasAnimatedToUser.current && mapRef.current?.animateToRegion) {
-              mapRef.current.animateToRegion(coords, 600);
-              hasAnimatedToUser.current = true;
-            }
-          }
-          resolveCity(driverLocation.lat, driverLocation.lng);
-        }
-
-        if (Platform.OS === 'web') {
-          if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                if (!isMounted || !pos?.coords) return;
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                const coords = {
-                  latitude: lat,
-                  longitude: lng,
-                  latitudeDelta: 0.035,
-                  longitudeDelta: 0.035,
-                };
-                setCurrentCoords(coords);
-                if (!hasAnimatedToUser.current && mapRef.current?.animateToRegion) {
-                  mapRef.current.animateToRegion(coords, 600);
-                  hasAnimatedToUser.current = true;
-                }
-                resolveCity(lat, lng);
-              },
-              (err) => console.log('[DriverOfflineView] Web GPS:', err),
-              { timeout: 8000, enableHighAccuracy: true }
-            );
-          }
-          return;
-        }
-
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          // Instant current position
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.High,
-          });
-
-          if (isMounted && loc?.coords) {
-            const lat = loc.coords.latitude;
-            const lng = loc.coords.longitude;
-            const coords = {
-              latitude: lat,
-              longitude: lng,
-              latitudeDelta: 0.035,
-              longitudeDelta: 0.035,
-            };
-            setCurrentCoords(coords);
-
-            if (!hasAnimatedToUser.current && mapRef.current?.animateToRegion) {
-              mapRef.current.animateToRegion(coords, 600);
-              hasAnimatedToUser.current = true;
-            }
-
-            resolveCity(lat, lng);
-          }
-
-          // Real-time location watch listener
-          locationSubscription = await Location.watchPositionAsync(
-            {
-              accuracy: Location.Accuracy.Balanced,
-              timeInterval: 5000,
-              distanceInterval: 10,
-            },
-            (newLoc) => {
-              if (isMounted && newLoc?.coords) {
-                const lat = newLoc.coords.latitude;
-                const lng = newLoc.coords.longitude;
-                setCurrentCoords((prev) => ({
-                  ...prev,
-                  latitude: lat,
-                  longitude: lng,
-                }));
-              }
-            }
-          );
-        }
-      } catch (err) {
-        console.log('[DriverOfflineView] Location resolve:', err);
-      }
-    }
-
-    async function resolveCity(lat: number, lng: number) {
-      try {
-        if (Platform.OS !== 'web') {
-          const rev = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-          if (rev && rev[0] && isMounted) {
-            const detectedCity = rev[0].city || rev[0].district || rev[0].subregion || rev[0].region;
-            if (detectedCity) setCity(detectedCity);
-            return;
-          }
-        }
-
-        const fullAddr = await reverseGeocode(lat, lng);
-        if (fullAddr && isMounted) {
-          const parts = fullAddr.split(',').map((p) => p.trim());
-          if (parts.length >= 2) {
-            setCity(parts[parts.length - 3] || parts[parts.length - 2] || parts[0]);
-          }
-        }
-      } catch {}
-    }
-
-    startLiveLocation();
-
-    return () => {
-      isMounted = false;
-      if (locationSubscription) {
-        locationSubscription.remove();
-      }
-    };
-  }, [driverLocation?.lat, driverLocation?.lng]);
-
   let MapView: any = null;
-  let Marker: any = null;
 
   try {
     const Maps = require('react-native-maps');
     MapView = Maps.default || Maps;
-    Marker = Maps.Marker;
   } catch {
     MapView = null;
-    Marker = null;
   }
 
   const haptic = (type: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Medium) => {
@@ -209,8 +70,12 @@ export function DriverOfflineView({
     }
   };
 
+  const topPadding = insets.top > 0
+    ? insets.top
+    : (Platform.OS === 'android' ? 16 : 12);
+
   return (
-    <View style={[styles.root, { paddingTop: Math.max(insets.top, 12) }]}>
+    <View style={[styles.root, { paddingTop: topPadding, paddingBottom: Math.max(insets.bottom, 16) }]}>
       {/* Top Ambient Glow */}
       <LinearGradient
         colors={['rgba(0, 102, 255, 0.12)', 'rgba(15, 19, 28, 0)']}
@@ -227,9 +92,12 @@ export function DriverOfflineView({
               haptic(Haptics.ImpactFeedbackStyle.Light);
               onOpenPreferences?.();
             }}
-            style={styles.circleIconBtn}
+            accessibilityLabel="Profile"
+            style={styles.avatarBtn}
           >
-            <MaterialIcons name="tune" size={20} color="#DFE2EF" />
+            <View style={styles.avatarInner}>
+              <Text style={styles.avatarText}>{resolvedAvatar}</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -237,42 +105,33 @@ export function DriverOfflineView({
         <Text style={styles.subTitle}>Ready to go?</Text>
       </View>
 
-      {/* Map Card - Clean White / Standard Map Background & Perfect Circle Driver Puck */}
-      <View style={styles.mapCard}>
+      {/* Map Card - Dark Sleek Static Preview Map & Centered Overlay Puck */}
+      <View style={styles.mapCard} pointerEvents="none">
         {MapView && Platform.OS !== 'web' ? (
           <MapView
             ref={mapRef}
             style={StyleSheet.absoluteFill}
             initialRegion={currentCoords}
-            showsUserLocation
+            scrollEnabled={false}
+            zoomEnabled={false}
+            rotateEnabled={false}
+            pitchEnabled={false}
+            showsUserLocation={false}
             showsCompass={false}
             showsMyLocationButton={false}
             toolbarEnabled={false}
-          >
-            {/* Real Driver GPS Location Puck (Perfect Full Circle) */}
-            <Marker
-              coordinate={{ latitude: currentCoords.latitude, longitude: currentCoords.longitude }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              title="Your Location"
-              flat
-            >
-              <View style={styles.puckContainer}>
-                <View style={styles.puckHalo} />
-                <View style={styles.puckCore}>
-                  <MaterialIcons name="navigation" size={13} color="#FFFFFF" />
-                </View>
-              </View>
-            </Marker>
-          </MapView>
+            customMapStyle={DARK_MAP_STYLE}
+            userInterfaceStyle="dark"
+          />
         ) : (
           /* Clean Map Canvas Fallback (Web) */
           <View style={StyleSheet.absoluteFill}>
             <LinearGradient
-              colors={['#F8FAFC', '#F1F5F9', '#E2E8F0']}
+              colors={['#0F131C', '#131A26', '#0F131C']}
               style={StyleSheet.absoluteFill}
             />
 
-            {/* Simulated Clean Roads */}
+            {/* Simulated Dark Roads */}
             <View style={styles.roadNetwork}>
               <View style={[styles.roadLineLight, { top: 60, left: -20, width: 420, transform: [{ rotate: '12deg' }] }]} />
               <View style={[styles.roadLineLight, { top: 130, left: -30, width: 440, transform: [{ rotate: '-22deg' }] }]} />
@@ -284,16 +143,18 @@ export function DriverOfflineView({
             </View>
 
             <Text style={styles.mapCityLabelLight}>{city}</Text>
-
-            {/* Center Navigation Puck (Perfect Circle) */}
-            <View style={styles.puckContainer}>
-              <View style={styles.puckHalo} />
-              <View style={styles.puckCore}>
-                <MaterialIcons name="navigation" size={13} color="#FFFFFF" />
-              </View>
-            </View>
           </View>
         )}
+
+        {/* 100% Guaranteed Centered Overlay Location Puck */}
+        <View style={styles.puckCenterOverlay} pointerEvents="none">
+          <View style={styles.puckContainer}>
+            <View style={styles.puckHalo} />
+            <View style={styles.puckCore}>
+              <MaterialIcons name="navigation" size={13} color="#FFFFFF" />
+            </View>
+          </View>
+        </View>
       </View>
 
       {/* Opportunities Card Container */}
@@ -307,15 +168,16 @@ export function DriverOfflineView({
               </Text>
             </View>
           </View>
-          <View style={styles.oppArrowBtn}>
-            <MaterialIcons name="arrow-forward" size={18} color="#DFE2EF" />
-          </View>
         </View>
 
-        <Text style={styles.oppSubtitle}>
+        <Text
+          style={styles.oppSubtitle}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
           {totalOrdersCount > 0
-            ? `${totalOrdersCount} active delivery requests near ${city}`
-            : `Upcoming reservations and promotions for ${city}`}
+            ? `${totalOrdersCount} ${totalOrdersCount === 1 ? 'delivery request' : 'delivery requests'} in your area • Go online to earn`
+            : 'High demand in your area • Go online to earn'}
         </Text>
 
         {/* Go Online Action Button - ONLY THIS BUTTON TRIGGERS GO ONLINE */}
@@ -374,36 +236,49 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 8,
   },
-  circleIconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.glassLevel2Bg,
-    borderWidth: 1,
-    borderColor: colors.glassLevel2Border,
+  avatarBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(244, 195, 0, 0.15)',
+    borderWidth: 1.5,
+    borderColor: '#FFE399',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarInner: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0F131C',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#FFE399',
+    fontSize: 15,
+    fontWeight: '700',
+  },
   mainTitle: {
-    fontSize: 32,
+    fontSize: Platform.OS === 'android' ? 34 : 32,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: -0.8,
-    lineHeight: 38,
+    letterSpacing: Platform.OS === 'android' ? -0.2 : -0.8,
+    lineHeight: Platform.OS === 'android' ? 42 : 38,
   },
   subTitle: {
-    fontSize: 17,
+    fontSize: Platform.OS === 'android' ? 18 : 17,
     fontWeight: '500',
     color: colors.onSurfaceVariant,
-    marginTop: 2,
+    marginTop: 3,
+    letterSpacing: Platform.OS === 'android' ? 0 : -0.2,
   },
   mapCard: {
     flex: 1,
-    minHeight: 280,
-    maxHeight: 380,
+    minHeight: 320,
     borderRadius: 24,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#0F131C',
     position: 'relative',
     marginVertical: 10,
     borderWidth: 1.5,
@@ -412,35 +287,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadows.md,
   },
-  puckContainer: {
-    width: 50,
-    height: 50,
+  puckCenterOverlay: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
+  },
+  puckContainer: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   puckHalo: {
     position: 'absolute',
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(0, 102, 255, 0.22)',
     borderWidth: 2,
     borderColor: 'rgba(0, 102, 255, 0.45)',
   },
   puckCore: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#0066FF',
     borderWidth: 2.5,
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 3,
-    elevation: 5,
+    ...(Platform.OS === 'ios'
+      ? {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.35,
+          shadowRadius: 3,
+        }
+      : {}),
   },
   roadNetwork: {
     ...StyleSheet.absoluteFillObject,
@@ -449,12 +334,12 @@ const styles = StyleSheet.create({
   roadLineLight: {
     position: 'absolute',
     height: 4,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: '#1A202C',
   },
   roadLineLightSecondary: {
     position: 'absolute',
     height: 2.5,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#242D3D',
   },
   waterShapeLight: {
     position: 'absolute',
@@ -463,7 +348,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 200,
     borderRadius: 100,
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: 'rgba(8, 11, 18, 0.7)',
     transform: [{ rotate: '-25deg' }],
   },
   mapCityLabelLight: {
@@ -495,10 +380,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   oppTitle: {
-    fontSize: 22,
+    fontSize: Platform.OS === 'android' ? 24 : 22,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: -0.4,
+    letterSpacing: Platform.OS === 'android' ? -0.2 : -0.4,
   },
   oppBadge: {
     backgroundColor: 'rgba(255, 227, 153, 0.14)',
@@ -513,18 +398,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  oppArrowBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.glassLevel3Bg,
-    borderWidth: 1,
-    borderColor: colors.glassLevel3Border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   oppSubtitle: {
-    fontSize: 13.5,
+    fontSize: 13,
     color: colors.onSurfaceVariant,
     lineHeight: 18,
   },

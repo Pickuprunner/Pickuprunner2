@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { useAuthStore, User } from '@/store/useAuthStore';
-import { authApi, usersApi, UpdateProfilePayload } from '@/apis';
-import { registerAndSyncDeviceToken } from '@/lib/notifications';
+import { authApi, usersApi, driverAvailabilityApi, UpdateProfilePayload } from '@/apis';
+import { registerAndSyncDeviceToken, unregisterDeviceToken } from '@/lib/notifications';
 
 export interface AuthUser extends User {}
 
@@ -90,8 +90,19 @@ export function useAuth(): AuthState {
   );
 
   const logout = useCallback(async () => {
+    const currentUser = useAuthStore.getState().user;
+    const refreshToken = useAuthStore.getState().refreshToken;
+
     try {
-      const refreshToken = useAuthStore.getState().refreshToken;
+      
+      if (currentUser?.id) {
+        await unregisterDeviceToken(currentUser.id).catch(() => {});
+      }
+
+      if (currentUser?.role === 'driver') {
+        await driverAvailabilityApi.setAvailability(false).catch(() => {});
+      }
+
       if (refreshToken) {
         await authApi.logout(refreshToken).catch(() => {});
       }

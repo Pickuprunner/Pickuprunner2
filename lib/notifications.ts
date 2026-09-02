@@ -264,6 +264,20 @@ export async function registerAndSyncDeviceToken(userId?: string): Promise<strin
   return activeSyncPromise;
 }
 
+export async function unregisterDeviceToken(userId?: string): Promise<void> {
+  try {
+    const storageKey = `${STORED_DEVICE_TOKEN_KEY}_${userId || 'guest'}`;
+    const token = (await AsyncStorage.getItem(storageKey)) || inMemorySyncedToken;
+    if (token) {
+      await deviceApi.removeDeviceToken(token).catch(() => {});
+      await AsyncStorage.removeItem(storageKey).catch(() => {});
+    }
+    inMemorySyncedToken = null;
+  } catch (err) {
+    console.warn('[notifications] Error unregistering device token:', err);
+  }
+}
+
 export interface InAppNotificationOptions {
   title: string;
   body: string;

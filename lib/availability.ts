@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { driverAvailabilityApi } from '@/apis/availability';
+import * as Location from 'expo-location';
+import { driverAvailabilityApi, driverLocationApi } from '@/apis/availability';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useDriverStore } from '@/store/useDriverStore';
 
@@ -60,4 +61,50 @@ export function useSetDriverAvailability() {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
   });
+}
+
+export function useDriverLocationHeartbeat(driverCoords?: { lat?: number; lng?: number }) {
+  const isOnline = useDriverStore((s) => s.isOnline);
+  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
+
+  useEffect(() => {
+    if (!token || user?.role !== 'driver' || !isOnline) return;
+
+    let isMounted = true;
+
+    async function sendHeartbeat() {
+      try {
+        let lat = driverCoords?.lat;
+        let lng = driverCoords?.lng;
+
+        if (!lat || !lng) {
+          const { status } = await Location.getForegroundPermissionsAsync().catch(() => ({ status: 'undetermined' }));
+          if (status === 'granted') {
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            }).catch(() => null);
+            if (loc?.coords) {
+              lat = loc.coords.latitude;
+              lng = loc.coords.longitude;
+            }
+          }
+        }
+
+        if (lat && lng && isMounted) {
+          await driverLocationApi.reportLocation({ lat, lng });
+        }
+      } catch {
+      }
+    }
+
+    sendHeartbeat();
+
+    const interval = setInterval(sendHeartbeat, 60000); //6 sec
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isOnline, token, user?.role, driverCoords?.lat, driverCoords?.lng]);
 }

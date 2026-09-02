@@ -50,7 +50,7 @@ export const deviceApi = {
 
 
   removeDeviceToken: (token: string): Promise<{ success: boolean; message?: string }> => {
-    return apiClient.del<{ success: boolean; message?: string }>(`/devices/${encodeURIComponent(token)}`);
+    return apiClient.del<{ success: boolean; message?: string }>('/devices', { token });
   },
 
 

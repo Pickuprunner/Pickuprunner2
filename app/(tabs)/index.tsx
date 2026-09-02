@@ -31,7 +31,7 @@ import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
-import { useDriverAvailability, useSetDriverAvailability } from '@/lib/availability';
+import { useDriverAvailability, useSetDriverAvailability, useDriverLocationHeartbeat } from '@/lib/availability';
 import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast, CustomLoading } from '@/components/core';
 
@@ -69,6 +69,8 @@ export default function OrdersScreen() {
   // Sync duty availability with backend
   useDriverAvailability();
   const setAvailabilityMutation = useSetDriverAvailability();
+
+  useDriverLocationHeartbeat(driverLocation);
 
   useFocusEffect(
     useCallback(() => {
