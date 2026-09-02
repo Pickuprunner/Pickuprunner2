@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ScrollView,
   Platform,
@@ -28,7 +28,9 @@ import {
   useRecordAccreditationConsent,
   useSubmitAccreditation,
   useCompleteAccreditation,
+  usePatchAccreditation,
 } from '@/lib/accreditation';
+import { accreditationApi } from '@/apis/accreditation';
 import { useMyVerification, useSubmitVerification } from '@/lib/verification';
 import { colors, spacing, borderRadius } from '@/constants/design';
 import { useToast } from '@/components/core';
@@ -62,6 +64,7 @@ export default function DriverVerificationScreen() {
   const recordConsentMutation = useRecordAccreditationConsent();
   const submitAccreditationMutation = useSubmitAccreditation();
   const completeAccreditationMutation = useCompleteAccreditation();
+  const patchAccreditationMutation = usePatchAccreditation();
 
   const { data: existing } = useMyVerification(user?.id);
   const submitVerification = useSubmitVerification();
@@ -80,8 +83,34 @@ export default function DriverVerificationScreen() {
 
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSubmittingAll, setIsSubmittingAll] = useState(false);
   const [currentStep, setCurrentStep] = useState(params.step ? Number(params.step) : 1);
   const [keyboardPadding, setKeyboardPadding] = useState(0);
+
+  const isFormSubmitting =
+    isSubmittingAll ||
+    completeAccreditationMutation.isPending ||
+    patchAccreditationMutation.isPending ||
+    submitAccreditationMutation.isPending ||
+    submitVerification.isPending ||
+    saveStepMutation.isPending ||
+    uploadDocMutation.isPending;
+
+  const rejectedStepNumbers = useMemo(() => {
+    const list: number[] = [];
+    if (rawVehicleStatus === 'rejected') list.push(1);
+    if (rawLicenseStatus === 'rejected') list.push(2);
+    if (rawBgStatus === 'rejected') list.push(3);
+    if (rawInsuranceStatus === 'rejected') list.push(4);
+    return list;
+  }, [rawVehicleStatus, rawLicenseStatus, rawBgStatus, rawInsuranceStatus]);
+
+  const canDirectSubmitStep = (stepNum: number) => {
+    if (!isEditing) return false;
+    if (stepNum === 4) return true;
+    const remainingRejected = rejectedStepNumbers.filter((s) => s > stepNum);
+    return remainingRejected.length === 0;
+  };
 
   useEffect(() => {
     if (params.edit === 'true') {
@@ -230,6 +259,71 @@ export default function DriverVerificationScreen() {
     }
   }, [accreditationData?.profile, existing]);
 
+  useEffect(() => {
+    const profile = accreditationData?.profile;
+    const docs = profile?.documents;
+    if (!docs) return;
+
+    let isMounted = true;
+
+    async function loadDocumentPreviews() {
+      try {
+        const patch: Partial<DriverWizardData> = {};
+
+        if (docs?.licenseFront && !formData.licenseFrontUrl) {
+          try {
+            const res = await accreditationApi.getDocumentUrl('license_front');
+            if (isMounted && res?.data?.url) {
+              patch.licenseFrontUrl = res.data.url;
+              patch.licenseFrontName = 'license_front.jpg';
+            }
+          } catch (e) {
+            console.log('[Accreditation] preview license_front warning:', e);
+          }
+        }
+
+        if (docs?.licenseBack && !formData.licenseBackUrl) {
+          try {
+            const res = await accreditationApi.getDocumentUrl('license_back');
+            if (isMounted && res?.data?.url) {
+              patch.licenseBackUrl = res.data.url;
+              patch.licenseBackName = 'license_back.jpg';
+            }
+          } catch (e) {
+            console.log('[Accreditation] preview license_back warning:', e);
+          }
+        }
+
+        if (docs?.insuranceCard && !formData.insuranceDocUrl) {
+          try {
+            const res = await accreditationApi.getDocumentUrl('insurance_card');
+            if (isMounted && res?.data?.url) {
+              patch.insuranceDocUrl = res.data.url;
+              patch.insuranceDocName = 'insurance_card.jpg';
+            }
+          } catch (e) {
+            console.log('[Accreditation] preview insurance_card warning:', e);
+          }
+        }
+
+        if (isMounted && Object.keys(patch).length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            ...patch,
+          }));
+        }
+      } catch (err) {
+        console.warn('[Accreditation] loadDocumentPreviews error:', err);
+      }
+    }
+
+    loadDocumentPreviews();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accreditationData?.profile?.documents]);
+
   const updateFormData = (patch: Partial<DriverWizardData>) => {
     setFormData((prev) => ({ ...prev, ...patch }));
   };
@@ -272,7 +366,7 @@ export default function DriverVerificationScreen() {
         },
       });
 
-      if (formData.licenseFrontUrl) {
+      if (formData.licenseFrontUrl && !formData.licenseFrontUrl.startsWith('http')) {
         await uploadDocMutation
           .mutateAsync({
             type: 'license_front',
@@ -284,7 +378,7 @@ export default function DriverVerificationScreen() {
           .catch((e) => console.warn('[Accreditation] upload license_front error:', e));
       }
 
-      if (formData.licenseBackUrl) {
+      if (formData.licenseBackUrl && !formData.licenseBackUrl.startsWith('http')) {
         await uploadDocMutation
           .mutateAsync({
             type: 'license_back',
@@ -317,7 +411,78 @@ export default function DriverVerificationScreen() {
     }
   };
 
+  const handleDirectSubmitFromStep = async (stepNum: number) => {
+    try {
+      setIsSubmittingAll(true);
+      if (stepNum === 1) {
+        await saveStepMutation.mutateAsync({
+          step: 'vehicle',
+          payload: {
+            vehicleMake: formData.vehicleMake.trim(),
+            vehicleModel: formData.vehicleModel.trim(),
+            vehicleYear: parseInt(formData.vehicleYear, 10) || undefined,
+            vehicleColor: formData.vehicleColor.trim(),
+            vehiclePlate: formData.licensePlate.trim(),
+            streetAddress: formData.address.trim(),
+            aptSuite: formData.apt.trim() || undefined,
+            city: formData.city.trim(),
+            state: formData.state.trim().toUpperCase(),
+            postalCode: formData.zip.trim(),
+          },
+        });
+      } else if (stepNum === 2) {
+        await saveStepMutation.mutateAsync({
+          step: 'license',
+          payload: {
+            licenseState: formData.licenseState.trim().toUpperCase(),
+            licenseNumber: formData.licenseNumber.trim(),
+            legalName: formData.licenseFullName.trim(),
+            dateOfBirth: normalizeDateToISO(formData.licenseDob),
+            licenseExpirationDate: normalizeDateToISO(formData.licenseExpDate),
+          },
+        });
+
+        if (formData.licenseFrontUrl && !formData.licenseFrontUrl.startsWith('http')) {
+          await uploadDocMutation
+            .mutateAsync({
+              type: 'license_front',
+              file: {
+                uri: formData.licenseFrontUrl,
+                name: formData.licenseFrontName || 'license_front.jpg',
+              },
+            })
+            .catch((e) => console.warn('[Accreditation] upload license_front error:', e));
+        }
+
+        if (formData.licenseBackUrl && !formData.licenseBackUrl.startsWith('http')) {
+          await uploadDocMutation
+            .mutateAsync({
+              type: 'license_back',
+              file: {
+                uri: formData.licenseBackUrl,
+                name: formData.licenseBackName || 'license_back.jpg',
+              },
+            })
+            .catch((e) => console.warn('[Accreditation] upload license_back error:', e));
+        }
+      } else if (stepNum === 3) {
+        await recordConsentMutation.mutateAsync({
+          authorized: formData.fcraAgreed,
+          legalName: formData.licenseFullName.trim() || user?.displayName || undefined,
+        });
+      }
+
+      await handleSubmitAll();
+    } catch (e: any) {
+      console.warn(`[Accreditation] direct submit from step ${stepNum} error:`, e);
+      showToast('Submission Error', { type: 'error', description: e?.message || 'Failed to submit update.' });
+    } finally {
+      setIsSubmittingAll(false);
+    }
+  };
+
   const handleSubmitAll = async () => {
+    setIsSubmittingAll(true);
     try {
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
@@ -378,7 +543,7 @@ export default function DriverVerificationScreen() {
           },
         }).catch(() => {});
 
-        if (formData.insuranceDocUrl) {
+        if (formData.insuranceDocUrl && !formData.insuranceDocUrl.startsWith('http')) {
           await uploadDocMutation
             .mutateAsync({
               type: 'insurance_card',
@@ -443,6 +608,8 @@ export default function DriverVerificationScreen() {
     } catch (err: any) {
       console.warn('Submission error:', err);
       showToast(err?.message || 'Submission failed. Please try again.', 'error');
+    } finally {
+      setIsSubmittingAll(false);
     }
   };
 
@@ -545,13 +712,22 @@ export default function DriverVerificationScreen() {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
           >
-            <StepIndicator currentStep={currentStep} totalSteps={4} />
+            <StepIndicator
+              currentStep={currentStep}
+              totalSteps={4}
+              onStepPress={(step) => setCurrentStep(step)}
+              isInteractive={isEditing}
+            />
 
             {currentStep === 1 && (
               <VehicleAddressStep
                 data={formData}
                 onChange={updateFormData}
                 onNext={handleStep1Next}
+                isEditing={isEditing}
+                canDirectSubmit={canDirectSubmitStep(1)}
+                onSubmitDirect={() => handleDirectSubmitFromStep(1)}
+                submitting={isFormSubmitting}
               />
             )}
 
@@ -564,6 +740,10 @@ export default function DriverVerificationScreen() {
                 onUploadDoc={(type, file) =>
                   uploadDocMutation.mutateAsync({ type, file })
                 }
+                isEditing={isEditing}
+                canDirectSubmit={canDirectSubmitStep(2)}
+                onSubmitDirect={() => handleDirectSubmitFromStep(2)}
+                submitting={isFormSubmitting}
               />
             )}
 
@@ -573,6 +753,10 @@ export default function DriverVerificationScreen() {
                 onChange={updateFormData}
                 onNext={handleStep3Next}
                 onBack={() => setCurrentStep(2)}
+                isEditing={isEditing}
+                canDirectSubmit={canDirectSubmitStep(3)}
+                onSubmitDirect={() => handleDirectSubmitFromStep(3)}
+                submitting={isFormSubmitting}
               />
             )}
 
@@ -585,7 +769,8 @@ export default function DriverVerificationScreen() {
                 onUploadDoc={(type, file) =>
                   uploadDocMutation.mutateAsync({ type, file })
                 }
-                submitting={submitVerification.isPending || submitAccreditationMutation.isPending}
+                isEditing={isEditing}
+                submitting={isFormSubmitting}
               />
             )}
           </ScrollView>

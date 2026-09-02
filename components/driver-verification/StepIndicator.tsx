@@ -1,12 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Check } from '@blinkdotnew/mobile-ui';
+import * as Haptics from 'expo-haptics';
 import { colors, borderRadius, spacing } from '@/constants/design';
 
 interface StepIndicatorProps {
   currentStep: number;
   totalSteps?: number;
   steps?: { title: string; subtitle?: string }[];
+  onStepPress?: (stepNumber: number) => void;
+  isInteractive?: boolean;
 }
 
 const DEFAULT_STEPS = [
@@ -20,7 +23,11 @@ export function StepIndicator({
   currentStep,
   totalSteps = 4,
   steps = DEFAULT_STEPS,
+  onStepPress,
+  isInteractive = false,
 }: StepIndicatorProps) {
+  const canPress = isInteractive || Boolean(onStepPress);
+
   return (
     <View style={styles.container}>
       <View style={styles.stepsRow}>
@@ -31,7 +38,19 @@ export function StepIndicator({
 
           return (
             <React.Fragment key={idx}>
-              <View style={styles.stepItem}>
+              <TouchableOpacity
+                activeOpacity={canPress ? 0.7 : 1}
+                disabled={!canPress}
+                onPress={() => {
+                  if (onStepPress) {
+                    if (Platform.OS !== 'web') {
+                      Haptics.selectionAsync().catch(() => {});
+                    }
+                    onStepPress(stepNum);
+                  }
+                }}
+                style={styles.stepItem}
+              >
                 <View
                   style={[
                     styles.circle,
@@ -61,7 +80,7 @@ export function StepIndicator({
                 >
                   {step.title}
                 </Text>
-              </View>
+              </TouchableOpacity>
 
               {idx < totalSteps - 1 && (
                 <View

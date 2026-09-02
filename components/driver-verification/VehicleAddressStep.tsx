@@ -14,20 +14,34 @@ import {
   ChevronRight,
   ChevronDown,
   ArrowRight,
+  CheckCircle,
 } from '@blinkdotnew/mobile-ui';
+import { ActivityIndicator } from 'react-native';
 import { colors, borderRadius, spacing } from '@/constants/design';
 import CustomInput from '@/components/core/CustomInput';
-import { useToast } from '@/components/core';
-import { US_STATES, DriverWizardData } from './mockData';
+import { useToast, CustomStatePickerModal } from '@/components/core';
+import { DriverWizardData } from './mockData';
 import { validateVehicleStep } from './validation';
 
 interface VehicleAddressStepProps {
   data: DriverWizardData;
   onChange: (patch: Partial<DriverWizardData>) => void;
   onNext: () => void;
+  isEditing?: boolean;
+  canDirectSubmit?: boolean;
+  onSubmitDirect?: () => void;
+  submitting?: boolean;
 }
 
-export function VehicleAddressStep({ data, onChange, onNext }: VehicleAddressStepProps) {
+export function VehicleAddressStep({
+  data,
+  onChange,
+  onNext,
+  isEditing = false,
+  canDirectSubmit = false,
+  onSubmitDirect,
+  submitting = false,
+}: VehicleAddressStepProps) {
   const { showToast } = useToast();
   const [showStateModal, setShowStateModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -43,7 +57,11 @@ export function VehicleAddressStep({ data, onChange, onNext }: VehicleAddressSte
       });
       return;
     }
-    onNext();
+    if (canDirectSubmit && onSubmitDirect) {
+      onSubmitDirect();
+    } else {
+      onNext();
+    }
   };
 
   return (
@@ -182,50 +200,37 @@ export function VehicleAddressStep({ data, onChange, onNext }: VehicleAddressSte
 
       {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
-      <Pressable onPress={handleNext} style={styles.nextBtn}>
-        <Text style={styles.nextBtnText}>Continue to Driver's License</Text>
-        <ArrowRight size={18} color={colors.onPrimaryContainer} />
+      <Pressable
+        onPress={handleNext}
+        style={[styles.nextBtn, submitting && { opacity: 0.7 }]}
+        disabled={submitting}
+      >
+        {submitting ? (
+          <>
+            <ActivityIndicator size="small" color="#FFFFFF" />
+            <Text style={styles.nextBtnText}>Submitting...</Text>
+          </>
+        ) : canDirectSubmit ? (
+          <>
+            <Text style={styles.nextBtnText}>Save & Resubmit</Text>
+            <CheckCircle size={18} color={colors.onPrimaryContainer} />
+          </>
+        ) : (
+          <>
+            <Text style={styles.nextBtnText}>Continue to Driver's License</Text>
+            <ArrowRight size={18} color={colors.onPrimaryContainer} />
+          </>
+        )}
       </Pressable>
 
       {/* STATE PICKER MODAL */}
-      <Modal visible={showStateModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select State</Text>
-              <Pressable onPress={() => setShowStateModal(false)}>
-                <Text style={styles.modalCloseText}>Done</Text>
-              </Pressable>
-            </View>
-            <FlatList
-              data={US_STATES}
-              keyExtractor={(item) => item}
-              numColumns={4}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.stateGridItem,
-                    data.state === item && styles.stateGridItemActive,
-                  ]}
-                  onPress={() => {
-                    onChange({ state: item });
-                    setShowStateModal(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.stateGridItemText,
-                      data.state === item && styles.stateGridItemTextActive,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
+      <CustomStatePickerModal
+        visible={showStateModal}
+        onClose={() => setShowStateModal(false)}
+        selectedState={data.state}
+        onSelect={(st) => onChange({ state: st })}
+        title="Select Address State"
+      />
     </View>
   );
 }
@@ -317,65 +322,6 @@ const styles = StyleSheet.create({
   nextBtnText: {
     color: colors.onPrimaryContainer,
     fontSize: 15,
-    fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.gutter,
-  },
-  modalCard: {
-    width: '100%',
-    maxHeight: '65%',
-    backgroundColor: '#161B26',
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    padding: spacing.md,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.onSurface,
-  },
-  modalCloseText: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  stateGridItem: {
-    flex: 1,
-    margin: 4,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  stateGridItemActive: {
-    backgroundColor: colors.primaryContainer,
-    borderColor: colors.primaryContainer,
-  },
-  stateGridItemText: {
-    color: colors.onSurface,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  stateGridItemTextActive: {
-    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
 });

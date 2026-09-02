@@ -154,6 +154,16 @@ export interface ConsentResponse {
   };
 }
 
+export interface CompleteAccreditationPayload {
+  fields: Record<string, any>;
+  files?: {
+    license_front?: { uri: string; name?: string; type?: string };
+    license_back?: { uri: string; name?: string; type?: string };
+    insurance_card?: { uri: string; name?: string; type?: string };
+  };
+  method?: 'POST' | 'PATCH';
+}
+
 export const accreditationApi = {
   getAccreditation: async (): Promise<AccreditationApiResponse> => {
     return apiClient.get<AccreditationApiResponse>('/driver/accreditation');
@@ -238,17 +248,11 @@ export const accreditationApi = {
     return apiClient.post<AccreditationApiResponse>('/driver/accreditation/submit', payload || {});
   },
 
-  completeAccreditation: async (data: {
-    fields: Record<string, any>;
-    files?: {
-      license_front?: { uri: string; name?: string; type?: string };
-      license_back?: { uri: string; name?: string; type?: string };
-      insurance_card?: { uri: string; name?: string; type?: string };
-    };
-  }): Promise<AccreditationApiResponse> => {
+  completeAccreditation: async (data: CompleteAccreditationPayload): Promise<AccreditationApiResponse> => {
     const baseUrl = getApiBaseUrl();
     const token = useAuthStore.getState().token;
     const formData = new FormData();
+    const method = data.method || 'POST';
 
     Object.entries(data.fields).forEach(([key, val]) => {
       if (val !== undefined && val !== null && String(val).trim() !== '') {
@@ -259,6 +263,9 @@ export const accreditationApi = {
     if (data.files) {
       for (const [key, file] of Object.entries(data.files)) {
         if (!file?.uri) continue;
+        if (file.uri.startsWith('http://') || file.uri.startsWith('https://')) {
+          continue;
+        }
         const fileName = file.name || `${key}_${Date.now()}.jpg`;
         const mimeType = file.type || (fileName.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
 
@@ -286,7 +293,7 @@ export const accreditationApi = {
     }
 
     const response = await fetch(`${baseUrl}/driver/accreditation/complete`, {
-      method: 'POST',
+      method,
       headers,
       body: formData,
     });
@@ -296,5 +303,9 @@ export const accreditationApi = {
       throw new Error(resJson?.error || resJson?.message || 'Failed to complete accreditation');
     }
     return resJson as AccreditationApiResponse;
+  },
+
+  patchAccreditation: async (data: Omit<CompleteAccreditationPayload, 'method'>): Promise<AccreditationApiResponse> => {
+    return accreditationApi.completeAccreditation({ ...data, method: 'PATCH' });
   },
 };

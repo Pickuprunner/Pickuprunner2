@@ -21,7 +21,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { colors, borderRadius, spacing } from '@/constants/design';
 import CustomInput from '@/components/core/CustomInput';
-import { useToast } from '@/components/core';
+import { CustomDatePicker, useToast } from '@/components/core';
 import { POPULAR_INSURERS, DriverWizardData } from './mockData';
 import { validateInsuranceStep } from './validation';
 
@@ -32,6 +32,7 @@ export interface InsuranceStepProps {
   onBack: () => void;
   submitting?: boolean;
   onUploadDoc?: (type: 'insurance_card', file: { uri: string; name?: string }) => Promise<any>;
+  isEditing?: boolean;
 }
 
 export function InsuranceStep({
@@ -41,6 +42,7 @@ export function InsuranceStep({
   onBack,
   submitting = false,
   onUploadDoc,
+  isEditing = false,
 }: InsuranceStepProps) {
   const { showToast } = useToast();
   const [errorMsg, setErrorMsg] = useState('');
@@ -165,40 +167,38 @@ export function InsuranceStep({
           label="POLICY NUMBER"
           value={data.policyNumber}
           onChangeText={(val) => onChange({ policyNumber: val.replace(/[^A-Za-z0-9-]/g, '').toUpperCase().slice(0, 30) })}
-          placeholder="e.g. AZ-98421034-7B"
+          placeholder="Enter policy number"
           autoCapitalize="characters"
           maxLength={30}
         />
 
         <View style={styles.row2}>
           <View style={styles.flex1}>
-            <CustomInput
+            <CustomDatePicker
               label="EFFECTIVE DATE"
               value={data.effectiveDate}
-              onChangeText={(val) => onChange({ effectiveDate: formatDateInput(val) })}
+              onChange={(val) => onChange({ effectiveDate: val })}
               placeholder="MM/DD/YYYY"
-              keyboardType="number-pad"
-              maxLength={10}
+              mode="effective"
             />
           </View>
           <View style={styles.flex1}>
-            <CustomInput
+            <CustomDatePicker
               label="EXPIRATION DATE"
               value={data.expirationDate}
-              onChangeText={(val) => onChange({ expirationDate: formatDateInput(val) })}
+              onChange={(val) => onChange({ expirationDate: val })}
               placeholder="MM/DD/YYYY"
-              keyboardType="number-pad"
-              maxLength={10}
+              mode="future"
             />
           </View>
         </View>
 
         {/* 17-CHARACTER VIN */}
         <CustomInput
-          label="VEHICLE IDENTIFICATION NUMBER (VIN - 17 CHARACTERS)"
+          label="VEHICLE IDENTIFICATION NUMBER"
           value={data.vinNumber}
           onChangeText={(val) => onChange({ vinNumber: val.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '').slice(0, 17) })}
-          placeholder="e.g. 4T1B11HK5JU123456"
+          placeholder="Enter VIN"
           autoCapitalize="characters"
           maxLength={17}
         />
@@ -251,15 +251,20 @@ export function InsuranceStep({
 
         <Pressable
           onPress={handleSubmit}
-          style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
+          style={[styles.submitBtn, submitting && { opacity: 0.7 }]}
           disabled={submitting}
         >
           {submitting ? (
-            <ActivityIndicator size="small" color={colors.onPrimaryContainer} />
+            <>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.submitBtnText}>Submitting...</Text>
+            </>
           ) : (
             <>
-              <Text style={styles.submitBtnText}>Submit for Approval</Text>
-              <CheckCircle size={18} color={colors.onPrimaryContainer} />
+              <Text style={styles.submitBtnText}>
+                {isEditing ? 'Save & Resubmit' : 'Submit for Approval'}
+              </Text>
+              <CheckCircle size={18} color="#FFFFFF" />
             </>
           )}
         </Pressable>

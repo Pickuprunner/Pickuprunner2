@@ -24,8 +24,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { colors, borderRadius, spacing } from '@/constants/design';
 import CustomInput from '@/components/core/CustomInput';
-import { useToast } from '@/components/core';
-import { US_STATES, DriverWizardData } from './mockData';
+import { CustomDatePicker, useToast, CustomStatePickerModal } from '@/components/core';
+import { DriverWizardData } from './mockData';
 import { validateLicenseStep } from './validation';
 
 export interface DriversLicenseStepProps {
@@ -34,6 +34,10 @@ export interface DriversLicenseStepProps {
   onNext: () => void;
   onBack: () => void;
   onUploadDoc?: (type: 'license_front' | 'license_back', file: { uri: string; name?: string }) => Promise<any>;
+  isEditing?: boolean;
+  canDirectSubmit?: boolean;
+  onSubmitDirect?: () => void;
+  submitting?: boolean;
 }
 
 export function DriversLicenseStep({
@@ -42,6 +46,10 @@ export function DriversLicenseStep({
   onNext,
   onBack,
   onUploadDoc,
+  isEditing = false,
+  canDirectSubmit = false,
+  onSubmitDirect,
+  submitting = false,
 }: DriversLicenseStepProps) {
   const { showToast } = useToast();
   const [showStateModal, setShowStateModal] = useState(false);
@@ -111,7 +119,12 @@ export function DriversLicenseStep({
       });
       return;
     }
-    onNext();
+
+    if (canDirectSubmit && onSubmitDirect) {
+      onSubmitDirect();
+    } else {
+      onNext();
+    }
   };
 
   return (
@@ -165,23 +178,21 @@ export function DriversLicenseStep({
 
         <View style={styles.row2}>
           <View style={styles.flex1}>
-            <CustomInput
+            <CustomDatePicker
               label="DATE OF BIRTH"
               value={data.licenseDob}
-              onChangeText={(val) => onChange({ licenseDob: formatDateInput(val) })}
+              onChange={(val) => onChange({ licenseDob: val })}
               placeholder="MM/DD/YYYY"
-              keyboardType="number-pad"
-              maxLength={10}
+              mode="birthdate"
             />
           </View>
           <View style={styles.flex1}>
-            <CustomInput
+            <CustomDatePicker
               label="EXPIRATION DATE"
               value={data.licenseExpDate}
-              onChangeText={(val) => onChange({ licenseExpDate: formatDateInput(val) })}
+              onChange={(val) => onChange({ licenseExpDate: val })}
               placeholder="MM/DD/YYYY"
-              keyboardType="number-pad"
-              maxLength={10}
+              mode="future"
             />
           </View>
         </View>
@@ -265,56 +276,43 @@ export function DriversLicenseStep({
       {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
       <View style={styles.actionsRow}>
-        <Pressable onPress={onBack} style={styles.backBtn}>
+        <Pressable onPress={onBack} style={styles.backBtn} disabled={submitting}>
           <ArrowLeft size={18} color={colors.onSurface} />
           <Text style={styles.backBtnText}>Back</Text>
         </Pressable>
 
-        <Pressable onPress={handleNext} style={styles.nextBtn}>
-          <Text style={styles.nextBtnText}>Continue to Background Check</Text>
-          <ArrowRight size={18} color={colors.onPrimaryContainer} />
+        <Pressable
+          onPress={handleNext}
+          style={[styles.nextBtn, submitting && { opacity: 0.7 }]}
+          disabled={submitting}
+        >
+          {submitting ? (
+            <>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.nextBtnText}>Submitting...</Text>
+            </>
+          ) : canDirectSubmit ? (
+            <>
+              <Text style={styles.nextBtnText}>Save & Resubmit</Text>
+              <CheckCircle size={18} color={colors.onPrimaryContainer} />
+            </>
+          ) : (
+            <>
+              <Text style={styles.nextBtnText}>Continue to Background Check</Text>
+              <ArrowRight size={18} color={colors.onPrimaryContainer} />
+            </>
+          )}
         </Pressable>
       </View>
 
       {/* STATE PICKER MODAL */}
-      <Modal visible={showStateModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>State of Issue</Text>
-              <Pressable onPress={() => setShowStateModal(false)}>
-                <Text style={styles.modalCloseText}>Done</Text>
-              </Pressable>
-            </View>
-            <FlatList
-              data={US_STATES}
-              keyExtractor={(item) => item}
-              numColumns={4}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.stateGridItem,
-                    data.licenseState === item && styles.stateGridItemActive,
-                  ]}
-                  onPress={() => {
-                    onChange({ licenseState: item });
-                    setShowStateModal(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.stateGridItemText,
-                      data.licenseState === item && styles.stateGridItemTextActive,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
+      <CustomStatePickerModal
+        visible={showStateModal}
+        onClose={() => setShowStateModal(false)}
+        selectedState={data.licenseState}
+        onSelect={(st) => onChange({ licenseState: st })}
+        title="State of Issue"
+      />
     </View>
   );
 }
@@ -494,65 +492,6 @@ const styles = StyleSheet.create({
   nextBtnText: {
     color: colors.onPrimaryContainer,
     fontSize: 14.5,
-    fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.gutter,
-  },
-  modalCard: {
-    width: '100%',
-    maxHeight: '65%',
-    backgroundColor: '#161B26',
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    padding: spacing.md,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.onSurface,
-  },
-  modalCloseText: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  stateGridItem: {
-    flex: 1,
-    margin: 4,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  stateGridItemActive: {
-    backgroundColor: colors.primaryContainer,
-    borderColor: colors.primaryContainer,
-  },
-  stateGridItemText: {
-    color: colors.onSurface,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  stateGridItemTextActive: {
-    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
 });

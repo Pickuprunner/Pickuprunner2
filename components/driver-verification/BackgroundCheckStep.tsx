@@ -6,6 +6,7 @@ import {
   Pressable,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Shield,
@@ -25,6 +26,10 @@ interface BackgroundCheckStepProps {
   onChange: (patch: Partial<DriverWizardData>) => void;
   onNext: () => void;
   onBack: () => void;
+  isEditing?: boolean;
+  canDirectSubmit?: boolean;
+  onSubmitDirect?: () => void;
+  submitting?: boolean;
 }
 
 export function BackgroundCheckStep({
@@ -32,6 +37,10 @@ export function BackgroundCheckStep({
   onChange,
   onNext,
   onBack,
+  isEditing = false,
+  canDirectSubmit = false,
+  onSubmitDirect,
+  submitting = false,
 }: BackgroundCheckStepProps) {
   const { showToast } = useToast();
   const [errorMsg, setErrorMsg] = useState('');
@@ -50,7 +59,11 @@ export function BackgroundCheckStep({
       showToast('FCRA Consent Required', { type: 'warning', description: msg });
       return;
     }
-    onNext();
+    if (canDirectSubmit && onSubmitDirect) {
+      onSubmitDirect();
+    } else {
+      onNext();
+    }
   };
 
   return (
@@ -116,14 +129,32 @@ export function BackgroundCheckStep({
       {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
       <View style={styles.actionsRow}>
-        <Pressable onPress={onBack} style={styles.backBtn}>
+        <Pressable onPress={onBack} style={styles.backBtn} disabled={submitting}>
           <ArrowLeft size={18} color={colors.onSurface} />
           <Text style={styles.backBtnText}>Back</Text>
         </Pressable>
 
-        <Pressable onPress={handleNext} style={styles.nextBtn}>
-          <Text style={styles.nextBtnText}>Continue to Vehicle Insurance</Text>
-          <ArrowRight size={18} color={colors.onPrimaryContainer} />
+        <Pressable
+          onPress={handleNext}
+          style={[styles.nextBtn, submitting && { opacity: 0.7 }]}
+          disabled={submitting}
+        >
+          {submitting ? (
+            <>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.nextBtnText}>Submitting...</Text>
+            </>
+          ) : canDirectSubmit ? (
+            <>
+              <Text style={styles.nextBtnText}>Save & Resubmit</Text>
+              <CheckCircle size={18} color={colors.onPrimaryContainer} />
+            </>
+          ) : (
+            <>
+              <Text style={styles.nextBtnText}>Continue to Vehicle Insurance</Text>
+              <ArrowRight size={18} color={colors.onPrimaryContainer} />
+            </>
+          )}
         </Pressable>
       </View>
     </View>

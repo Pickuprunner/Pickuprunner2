@@ -101,8 +101,30 @@ export function useCompleteAccreditation() {
         license_back?: { uri: string; name?: string; type?: string };
         insurance_card?: { uri: string; name?: string; type?: string };
       };
+      method?: 'POST' | 'PATCH';
     }) => {
       const res = await accreditationApi.completeAccreditation(data);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ACCREDITATION_QUERY_KEY });
+    },
+  });
+}
+
+export function usePatchAccreditation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      fields: Record<string, any>;
+      files?: {
+        license_front?: { uri: string; name?: string; type?: string };
+        license_back?: { uri: string; name?: string; type?: string };
+        insurance_card?: { uri: string; name?: string; type?: string };
+      };
+    }) => {
+      const res = await accreditationApi.patchAccreditation(data);
       return res.data;
     },
     onSuccess: () => {
