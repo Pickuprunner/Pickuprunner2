@@ -14,6 +14,7 @@ export interface ChatMessage {
 }
 
 const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {};
+const EMPTY_ARRAY: ChatMessage[] = [];
 
 interface ChatStoreState {
   conversations: Record<string, ChatMessage[]>;
@@ -52,6 +53,7 @@ export const useChatStore = create<ChatStoreState>()(
 
       setActiveThreadOrderId: (orderId) => {
         set((state) => {
+          if (state.activeThreadOrderId === orderId) return state;
           if (!orderId) return { activeThreadOrderId: null };
           const unreadForThis = state.unreadCounts[orderId] || 0;
           const newCounts = { ...state.unreadCounts, [orderId]: 0 };
@@ -64,7 +66,11 @@ export const useChatStore = create<ChatStoreState>()(
         });
       },
 
-      setTotalUnread: (count) => set({ totalUnread: Math.max(0, count) }),
+      setTotalUnread: (count) =>
+        set((state) => {
+          const next = Math.max(0, count);
+          return state.totalUnread === next ? state : { totalUnread: next };
+        }),
 
       incrementUnread: (orderId) => {
         set((state) => {
@@ -85,6 +91,7 @@ export const useChatStore = create<ChatStoreState>()(
       clearUnread: (orderId) => {
         set((state) => {
           const unreadForThis = state.unreadCounts[orderId] || 0;
+          if (unreadForThis === 0) return state;
           const nextCounts = { ...state.unreadCounts, [orderId]: 0 };
           const nextTotal = Math.max(0, state.totalUnread - unreadForThis);
           return {
@@ -116,16 +123,28 @@ export const useChatStore = create<ChatStoreState>()(
       },
 
       setMessages: (orderId, messages) => {
-        set((state) => ({
-          conversations: {
-            ...state.conversations,
-            [orderId]: messages,
-          },
-        }));
+        set((state) => {
+          const current = state.conversations[orderId];
+          if (current && current.length === messages.length) {
+            const isIdentical = current.every(
+              (m, i) =>
+                m.id === messages[i]?.id &&
+                m.readAt === messages[i]?.readAt &&
+                m.text === messages[i]?.text
+            );
+            if (isIdentical) return state;
+          }
+          return {
+            conversations: {
+              ...state.conversations,
+              [orderId]: messages,
+            },
+          };
+        });
       },
 
       getMessages: (orderId) => {
-        return get().conversations[orderId] || [];
+        return get().conversations[orderId] || EMPTY_ARRAY;
       },
 
       clearConversation: (orderId) => {

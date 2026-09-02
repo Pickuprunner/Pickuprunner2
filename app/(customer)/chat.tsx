@@ -208,7 +208,6 @@ export default function CustomerChatScreen() {
     const match = orders.find((o) => o.id === orderId);
     if (match) {
       setActiveChatOrder(match);
-      router.setParams({ orderId: '' });
     } else {
       ordersApi
         .getById(orderId)
@@ -217,11 +216,8 @@ export default function CustomerChatScreen() {
           if (o && o.id) {
             setActiveChatOrder(o);
           }
-          router.setParams({ orderId: '' });
         })
-        .catch(() => {
-          router.setParams({ orderId: '' });
-        });
+        .catch(() => {});
     }
   }, [orderId, orders]);
 
@@ -240,13 +236,10 @@ export default function CustomerChatScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchChatsList();
-      if (!orderId) {
-        setActiveChatOrder(null);
-      }
       return () => {
         setActiveChatOrder(null);
       };
-    }, [fetchChatsList, orderId])
+    }, [fetchChatsList])
   );
 
   const fetchOrders = useCallback(async () => {

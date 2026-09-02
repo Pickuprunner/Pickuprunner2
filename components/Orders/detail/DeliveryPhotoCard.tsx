@@ -16,7 +16,6 @@ export interface DeliveryPhotoCardProps {
   photoUrl: string | null;
   uploadingPhoto: boolean;
   onPickPhoto: (source: 'camera' | 'library') => void;
-  onMockFill: () => void;
 }
 
 export function DeliveryPhotoCard({
@@ -24,7 +23,6 @@ export function DeliveryPhotoCard({
   photoUrl,
   uploadingPhoto,
   onPickPhoto,
-  onMockFill,
 }: DeliveryPhotoCardProps) {
   const currentPhoto = photoUri ?? photoUrl;
 
@@ -36,15 +34,6 @@ export function DeliveryPhotoCard({
           <Text style={styles.photoTitle}>Delivery Photo</Text>
           <Text style={styles.photoRequired}>(Required)</Text>
         </View>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.mockPhotoChip}
-          onPress={onMockFill}
-        >
-          <MaterialIcons name="auto-fix-high" size={14} color={colors.tertiary} />
-          <Text style={styles.mockPhotoChipText}>Mock Fill</Text>
-        </TouchableOpacity>
       </View>
 
       {!!currentPhoto && (
@@ -95,7 +84,7 @@ export function DeliveryPhotoCard({
 
 const styles = StyleSheet.create({
   photoBox: {
-    marginTop: 14,
+    marginHorizontal: 20,
     padding: 16,
     gap: 12,
   },
@@ -120,22 +109,6 @@ const styles = StyleSheet.create({
     color: colors.warning,
     fontSize: 12,
     fontWeight: '600',
-  },
-  mockPhotoChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.greenAlpha15,
-    borderWidth: 1,
-    borderColor: colors.greenAlpha40,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  mockPhotoChipText: {
-    color: colors.tertiary,
-    fontSize: 12,
-    fontWeight: '700',
   },
   photoPreviewWrapper: {
     width: '100%',

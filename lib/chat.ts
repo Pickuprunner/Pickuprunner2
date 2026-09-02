@@ -76,6 +76,8 @@ export function isOrderActive(status?: string): boolean {
   return s === 'accepted' || s === 'shopping' || s === 'picked_up' || s === 'en_route' || s === 'active';
 }
 
+const EMPTY_MESSAGES: ChatMessage[] = [];
+
 interface UseOrderChatOptions {
   orderId: string;
   orderStatus?: string;
@@ -84,7 +86,9 @@ interface UseOrderChatOptions {
 }
 
 export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrderChatOptions) {
-  const storeMessages = useChatStore((state) => (orderId ? state.conversations[orderId] || [] : []));
+  const storeMessages = useChatStore(
+    useCallback((state) => (orderId ? state.conversations[orderId] ?? EMPTY_MESSAGES : EMPTY_MESSAGES), [orderId])
+  );
   const [isLoading, setIsLoading] = useState(() => {
     if (!orderId) return false;
     const existing = useChatStore.getState().getMessages(orderId);
@@ -95,15 +99,8 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
   const sessionIdRef = useRef<string>('static-session');
   const orderIdRef = useRef<string>(orderId);
   orderIdRef.current = orderId;
-
-  useEffect(() => {
-    if (!orderId) {
-      setIsLoading(false);
-      return;
-    }
-    const cached = useChatStore.getState().getMessages(orderId);
-    setIsLoading(!cached || cached.length === 0);
-  }, [orderId]);
+  const roleRef = useRef(role);
+  roleRef.current = role;
 
   const fetchAndSyncMessages = useCallback(async () => {
     if (!orderIdRef.current) return;
@@ -114,7 +111,7 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
       setIsConnected(true);
 
       if (res.messages && Array.isArray(res.messages)) {
-        const mapped = res.messages.map((m) => mapApiToChatMessage(m, role));
+        const mapped = res.messages.map((m) => mapApiToChatMessage(m, roleRef.current));
         const prev = useChatStore.getState().getMessages(currentOrderId);
         const existingIds = new Set(prev.map((p) => p.id));
         const newIncoming = mapped.filter((m) => !m.mine && !existingIds.has(m.id));
@@ -136,7 +133,7 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
     } finally {
       setIsLoading(false);
     }
-  }, [role]);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;

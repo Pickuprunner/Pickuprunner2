@@ -341,7 +341,7 @@ export default function OrderDetailScreen() {
     if (!hasPhoto) {
       Alert.alert(
         'Delivery Photo Required',
-        'Please take, choose, or mock fill a photo before completing this delivery.'
+        'Please take or choose a photo before completing this delivery.'
       );
       return;
     }
@@ -526,20 +526,17 @@ export default function OrderDetailScreen() {
             <CustomerInfoCard order={activeOrder || order} />
 
             {status === 'picked_up' && (
-              <View style={{ marginHorizontal: 20, marginTop: 12 }}>
+              <>
+                <View style={styles.sectionHead}>
+                  <Text style={styles.sectionHeadText}>PROOF OF DELIVERY</Text>
+                </View>
                 <DeliveryPhotoCard
                   photoUri={photoUri}
                   photoUrl={photoUrl}
                   uploadingPhoto={uploadingPhoto}
                   onPickPhoto={pickPhoto}
-                  onMockFill={() => {
-                    const sampleUri =
-                      'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&auto=format&fit=crop&q=60';
-                    dispatch({ type: 'SET_PHOTO', uri: sampleUri });
-                    showToast('Mock Photo Filled', { type: 'success' });
-                  }}
                 />
-              </View>
+              </>
             )}
 
             {status === 'delivered' && (
