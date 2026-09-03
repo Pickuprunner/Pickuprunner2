@@ -13,6 +13,7 @@ const GREEN = '#00E297';
 interface Props {
   pendingCount: number;
   queueCount: number;
+  completedCount?: number;
   atCapacity: boolean;
   isConnected: boolean;
   isOnline?: boolean;
@@ -35,6 +36,7 @@ interface Props {
 export function OrdersHeader({
   pendingCount,
   queueCount,
+  completedCount,
   atCapacity,
   isConnected,
   isOnline = true,
@@ -74,10 +76,25 @@ export function OrdersHeader({
   const pills = (
     <View style={styles.pillsContainer}>
       <View style={styles.pillsLeft}>
-        <View style={[styles.pill, atCapacity && styles.pillCapacity]}>
-          <MaterialIcons name="inventory-2" size={15} color={colors.onSurfaceVariant} />
-          <Text style={styles.pillText}>
-            My Queue {queueCount}/{MAX_QUEUE}
+        <View
+          style={[
+            styles.pill,
+            completedCount !== undefined && completedCount > 0 && styles.pillCompleted,
+            atCapacity && styles.pillCapacity,
+          ]}
+        >
+          <MaterialIcons
+            name={completedCount !== undefined && completedCount > 0 ? 'task-alt' : 'inventory-2'}
+            size={15}
+            color={completedCount !== undefined && completedCount > 0 ? '#FFE399' : colors.onSurfaceVariant}
+          />
+          <Text
+            style={[
+              styles.pillText,
+              completedCount !== undefined && completedCount > 0 && styles.pillCompletedText,
+            ]}
+          >
+            My Queue {completedCount !== undefined ? completedCount : queueCount}/{MAX_QUEUE}
           </Text>
         </View>
 
@@ -227,6 +244,14 @@ const styles = StyleSheet.create({
   },
   pillCapacity: {
     borderColor: 'rgba(249, 115, 22, 0.4)',
+  },
+  pillCompleted: {
+    backgroundColor: 'rgba(255, 227, 153, 0.12)',
+    borderColor: 'rgba(255, 227, 153, 0.35)',
+  },
+  pillCompletedText: {
+    color: '#FFE399',
+    fontWeight: '700',
   },
   pillText: {
     fontSize: 11.5,

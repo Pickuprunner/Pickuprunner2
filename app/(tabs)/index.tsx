@@ -262,7 +262,7 @@ export default function OrdersScreen() {
 
   const isLoading = isLoadingAvailable && orders.length === 0;
 
-  const { queueCount, atCapacity } = useDriverQueue(allOrders, driverId);
+  const { queueCount, completedCount, atCapacity } = useDriverQueue(allOrders, driverId);
 
   const avatarInitial = useMemo(() => {
     const name = user?.displayName || user?.email || 'Driver';
@@ -568,6 +568,7 @@ export default function OrdersScreen() {
           }}
           pendingCount={pendingCount}
           queueCount={queueCount}
+          completedCount={completedCount}
           atCapacity={atCapacity}
           isConnected={isConnected}
           isOnline={isOnline}

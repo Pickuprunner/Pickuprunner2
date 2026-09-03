@@ -322,9 +322,10 @@ export function useUpdateOrderStatus() {
       }).catch(() => { });
     },
     onSettled: (_data, _err, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['orders', APP_CONFIG.CITY_ID] });
       queryClient.invalidateQueries({ queryKey: ['orders', 'available'] });
-      queryClient.invalidateQueries({ queryKey: ['order', vars.id] });
+      queryClient.invalidateQueries({ queryKey: ['order', vars?.id] });
     },
   });
 }
