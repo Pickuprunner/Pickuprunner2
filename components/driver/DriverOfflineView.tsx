@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,8 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { DARK_MAP_STYLE } from '@/components/map/mapTypes';
 
 interface DriverOfflineViewProps {
-  onGoOnline: () => void;
+  onGoOnline?: () => void;
+  onRetry?: () => void;
   isLoading?: boolean;
   onOpenPreferences?: () => void;
   onOpenOpportunities?: () => void;
@@ -27,10 +28,12 @@ interface DriverOfflineViewProps {
   availableCount?: number;
   orders?: Order[];
   avatar?: string;
+  isNetworkOffline?: boolean;
 }
 
 export function DriverOfflineView({
   onGoOnline,
+  onRetry,
   isLoading = false,
   onOpenPreferences,
   onOpenOpportunities,
@@ -39,6 +42,7 @@ export function DriverOfflineView({
   availableCount = 0,
   orders = [],
   avatar,
+  isNetworkOffline = false,
 }: DriverOfflineViewProps) {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
@@ -73,6 +77,15 @@ export function DriverOfflineView({
   const topPadding = insets.top > 0
     ? insets.top
     : (Platform.OS === 'android' ? 16 : 12);
+
+  const handleAction = () => {
+    haptic(Haptics.ImpactFeedbackStyle.Heavy);
+    if (isNetworkOffline && onRetry) {
+      onRetry();
+    } else if (onGoOnline) {
+      onGoOnline();
+    }
+  };
 
   return (
     <View style={[styles.root, { paddingTop: topPadding, paddingBottom: Math.max(insets.bottom, 16) }]}>
@@ -146,7 +159,7 @@ export function DriverOfflineView({
           </View>
         )}
 
-        {/* 100% Guaranteed Centered Overlay Location Puck */}
+        {/* Centered Overlay Location Puck */}
         <View style={styles.puckCenterOverlay} pointerEvents="none">
           <View style={styles.puckContainer}>
             <View style={styles.puckHalo} />
@@ -157,53 +170,86 @@ export function DriverOfflineView({
         </View>
       </View>
 
-      {/* Opportunities Card Container */}
+      {/* Action / Opportunities Card Container */}
       <View style={styles.opportunitiesCardContainer}>
-        <View style={styles.oppHeaderRow}>
-          <View style={styles.oppTitleWrapper}>
-            <Text style={styles.oppTitle}>Opportunities</Text>
-            <View style={styles.oppBadge}>
-              <Text style={styles.oppBadgeText}>
-                {totalOrdersCount > 0 ? `${totalOrdersCount} New` : 'Live'}
-              </Text>
+        {isNetworkOffline ? (
+          <>
+            <View style={styles.oppHeaderRow}>
+              <View style={styles.oppTitleWrapper}>
+                <MaterialIcons name="signal-cellular-connected-no-internet-0-bar" size={20} color="#F87171" />
+                <Text style={styles.oppTitle}>Connection Paused</Text>
+              </View>
+              <View style={[styles.oppBadge, { backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
+                <Text style={[styles.oppBadgeText, { color: '#FCA5A5' }]}>Offline</Text>
+              </View>
             </View>
-          </View>
-        </View>
 
-        <Text
-          style={styles.oppSubtitle}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
-          {totalOrdersCount > 0
-            ? `${totalOrdersCount} ${totalOrdersCount === 1 ? 'delivery request' : 'delivery requests'} in your area • Go online to earn`
-            : 'High demand in your area • Go online to earn'}
-        </Text>
+            <Text style={styles.oppSubtitle} numberOfLines={2}>
+              Please turn on mobile data or Wi-Fi to receive orders and reconnect.
+            </Text>
 
-        {/* Go Online Action Button - ONLY THIS BUTTON TRIGGERS GO ONLINE */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          disabled={isLoading}
-          onPress={() => {
-            haptic(Haptics.ImpactFeedbackStyle.Heavy);
-            onGoOnline();
-          }}
-          style={styles.goOnlineBtn}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color="#0F131C" />
-          ) : (
-            <View style={styles.goOnlineContent}>
-              <MaterialCommunityIcons
-                name="steering"
-                size={24}
-                color="#0F131C"
-                style={styles.steeringIcon}
-              />
-              <Text style={styles.goOnlineText}>Go online</Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              disabled={isLoading}
+              onPress={handleAction}
+              style={[styles.goOnlineBtn, { backgroundColor: '#FFE399' }]}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#0F131C" />
+              ) : (
+                <View style={styles.goOnlineContent}>
+                  <MaterialCommunityIcons
+                    name="refresh"
+                    size={22}
+                    color="#0F131C"
+                    style={styles.steeringIcon}
+                  />
+                  <Text style={[styles.goOnlineText, { color: '#0F131C' }]}>Retry Connection</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <View style={styles.oppHeaderRow}>
+              <View style={styles.oppTitleWrapper}>
+                <Text style={styles.oppTitle}>Opportunities</Text>
+                <View style={styles.oppBadge}>
+                  <Text style={styles.oppBadgeText}>
+                    {totalOrdersCount > 0 ? `${totalOrdersCount} New` : 'Live'}
+                  </Text>
+                </View>
+              </View>
             </View>
-          )}
-        </TouchableOpacity>
+
+            <Text style={styles.oppSubtitle} numberOfLines={1} adjustsFontSizeToFit>
+              {totalOrdersCount > 0
+                ? `${totalOrdersCount} ${totalOrdersCount === 1 ? 'delivery request' : 'delivery requests'} in your area • Go online to earn`
+                : 'High demand in your area • Go online to earn'}
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              disabled={isLoading}
+              onPress={handleAction}
+              style={styles.goOnlineBtn}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#0F131C" />
+              ) : (
+                <View style={styles.goOnlineContent}>
+                  <MaterialCommunityIcons
+                    name="steering"
+                    size={24}
+                    color="#0F131C"
+                    style={styles.steeringIcon}
+                  />
+                  <Text style={styles.goOnlineText}>Go online</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );

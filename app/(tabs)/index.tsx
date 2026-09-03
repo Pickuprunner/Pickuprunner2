@@ -44,6 +44,7 @@ import {
 } from '@/components/Orders';
 import { DriverProfileStatusScreen } from '@/components/driver-verification';
 import { DriverOfflineView } from '@/components/driver';
+import { useNetworkStatus } from '@/lib/network';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -58,6 +59,7 @@ export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [driverLocation, setDriverLocation] = useState<{ lat?: number; lng?: number }>({});
+  const { isConnected: isNetworkConnected, isChecking: isCheckingNetwork, checkConnection } = useNetworkStatus();
 
   const [headerHeight, setHeaderHeight] = useState(200);
   const headerTranslateY = useRef(new Animated.Value(0)).current;
@@ -514,7 +516,22 @@ export default function OrdersScreen() {
     );
   }
 
-  // If driver is Offline -> Render Offline UI (Screenshot 1)
+  // 1. If phone data / network is disconnected (Wi-Fi or Mobile Data is OFF) -> Render Network Offline UI
+  if (!isNetworkConnected) {
+    return (
+      <DriverOfflineView
+        onRetry={checkConnection}
+        isLoading={isCheckingNetwork}
+        onOpenPreferences={() => router.push('/(tabs)/profile')}
+        driverLocation={driverLocation}
+        availableCount={orders.length}
+        orders={orders}
+        isNetworkOffline={true}
+      />
+    );
+  }
+
+  // 2. If driver manually set duty to Offline (from Profile screen or duty toggle) -> Render Duty Offline UI
   if (!isOnline) {
     return (
       <DriverOfflineView
@@ -524,11 +541,12 @@ export default function OrdersScreen() {
         driverLocation={driverLocation}
         availableCount={orders.length}
         orders={orders}
+        isNetworkOffline={false}
       />
     );
   }
 
-  // If driver is Online -> Directly render Orders Feed
+  // 3. Driver is Online and Network is Connected -> Directly render Orders Feed
   return (
     <View style={styles.root}>
       <Animated.View

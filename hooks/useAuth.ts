@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { useAuthStore, User } from '@/store/useAuthStore';
+import { useDriverStore } from '@/store/useDriverStore';
 import { authApi, usersApi, driverAvailabilityApi, UpdateProfilePayload } from '@/apis';
 import { registerAndSyncDeviceToken, unregisterDeviceToken } from '@/lib/notifications';
 
@@ -59,6 +60,11 @@ export function useAuth(): AuthState {
       // Trigger permission check & device token backend sync
       registerAndSyncDeviceToken(session.user?.id);
 
+      if (session.user?.role === 'driver') {
+        useDriverStore.setState({ isOnline: true });
+        driverAvailabilityApi.setAvailability(true).catch(() => {});
+      }
+
       return session.user;
     },
     [setSession]
@@ -84,6 +90,11 @@ export function useAuth(): AuthState {
       // Trigger permission check & device token backend sync
       registerAndSyncDeviceToken(session.user?.id);
 
+      if (session.user?.role === 'driver') {
+        useDriverStore.setState({ isOnline: true });
+        driverAvailabilityApi.setAvailability(true).catch(() => {});
+      }
+
       return session.user;
     },
     [setSession]
@@ -94,12 +105,12 @@ export function useAuth(): AuthState {
     const refreshToken = useAuthStore.getState().refreshToken;
 
     try {
-      
       if (currentUser?.id) {
         await unregisterDeviceToken(currentUser.id).catch(() => {});
       }
 
       if (currentUser?.role === 'driver') {
+        useDriverStore.setState({ isOnline: false });
         await driverAvailabilityApi.setAvailability(false).catch(() => {});
       }
 
