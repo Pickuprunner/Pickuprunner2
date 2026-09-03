@@ -3,7 +3,6 @@ import {
   Animated,
   Easing,
   FlatList,
-  RefreshControl,
   StyleSheet,
   View,
   Text,
@@ -33,7 +32,7 @@ import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { useDriverAvailability, useSetDriverAvailability, useDriverLocationHeartbeat } from '@/lib/availability';
 import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
-import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast, CustomLoading } from '@/components/core';
+import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast, CustomLoading, CustomRefreshControl } from '@/components/core';
 
 import { isAccreditationFullyApproved } from '@/apis/accreditation';
 import {
@@ -604,16 +603,7 @@ export default function OrdersScreen() {
         ListEmptyComponent={EmptyView}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl
-            refreshing={false}
-            onRefresh={onRefresh}
-            tintColor="transparent"
-            colors={['transparent']}
-            progressBackgroundColor="transparent"
-            style={{ opacity: 0 }}
-          />
-        }
+        refreshControl={<CustomRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={[
           styles.list,
           queueCount > 0 && { paddingBottom: 110 },
@@ -637,7 +627,6 @@ export default function OrdersScreen() {
       />
 
       <ActiveDeliveriesBanner queueCount={queueCount} orders={myActiveOrders} />
-      <CustomLoading visible={refreshing} variant="circle" overlay position="top" />
     </View>
   );
 }

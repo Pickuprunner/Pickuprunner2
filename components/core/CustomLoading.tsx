@@ -10,6 +10,7 @@ import {
   ViewStyle,
   TextStyle,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { colors } from '@/constants/design';
 
@@ -55,7 +56,7 @@ export function CustomLoading({
   visible = true,
   variant = 'circle',
   size = 'large',
-  color = '#F4C300',
+  color = '#FFE399',
   backgroundColor = 'transparent',
   text,
   textColor = '#0F131C',
@@ -351,3 +352,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+export interface CustomRefreshControlProps {
+  refreshing?: boolean;
+  onRefresh: () => void | Promise<void>;
+  children?: React.ReactNode;
+  tintColor?: string;
+  colors?: string[];
+  progressBackgroundColor?: string;
+}
+
+export function CustomRefreshControl({
+  refreshing = false,
+  onRefresh,
+  children,
+  tintColor = '#FFE399',
+  colors = ['#FFE399'],
+  progressBackgroundColor = '#151821',
+  ...rest
+}: CustomRefreshControlProps) {
+  return (
+    <RefreshControl
+      {...rest}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      tintColor={tintColor}
+      colors={colors}
+      progressBackgroundColor={progressBackgroundColor}
+    >
+      {children}
+    </RefreshControl>
+  );
+}

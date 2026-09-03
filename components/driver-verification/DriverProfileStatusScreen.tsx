@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  RefreshControl,
   ActivityIndicator,
   Platform,
 } from 'react-native';
@@ -28,7 +27,7 @@ import { colors, spacing, borderRadius } from '@/constants/design';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { useMyVerification } from '@/lib/verification';
-import { useToast, CustomLoading } from '@/components/core';
+import { useToast, CustomLoading, CustomRefreshControl } from '@/components/core';
 
 import { isAccreditationFullyApproved } from '@/apis/accreditation';
 
@@ -203,16 +202,7 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
           },
         ]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={false}
-            onRefresh={handleRefresh}
-            tintColor="transparent"
-            colors={['transparent']}
-            progressBackgroundColor="transparent"
-            style={{ opacity: 0 }}
-          />
-        }
+        refreshControl={<CustomRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {/* HERO ICON & STATUS */}
         <View style={styles.heroSection}>
@@ -448,7 +438,6 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
           </TouchableOpacity>
         </View>
       </ScrollView>
-      <CustomLoading visible={refreshing} variant="circle" overlay position="top" topOffset={insets.top + 24} />
     </View>
   );
 }

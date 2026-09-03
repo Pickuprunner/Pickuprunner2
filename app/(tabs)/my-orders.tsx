@@ -1,9 +1,8 @@
-import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useRef } from 'react';
 import {
   Animated,
   Easing,
   FlatList,
-  RefreshControl,
   Platform,
   StyleSheet,
   View,
@@ -24,7 +23,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { calcDriverEarnings } from '@/lib/config';
 import { colors } from '@/constants/design';
-import { SkeletonList, CustomLoading } from '@/components/core';
+import { SkeletonList, CustomLoading, CustomRefreshControl } from '@/components/core';
 
 import {
   MyOrdersHeader,
@@ -106,7 +105,7 @@ export default function MyOrdersScreen() {
     let totalMiles = 0;
     let totalTipCents = 0;
 
-    const source = deliveredOrders.length > 0 ? deliveredOrders : allDriverOrders;
+     const source = deliveredOrders.length > 0 ? deliveredOrders : allDriverOrders;
     for (const o of source) {
       const miles = Number(o.distanceMiles) || 0;
       const tip = Number(o.tipAmount) || 0;
@@ -372,7 +371,7 @@ export default function MyOrdersScreen() {
                 <View style={styles.minimalCardRight}>
                   <Text style={styles.minimalEarnings}>{earnings.totalDisplay}</Text>
                   <View style={styles.deliveredPill}>
-                    <Text style={styles.deliveredPillText}>DELIVERED ✓</Text>
+                    <Text style={styles.deliveredPillText}>DELIVERED</Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -395,19 +394,11 @@ export default function MyOrdersScreen() {
         ListEmptyComponent={EmptyView}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        refreshControl={
-          <RefreshControl
-            refreshing={false}
-            onRefresh={onRefresh}
-            tintColor="transparent"
-            colors={['transparent']}
-          />
-        }
+        refreshControl={<CustomRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       />
-      <CustomLoading visible={refreshing} variant="circle" overlay position="top" />
     </View>
   );
 }

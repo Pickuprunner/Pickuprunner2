@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   ScrollView,
-  RefreshControl,
   View,
   Text,
   StyleSheet,
@@ -15,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_CONFIG } from '@/lib/config';
 import { useAllVerifications } from '@/lib/verification';
 import { useAllBackgroundChecks } from '@/lib/backgroundCheck';
-import { CustomHeader, CustomLoading } from '@/components/core';
+import { CustomHeader, CustomLoading, CustomRefreshControl } from '@/components/core';
 import { useToast } from '@/components/core/CustomToast';
 import {
   AdminOverviewPanel,
@@ -192,9 +191,7 @@ export default function AdminScreen() {
         showsVerticalScrollIndicator={false}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={refetch} tintColor={colors.primary} />
-        }
+        refreshControl={<CustomRefreshControl refreshing={isLoading} onRefresh={refetch} />}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: Math.max(insets.bottom, 16) + 32 },

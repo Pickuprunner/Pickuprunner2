@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   Platform,
-  RefreshControl,
   ScrollView,
   View,
   Text,
@@ -23,7 +22,7 @@ import { createCheckoutForOrder, openCheckoutUrl } from '@/apis/checkout';
 import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { APP_CONFIG } from '@/lib/config';
-import { useToast, CustomSkeleton, CustomConfirmModal } from '@/components/core';
+import { useToast, CustomSkeleton, CustomConfirmModal, CustomLoading, CustomRefreshControl } from '@/components/core';
 import { colors } from '@/constants/design';
 import {
   TrackHeroCard,
@@ -713,13 +712,7 @@ export default function TrackOrderScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => fetchOrder(true)}
-            tintColor={colors.secondary}
-          />
-        }
+        refreshControl={<CustomRefreshControl onRefresh={() => fetchOrder(true)} />}
       >
         {/* Status Hero Card */}
         <Animated.View entering={FadeInDown.springify()}>

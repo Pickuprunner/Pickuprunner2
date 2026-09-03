@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   FlatList,
-  RefreshControl,
   TouchableOpacity,
   TextInput,
   StyleSheet,
@@ -27,7 +26,7 @@ import {
   CustomerOrderFilterModal,
   CustomerFilterState,
 } from '@/components/Orders';
-import { useToast, SkeletonList, CustomConfirmModal, CustomLoading } from '@/components/core';
+import { useToast, SkeletonList, CustomConfirmModal, CustomLoading, CustomRefreshControl } from '@/components/core';
 
 const SESSION_KEY = 'customer_session_id';
 const CHANNEL_NAME = 'order-updates';
@@ -606,16 +605,7 @@ export default function MyOrdersScreen() {
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={false}
-            onRefresh={onRefresh}
-            tintColor="transparent"
-            colors={['transparent']}
-            progressBackgroundColor="transparent"
-            style={{ opacity: 0 }}
-          />
-        }
+        refreshControl={<CustomRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           loading ? (
             <SkeletonList count={3} />
@@ -679,7 +669,6 @@ export default function MyOrdersScreen() {
         onClose={() => setCancelTargetOrder(null)}
         onConfirm={confirmCancel}
       />
-      <CustomLoading visible={refreshing} variant="circle" overlay position="top" />
     </View>
   );
 }

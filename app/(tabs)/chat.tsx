@@ -8,7 +8,6 @@ import {
   Text,
   ScrollView,
   BackHandler,
-  RefreshControl,
   StatusBar,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -27,6 +26,7 @@ import { chatApi, ApiChatSummary } from '@/apis/chat';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useAuthStore } from '@/store/useAuthStore';
 import { colors } from '@/constants/design';
+import { CustomLoading, CustomRefreshControl } from '@/components/core';
 import {
   ConversationCard,
   ChatHeader,
@@ -114,7 +114,7 @@ function OrderChatView({ order, displayName, onBack }: { order: Order; displayNa
       >
         {isLoading && messages.length === 0 ? (
           <YStack flex={1} alignItems="center" justifyContent="center">
-            <Spinner size="large" color="$color9" />
+            <CustomLoading size="large" />
           </YStack>
         ) : messages.length === 0 ? (
           <ChatEmptyState
@@ -323,7 +323,7 @@ export default function ChatScreen() {
 
       {!chatsLoaded && ordersLoading && !hasApiChats ? (
         <YStack flex={1} alignItems="center" justifyContent="center">
-          <Spinner size="large" color="$color9" />
+          <CustomLoading size="large" />
         </YStack>
       ) : chatsLoaded && !hasApiChats && activeOrders.length === 0 && recentOrders.length === 0 ? (
         <ChatEmptyState
@@ -338,13 +338,14 @@ export default function ChatScreen() {
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl
+            <CustomRefreshControl
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                fetchChatsList();
+                Promise.resolve(fetchChatsList()).finally(() => {
+                  setRefreshing(false);
+                });
               }}
-              tintColor="#FFE399"
             />
           }
         >

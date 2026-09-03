@@ -8,7 +8,9 @@ export {
 } from './CustomHeader';
 export {
   CustomLoading,
+  CustomRefreshControl,
   type CustomLoadingProps,
+  type CustomRefreshControlProps,
   type LoadingVariant,
   type LoadingSize,
 } from './CustomLoading';

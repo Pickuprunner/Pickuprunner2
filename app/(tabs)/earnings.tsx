@@ -3,7 +3,6 @@ import {
   ScrollView,
   Platform,
   StyleSheet,
-  RefreshControl,
   Alert,
   View,
   Text,
@@ -18,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { APP_CONFIG, ORDER_SCOPE } from '@/lib/config';
 import { useConnectStatus, useConnectPayout } from '@/lib/stripeConnect';
 import { useDriverId } from '@/hooks/useDriverId';
-import { CustomHeader, useToast } from '@/components/core';
+import { CustomHeader, useToast, CustomLoading, CustomRefreshControl } from '@/components/core';
 import { colors } from '@/constants/design';
 
 import {
@@ -228,7 +227,7 @@ export default function EarningsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={GOLD} />}
+        refreshControl={<CustomRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <EarningsHeroCard
           availableCents={availableCents}

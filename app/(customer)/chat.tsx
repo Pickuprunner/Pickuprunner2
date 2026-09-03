@@ -8,7 +8,6 @@ import {
   View,
   Text,
   StatusBar,
-  RefreshControl,
   BackHandler,
   ActivityIndicator,
 } from 'react-native';
@@ -25,7 +24,7 @@ import { chatApi, ApiChatSummary } from '@/apis/chat';
 import { CustomerOrderData } from '@/components/Orders';
 import { useOrderStore } from '@/store/useOrderStore';
 import { useOrdersRealtime } from '@/lib/realtime';
-import { useToast, CustomSkeleton } from '@/components/core';
+import { useToast, CustomSkeleton, CustomLoading, CustomRefreshControl } from '@/components/core';
 import { colors } from '@/constants/design';
 import {
   ConversationCard,
@@ -144,7 +143,7 @@ function CustomerOrderChatView({
       >
         {isLoading && messages.length === 0 ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator size="large" color="#FFE399" />
+            <CustomLoading size="large" />
           </View>
         ) : messages.length === 0 ? (
           <ChatEmptyState
@@ -413,14 +412,14 @@ export default function CustomerChatScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContainer}
         refreshControl={
-          <RefreshControl
+          <CustomRefreshControl
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              fetchOrders();
-              fetchChatsList();
+              Promise.all([fetchOrders(), fetchChatsList()]).finally(() => {
+                setRefreshing(false);
+              });
             }}
-            tintColor="#FFE399"
           />
         }
         ListHeaderComponent={
