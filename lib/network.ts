@@ -19,6 +19,7 @@ type NetworkListener = (isConnected: boolean) => void;
 class NetworkManager {
   private static instance: NetworkManager;
   private isConnected: boolean = true;
+  private consecutiveFailures: number = 0;
   private listeners: Set<NetworkListener> = new Set();
   private heartbeatInterval: any = null;
   private isPinging: boolean = false;
@@ -26,14 +27,20 @@ class NetworkManager {
   private constructor() {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       this.isConnected = typeof navigator !== 'undefined' ? navigator.onLine : true;
-      window.addEventListener('online', () => this.setConnected(true));
-      window.addEventListener('offline', () => this.setConnected(false));
+      window.addEventListener('online', () => {
+        this.consecutiveFailures = 0;
+        this.setConnected(true);
+      });
+      window.addEventListener('offline', () => {
+        this.consecutiveFailures = 3;
+        this.setConnected(false);
+      });
     }
 
-    // React Native AppState listener
+    // React Native AppState listener — ping when app comes to foreground
     AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active') {
-        this.ping();
+        this.ping(true);
       }
     });
 
@@ -64,10 +71,12 @@ class NetworkManager {
   }
 
   public startHeartbeat() {
-    if (this.heartbeatInterval) return;
+    this.stopHeartbeat();
+    // 8-second interval when connected, adjusted to 3.5s when offline
+    const intervalMs = this.isConnected ? 8000 : 3500;
     this.heartbeatInterval = setInterval(() => {
-      this.ping();
-    }, 2500);
+      this.ping(false);
+    }, intervalMs);
   }
 
   public stopHeartbeat() {
@@ -77,15 +86,18 @@ class NetworkManager {
     }
   }
 
-  public async ping(): Promise<boolean> {
+  /**
+   * Pings connectivity.
+   * @param isManualCheck When true (e.g. user taps retry), sets status immediately without waiting for threshold.
+   */
+  public async ping(isManualCheck: boolean = false): Promise<boolean> {
     if (this.isPinging) return this.isConnected;
     this.isPinging = true;
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-      // Fast race check: test backend /health and internet generate_204 simultaneously
       const baseUrl = resolveApiUrl(rawApiUrl);
 
       const checkEndpoint = async (targetUrl: string) => {
@@ -99,22 +111,44 @@ class NetworkManager {
 
       let isSuccess = false;
       try {
-        isSuccess = await checkEndpoint(`${baseUrl}/health`);
+        // Fast internet reachability check
+        isSuccess = await checkEndpoint('https://connectivitycheck.gstatic.com/generate_204');
       } catch {
         try {
-          // Fallback global reachability ping
-          isSuccess = await checkEndpoint('https://connectivitycheck.gstatic.com/generate_204');
+          // Secondary fallback to local backend or Cloudflare trace
+          isSuccess = await checkEndpoint(`${baseUrl}/health`);
         } catch {
-          isSuccess = false;
+          try {
+            isSuccess = await checkEndpoint('https://1.1.1.1/cdn-cgi/trace');
+          } catch {
+            isSuccess = false;
+          }
         }
       }
 
       clearTimeout(timeoutId);
-      this.setConnected(isSuccess);
-      return isSuccess;
+
+      if (isSuccess) {
+        this.consecutiveFailures = 0;
+        this.setConnected(true);
+        this.startHeartbeat();
+        return true;
+      } else {
+        this.consecutiveFailures++;
+        // Debounce: Require at least 2 consecutive failed checks (or manual check) before declaring offline
+        if (isManualCheck || this.consecutiveFailures >= 2) {
+          this.setConnected(false);
+          this.startHeartbeat();
+        }
+        return this.isConnected;
+      }
     } catch {
-      this.setConnected(false);
-      return false;
+      this.consecutiveFailures++;
+      if (isManualCheck || this.consecutiveFailures >= 2) {
+        this.setConnected(false);
+        this.startHeartbeat();
+      }
+      return this.isConnected;
     } finally {
       this.isPinging = false;
     }
@@ -144,9 +178,6 @@ export function useNetworkStatus() {
       }
     });
 
-    // Immediate initial ping
-    networkManager.ping();
-
     return () => {
       isMountedRef.current = false;
       unsubscribe();
@@ -157,7 +188,7 @@ export function useNetworkStatus() {
     if (!isMountedRef.current) return isConnected;
     setIsChecking(true);
     try {
-      const result = await networkManager.ping();
+      const result = await networkManager.ping(true);
       if (isMountedRef.current) {
         setIsConnected(result);
       }
