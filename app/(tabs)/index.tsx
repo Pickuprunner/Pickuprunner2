@@ -191,9 +191,9 @@ export default function OrdersScreen() {
       return;
     }
     if (atCapacity) {
-      showToast('Queue Limit Reached', {
+      showToast('Daily Limit Reached', {
         type: 'warning',
-        description: 'Complete existing deliveries before accepting more',
+        description: 'You have reached the maximum limit of 3 orders for today',
       });
       return;
     }
