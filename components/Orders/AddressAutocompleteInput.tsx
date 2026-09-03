@@ -122,11 +122,11 @@ export function AddressAutocompleteInput({
       setShowDropdown(false);
 
       if (item.placeId) {
-        getPlaceCoordinates(item.placeId, item.displayName).catch(() => {});
+        await getPlaceCoordinates(item.placeId, item.displayName).catch(() => {});
       } else if (item.lat && item.lon) {
         setCachedCoords(item.displayName, { lat: item.lat, lon: item.lon });
       } else {
-        geocode(item.displayName).catch(() => {});
+        await geocode(item.displayName).catch(() => {});
       }
     } catch {}
   };
@@ -223,9 +223,12 @@ export function AddressAutocompleteInput({
         onClose={() => setMapModalVisible(false)}
         initialAddress={value}
         title={`Pinpoint ${label.replace(' *', '')}`}
-        onSelectAddress={(addr) => {
+        onSelectAddress={(addr, coords) => {
           isSelectingRef.current = true;
           onChangeText(addr);
+          if (coords) {
+            setCachedCoords(addr, coords);
+          }
           setSuggestions([]);
           setShowDropdown(false);
           showToast('Address Selected', {

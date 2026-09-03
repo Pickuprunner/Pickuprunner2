@@ -93,7 +93,6 @@
         "expo-build-properties",
         {
           "ios": {
-            "buildReactNativeFromSource": true,
             "deploymentTarget": "16.0"
           },
           "android": {

@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface LocationCoords {
   lat: number;
   lon: number;
+  bbox?: [number, number, number, number]; 
 }
 
 export interface AddressSuggestion {
@@ -14,6 +15,7 @@ export interface AddressSuggestion {
   primaryText: string;
   secondaryText: string;
   placeId?: string;
+  bbox?: [number, number, number, number]; 
 }
 
 interface LocationStoreState {
@@ -62,14 +64,14 @@ export const useLocationStore = create<LocationStoreState>()(
       },
 
       setCachedReverseGeocode: (lat, lon, address) => {
-        const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+        const key = `${lat},${lon}`;
         set((state) => ({
           reverseGeocodeCache: { ...state.reverseGeocodeCache, [key]: address },
         }));
       },
 
       getCachedReverseGeocode: (lat, lon) => {
-        const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+        const key = `${lat},${lon}`;
         return get().reverseGeocodeCache[key] || null;
       },
 

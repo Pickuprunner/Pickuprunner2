@@ -103,7 +103,7 @@ export default function NewOrderScreen() {
         }
       } catch { }
       setCalculating(false);
-    }, 1200);
+    }, 400);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);

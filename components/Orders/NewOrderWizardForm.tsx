@@ -135,6 +135,21 @@ export function NewOrderWizardForm({
         });
         return;
       }
+      if (calculating) {
+        showToast('Calculating Distance', {
+          description: 'Please wait a moment while route distance is calculated.',
+          type: 'info',
+        });
+        return;
+      }
+      const milesNum = parseFloat(miles);
+      if (isNaN(milesNum) || milesNum <= 0) {
+        showToast('Route Distance Missing', {
+          description: 'Unable to calculate delivery distance. Please verify both addresses.',
+          type: 'warning',
+        });
+        return;
+      }
     }
     haptic();
     setCurrentStep(Math.min(currentStep + 1, 2));

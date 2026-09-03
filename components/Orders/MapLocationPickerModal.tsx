@@ -15,7 +15,10 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/constants/design';
-import { reverseGeocode, geocode, searchAddressSuggestions, getPlaceCoordinates, AddressSuggestion } from '@/lib/distance';
+import { reverseGeocode, geocode, searchAddressSuggestions, getPlaceCoordinates, getRegionFromBbox, AddressSuggestion } from '@/lib/distance';
+import { useLocationStore } from '@/store/useLocationStore';
+
+const DEFAULT_MAP_COORDS = { lat: 31.9576, lon: -110.9709 }; // Sahuarita, Arizona
 
 let MapView: any = null;
 if (Platform.OS !== 'web') {
@@ -32,7 +35,7 @@ const PRIMARY_BLUE = '#1E75FF';
 interface MapLocationPickerModalProps {
   visible: boolean;
   onClose: () => void;
-  onSelectAddress: (address: string) => void;
+  onSelectAddress: (address: string, coords?: { lat: number; lon: number }) => void;
   initialAddress?: string;
   title?: string;
 }
@@ -45,12 +48,13 @@ export function MapLocationPickerModal({
   title = 'Pin Location on Map',
 }: MapLocationPickerModalProps) {
   const mapRef = useRef<any>(null);
-  const coordsRef = useRef<{ lat: number; lon: number }>({ lat: 21.1702, lon: 72.8311 });
+  const initialCoords = useLocationStore.getState().currentLocation || DEFAULT_MAP_COORDS;
+  const coordsRef = useRef<{ lat: number; lon: number }>(initialCoords);
   const [initialRegion, setInitialRegion] = useState({
-    latitude: 21.1702,
-    longitude: 72.8311,
-    latitudeDelta: 0.005,
-    longitudeDelta: 0.005,
+    latitude: initialCoords.lat,
+    longitude: initialCoords.lon,
+    latitudeDelta: 0.003,
+    longitudeDelta: 0.003,
   });
 
   const [selectedAddress, setSelectedAddress] = useState(initialAddress);
@@ -62,6 +66,7 @@ export function MapLocationPickerModal({
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipReverseGeocodeRef = useRef(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -75,12 +80,7 @@ export function MapLocationPickerModal({
       geocode(initialAddress).then((coords) => {
         if (coords) {
           coordsRef.current = coords;
-          const target = {
-            latitude: coords.lat,
-            longitude: coords.lon,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-          };
+          const target = getRegionFromBbox(coords.bbox, coords);
           setInitialRegion(target);
           setTimeout(() => {
             if (mapRef.current?.animateToRegion) {
@@ -119,8 +119,8 @@ export function MapLocationPickerModal({
       const target = {
         latitude: coords.lat,
         longitude: coords.lon,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
+        latitudeDelta: 0.0025,
+        longitudeDelta: 0.0025,
       };
       setInitialRegion(target);
       if (mapRef.current?.animateToRegion) {
@@ -149,7 +149,7 @@ export function MapLocationPickerModal({
           setSelectedAddress(addr);
         }
       } catch {
-        setSelectedAddress(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+        setSelectedAddress(`${lat}, ${lon}`);
       } finally {
         setLoadingAddress(false);
       }
@@ -158,11 +158,15 @@ export function MapLocationPickerModal({
 
   const handleRegionChangeComplete = useCallback((newRegion: any) => {
     if (!newRegion) return;
+    if (skipReverseGeocodeRef.current) {
+      skipReverseGeocodeRef.current = false;
+      return;
+    }
     const prev = coordsRef.current;
     const dLat = Math.abs(newRegion.latitude - prev.lat);
     const dLon = Math.abs(newRegion.longitude - prev.lon);
 
-    if (dLat > 0.00015 || dLon > 0.00015) {
+    if (dLat > 0.00001 || dLon > 0.00001) {
       coordsRef.current = { lat: newRegion.latitude, lon: newRegion.longitude };
       fetchAddressForCoords(newRegion.latitude, newRegion.longitude);
     }
@@ -209,22 +213,21 @@ export function MapLocationPickerModal({
       }
     }
 
+    let bbox = item.bbox;
+
     if (!lat || !lon) {
       const coords = await geocode(item.displayName);
       if (coords) {
         lat = coords.lat;
         lon = coords.lon;
+        if (!bbox) bbox = coords.bbox;
       }
     }
 
     if (lat && lon) {
       coordsRef.current = { lat, lon };
-      const target = {
-        latitude: lat,
-        longitude: lon,
-        latitudeDelta: 0.008,
-        longitudeDelta: 0.008,
-      };
+      skipReverseGeocodeRef.current = true;
+      const target = getRegionFromBbox(bbox, { lat, lon });
       if (mapRef.current?.animateToRegion) {
         mapRef.current.animateToRegion(target, 450);
       }
@@ -266,7 +269,8 @@ export function MapLocationPickerModal({
   const handleConfirm = () => {
     if (selectedAddress.trim()) {
       haptic();
-      onSelectAddress(selectedAddress.trim());
+      useLocationStore.getState().setCachedCoords(selectedAddress.trim(), coordsRef.current);
+      onSelectAddress(selectedAddress.trim(), coordsRef.current);
       onClose();
     }
   };
@@ -306,6 +310,26 @@ export function MapLocationPickerModal({
                 onChangeText={handleSearchChange}
                 autoCapitalize="words"
                 returnKeyType="search"
+                onSubmitEditing={async () => {
+                  if (!searchQuery.trim()) return;
+                  Keyboard.dismiss();
+                  if (searchSuggestions.length > 0) {
+                    handleSelectSearchSuggestion(searchSuggestions[0]);
+                    return;
+                  }
+                  setIsSearching(true);
+                  const coords = await geocode(searchQuery);
+                  setIsSearching(false);
+                  if (coords) {
+                    setSelectedAddress(searchQuery.trim());
+                    coordsRef.current = coords;
+                    skipReverseGeocodeRef.current = true;
+                    const target = getRegionFromBbox(coords.bbox, coords);
+                    if (mapRef.current?.animateToRegion) {
+                      mapRef.current.animateToRegion(target, 450);
+                    }
+                  }
+                }}
               />
               {isSearching ? (
                 <ActivityIndicator size="small" color={GOLD} />
@@ -372,7 +396,7 @@ export function MapLocationPickerModal({
                 <MaterialIcons name="place" size={36} color={GOLD} />
                 <Text style={styles.webFallbackTitle}>Interactive Map</Text>
                 <Text style={styles.webFallbackSubtitle}>
-                  Coordinates: {coordsRef.current.lat.toFixed(4)}, {coordsRef.current.lon.toFixed(4)}
+                  Coordinates: {coordsRef.current.lat}, {coordsRef.current.lon}
                 </Text>
               </View>
             )}
@@ -623,17 +647,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
+    width: 42,
+    height: 42,
     marginLeft: -21,
     marginTop: -42,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   pinShadow: {
+    position: 'absolute',
+    bottom: -1,
     width: 10,
-    height: 4,
+    height: 3,
     borderRadius: 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    marginTop: -2,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
   },
   floatingControls: {
     position: 'absolute',
