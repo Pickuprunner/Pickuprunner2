@@ -75,9 +75,6 @@ export default function RootLayout() {
                   <Stack.Screen name="connect/onboarding/success" />
                   <Stack.Screen name="connect/onboarding/reauth" />
                   <Stack.Screen name="delete-account" />
-                  <Stack.Screen name="terms" />
-                  <Stack.Screen name="privacy-policy" />
-                  <Stack.Screen name="privacy" />
                   <Stack.Screen name="+not-found" />
                 </Stack>
                 <StatusBar style="auto" />

@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius } from '@/constants/design';
+import { openTerms, openPrivacy } from '@/lib/config';
 
 interface TermsAgreementProps {
   agreed: boolean;
@@ -40,14 +40,14 @@ export function TermsAgreement({
       <Text style={styles.label}>
         I agree to the{' '}
         <Text
-          onPress={() => router.push('/terms')}
+          onPress={openTerms}
           style={[styles.link, { color: accentColor }]}
         >
           Terms of Use
         </Text>
         {' '}&{' '}
         <Text
-          onPress={() => router.push('/privacy-policy')}
+          onPress={openPrivacy}
           style={[styles.link, { color: accentColor }]}
         >
           Privacy Policy

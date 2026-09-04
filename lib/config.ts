@@ -1,3 +1,5 @@
+import { Linking } from 'react-native';
+
 export const APP_CONFIG = {
 
   // ── Market / City ────────────────────────────────────────────
@@ -75,6 +77,9 @@ const rawFrontendUrl =
 export const FRONTEND_URL = rawFrontendUrl.replace(/\/+$/, '');
 export const TERMS_URL = `${FRONTEND_URL}/terms`;
 export const PRIVACY_URL = `${FRONTEND_URL}/privacy`;
+
+export const openTerms = () => Linking.openURL(TERMS_URL).catch(() => {});
+export const openPrivacy = () => Linking.openURL(PRIVACY_URL).catch(() => {});
 
 /**
  * Helper — true if this is a store-specific build

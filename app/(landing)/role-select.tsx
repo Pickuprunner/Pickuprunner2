@@ -14,7 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
 import { saveRole, AppRole } from '@/hooks/useRole';
 import { colors, gradients, shadows, borderRadius, spacing } from '@/constants/design';
-import { APP_CONFIG } from '@/lib/config';
+import { APP_CONFIG, openTerms, openPrivacy } from '@/lib/config';
 
 export default function RoleSelectScreen() {
   const insets = useSafeAreaInsets();
@@ -132,14 +132,14 @@ export default function RoleSelectScreen() {
           <View style={styles.linksRow}>
             <Text
               style={styles.linkText}
-              onPress={() => router.push('/privacy-policy')}
+              onPress={openPrivacy}
             >
               Privacy Policy
             </Text>
             <Text style={styles.linkDot}>·</Text>
             <Text
               style={styles.linkText}
-              onPress={() => router.push('/terms')}
+              onPress={openTerms}
             >
               Terms of Use
             </Text>

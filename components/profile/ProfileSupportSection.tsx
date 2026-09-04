@@ -1,7 +1,7 @@
 import React from 'react';
 import { Linking } from 'react-native';
 import { HelpCircle, Mail, Shield, ShieldCheck, FileText } from '@blinkdotnew/mobile-ui';
-import { router } from 'expo-router';
+import { openTerms, openPrivacy } from '@/lib/config';
 import { ProfileSection, ItemDivider } from './ProfileSection';
 import { ProfileActionRow } from './ProfileActionRow';
 
@@ -44,7 +44,7 @@ export function ProfileSupportSection({ supportEmail, isCustomer = false }: Prof
         }
         iconBg="rgba(255, 255, 255, 0.06)"
         title="Privacy Policy"
-        onPress={() => router.push('/privacy-policy')}
+        onPress={openPrivacy}
         hapticStyle="medium"
       />
 
@@ -54,7 +54,7 @@ export function ProfileSupportSection({ supportEmail, isCustomer = false }: Prof
         icon={<FileText size={18} color="rgba(255, 255, 255, 0.8)" />}
         iconBg="rgba(255, 255, 255, 0.06)"
         title="Terms of Service"
-        onPress={() => router.push('/terms')}
+        onPress={openTerms}
         hapticStyle="medium"
       />
     </ProfileSection>

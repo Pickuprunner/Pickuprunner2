@@ -4,7 +4,7 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { CustomInput } from '@/components/core';
-import { APP_CONFIG } from '@/lib/config';
+import { APP_CONFIG, openTerms, openPrivacy } from '@/lib/config';
 import { colors, spacing } from '@/constants/design';
 
 const TIP_OPTIONS = [
@@ -337,14 +337,14 @@ export function PricingSummaryCard({
               I agree to the{' '}
               <Text
                 style={styles.termsLink}
-                onPress={() => router.push('/terms')}
+                onPress={openTerms}
               >
                 Terms of Service
               </Text>
               {' '}and{' '}
               <Text
                 style={styles.termsLink}
-                onPress={() => router.push('/privacy-policy')}
+                onPress={openPrivacy}
               >
                 Privacy Policy
               </Text>
