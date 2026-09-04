@@ -1,4 +1,4 @@
-package com.pickuprunner.app
+package com.pickuprunner
 
 import android.app.Application
 import android.content.res.Configuration

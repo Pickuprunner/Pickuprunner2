@@ -1,4 +1,4 @@
-package com.pickuprunner.app
+package com.pickuprunner
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

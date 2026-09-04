@@ -37,7 +37,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0052FF"
       },
-      "package": "com.pickuprunner.app",
+      "package": "com.pickuprunner",
       "googleServicesFile": "./android/app/google-services.json",
       "config": {
         "googleMaps": {
