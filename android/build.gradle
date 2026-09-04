@@ -23,3 +23,12 @@ allprojects {
 
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
+
+allprojects { proj ->
+  proj.tasks.matching { it.name.startsWith("externalNativeBuildClean") }.configureEach {
+    it.enabled = false
+  }
+  proj.tasks.matching { it.name == "clean" }.configureEach {
+    it.doFirst { proj.delete(proj.file(".cxx")) }
+  }
+}
