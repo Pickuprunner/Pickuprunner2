@@ -240,7 +240,7 @@ export const accreditationApi = {
     return apiClient.get<ViewDocResponse>(`/driver/accreditation/documents/${type}`);
   },
 
-  recordConsent: async (payload: { authorized: boolean; legalName?: string }): Promise<ConsentResponse> => {
+  recordConsent: async (payload: { authorized: boolean; legalName?: string; ssnLast4?: string }): Promise<ConsentResponse> => {
     return apiClient.post<ConsentResponse>('/driver/accreditation/consent', payload);
   },
 

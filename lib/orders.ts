@@ -124,6 +124,14 @@ export function useCreateOrder() {
       deliveryAddress: string;
       pickupLat?: number;
       pickupLng?: number;
+      deliveryLat?: number;
+      deliveryLng?: number;
+      pickupPlaceId?: string;
+      deliveryPlaceId?: string;
+      pickupLocationSource?: 'nominatim' | 'photon' | 'manual';
+      deliveryLocationSource?: 'nominatim' | 'photon' | 'manual';
+      pickupPrecision?: string;
+      deliveryPrecision?: string;
       items: string;
       tipAmount?: number;
       distanceMiles?: number;
@@ -144,6 +152,14 @@ export function useCreateOrder() {
         deliveryAddress: orderData.deliveryAddress.trim(),
         pickupLat: orderData.pickupLat,
         pickupLng: orderData.pickupLng,
+        deliveryLat: orderData.deliveryLat,
+        deliveryLng: orderData.deliveryLng,
+        pickupPlaceId: orderData.pickupPlaceId,
+        deliveryPlaceId: orderData.deliveryPlaceId,
+        pickupLocationSource: orderData.pickupLocationSource,
+        deliveryLocationSource: orderData.deliveryLocationSource,
+        pickupPrecision: orderData.pickupPrecision,
+        deliveryPrecision: orderData.deliveryPrecision,
         items: orderData.items?.trim() || '[LEAVE AT DOOR] Standard delivery items',
         tipAmount: tipCents,
         distanceMiles: Math.max(0, Number(orderData.distanceMiles ?? 0)),

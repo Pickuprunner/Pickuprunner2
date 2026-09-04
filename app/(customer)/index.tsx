@@ -211,10 +211,16 @@ export default function CustomerNewOrderScreen() {
       let serverOrder: any = null;
 
       let pickupCoords: { lat: number; lon: number } | null = null;
+      let deliveryCoords: { lat: number; lon: number } | null = null;
       try {
         pickupCoords = await geocode(form.address.trim());
       } catch (geoErr) {
         console.warn('[customer-new-order] Geocoding pickup failed:', geoErr);
+      }
+      try {
+        deliveryCoords = await geocode(form.deliveryAddress.trim());
+      } catch (geoErr) {
+        console.warn('[customer-new-order] Geocoding delivery failed:', geoErr);
       }
 
       const resolvedName = form.name.trim() || user?.displayName || 'Customer';
@@ -230,6 +236,8 @@ export default function CustomerNewOrderScreen() {
           deliveryAddress: form.deliveryAddress.trim(),
           pickupLat: pickupCoords?.lat,
           pickupLng: pickupCoords?.lon,
+          deliveryLat: deliveryCoords?.lat,
+          deliveryLng: deliveryCoords?.lon,
           items: orderItems || '[LEAVE AT DOOR] Standard delivery items',
           distanceMiles: parseFloat(form.miles) || 0,
           tipAmount: finalTipCents,
@@ -249,6 +257,10 @@ export default function CustomerNewOrderScreen() {
         customerEmail: resolvedEmail || '',
         pickupAddress: form.address.trim(),
         deliveryAddress: form.deliveryAddress.trim(),
+        pickupLat: pickupCoords?.lat,
+        pickupLng: pickupCoords?.lon,
+        deliveryLat: deliveryCoords?.lat,
+        deliveryLng: deliveryCoords?.lon,
         items: orderItems || '[LEAVE AT DOOR] Standard delivery items',
         distanceMiles: parseFloat(form.miles) || 0,
         status: 'pending' as const,

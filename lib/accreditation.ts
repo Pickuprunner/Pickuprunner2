@@ -66,7 +66,7 @@ export function useRecordAccreditationConsent() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: { authorized: boolean; legalName?: string }) => {
+    mutationFn: async (payload: { authorized: boolean; legalName?: string; ssnLast4?: string }) => {
       const res = await accreditationApi.recordConsent(payload);
       return res.data;
     },

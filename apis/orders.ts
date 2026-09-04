@@ -19,6 +19,14 @@ export interface CreateOrderPayload {
   deliveryAddress: string;
   pickupLat?: number;
   pickupLng?: number;
+  deliveryLat?: number;
+  deliveryLng?: number;
+  pickupPlaceId?: string;
+  deliveryPlaceId?: string;
+  pickupLocationSource?: 'nominatim' | 'photon' | 'manual';
+  deliveryLocationSource?: 'nominatim' | 'photon' | 'manual';
+  pickupPrecision?: string;
+  deliveryPrecision?: string;
   items?: string;
   status?: OrderStatus;
   tipAmount?: number;
@@ -42,6 +50,14 @@ export interface UpdateOrderPayload {
   deliveryAddress?: string;
   pickupLat?: number;
   pickupLng?: number;
+  deliveryLat?: number;
+  deliveryLng?: number;
+  pickupPlaceId?: string;
+  deliveryPlaceId?: string;
+  pickupLocationSource?: 'nominatim' | 'photon' | 'manual';
+  deliveryLocationSource?: 'nominatim' | 'photon' | 'manual';
+  pickupPrecision?: string;
+  deliveryPrecision?: string;
   items?: string;
   customerName?: string;
   customerPhone?: string;
@@ -71,6 +87,18 @@ export interface OrderItem {
   delivery_lng?: number;
   pickupDistanceMiles?: number;
   pickup_distance_miles?: number;
+  pickupPlaceId?: string;
+  pickup_place_id?: string;
+  deliveryPlaceId?: string;
+  delivery_place_id?: string;
+  pickupLocationSource?: 'nominatim' | 'photon' | 'manual';
+  pickup_location_source?: 'nominatim' | 'photon' | 'manual';
+  deliveryLocationSource?: 'nominatim' | 'photon' | 'manual';
+  delivery_location_source?: 'nominatim' | 'photon' | 'manual';
+  pickupPrecision?: string;
+  pickup_precision?: string;
+  deliveryPrecision?: string;
+  delivery_precision?: string;
   earningsCents?: number;
   earnings_cents?: number;
   mileageCents?: number;
@@ -151,6 +179,12 @@ function unwrapOrder(res: any): OrderItem {
     checkoutSessionId: raw.checkoutSessionId || raw.checkout_session_id,
     deliveryPhotoUrl: raw.deliveryPhotoUrl || raw.delivery_photo_url,
     deliveredAt: raw.deliveredAt || raw.delivered_at,
+    pickupPlaceId: raw.pickupPlaceId || raw.pickup_place_id,
+    deliveryPlaceId: raw.deliveryPlaceId || raw.delivery_place_id,
+    pickupLocationSource: raw.pickupLocationSource || raw.pickup_location_source,
+    deliveryLocationSource: raw.deliveryLocationSource || raw.delivery_location_source,
+    pickupPrecision: raw.pickupPrecision || raw.pickup_precision,
+    deliveryPrecision: raw.deliveryPrecision || raw.delivery_precision,
   };
 }
 

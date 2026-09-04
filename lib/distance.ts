@@ -44,14 +44,17 @@ export async function fetchOsmAutocomplete(
     const attempts = generateQueryPermutations(searchQuery);
 
     for (const attempt of attempts) {
-      let url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&addressdetails=1&namedetails=1&extratags=1&dedupe=1&q=${encodeURIComponent(attempt)}`;
+      let url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&addressdetails=1&namedetails=1&extratags=1&dedupe=1&accept-language=en-US,en&q=${encodeURIComponent(attempt)}`;
       if (biasCoords && typeof biasCoords.lat === 'number' && typeof biasCoords.lon === 'number') {
         const delta = 0.35;
         url += `&viewbox=${biasCoords.lon - delta},${biasCoords.lat + delta},${biasCoords.lon + delta},${biasCoords.lat - delta}`;
       }
 
       const res = await fetch(url, {
-        headers: { 'User-Agent': 'PickupRunner/1.0 (contact@pickuprunner.app)' },
+        headers: {
+          'User-Agent': 'PickupRunner/1.0 (contact@pickuprunner.app)',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
       });
       if (res.ok) {
         const data = await res.json();
@@ -178,9 +181,12 @@ export async function nativeOrOsmGeocode(address: string): Promise<LocationCoord
     const attempts = generateQueryPermutations(cleanAddr);
 
     for (const attempt of attempts) {
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&namedetails=1&extratags=1&dedupe=1&q=${encodeURIComponent(attempt)}`;
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&namedetails=1&extratags=1&dedupe=1&accept-language=en-US,en&q=${encodeURIComponent(attempt)}`;
       const res = await fetch(url, {
-        headers: { 'User-Agent': 'PickupRunner/1.0 (contact@pickuprunner.app)' },
+        headers: {
+          'User-Agent': 'PickupRunner/1.0 (contact@pickuprunner.app)',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
       });
       if (res.ok) {
         const data = await res.json();
@@ -271,9 +277,12 @@ export async function nativeOrOsmReverseGeocode(lat: number, lon: number): Promi
   } catch { }
 
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&addressdetails=1`;
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&addressdetails=1&accept-language=en-US,en`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'PickupRunner/1.0 (contact@pickuprunner.app)' },
+      headers: {
+        'User-Agent': 'PickupRunner/1.0 (contact@pickuprunner.app)',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
     });
     if (res.ok) {
       const data = await res.json();

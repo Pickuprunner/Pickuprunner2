@@ -146,6 +146,13 @@ export default function NewOrderScreen() {
         console.warn('[new-order] Geocoding pickup failed:', geoErr);
       }
 
+      let deliveryCoords: { lat: number; lon: number } | null = null;
+      try {
+        deliveryCoords = await geocode(deliveryAddress.trim());
+      } catch (geoErr) {
+        console.warn('[new-order] Geocoding delivery failed:', geoErr);
+      }
+
       const created = await createOrder.mutateAsync({
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
@@ -157,6 +164,8 @@ export default function NewOrderScreen() {
         distanceMiles: parseFloat(miles) || 0,
         pickupLat: pickupCoords?.lat,
         pickupLng: pickupCoords?.lon,
+        deliveryLat: deliveryCoords?.lat,
+        deliveryLng: deliveryCoords?.lon,
       } as any);
 
       if (Platform.OS !== 'web') {

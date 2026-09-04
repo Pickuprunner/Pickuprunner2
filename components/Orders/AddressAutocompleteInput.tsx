@@ -103,10 +103,10 @@ export function AddressAutocompleteInput({
         }
         const results = await searchAddressSuggestions(cleanText, 3, nearbyCoords);
         setSuggestions(results);
-        setShowDropdown(results.length > 0);
+        setShowDropdown(true);
       } catch {
         setSuggestions([]);
-        setShowDropdown(false);
+        setShowDropdown(true);
       } finally {
         setLoadingSuggestions(false);
       }
@@ -169,7 +169,9 @@ export function AddressAutocompleteInput({
         focusBorderColor="#F4C300"
         focusGlowColor="rgba(244, 195, 0, 0.35)"
         onFocus={() => {
-          if (suggestions.length > 0) setShowDropdown(true);
+          if (suggestions.length > 0 || Boolean(value && value.trim().length >= 3)) {
+            setShowDropdown(true);
+          }
         }}
         onBlur={() => {
           setTimeout(() => {
@@ -181,40 +183,66 @@ export function AddressAutocompleteInput({
         }}
       />
 
-      {showDropdown && suggestions.length > 0 && (
+      {showDropdown && Boolean(value && value.trim().length >= 3) && (
         <View style={styles.dropdownContainer}>
-          <ScrollView
-            style={styles.dropdownScroll}
-            keyboardShouldPersistTaps="handled"
-            nestedScrollEnabled={true}
-            showsVerticalScrollIndicator={true}
-          >
-            {suggestions.slice(0, 3).map((item, index) => (
-              <Pressable
-                key={`${item.displayName}-${index}`}
-                onPress={() => handleSelectSuggestion(item)}
-                style={({ pressed }) => [
-                  styles.suggestionItem,
-                  index < Math.min(suggestions.length, 3) - 1 && styles.suggestionBorder,
-                  pressed && styles.suggestionPressed,
-                ]}
-              >
-                <View style={styles.suggestionIconCircle}>
-                  <MaterialIcons name="place" size={16} color={GOLD} />
-                </View>
-                <View style={styles.suggestionTextCol}>
-                  <Text style={styles.primaryText} numberOfLines={1}>
-                    {item.primaryText}
-                  </Text>
-                  {item.secondaryText ? (
-                    <Text style={styles.secondaryText} numberOfLines={1}>
-                      {item.secondaryText}
+          {suggestions.length > 0 ? (
+            <ScrollView
+              style={styles.dropdownScroll}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+            >
+              {suggestions.slice(0, 3).map((item, index) => (
+                <Pressable
+                  key={`${item.displayName}-${index}`}
+                  onPress={() => handleSelectSuggestion(item)}
+                  style={({ pressed }) => [
+                    styles.suggestionItem,
+                    index < Math.min(suggestions.length, 3) - 1 && styles.suggestionBorder,
+                    pressed && styles.suggestionPressed,
+                  ]}
+                >
+                  <View style={styles.suggestionIconCircle}>
+                    <MaterialIcons name="place" size={16} color={GOLD} />
+                  </View>
+                  <View style={styles.suggestionTextCol}>
+                    <Text style={styles.primaryText} numberOfLines={1}>
+                      {item.primaryText}
                     </Text>
-                  ) : null}
-                </View>
-              </Pressable>
-            ))}
-          </ScrollView>
+                    {item.secondaryText ? (
+                      <Text style={styles.secondaryText} numberOfLines={1}>
+                        {item.secondaryText}
+                      </Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : !loadingSuggestions && enableMapPicker ? (
+            <Pressable
+              onPress={() => {
+                haptic();
+                setShowDropdown(false);
+                setMapModalVisible(true);
+              }}
+              style={({ pressed }) => [
+                styles.suggestionItem,
+                pressed && styles.suggestionPressed,
+              ]}
+            >
+              <View style={[styles.suggestionIconCircle, { backgroundColor: 'rgba(30, 117, 255, 0.15)' }]}>
+                <MaterialIcons name="pin-drop" size={16} color={PRIMARY_BLUE} />
+              </View>
+              <View style={styles.suggestionTextCol}>
+                <Text style={styles.primaryText} numberOfLines={1}>
+                  No match found
+                </Text>
+                <Text style={styles.secondaryText} numberOfLines={1}>
+                  Tap to pinpoint location on map
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
         </View>
       )}
 

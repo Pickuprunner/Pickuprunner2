@@ -51,10 +51,15 @@ export interface BalanceResponse {
 }
 
 export const connectApi = {
-  autoCreateAccount: (payload?: { driverEmail?: string; driverUserId?: string }) =>
+  autoCreateAccount: (payload?: { driverEmail?: string; driverUserId?: string; driverPhone?: string }) =>
     apiClient.post<ConnectAccountResponse>('/connect/auto-create', payload),
 
-  createOnboardingLink: (payload?: { returnUrl?: string; refreshUrl?: string }) =>
+  createOnboardingLink: (payload?: {
+    driverUserId?: string;
+    stripeAccountId?: string;
+    returnUrl?: string;
+    refreshUrl?: string;
+  }) =>
     apiClient.post<ConnectOnboardResponse>('/connect/onboard', payload),
 
   getStatus: () =>

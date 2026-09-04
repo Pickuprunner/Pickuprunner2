@@ -9,6 +9,7 @@ export interface User {
   displayName?: string | null;
   phone?: string | null;
   status?: string;
+  isAvailable?: boolean;
   emailVerified?: boolean;
   stripeAccountId?: string | null;
 }

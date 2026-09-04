@@ -28,6 +28,18 @@ export interface Order {
   deliveryLng?: number;
   delivery_lat?: number;
   delivery_lng?: number;
+  pickupPlaceId?: string;
+  pickup_place_id?: string;
+  deliveryPlaceId?: string;
+  delivery_place_id?: string;
+  pickupLocationSource?: 'nominatim' | 'photon' | 'manual';
+  pickup_location_source?: 'nominatim' | 'photon' | 'manual';
+  deliveryLocationSource?: 'nominatim' | 'photon' | 'manual';
+  delivery_location_source?: 'nominatim' | 'photon' | 'manual';
+  pickupPrecision?: string;
+  pickup_precision?: string;
+  deliveryPrecision?: string;
+  delivery_precision?: string;
   pickupDistanceMiles?: number;
   earningsCents?: number;
   items: string;
@@ -78,12 +90,20 @@ export interface Order {
 export interface CreateOrderInput {
   id?: string;
   customerName: string;
-  customerPhone?: string;
+  customerPhone: string;
   customerEmail?: string;
   pickupAddress: string;
   deliveryAddress: string;
   pickupLat?: number;
   pickupLng?: number;
+  deliveryLat?: number;
+  deliveryLng?: number;
+  pickupPlaceId?: string;
+  deliveryPlaceId?: string;
+  pickupLocationSource?: 'nominatim' | 'photon' | 'manual';
+  deliveryLocationSource?: 'nominatim' | 'photon' | 'manual';
+  pickupPrecision?: string;
+  deliveryPrecision?: string;
   items: string;
   status?: OrderStatus;
   tipAmount?: number;
@@ -171,6 +191,16 @@ export const useOrderStore = create<OrderStoreState>()(
             customerEmail: incoming.customerEmail || incoming.customer_email || existing?.customerEmail,
             pickupAddress: incoming.pickupAddress || incoming.pickup_address || existing?.pickupAddress || '',
             deliveryAddress: incoming.deliveryAddress || incoming.delivery_address || existing?.deliveryAddress || '',
+            pickupLat: incoming.pickupLat != null ? Number(incoming.pickupLat) : incoming.pickup_lat != null ? Number(incoming.pickup_lat) : existing?.pickupLat,
+            pickupLng: incoming.pickupLng != null ? Number(incoming.pickupLng) : incoming.pickup_lng != null ? Number(incoming.pickup_lng) : existing?.pickupLng,
+            deliveryLat: incoming.deliveryLat != null ? Number(incoming.deliveryLat) : incoming.delivery_lat != null ? Number(incoming.delivery_lat) : existing?.deliveryLat,
+            deliveryLng: incoming.deliveryLng != null ? Number(incoming.deliveryLng) : incoming.delivery_lng != null ? Number(incoming.delivery_lng) : existing?.deliveryLng,
+            pickupPlaceId: incoming.pickupPlaceId || incoming.pickup_place_id || existing?.pickupPlaceId,
+            deliveryPlaceId: incoming.deliveryPlaceId || incoming.delivery_place_id || existing?.deliveryPlaceId,
+            pickupLocationSource: incoming.pickupLocationSource || incoming.pickup_location_source || existing?.pickupLocationSource,
+            deliveryLocationSource: incoming.deliveryLocationSource || incoming.delivery_location_source || existing?.deliveryLocationSource,
+            pickupPrecision: incoming.pickupPrecision || incoming.pickup_precision || existing?.pickupPrecision,
+            deliveryPrecision: incoming.deliveryPrecision || incoming.delivery_precision || existing?.deliveryPrecision,
             items: incoming.items || existing?.items || '',
             status: resolvedStatus,
             createdAt: incoming.createdAt || incoming.created_at || existing?.createdAt || new Date().toISOString(),
@@ -179,7 +209,7 @@ export const useOrderStore = create<OrderStoreState>()(
             cityId: incoming.cityId || incoming.city_id || existing?.cityId || APP_CONFIG.CITY_ID,
             storeId: incoming.storeId || incoming.store_id || existing?.storeId || APP_CONFIG.STORE_ID,
             orderScope: incoming.orderScope || incoming.order_scope || existing?.orderScope || ORDER_SCOPE,
-            tipAmount: incoming.tipAmount ?? incoming.tip_amount ?? existing?.tipAmount ?? 10.0,
+            tipAmount: incoming.tipAmount ?? incoming.tip_amount ?? existing?.tipAmount ?? 1000,
             paymentStatus:
               existing?.paymentStatus === 'paid' || existing?.paymentStatus === 'test_paid'
                 ? existing.paymentStatus
@@ -271,13 +301,23 @@ export const useOrderStore = create<OrderStoreState>()(
           storeId: orderData.storeId || APP_CONFIG.STORE_ID,
           orderScope: orderData.orderScope || ORDER_SCOPE,
           paymentStatus: 'paid',
-          tipAmount: orderData.tipAmount ?? 10.0,
+          tipAmount: orderData.tipAmount ?? 1000,
           distanceMiles: orderData.distanceMiles ?? 3.5,
           customerName: orderData.customerName,
           customerPhone: orderData.customerPhone || '(555) 000-0000',
           customerEmail: orderData.customerEmail || '',
           pickupAddress: orderData.pickupAddress,
           deliveryAddress: orderData.deliveryAddress,
+          pickupLat: orderData.pickupLat,
+          pickupLng: orderData.pickupLng,
+          deliveryLat: orderData.deliveryLat,
+          deliveryLng: orderData.deliveryLng,
+          pickupPlaceId: orderData.pickupPlaceId,
+          deliveryPlaceId: orderData.deliveryPlaceId,
+          pickupLocationSource: orderData.pickupLocationSource,
+          deliveryLocationSource: orderData.deliveryLocationSource,
+          pickupPrecision: orderData.pickupPrecision,
+          deliveryPrecision: orderData.deliveryPrecision,
           items: orderData.items,
           hasAlcohol: orderData.hasAlcohol ?? 0,
           userId: orderData.userId,
