@@ -48,19 +48,15 @@ export function ProfileSupportSection({ supportEmail, isCustomer = false }: Prof
         hapticStyle="medium"
       />
 
-      {!isCustomer && (
-        <>
-          <ItemDivider />
+      <ItemDivider />
 
-          <ProfileActionRow
-            icon={<FileText size={18} color="rgba(255, 255, 255, 0.8)" />}
-            iconBg="rgba(255, 255, 255, 0.06)"
-            title="Terms of Service"
-            onPress={() => router.push('/terms')}
-            hapticStyle="medium"
-          />
-        </>
-      )}
+      <ProfileActionRow
+        icon={<FileText size={18} color="rgba(255, 255, 255, 0.8)" />}
+        iconBg="rgba(255, 255, 255, 0.06)"
+        title="Terms of Service"
+        onPress={() => router.push('/terms')}
+        hapticStyle="medium"
+      />
     </ProfileSection>
   );
 }

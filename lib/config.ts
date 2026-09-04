@@ -69,6 +69,13 @@ export const APP_CONFIG = {
 
 } as const;
 
+const rawFrontendUrl =
+  process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://www.pickuprunner.net';
+
+export const FRONTEND_URL = rawFrontendUrl.replace(/\/+$/, '');
+export const TERMS_URL = `${FRONTEND_URL}/terms`;
+export const PRIVACY_URL = `${FRONTEND_URL}/privacy`;
+
 /**
  * Helper — true if this is a store-specific build
  */

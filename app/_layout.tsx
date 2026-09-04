@@ -77,6 +77,7 @@ export default function RootLayout() {
                   <Stack.Screen name="delete-account" />
                   <Stack.Screen name="terms" />
                   <Stack.Screen name="privacy-policy" />
+                  <Stack.Screen name="privacy" />
                   <Stack.Screen name="+not-found" />
                 </Stack>
                 <StatusBar style="auto" />

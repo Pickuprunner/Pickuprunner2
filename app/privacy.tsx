@@ -1,11 +1,11 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, Linking } from 'react-native';
 import { router } from 'expo-router';
-import { TERMS_URL } from '@/lib/config';
+import { PRIVACY_URL } from '@/lib/config';
 
-export default function TermsScreen() {
+export default function PrivacyRedirectScreen() {
   useEffect(() => {
-    Linking.openURL(TERMS_URL).catch(() => {});
+    Linking.openURL(PRIVACY_URL).catch(() => {});
     if (router.canGoBack()) {
       router.back();
     } else {
