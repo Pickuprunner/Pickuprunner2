@@ -3,6 +3,7 @@ import {
   Animated,
   View,
   Text,
+  Image,
   StyleSheet,
   Pressable,
   TextInput,
@@ -76,6 +77,8 @@ export interface CustomHeaderProps {
   showAvatar?: boolean;
   /** Avatar initial or icon label */
   avatar?: string;
+  /** Avatar photo image URL */
+  avatarUrl?: string | null;
   /** Press handler for avatar button, defaults to router.push('/(tabs)/profile') */
   onAvatarPress?: () => void;
 
@@ -187,6 +190,7 @@ export function CustomHeader({
 
   showAvatar = false,
   avatar = 'D',
+  avatarUrl,
   onAvatarPress,
 
   pills,
@@ -366,7 +370,11 @@ export function CustomHeader({
               ]}
             >
               <View style={styles.avatarInner}>
-                <Text style={styles.avatarText}>{avatar}</Text>
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>{avatar}</Text>
+                )}
               </View>
             </Pressable>
           )}
@@ -526,6 +534,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F131C',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   avatarText: {
     color: '#FFE399',

@@ -525,6 +525,7 @@ export default function OrdersScreen() {
         driverLocation={driverLocation}
         availableCount={orders.length}
         orders={orders}
+        avatarUrl={user?.photoUrl}
         isNetworkOffline={true}
       />
     );
@@ -540,6 +541,7 @@ export default function OrdersScreen() {
         driverLocation={driverLocation}
         availableCount={orders.length}
         orders={orders}
+        avatarUrl={user?.photoUrl}
         isNetworkOffline={false}
       />
     );
@@ -561,6 +563,7 @@ export default function OrdersScreen() {
           showSearch={false}
           showAvatar
           avatar={avatarInitial}
+          avatarUrl={user?.photoUrl}
           onAvatarPress={() => {
             haptic();
             router.push('/(tabs)/profile');

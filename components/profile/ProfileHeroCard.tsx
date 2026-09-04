@@ -35,6 +35,7 @@ export interface MetricItemData {
   label: string;
   value: string | number;
   color: string;
+  onPress?: () => void;
 }
 
 export interface ProfileHeroCardProps {
@@ -43,6 +44,7 @@ export interface ProfileHeroCardProps {
   photoUrl?: string | null;
   isUploading?: boolean;
   onPickPhoto?: () => void;
+  onRemovePhoto?: () => void;
   onSaveDisplayName?: (name: string) => Promise<void> | void;
   metrics: MetricItemData[];
   initialsFallback?: string;
@@ -60,6 +62,7 @@ export function ProfileHeroCard({
   photoUrl,
   isUploading = false,
   onPickPhoto,
+  onRemovePhoto,
   onSaveDisplayName,
   metrics,
   initialsFallback = 'PR',
@@ -210,10 +213,26 @@ export function ProfileHeroCard({
         <View style={styles.metricsRow}>
           {metrics.map((item, idx) => (
             <React.Fragment key={item.label}>
-              <View style={styles.metricItem}>
-                <Text style={styles.metricLabel}>{item.label}</Text>
-                <Text style={[styles.metricValue, { color: item.color }]}>{item.value}</Text>
-              </View>
+              {item.onPress ? (
+                <Pressable
+                  onPress={() => {
+                    haptic('light');
+                    item.onPress?.();
+                  }}
+                  style={({ pressed }) => [
+                    styles.metricItem,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <Text style={styles.metricLabel}>{item.label}</Text>
+                  <Text style={[styles.metricValue, { color: item.color }]}>{item.value}</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricLabel}>{item.label}</Text>
+                  <Text style={[styles.metricValue, { color: item.color }]}>{item.value}</Text>
+                </View>
+              )}
               {idx < metrics.length - 1 && <View style={styles.metricDivider} />}
             </React.Fragment>
           ))}
@@ -296,7 +315,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  /* Editing */
+ 
   editingWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -344,7 +363,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.95 }],
   },
 
-  /* Metrics */
+  
   metricsRow: {
     flexDirection: 'row',
     alignItems: 'center',

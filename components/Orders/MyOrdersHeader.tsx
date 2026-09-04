@@ -8,6 +8,7 @@ interface Props {
   isConnected?: boolean;
   showAvatar?: boolean;
   avatar?: string;
+  avatarUrl?: string | null;
   onAvatarPress?: () => void;
 }
 
@@ -17,6 +18,7 @@ export function MyOrdersHeader({
   isConnected = true,
   showAvatar = true,
   avatar = 'D',
+  avatarUrl,
   onAvatarPress,
 }: Props) {
   const subtitleHighlight = isConnected ? 'Online • In Service' : 'Connecting…';
@@ -28,6 +30,7 @@ export function MyOrdersHeader({
       subtitleHighlight={subtitleHighlight}
       showAvatar={showAvatar}
       avatar={avatar}
+      avatarUrl={avatarUrl}
       onAvatarPress={onAvatarPress}
       rightContent={
         <View style={styles.rightPills}>

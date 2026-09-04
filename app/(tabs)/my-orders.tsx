@@ -321,6 +321,7 @@ export default function MyOrdersScreen() {
           isConnected={isConnected}
           showAvatar
           avatar={avatarInitial}
+          avatarUrl={user?.photoUrl}
           onAvatarPress={() => {
             haptic();
             router.push('/(tabs)/profile');

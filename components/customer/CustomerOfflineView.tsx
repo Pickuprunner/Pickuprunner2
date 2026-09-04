@@ -13,58 +13,47 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, shadows } from '@/constants/design';
-import { Order } from '@/lib/orders';
 import { useAuthStore } from '@/store/useAuthStore';
 import { DARK_MAP_STYLE } from '@/components/map/mapTypes';
 
-interface DriverOfflineViewProps {
-  onGoOnline?: () => void;
+interface CustomerOfflineViewProps {
   onRetry?: () => void;
   isLoading?: boolean;
-  onOpenPreferences?: () => void;
-  onOpenOpportunities?: () => void;
-  onOpenMapFullscreen?: () => void;
-  driverLocation?: { lat?: number; lng?: number };
-  driverCity?: string;
-  availableCount?: number;
-  orders?: Order[];
+  onOpenProfile?: () => void;
+  customerLocation?: { lat?: number; lng?: number };
+  customerCity?: string;
+  cachedOrdersCount?: number;
   avatar?: string;
   avatarUrl?: string | null;
-  isNetworkOffline?: boolean;
 }
 
-export function DriverOfflineView({
-  onGoOnline,
+export function CustomerOfflineView({
   onRetry,
   isLoading = false,
-  onOpenPreferences,
-  onOpenOpportunities,
-  driverLocation,
-  driverCity: initialCity,
-  availableCount = 0,
-  orders = [],
+  onOpenProfile,
+  customerLocation,
+  customerCity: initialCity,
+  cachedOrdersCount = 0,
   avatar,
   avatarUrl,
-  isNetworkOffline = false,
-}: DriverOfflineViewProps) {
+}: CustomerOfflineViewProps) {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
-  const resolvedAvatar = avatar || (user?.displayName || user?.email || 'D').charAt(0).toUpperCase();
+  const resolvedAvatar =
+    avatar || (user?.displayName || user?.email || 'C').charAt(0).toUpperCase();
   const resolvedAvatarUrl = avatarUrl !== undefined ? avatarUrl : user?.photoUrl;
   const mapRef = useRef<any>(null);
 
   const currentCoords = {
-    latitude: driverLocation?.lat || 37.422,
-    longitude: driverLocation?.lng || -122.084,
+    latitude: customerLocation?.lat || 37.422,
+    longitude: customerLocation?.lng || -122.084,
     latitudeDelta: 0.035,
     longitudeDelta: 0.035,
   };
 
-  const city = initialCity || 'San Francisco';
-  const totalOrdersCount = orders.length > 0 ? orders.length : availableCount;
+  const city = initialCity || 'Your Area';
 
   let MapView: any = null;
-
   try {
     const Maps = require('react-native-maps');
     MapView = Maps.default || Maps;
@@ -78,36 +67,41 @@ export function DriverOfflineView({
     }
   };
 
-  const topPadding = insets.top > 0
-    ? insets.top
-    : (Platform.OS === 'android' ? 16 : 12);
+  const topPadding =
+    insets.top > 0 ? insets.top : Platform.OS === 'android' ? 16 : 12;
 
   const handleAction = () => {
     haptic(Haptics.ImpactFeedbackStyle.Heavy);
-    if (isNetworkOffline && onRetry) {
+    if (onRetry) {
       onRetry();
-    } else if (onGoOnline) {
-      onGoOnline();
     }
   };
 
   return (
-    <View style={[styles.root, { paddingTop: topPadding, paddingBottom: Math.max(insets.bottom, 16) }]}>
-     
+    <View
+      style={[
+        styles.root,
+        {
+          paddingTop: topPadding,
+          paddingBottom: Math.max(insets.bottom, 16),
+        },
+      ]}
+    >
+      {/* Top Ambient Glow */}
       <LinearGradient
-        colors={['rgba(0, 102, 255, 0.12)', 'rgba(15, 19, 28, 0)']}
+        colors={['rgba(255, 227, 153, 0.08)', 'rgba(15, 19, 28, 0)']}
         style={styles.ambientGlow}
         pointerEvents="none"
       />
 
-     
+      {/* Header */}
       <View style={styles.headerContainer}>
         <View style={styles.topRightIconsRow}>
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => {
               haptic(Haptics.ImpactFeedbackStyle.Light);
-              onOpenPreferences?.();
+              onOpenProfile?.();
             }}
             accessibilityLabel="Profile"
             style={styles.avatarBtn}
@@ -123,10 +117,10 @@ export function DriverOfflineView({
         </View>
 
         <Text style={styles.mainTitle}>You're offline</Text>
-        <Text style={styles.subTitle}>Ready to go?</Text>
+        <Text style={styles.subTitle}>No internet connection</Text>
       </View>
 
-    
+      {/* Center Visual Map Card */}
       <View style={styles.mapCard} pointerEvents="none">
         {MapView && Platform.OS !== 'web' ? (
           <MapView
@@ -145,21 +139,49 @@ export function DriverOfflineView({
             userInterfaceStyle="dark"
           />
         ) : (
-         
           <View style={StyleSheet.absoluteFill}>
             <LinearGradient
-              colors={['#0F131C', '#131A26', '#0F131C']}
+              colors={['#0F131C', '#141923', '#0F131C']}
               style={StyleSheet.absoluteFill}
             />
 
-           
             <View style={styles.roadNetwork}>
-              <View style={[styles.roadLineLight, { top: 60, left: -20, width: 420, transform: [{ rotate: '12deg' }] }]} />
-              <View style={[styles.roadLineLight, { top: 130, left: -30, width: 440, transform: [{ rotate: '-22deg' }] }]} />
-              <View style={[styles.roadLineLight, { top: 220, left: 10, width: 400, transform: [{ rotate: '30deg' }] }]} />
-              <View style={[styles.roadLineLight, { top: 100, left: 90, width: 280, transform: [{ rotate: '68deg' }] }]} />
-              <View style={[styles.roadLineLightSecondary, { top: 40, left: 190, width: 220, transform: [{ rotate: '-40deg' }] }]} />
-              <View style={[styles.roadLineLightSecondary, { top: 170, left: 70, width: 300, transform: [{ rotate: '8deg' }] }]} />
+              <View
+                style={[
+                  styles.roadLineLight,
+                  { top: 60, left: -20, width: 420, transform: [{ rotate: '12deg' }] },
+                ]}
+              />
+              <View
+                style={[
+                  styles.roadLineLight,
+                  { top: 130, left: -30, width: 440, transform: [{ rotate: '-22deg' }] },
+                ]}
+              />
+              <View
+                style={[
+                  styles.roadLineLight,
+                  { top: 220, left: 10, width: 400, transform: [{ rotate: '30deg' }] },
+                ]}
+              />
+              <View
+                style={[
+                  styles.roadLineLight,
+                  { top: 100, left: 90, width: 280, transform: [{ rotate: '68deg' }] },
+                ]}
+              />
+              <View
+                style={[
+                  styles.roadLineLightSecondary,
+                  { top: 40, left: 190, width: 220, transform: [{ rotate: '-40deg' }] },
+                ]}
+              />
+              <View
+                style={[
+                  styles.roadLineLightSecondary,
+                  { top: 170, left: 70, width: 300, transform: [{ rotate: '8deg' }] },
+                ]}
+              />
               <View style={styles.waterShapeLight} />
             </View>
 
@@ -167,97 +189,66 @@ export function DriverOfflineView({
           </View>
         )}
 
-       
+        {/* Center Radar / Location Pin */}
         <View style={styles.puckCenterOverlay} pointerEvents="none">
           <View style={styles.puckContainer}>
             <View style={styles.puckHalo} />
             <View style={styles.puckCore}>
-              <MaterialIcons name="navigation" size={13} color="#FFFFFF" />
+              <MaterialIcons name="cloud-off" size={14} color="#FFFFFF" />
             </View>
           </View>
         </View>
       </View>
 
-     
-      <View style={styles.opportunitiesCardContainer}>
-        {isNetworkOffline ? (
-          <>
-            <View style={styles.oppHeaderRow}>
-              <View style={styles.oppTitleWrapper}>
-                <MaterialIcons name="signal-cellular-connected-no-internet-0-bar" size={20} color="#F87171" />
-                <Text style={styles.oppTitle}>Connection Paused</Text>
-              </View>
-              <View style={[styles.oppBadge, { backgroundColor: 'rgba(239, 68, 68, 0.14)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
-                <Text style={[styles.oppBadgeText, { color: '#FCA5A5' }]}>Offline</Text>
-              </View>
-            </View>
+      {/* Bottom Action / Status Card */}
+      <View style={styles.actionCardContainer}>
+        <View style={styles.actionHeaderRow}>
+          <View style={styles.actionTitleWrapper}>
+            <MaterialIcons
+              name="signal-cellular-connected-no-internet-0-bar"
+              size={22}
+              color="#F87171"
+            />
+            <Text style={styles.actionTitle}>Connection Paused</Text>
+          </View>
+          <View style={styles.offlineBadge}>
+            <Text style={styles.offlineBadgeText}>Offline</Text>
+          </View>
+        </View>
 
-            <Text style={styles.oppSubtitle} numberOfLines={2}>
-              Please turn on mobile data or Wi-Fi to receive orders and reconnect.
+        <Text style={styles.actionSubtitle}>
+          Please turn on mobile data or Wi-Fi to view and track your orders in real time.
+        </Text>
+
+        {cachedOrdersCount > 0 && (
+          <View style={styles.cachedInfoRow}>
+            <MaterialIcons name="save" size={14} color="#FFE399" />
+            <Text style={styles.cachedInfoText}>
+              {cachedOrdersCount} order{cachedOrdersCount > 1 ? 's' : ''} saved locally
             </Text>
-
-            <TouchableOpacity
-              activeOpacity={0.85}
-              disabled={isLoading}
-              onPress={handleAction}
-              style={[styles.goOnlineBtn, { backgroundColor: '#FFE399' }]}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#0F131C" />
-              ) : (
-                <View style={styles.goOnlineContent}>
-                  <MaterialCommunityIcons
-                    name="refresh"
-                    size={22}
-                    color="#0F131C"
-                    style={styles.steeringIcon}
-                  />
-                  <Text style={[styles.goOnlineText, { color: '#0F131C' }]}>Retry Connection</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <View style={styles.oppHeaderRow}>
-              <View style={styles.oppTitleWrapper}>
-                <Text style={styles.oppTitle}>Opportunities</Text>
-                <View style={styles.oppBadge}>
-                  <Text style={styles.oppBadgeText}>
-                    {totalOrdersCount > 0 ? `${totalOrdersCount} New` : 'Live'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <Text style={styles.oppSubtitle} numberOfLines={1} adjustsFontSizeToFit>
-              {totalOrdersCount > 0
-                ? `${totalOrdersCount} ${totalOrdersCount === 1 ? 'delivery request' : 'delivery requests'} in your area • Go online to earn`
-                : 'High demand in your area • Go online to earn'}
-            </Text>
-
-            <TouchableOpacity
-              activeOpacity={0.85}
-              disabled={isLoading}
-              onPress={handleAction}
-              style={styles.goOnlineBtn}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#0F131C" />
-              ) : (
-                <View style={styles.goOnlineContent}>
-                  <MaterialCommunityIcons
-                    name="steering"
-                    size={24}
-                    color="#0F131C"
-                    style={styles.steeringIcon}
-                  />
-                  <Text style={styles.goOnlineText}>Go online</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </>
+          </View>
         )}
+
+        <TouchableOpacity
+          activeOpacity={0.85}
+          disabled={isLoading}
+          onPress={handleAction}
+          style={styles.retryBtn}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#0F131C" />
+          ) : (
+            <View style={styles.retryBtnContent}>
+              <MaterialCommunityIcons
+                name="refresh"
+                size={22}
+                color="#0F131C"
+                style={styles.retryIcon}
+              />
+              <Text style={styles.retryBtnText}>Retry Connection</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -294,7 +285,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(244, 195, 0, 0.15)',
+    backgroundColor: 'rgba(255, 227, 153, 0.15)',
     borderWidth: 1.5,
     borderColor: '#FFE399',
     alignItems: 'center',
@@ -365,15 +356,15 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0, 102, 255, 0.22)',
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
     borderWidth: 2,
-    borderColor: 'rgba(0, 102, 255, 0.45)',
+    borderColor: 'rgba(239, 68, 68, 0.45)',
   },
   puckCore: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#0066FF',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#EF4444',
     borderWidth: 2.5,
     borderColor: '#FFFFFF',
     alignItems: 'center',
@@ -415,12 +406,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     right: 20,
-    color: '#3B82F6',
-    fontSize: 20,
+    color: '#FFE399',
+    fontSize: 18,
     fontWeight: '800',
-    opacity: 0.85,
+    opacity: 0.75,
   },
-  opportunitiesCardContainer: {
+  actionCardContainer: {
     backgroundColor: colors.glassLevel2Bg,
     borderRadius: 22,
     borderWidth: 1,
@@ -429,64 +420,75 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 4,
   },
-  oppHeaderRow: {
+  actionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  oppTitleWrapper: {
+  actionTitleWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  oppTitle: {
-    fontSize: Platform.OS === 'android' ? 24 : 22,
+  actionTitle: {
+    fontSize: Platform.OS === 'android' ? 22 : 20,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: Platform.OS === 'android' ? -0.2 : -0.4,
   },
-  oppBadge: {
-    backgroundColor: 'rgba(255, 227, 153, 0.14)',
+  offlineBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.14)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 227, 153, 0.3)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
     paddingHorizontal: 8,
     paddingVertical: 2.5,
     borderRadius: 10,
   },
-  oppBadgeText: {
-    color: '#FFE399',
+  offlineBadgeText: {
+    color: '#FCA5A5',
     fontSize: 11,
     fontWeight: '700',
   },
-  oppSubtitle: {
+  actionSubtitle: {
     fontSize: 13,
     color: colors.onSurfaceVariant,
     lineHeight: 18,
   },
-  goOnlineBtn: {
+  cachedInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  cachedInfoText: {
+    color: '#FFE399',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  retryBtn: {
     height: 54,
     borderRadius: 27,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#FFE399',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 6,
-    shadowColor: '#2563EB',
+    shadowColor: '#FFE399',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 6,
   },
-  goOnlineContent: {
+  retryBtnContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
   },
-  steeringIcon: {
+  retryIcon: {
     marginRight: 2,
   },
-  goOnlineText: {
-    fontSize: 18,
+  retryBtnText: {
+    fontSize: 17,
     fontWeight: '800',
     color: '#0F131C',
     letterSpacing: 0.2,

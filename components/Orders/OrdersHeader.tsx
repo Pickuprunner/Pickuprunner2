@@ -24,6 +24,7 @@ interface Props {
   onFilterPress?: () => void;
   showAvatar?: boolean;
   avatar?: string;
+  avatarUrl?: string | null;
   onAvatarPress?: () => void;
   sticky?: boolean;
   translateY?: Animated.Value | Animated.AnimatedInterpolation<number>;
@@ -47,6 +48,7 @@ export function OrdersHeader({
   onFilterPress,
   showAvatar = true,
   avatar = 'D',
+  avatarUrl,
   onAvatarPress,
   sticky = false,
   translateY,
@@ -202,6 +204,7 @@ export function OrdersHeader({
       highlightText={pendingCount}
       showAvatar={showAvatar}
       avatar={avatar}
+      avatarUrl={avatarUrl}
       onAvatarPress={onAvatarPress}
       pills={pills}
       showSearch={showSearch}

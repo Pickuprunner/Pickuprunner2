@@ -26,6 +26,8 @@ import {
   CustomerOrderFilterModal,
   CustomerFilterState,
 } from '@/components/Orders';
+import { CustomerOfflineView } from '@/components/customer';
+import { useNetworkStatus } from '@/lib/network';
 import { useToast, SkeletonList, CustomConfirmModal, CustomLoading, CustomRefreshControl } from '@/components/core';
 
 const SESSION_KEY = 'customer_session_id';
@@ -51,7 +53,7 @@ export default function MyOrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(true);
+  const { isConnected: isNetworkConnected, isChecking: isCheckingNetwork, checkConnection } = useNetworkStatus();
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [filters, setFilters] = useState<CustomerFilterState>({
     status: 'all',
@@ -213,6 +215,12 @@ export default function MyOrdersScreen() {
   );
 
   useEffect(() => {
+    if (isNetworkConnected) {
+      fetchOrders();
+    }
+  }, [isNetworkConnected, fetchOrders]);
+
+  useEffect(() => {
     if (storeOrders && storeOrders.length > 0) {
       setOrders((prev) => {
         if (!prev || prev.length === 0) {
@@ -296,11 +304,8 @@ export default function MyOrdersScreen() {
           if (!mounted) return;
           fetchOrders(sid);
         });
-
-        if (mounted) setIsConnected(true);
       } catch (err) {
         console.warn('[my-orders] realtime subscription failed:', err);
-        if (mounted) setIsConnected(false);
       }
     }
 
@@ -486,6 +491,18 @@ export default function MyOrdersScreen() {
     ),
     [handleCancel]
   );
+
+  // If phone data / Wi-Fi is OFF -> Render Customer Offline Screen
+  if (!isNetworkConnected) {
+    return (
+      <CustomerOfflineView
+        onRetry={checkConnection}
+        isLoading={isCheckingNetwork}
+        onOpenProfile={() => router.push('/(customer)/profile')}
+        cachedOrdersCount={orders.length}
+      />
+    );
+  }
 
   return (
     <View style={styles.root}>

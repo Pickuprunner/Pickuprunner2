@@ -68,7 +68,17 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { user, isAuthenticated, isLoading: authLoading, logout, updateProfile, forgotPassword } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    isLoading: authLoading,
+    logout,
+    updateProfile,
+    uploadPhoto: authUploadPhoto,
+    deletePhoto: authDeletePhoto,
+    fetchProfile,
+    forgotPassword,
+  } = useAuth();
   const driverId = useDriverId();
   const { data: accreditation } = useDriverAccreditation();
   const { data: verification } = useMyVerification(user?.id);
@@ -95,6 +105,18 @@ export default function ProfileScreen() {
   }, [authLoading, isAuthenticated, user]);
 
   useEffect(() => {
+    if (isAuthenticated) {
+      fetchProfile();
+    }
+  }, [isAuthenticated, fetchProfile]);
+
+  useEffect(() => {
+    if (user?.photoUrl) {
+      setPhotoUrl(user.photoUrl);
+    }
+  }, [user?.photoUrl]);
+
+  useEffect(() => {
     if (authLoading) return;
     if (isAuthenticated && user?.displayName) {
       setDisplayName(user.displayName);
@@ -107,12 +129,6 @@ export default function ProfileScreen() {
     }
   }, [isAuthenticated, authLoading, user?.displayName]);
 
-  useEffect(() => {
-    AsyncStorage.getItem('driver_photo_url').then((url) => {
-      if (url) setPhotoUrl(url);
-    });
-  }, []);
-
   const handlePickPhoto = async () => {
     haptic('light');
     if (Platform.OS === 'web') {
@@ -123,32 +139,48 @@ export default function ProfileScreen() {
       mediaTypes: 'images' as any,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.7,
+      quality: 0.8,
     });
     if (result.canceled || !result.assets?.[0]) return;
-    await uploadPhoto(result.assets[0].uri);
+    const asset = result.assets[0];
+    await processUpload({
+      uri: asset.uri,
+      name: asset.fileName || `driver_${Date.now()}.jpg`,
+      type: asset.mimeType || 'image/jpeg',
+    });
   };
 
-  const uploadPhoto = async (uri: string) => {
+  const processUpload = async (fileInput: any) => {
     setIsUploading(true);
     try {
-      const userId = user?.id || 'anon';
-      const path = `driver-photos/${userId}-${Date.now()}.jpg`;
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const { publicUrl } = await blink.storage.upload(blob as File, path);
-      await AsyncStorage.setItem('driver_photo_url', publicUrl);
-      setPhotoUrl(publicUrl);
+      const res = await authUploadPhoto(fileInput);
+      if (res?.photoUrl) {
+        setPhotoUrl(res.photoUrl);
+      }
+      showToast('Profile photo updated', 'success');
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
-    } catch (err) {
-      console.warn('[profile] photo upload failed:', err);
-      if (Platform.OS === 'web') {
-        window.alert('Photo upload failed. Please try again.');
-      } else {
-        Alert.alert('Upload Failed', 'Could not upload photo. Please try again.');
+    } catch (err: any) {
+      console.warn('[driver profile] photo upload failed:', err);
+      showToast(err?.message || 'Could not upload photo. Please try again.', 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    setIsUploading(true);
+    try {
+      await authDeletePhoto();
+      setPhotoUrl(null);
+      showToast('Profile photo removed', 'info');
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
+    } catch (err: any) {
+      console.warn('[driver profile] photo delete failed:', err);
+      showToast(err?.message || 'Could not remove photo. Please try again.', 'error');
     } finally {
       setIsUploading(false);
     }
@@ -157,8 +189,7 @@ export default function ProfileScreen() {
   const handleWebFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const uri = URL.createObjectURL(file);
-    await uploadPhoto(uri);
+    await processUpload(file);
     if (webFileInputRef.current) webFileInputRef.current.value = '';
   };
 
@@ -326,9 +357,10 @@ export default function ProfileScreen() {
         <ProfileHeroCard
           displayName={displayName}
           emailText={user?.email || 'driver@pickuprunner.com'}
-          photoUrl={photoUrl}
+          photoUrl={user?.photoUrl || photoUrl}
           isUploading={isUploading}
           onPickPhoto={handlePickPhoto}
+          onRemovePhoto={handleRemovePhoto}
           onSaveDisplayName={handleSaveDisplayName}
           initialsFallback="DR"
           metrics={[

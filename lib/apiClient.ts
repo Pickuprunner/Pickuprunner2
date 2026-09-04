@@ -102,9 +102,13 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const { skipAuth, _retry, ...fetchOptions } = options;
   const token = useAuthStore.getState().token;
 
+  const isFormData =
+    (typeof FormData !== 'undefined' && fetchOptions.body instanceof FormData) ||
+    (fetchOptions.body && typeof fetchOptions.body === 'object' && '_parts' in (fetchOptions.body as any));
+
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     Accept: 'application/json',
+    ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
     ...((options.headers as Record<string, string>) || {}),
   };
 
@@ -119,7 +123,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   const method = fetchOptions.method || 'GET';
   const tag = `[API ${method}] ${endpoint}`;
 
-  if (fetchOptions.body) {
+  if (fetchOptions.body && !isFormData) {
     try {
       const parsedBody = JSON.parse(fetchOptions.body as string);
       console.log(`\n📤 ${tag} Request:\n${JSON.stringify(parsedBody, null, 2)}`);
@@ -193,6 +197,14 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   return data as T;
 }
 
+function formatBody(body: any) {
+  if (body === undefined) return undefined;
+  const isFormData =
+    (typeof FormData !== 'undefined' && body instanceof FormData) ||
+    (body && typeof body === 'object' && '_parts' in body);
+  return isFormData ? body : JSON.stringify(body);
+}
+
 export const apiClient = {
   get: <T>(endpoint: string, options?: RequestOptions) =>
     request<T>(endpoint, { ...options, method: 'GET' }),
@@ -201,27 +213,27 @@ export const apiClient = {
     request<T>(endpoint, {
       ...options,
       method: 'POST',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: formatBody(body),
     }),
 
   patch: <T>(endpoint: string, body?: any, options?: RequestOptions) =>
     request<T>(endpoint, {
       ...options,
       method: 'PATCH',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: formatBody(body),
     }),
 
   put: <T>(endpoint: string, body?: any, options?: RequestOptions) =>
     request<T>(endpoint, {
       ...options,
       method: 'PUT',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: formatBody(body),
     }),
 
   del: <T>(endpoint: string, body?: any, options?: RequestOptions) =>
     request<T>(endpoint, {
       ...options,
       method: 'DELETE',
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: formatBody(body),
     }),
 };

@@ -27,6 +27,32 @@ export interface UsersListResponse {
   };
 }
 
+export interface UploadPhotoResponse {
+  success?: boolean;
+  data: {
+    photoUrl: string;
+    user: User;
+  };
+}
+
+export interface DeletePhotoResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    photoUrl: null;
+    user: User;
+  };
+}
+
+export type PhotoInput =
+  | File
+  | Blob
+  | {
+      uri: string;
+      name?: string;
+      type?: string;
+    };
+
 export const usersApi = {
   getMe: async (): Promise<User> => {
     const res = await apiClient.get<UserResponse>('/users/me');
@@ -36,6 +62,32 @@ export const usersApi = {
   updateMe: async (payload: UpdateProfilePayload): Promise<User> => {
     const res = await apiClient.patch<UserResponse>('/users/me', payload);
     return res.data.user;
+  },
+
+  uploadPhoto: async (fileInput: PhotoInput): Promise<{ photoUrl: string; user: User }> => {
+    const formData = new FormData();
+    if (typeof File !== 'undefined' && fileInput instanceof File) {
+      formData.append('file', fileInput);
+    } else if (typeof Blob !== 'undefined' && fileInput instanceof Blob) {
+      formData.append('file', fileInput, 'photo.jpg');
+    } else if (typeof fileInput === 'object' && 'uri' in fileInput) {
+      const fileName = fileInput.name || `avatar_${Date.now()}.jpg`;
+      const fileType = fileInput.type || 'image/jpeg';
+      formData.append('file', {
+        uri: fileInput.uri,
+        name: fileName,
+        type: fileType,
+      } as any);
+    } else {
+      throw new Error('Invalid file input');
+    }
+
+    const res = await apiClient.post<UploadPhotoResponse>('/users/me/photo', formData);
+    return res.data;
+  },
+
+  deletePhoto: async (): Promise<DeletePhotoResponse> => {
+    return apiClient.del<DeletePhotoResponse>('/users/me/photo');
   },
 
   list: (params?: { role?: string; status?: string; page?: number; limit?: number }) => {

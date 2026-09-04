@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ScrollView,
   Platform,
@@ -10,11 +10,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShoppingBag } from '@blinkdotnew/mobile-ui';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useOrderStore } from '@/store/useOrderStore';
+import { useOrdersRealtime } from '@/lib/realtime';
+import { ordersApi } from '@/apis/orders';
 import { blink } from '@/lib/blink';
 import { APP_CONFIG } from '@/lib/config';
 import { CustomHeader, useToast } from '@/components/core';
@@ -51,9 +55,20 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 export default function CustomerProfileScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
-  const { user, isAuthenticated, isLoading, logout, updateProfile, forgotPassword } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    isLoading,
+    logout,
+    updateProfile,
+    uploadPhoto: authUploadPhoto,
+    deletePhoto: authDeletePhoto,
+    fetchProfile,
+    forgotPassword,
+  } = useAuth();
   const [displayName, setDisplayName] = useState('Customer');
-  const [orderStats, setOrderStats] = useState({ pending: 0, delivered: 0 });
+  const storeOrders = useOrderStore((state) => state.orders);
+  const [orderStats, setOrderStats] = useState({ active: 0, completed: 0 });
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -67,10 +82,103 @@ export default function CustomerProfileScreen() {
   }, [isLoading, isAuthenticated, user]);
 
   useEffect(() => {
-    AsyncStorage.getItem('customer_photo_url').then((url) => {
-      if (url) setPhotoUrl(url);
-    });
+    if (isAuthenticated) {
+      fetchProfile();
+    }
+  }, [isAuthenticated, fetchProfile]);
+
+  useEffect(() => {
+    if (user?.photoUrl) {
+      setPhotoUrl(user.photoUrl);
+    }
+  }, [user?.photoUrl]);
+
+  const calculateAndSetStats = useCallback((ordersList: any[]) => {
+    const active = ordersList.filter(
+      (o) => o?.status && o.status !== 'delivered' && o.status !== 'cancelled'
+    ).length;
+    const completed = ordersList.filter((o) => o?.status === 'delivered').length;
+    setOrderStats({ active, completed });
   }, []);
+
+  const fetchOrderStats = useCallback(async () => {
+    let localOrders: any[] = [];
+    try {
+      const raw = await AsyncStorage.getItem('customer_local_orders');
+      if (raw) localOrders = JSON.parse(raw);
+    } catch { }
+
+    const sid = await AsyncStorage.getItem(SESSION_KEY);
+    const authUser = await blink.auth.me().catch(() => null);
+    const userEmail = authUser?.email || useAuthStore.getState().user?.email || user?.email;
+    const token = useAuthStore.getState().token;
+
+    try {
+      const [backendMine, sessionOrders1, sessionOrders2, emailOrders] = await Promise.all([
+        token ? ordersApi.getMine().catch(() => []) : Promise.resolve([]),
+        sid
+          ? blink.db.orders
+              .list({
+                where: { customer_session_id: sid },
+                orderBy: { created_at: 'desc' },
+                limit: 50,
+              })
+              .catch(() => [])
+          : Promise.resolve([]),
+        sid
+          ? blink.db.orders
+              .list({
+                where: { customerSessionId: sid },
+                orderBy: { createdAt: 'desc' },
+                limit: 50,
+              })
+              .catch(() => [])
+          : Promise.resolve([]),
+        userEmail
+          ? blink.db.orders
+              .list({
+                where: { customer_email: userEmail },
+                orderBy: { created_at: 'desc' },
+                limit: 50,
+              })
+              .catch(() => [])
+          : Promise.resolve([]),
+      ]);
+
+      const map = new Map<string, any>();
+      (localOrders || []).forEach((o) => o?.id && map.set(o.id, o));
+      (sessionOrders1 || []).forEach((o: any) => o?.id && map.set(o.id, o));
+      (sessionOrders2 || []).forEach((o: any) => o?.id && map.set(o.id, o));
+      (emailOrders || []).forEach((o: any) => o?.id && map.set(o.id, o));
+      if (Array.isArray(backendMine)) {
+        backendMine.forEach((o: any) => o?.id && map.set(o.id, o));
+      }
+      (storeOrders || []).forEach((o: any) => o?.id && map.set(o.id, o));
+
+      calculateAndSetStats(Array.from(map.values()));
+    } catch {
+      const map = new Map<string, any>();
+      (localOrders || []).forEach((o) => o?.id && map.set(o.id, o));
+      (storeOrders || []).forEach((o: any) => o?.id && map.set(o.id, o));
+      calculateAndSetStats(Array.from(map.values()));
+    }
+  }, [user?.email, storeOrders, calculateAndSetStats]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrderStats();
+    }, [fetchOrderStats])
+  );
+
+  useOrdersRealtime(
+    useCallback(() => {
+      fetchOrderStats();
+    }, [fetchOrderStats])
+  );
+
+  useEffect(() => {
+    fetchOrderStats();
+  }, [fetchOrderStats]);
 
   const handlePickPhoto = async () => {
     haptic('light');
@@ -82,32 +190,48 @@ export default function CustomerProfileScreen() {
       mediaTypes: 'images' as any,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.7,
+      quality: 0.8,
     });
     if (result.canceled || !result.assets?.[0]) return;
-    await uploadPhoto(result.assets[0].uri);
+    const asset = result.assets[0];
+    await processUpload({
+      uri: asset.uri,
+      name: asset.fileName || `customer_${Date.now()}.jpg`,
+      type: asset.mimeType || 'image/jpeg',
+    });
   };
 
-  const uploadPhoto = async (uri: string) => {
+  const processUpload = async (fileInput: any) => {
     setIsUploading(true);
     try {
-      const userId = user?.id || 'anon';
-      const path = `customer-photos/${userId}-${Date.now()}.jpg`;
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const { publicUrl } = await blink.storage.upload(blob as File, path);
-      await AsyncStorage.setItem('customer_photo_url', publicUrl);
-      setPhotoUrl(publicUrl);
+      const res = await authUploadPhoto(fileInput);
+      if (res?.photoUrl) {
+        setPhotoUrl(res.photoUrl);
+      }
+      showToast('Profile photo updated', 'success');
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('[customer profile] photo upload failed:', err);
-      if (Platform.OS === 'web') {
-        window.alert('Photo upload failed. Please try again.');
-      } else {
-        Alert.alert('Upload Failed', 'Could not upload photo. Please try again.');
+      showToast(err?.message || 'Could not upload photo. Please try again.', 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    setIsUploading(true);
+    try {
+      await authDeletePhoto();
+      setPhotoUrl(null);
+      showToast('Profile photo removed', 'info');
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
+    } catch (err: any) {
+      console.warn('[customer profile] photo delete failed:', err);
+      showToast(err?.message || 'Could not remove photo. Please try again.', 'error');
     } finally {
       setIsUploading(false);
     }
@@ -116,8 +240,7 @@ export default function CustomerProfileScreen() {
   const handleWebFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const uri = URL.createObjectURL(file);
-    await uploadPhoto(uri);
+    await processUpload(file);
     if (webFileInputRef.current) webFileInputRef.current.value = '';
   };
 
@@ -134,18 +257,6 @@ export default function CustomerProfileScreen() {
         }
       });
     }
-
-    AsyncStorage.getItem(SESSION_KEY).then(async (sid) => {
-      if (!sid) return;
-      try {
-        const orders = (await blink.db.orders.list({
-          where: { customer_session_id: sid },
-        })) as any[];
-        const pending = orders.filter((o) => o.status !== 'delivered').length;
-        const delivered = orders.filter((o) => o.status === 'delivered').length;
-        setOrderStats({ pending, delivered });
-      } catch { }
-    });
   }, [isAuthenticated, user?.displayName]);
 
   const handleSaveDisplayName = async (newName: string) => {
@@ -240,14 +351,25 @@ export default function CustomerProfileScreen() {
         <ProfileHeroCard
           displayName={displayName}
           emailText={user?.email || 'Guest Customer Session'}
-          photoUrl={photoUrl}
+          photoUrl={user?.photoUrl || photoUrl}
           isUploading={isUploading}
           onPickPhoto={handlePickPhoto}
+          onRemovePhoto={handleRemovePhoto}
           onSaveDisplayName={handleSaveDisplayName}
           initialsFallback="CU"
           metrics={[
-            { label: 'ACTIVE', value: orderStats.pending, color: BLUE },
-            { label: 'COMPLETED', value: orderStats.delivered, color: GREEN },
+            {
+              label: 'ACTIVE',
+              value: orderStats.active,
+              color: BLUE,
+              onPress: () => router.push('/(customer)/my-orders'),
+            },
+            {
+              label: 'COMPLETED',
+              value: orderStats.completed,
+              color: GREEN,
+              onPress: () => router.push('/(customer)/my-orders'),
+            },
             { label: 'SAVED PLACES', value: 'Home, Work', color: GOLD },
           ]}
         />

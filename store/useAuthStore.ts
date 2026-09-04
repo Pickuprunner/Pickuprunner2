@@ -12,6 +12,7 @@ export interface User {
   isAvailable?: boolean;
   emailVerified?: boolean;
   stripeAccountId?: string | null;
+  photoUrl?: string | null;
 }
 
 interface AuthState {

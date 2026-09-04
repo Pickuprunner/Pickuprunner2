@@ -22,6 +22,8 @@ export interface AuthState {
   logout: () => Promise<void>;
   fetchProfile: () => Promise<AuthUser | null>;
   updateProfile: (payload: UpdateProfilePayload) => Promise<AuthUser>;
+  uploadPhoto: (file: any) => Promise<{ photoUrl: string; user: AuthUser }>;
+  deletePhoto: () => Promise<void>;
   forgotPassword: (
     email: string,
     role?: string
@@ -142,6 +144,24 @@ export function useAuth(): AuthState {
     [updateUser]
   );
 
+  const uploadPhoto = useCallback(
+    async (fileInput: any): Promise<{ photoUrl: string; user: AuthUser }> => {
+      const res = await usersApi.uploadPhoto(fileInput);
+      if (res.user) {
+        updateUser(res.user);
+      } else if (res.photoUrl) {
+        updateUser({ photoUrl: res.photoUrl });
+      }
+      return res as any;
+    },
+    [updateUser]
+  );
+
+  const deletePhoto = useCallback(async (): Promise<void> => {
+    await usersApi.deletePhoto();
+    updateUser({ photoUrl: null });
+  }, [updateUser]);
+
   const forgotPassword = useCallback(async (email: string, role?: string) => {
     return authApi.forgotPassword(email.trim().toLowerCase(), role);
   }, []);
@@ -160,6 +180,8 @@ export function useAuth(): AuthState {
     logout,
     fetchProfile,
     updateProfile,
+    uploadPhoto,
+    deletePhoto,
     forgotPassword,
     resetPassword,
   };
