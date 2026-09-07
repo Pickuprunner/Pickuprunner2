@@ -24,20 +24,6 @@ export * from './locationCalculations';
 
 export const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
-export const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
-export const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
-export const PHOTON_API_URL = 'https://photon.komoot.io/api';
-export const OSRM_ROUTING_URL = 'https://router.project-osrm.org/route/v1/driving';
-
-export const PHOTON_FILTER_PARAMS = 'lang=en&osm_tag=!boundary:administrative&layer=house,street,poi,city';
-export const NOMINATIM_SEARCH_PARAMS = 'format=jsonv2&addressdetails=1&namedetails=1&extratags=1&dedupe=1&accept-language=en-US,en';
-export const NOMINATIM_REVERSE_PARAMS = 'format=jsonv2&addressdetails=1&accept-language=en-US,en';
-
-export const OSM_HEADERS = {
-  'User-Agent': 'PickupRunner/1.0 (contact@pickuprunner.app)',
-  'Accept-Language': 'en-US,en;q=0.9',
-};
-
 export async function fetchOsmAutocomplete(
   query: string,
   nearbyCoords?: LocationCoords | null,
@@ -58,13 +44,18 @@ export async function fetchOsmAutocomplete(
     const attempts = generateQueryPermutations(searchQuery);
 
     for (const attempt of attempts) {
-      let url = `${NOMINATIM_SEARCH_URL}?${NOMINATIM_SEARCH_PARAMS}&limit=10&q=${encodeURIComponent(attempt)}`;
+      let url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&addressdetails=1&namedetails=1&extratags=1&dedupe=1&accept-language=en-US,en&q=${encodeURIComponent(attempt)}`;
       if (biasCoords && typeof biasCoords.lat === 'number' && typeof biasCoords.lon === 'number') {
         const delta = 0.35;
         url += `&viewbox=${biasCoords.lon - delta},${biasCoords.lat + delta},${biasCoords.lon + delta},${biasCoords.lat - delta}`;
       }
 
-      const res = await fetch(url, { headers: OSM_HEADERS });
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'PickupRunner/1.0 (contact@pickuprunner.app)',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -116,7 +107,7 @@ export async function fetchOsmAutocomplete(
     }
 
     try {
-      let pUrl = `${PHOTON_API_URL}/?${PHOTON_FILTER_PARAMS}&limit=${limit}&q=${encodeURIComponent(searchQuery)}`;
+      let pUrl = `https://photon.komoot.io/api/?limit=${limit}&lang=en&osm_tag=!boundary:administrative&layer=house,street,poi,city&q=${encodeURIComponent(searchQuery)}`;
       if (biasCoords && typeof biasCoords.lat === 'number' && typeof biasCoords.lon === 'number') {
         pUrl += `&lat=${biasCoords.lat}&lon=${biasCoords.lon}&location_bias_scale=0.6`;
       }
@@ -166,21 +157,68 @@ export async function nativeOrOsmGeocode(address: string): Promise<LocationCoord
   const cached = getCachedCoords(cleanAddr);
   if (cached) return cached;
 
-  const { prefix, baseAddress } = extractUnitOrFlatPrefix(cleanAddr);
-  const targetAddress = prefix && baseAddress ? baseAddress : cleanAddr;
-
-  // 1. Platform-agnostic geocoding (Photon / OSM) first so Android & iOS resolve identical coordinates
   try {
-    const pUrl = `${PHOTON_API_URL}/?${PHOTON_FILTER_PARAMS}&limit=1&q=${encodeURIComponent(targetAddress)}`;
-    const pRes = await fetch(pUrl);
-    if (pRes.ok) {
-      const pData = await pRes.json();
-      if (Array.isArray(pData.features) && pData.features.length > 0) {
-        const f = pData.features[0];
-        const coordsGeo = f.geometry?.coordinates || [0, 0];
-        const lon = coordsGeo[0] || 0;
-        const lat = coordsGeo[1] || 0;
-        if (lat !== 0 && lon !== 0) {
+    const results = await Location.geocodeAsync(cleanAddr);
+    if (results && results.length > 0) {
+      const coords: LocationCoords = { lat: results[0].latitude, lon: results[0].longitude };
+      setCachedCoords(cleanAddr, coords);
+      return coords;
+    }
+  } catch { }
+
+  const { prefix, baseAddress } = extractUnitOrFlatPrefix(cleanAddr);
+  if (prefix && baseAddress && baseAddress !== cleanAddr) {
+    try {
+      const baseCoords = await nativeOrOsmGeocode(baseAddress);
+      if (baseCoords) {
+        setCachedCoords(cleanAddr, baseCoords);
+        return baseCoords;
+      }
+    } catch { }
+  }
+
+  try {
+    const attempts = generateQueryPermutations(cleanAddr);
+
+    for (const attempt of attempts) {
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&namedetails=1&extratags=1&dedupe=1&accept-language=en-US,en&q=${encodeURIComponent(attempt)}`;
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'PickupRunner/1.0 (contact@pickuprunner.app)',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const sorted = [...data].sort((a, b) => rankNominatimItem(a, attempt) - rankNominatimItem(b, attempt));
+          const best = sorted[0];
+          const bbox: [number, number, number, number] | undefined =
+            Array.isArray(best.boundingbox) && best.boundingbox.length >= 4
+              ? [
+                  parseFloat(best.boundingbox[0]),
+                  parseFloat(best.boundingbox[1]),
+                  parseFloat(best.boundingbox[2]),
+                  parseFloat(best.boundingbox[3]),
+                ]
+              : undefined;
+          const coords: LocationCoords = { lat: parseFloat(best.lat), lon: parseFloat(best.lon), bbox };
+          setCachedCoords(cleanAddr, coords);
+          return coords;
+        }
+      }
+    }
+
+    try {
+      const pUrl = `https://photon.komoot.io/api/?limit=1&lang=en&osm_tag=!boundary:administrative&layer=house,street,poi,city&q=${encodeURIComponent(cleanAddr)}`;
+      const pRes = await fetch(pUrl);
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        if (Array.isArray(pData.features) && pData.features.length > 0) {
+          const f = pData.features[0];
+          const coordsGeo = f.geometry?.coordinates || [0, 0];
+          const lon = coordsGeo[0] || 0;
+          const lat = coordsGeo[1] || 0;
           const extent = f.properties?.extent;
           const bbox: [number, number, number, number] | undefined =
             Array.isArray(extent) && extent.length === 4
@@ -188,68 +226,11 @@ export async function nativeOrOsmGeocode(address: string): Promise<LocationCoord
               : undefined;
           const coords: LocationCoords = { lat, lon, bbox };
           setCachedCoords(cleanAddr, coords);
-          if (cleanAddr !== targetAddress) setCachedCoords(targetAddress, coords);
           return coords;
         }
       }
-    }
-  } catch { }
-
-  // 2. Nominatim with query permutations
-  try {
-    const attempts = generateQueryPermutations(targetAddress);
-
-    for (const attempt of attempts.slice(0, 3)) {
-      const url = `${NOMINATIM_SEARCH_URL}?${NOMINATIM_SEARCH_PARAMS}&limit=5&q=${encodeURIComponent(attempt)}`;
-      const res = await fetch(url, { headers: OSM_HEADERS });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const sorted = [...data].sort((a, b) => rankNominatimItem(a, attempt) - rankNominatimItem(b, attempt));
-          const best = sorted[0];
-          const lat = parseFloat(best.lat);
-          const lon = parseFloat(best.lon);
-          if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
-            const bbox: [number, number, number, number] | undefined =
-              Array.isArray(best.boundingbox) && best.boundingbox.length >= 4
-                ? [
-                    parseFloat(best.boundingbox[0]),
-                    parseFloat(best.boundingbox[1]),
-                    parseFloat(best.boundingbox[2]),
-                    parseFloat(best.boundingbox[3]),
-                  ]
-                : undefined;
-            const coords: LocationCoords = { lat, lon, bbox };
-            setCachedCoords(cleanAddr, coords);
-            if (cleanAddr !== targetAddress) setCachedCoords(targetAddress, coords);
-            return coords;
-          }
-        }
-      }
-    }
-  } catch { }
-
-  // 3. Fallback to native device geocoder (Apple / Google) only when OSM has no results
-  try {
-    const results = await Location.geocodeAsync(targetAddress);
-    if (results && results.length > 0) {
-      const coords: LocationCoords = { lat: results[0].latitude, lon: results[0].longitude };
-      setCachedCoords(cleanAddr, coords);
-      if (cleanAddr !== targetAddress) setCachedCoords(targetAddress, coords);
-      return coords;
-    }
-  } catch { }
-
-  if (targetAddress !== cleanAddr) {
-    try {
-      const results = await Location.geocodeAsync(cleanAddr);
-      if (results && results.length > 0) {
-        const coords: LocationCoords = { lat: results[0].latitude, lon: results[0].longitude };
-        setCachedCoords(cleanAddr, coords);
-        return coords;
-      }
     } catch { }
-  }
+  } catch { }
 
   return null;
 }
@@ -296,8 +277,13 @@ export async function nativeOrOsmReverseGeocode(lat: number, lon: number): Promi
   } catch { }
 
   try {
-    const url = `${NOMINATIM_REVERSE_URL}?${NOMINATIM_REVERSE_PARAMS}&lat=${lat}&lon=${lon}`;
-    const res = await fetch(url, { headers: OSM_HEADERS });
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&addressdetails=1&accept-language=en-US,en`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'PickupRunner/1.0 (contact@pickuprunner.app)',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
     if (res.ok) {
       const data = await res.json();
       if (data?.address) {
@@ -333,7 +319,7 @@ export async function calcRouteMiles(
   deliveryCoords: LocationCoords,
 ): Promise<number> {
   try {
-    const osrmUrl = `${OSRM_ROUTING_URL}/${pickupCoords.lon},${pickupCoords.lat};${deliveryCoords.lon},${deliveryCoords.lat}?overview=false`;
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${pickupCoords.lon},${pickupCoords.lat};${deliveryCoords.lon},${deliveryCoords.lat}?overview=false`;
     const oRes = await fetch(osrmUrl);
     if (oRes.ok) {
       const oData = await oRes.json();
@@ -361,7 +347,7 @@ export async function fetchDrivingRoute(
   }
 
   try {
-    const url = `${OSRM_ROUTING_URL}/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
     const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
