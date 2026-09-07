@@ -335,6 +335,42 @@ export async function calcRouteMiles(
   return Math.max(0.1, Math.round(straightLine * 1.25 * 10) / 10);
 }
 
+const routeCoordsCache = new Map<string, { latitude: number; longitude: number }[]>();
+
+export async function fetchDrivingRoute(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number }
+): Promise<{ latitude: number; longitude: number }[]> {
+  const key = `${origin.lat.toFixed(5)},${origin.lng.toFixed(5)}_${destination.lat.toFixed(5)},${destination.lng.toFixed(5)}`;
+  if (routeCoordsCache.has(key)) {
+    return routeCoordsCache.get(key)!;
+  }
+
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      const coords = data?.routes?.[0]?.geometry?.coordinates;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        const route = coords.map(([lon, lat]: [number, number]) => ({
+          latitude: lat,
+          longitude: lon,
+        }));
+        routeCoordsCache.set(key, route);
+        return route;
+      }
+    }
+  } catch (err) {
+    console.warn('[fetchDrivingRoute] Route fetch error:', err);
+  }
+
+  return [
+    { latitude: origin.lat, longitude: origin.lng },
+    { latitude: destination.lat, longitude: destination.lng },
+  ];
+}
+
 export const searchAddressSuggestions = (
   query: string,
   limit: number = 4,

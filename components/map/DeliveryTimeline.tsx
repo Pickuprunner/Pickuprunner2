@@ -16,13 +16,13 @@ const STEPS: StepConfig[] = [
   { key: 'delivered', label: 'Delivered', iconName: 'where-to-vote' },
 ];
 
-const BLUE = '#0066FF';
+const BLUE = '#00A8FF';
 const GREEN = '#00E297';
 
 export function DeliveryTimeline({ status }: { status: Order['status'] }) {
   const orderKeys = ['pending', 'accepted', 'picked_up', 'delivered'];
   const currentIndex = Math.max(0, orderKeys.indexOf(status));
-  const isAllDelivered = currentIndex === 3;
+  const isAllDelivered = status === 'delivered';
 
   const currentLabel =
     currentIndex === 0
@@ -35,7 +35,7 @@ export function DeliveryTimeline({ status }: { status: Order['status'] }) {
 
   return (
     <View style={styles.timelineContainer}>
-      {/* Header with Title & Active Status Pill */}
+      
       <View style={styles.headerRow}>
         <Text style={styles.headerTitle}>DELIVERY PROGRESS</Text>
         <View style={[styles.statusPill, isAllDelivered && styles.statusPillDelivered]}>
@@ -46,16 +46,29 @@ export function DeliveryTimeline({ status }: { status: Order['status'] }) {
         </View>
       </View>
 
-      {/* Stepper with strictly separated nodes & connector lines */}
+      
       <View style={styles.stepperContainer}>
-        {/* Row of Circles & Intermediary Line Segments */}
-        <View style={styles.circlesRow}>
-          {STEPS.map((step, index) => {
-            const isCompleted = index < currentIndex;
-            const isActive = index === currentIndex;
+        {STEPS.map((step, index) => {
+          const isCompleted = index < currentIndex || (isAllDelivered && index === currentIndex);
+          const isActive = index === currentIndex && !isAllDelivered;
 
-            return (
-              <React.Fragment key={step.key}>
+          return (
+            <View key={step.key} style={styles.stepColumn}>
+              
+              <View style={styles.nodeRow}>
+                
+                <View
+                  style={[
+                    styles.connectorHalf,
+                    index === 0
+                      ? styles.connectorHidden
+                      : index <= currentIndex
+                        ? styles.connectorCompleted
+                        : null,
+                  ]}
+                />
+
+                {/* Node Circle */}
                 <View
                   style={[
                     styles.nodeCircle,
@@ -63,55 +76,44 @@ export function DeliveryTimeline({ status }: { status: Order['status'] }) {
                     isActive && styles.nodeCircleActive,
                   ]}
                 >
-                  <MaterialIcons
-                    name={step.iconName}
-                    size={14}
-                    color={
-                      isCompleted
-                        ? GREEN
-                        : isActive
-                          ? BLUE
-                          : 'rgba(255, 255, 255, 0.28)'
-                    }
-                  />
+                  {isCompleted ? (
+                    <MaterialIcons name="check" size={15} color="#07121E" />
+                  ) : (
+                    <MaterialIcons
+                      name={step.iconName}
+                      size={isActive ? 15 : 13}
+                      color={isActive ? BLUE : 'rgba(255, 255, 255, 0.35)'}
+                    />
+                  )}
                 </View>
 
-                {/* Connector line strictly between adjacent nodes */}
-                {index < STEPS.length - 1 && (
-                  <View
-                    style={[
-                      styles.connectorLine,
-                      index < currentIndex && styles.connectorCompleted,
-                    ]}
-                  />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </View>
-
-        {/* Row of Labels underneath */}
-        <View style={styles.labelsRow}>
-          {STEPS.map((step, index) => {
-            const isCompleted = index < currentIndex;
-            const isActive = index === currentIndex;
-
-            return (
-              <View key={step.key} style={styles.labelCol}>
-                <Text
-                  numberOfLines={1}
+               
+                <View
                   style={[
-                    styles.stepLabel,
-                    isCompleted && styles.labelCompleted,
-                    isActive && styles.labelActive,
+                    styles.connectorHalf,
+                    index === STEPS.length - 1
+                      ? styles.connectorHidden
+                      : index < currentIndex
+                        ? styles.connectorCompleted
+                        : null,
                   ]}
-                >
-                  {step.label}
-                </Text>
+                />
               </View>
-            );
-          })}
-        </View>
+
+             
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.stepLabel,
+                  isCompleted && styles.labelCompleted,
+                  isActive && styles.labelActive,
+                ]}
+              >
+                {step.label}
+              </Text>
+            </View>
+          );
+        })}
       </View>
     </View>
   );
@@ -140,8 +142,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(0, 102, 255, 0.12)',
-    borderColor: 'rgba(0, 102, 255, 0.35)',
+    backgroundColor: 'rgba(0, 168, 255, 0.12)',
+    borderColor: 'rgba(0, 168, 255, 0.35)',
     borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -170,61 +172,50 @@ const styles = StyleSheet.create({
     color: GREEN,
   },
   stepperContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     width: '100%',
+  },
+  stepColumn: {
+    flex: 1,
+    alignItems: 'center',
     gap: 6,
   },
-  circlesRow: {
+  nodeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    width: '100%',
+  },
+  connectorHalf: {
+    flex: 1,
+    height: 2.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  connectorCompleted: {
+    backgroundColor: GREEN,
+  },
+  connectorHidden: {
+    backgroundColor: 'transparent',
   },
   nodeCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#131824',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#111724',
     borderColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   nodeCircleCompleted: {
-    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    backgroundColor: GREEN,
     borderColor: GREEN,
     borderWidth: 1.5,
-    shadowColor: GREEN,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
   },
   nodeCircleActive: {
-    backgroundColor: 'rgba(0, 102, 255, 0.14)',
+    backgroundColor: '#071830',
     borderColor: BLUE,
     borderWidth: 2,
-    shadowColor: BLUE,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 7,
-  },
-  connectorLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    marginHorizontal: 4,
-    borderRadius: 1,
-  },
-  connectorCompleted: {
-    backgroundColor: GREEN,
-    height: 2.5,
-  },
-  labelsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  labelCol: {
-    flex: 1,
-    alignItems: 'center',
   },
   stepLabel: {
     fontSize: 10,
@@ -239,6 +230,6 @@ const styles = StyleSheet.create({
   },
   labelActive: {
     color: BLUE,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 });

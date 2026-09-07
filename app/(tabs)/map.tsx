@@ -28,9 +28,16 @@ export default function MapScreen() {
 
   const orders = useMemo(() => {
     const orderMap = new Map<string, Order>();
-    (availableOrders || []).forEach((o) => o?.id && orderMap.set(o.id, o));
+    (availableOrders || []).forEach((o) => {
+      if (o?.id && o.status === 'pending') {
+        orderMap.set(o.id, o);
+      }
+    });
     (allOrders || []).forEach((o) => {
-      if (o?.id && ((o.driverUserId === driverId) || o.status !== 'delivered')) {
+      if (!o?.id) return;
+      const isMyActive = o.driverUserId === driverId && (o.status === 'accepted' || o.status === 'picked_up');
+      const isPending = o.status === 'pending';
+      if (isMyActive || isPending) {
         orderMap.set(o.id, { ...(orderMap.get(o.id) || {}), ...o });
       }
     });
@@ -40,6 +47,7 @@ export default function MapScreen() {
   const { isMyOrder } = useDriverQueue(orders, driverId);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [currentTab, setCurrentTab] = useState<'active' | 'pending'>('pending');
 
   const pendingOrders = useMemo(() => orders.filter((o) => o.status === 'pending'), [orders]);
   const activeOrders = useMemo(
@@ -51,6 +59,18 @@ export default function MapScreen() {
     () => orders.find((o) => o.id === selectedId),
     [orders, selectedId]
   );
+
+  const handleSelectId = (id: string | null) => {
+    setSelectedId(id);
+    if (id) {
+      const order = orders.find((o) => o.id === id);
+      if (order?.status === 'pending') {
+        setCurrentTab('pending');
+      } else if (order?.status === 'accepted' || order?.status === 'picked_up') {
+        setCurrentTab('active');
+      }
+    }
+  };
 
   const handleOpenOrder = (order: Order) => {
     haptic('medium');
@@ -80,26 +100,28 @@ export default function MapScreen() {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <View style={styles.mapWrapper}>
         {Platform.OS === 'web' ? (
-          <WebMap orders={orders} selectedId={selectedId} onSelect={setSelectedId} />
+          <WebMap orders={orders} selectedId={selectedId} onSelect={handleSelectId} />
         ) : (
-          <NativeMap orders={orders} selectedId={selectedId} onSelect={setSelectedId} />
+          <NativeMap orders={orders} selectedId={selectedId} onSelect={handleSelectId} />
         )}
       </View>
       <View style={styles.bottomSection}>
         {selectedOrder ? (
           <MapSelectedCard
             selectedOrder={selectedOrder}
-            onClose={() => setSelectedId(null)}
+            onClose={() => handleSelectId(null)}
             onAccept={handleAcceptOrder}
             onOpenOrder={handleOpenOrder}
           />
         ) : (
           <MapStopsCarousel
+            currentTab={currentTab}
+            onTabChange={setCurrentTab}
             pendingOrders={pendingOrders}
             activeOrders={activeOrders}
             selectedId={selectedId}
             isConnected={isConnected}
-            onSelectId={setSelectedId}
+            onSelectId={handleSelectId}
           />
         )}
       </View>

@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet, Dimensions, Animated } from 'react-native';
 import { CheckCircle, Wifi, WifiOff } from '@blinkdotnew/mobile-ui';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Order } from '@/lib/orders';
 import { APP_CONFIG, calcDriverEarnings } from '@/lib/config';
 import { colors, shadows, borderRadius } from '@/constants/design';
-import { haptic, GOLD, GREEN, COBALT } from './mapTypes';
+import { haptic, GOLD, GOLD_LIGHT, GREEN, COBALT } from './mapTypes';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const BLUE = '#00A8FF';
+const TAB_WIDTH = 92;
 
 export function MapStopsCarousel({
   pendingOrders,
@@ -15,57 +18,91 @@ export function MapStopsCarousel({
   selectedId,
   isConnected,
   onSelectId,
+  currentTab: controlledTab,
+  onTabChange,
 }: {
   pendingOrders: Order[];
   activeOrders: Order[];
   selectedId: string | null;
   isConnected: boolean;
   onSelectId: (id: string) => void;
+  currentTab?: 'active' | 'pending';
+  onTabChange?: (tab: 'active' | 'pending') => void;
 }) {
-  const [currentTab, setCurrentTab] = useState<'active' | 'pending'>('pending');
+  const [internalTab, setInternalTab] = useState<'active' | 'pending'>('pending');
+  const currentTab = controlledTab ?? internalTab;
+  const setCurrentTab = onTabChange ?? setInternalTab;
+
+  const slideAnim = useRef(new Animated.Value(currentTab === 'pending' ? 1 : 0)).current;
 
   useEffect(() => {
-    if (activeOrders.length > 0 && currentTab !== 'active') {
-      setCurrentTab('active');
-    } else if (activeOrders.length === 0 && pendingOrders.length > 0 && currentTab === 'active') {
+    Animated.spring(slideAnim, {
+      toValue: currentTab === 'pending' ? 1 : 0,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 50,
+    }).start();
+  }, [currentTab]);
+
+  useEffect(() => {
+    if (activeOrders.length === 0 && pendingOrders.length > 0 && currentTab === 'active') {
       setCurrentTab('pending');
     }
-  }, [activeOrders.length, pendingOrders.length]);
+  }, [activeOrders.length, pendingOrders.length, currentTab]);
 
   const displayOrders = currentTab === 'active' ? activeOrders : pendingOrders;
 
   return (
     <View style={styles.pendingStopsContainer}>
       <View style={styles.bottomHeaderRow}>
-        <View style={styles.filterRow}>
-          {activeOrders.length > 0 && (
-            <Pressable
-              onPress={() => {
-                haptic('light');
-                setCurrentTab('active');
-              }}
-              style={({ pressed }) => [
-                styles.tabPill,
-                currentTab === 'active' ? styles.tabPillActiveSelected : styles.tabPillActiveUnselected,
-                pressed && { opacity: 0.8 },
+        <View style={styles.segmentedControl}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.slidingPill,
+              {
+                left: slideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [3, 3 + TAB_WIDTH],
+                }),
+                borderColor:
+                  currentTab === 'active'
+                    ? 'rgba(0, 168, 255, 0.45)'
+                    : 'rgba(255, 227, 153, 0.45)',
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={
+                currentTab === 'active'
+                  ? ['rgba(0, 168, 255, 0.22)', 'rgba(0, 168, 255, 0.06)']
+                  : ['rgba(255, 227, 153, 0.20)', 'rgba(255, 227, 153, 0.05)']
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.slidingGradient}
+            />
+          </Animated.View>
+
+          <Pressable
+            onPress={() => {
+              haptic('light');
+              setCurrentTab('active');
+            }}
+            style={({ pressed }) => [
+              styles.segmentTab,
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                currentTab === 'active' && styles.segmentTextActiveBlue,
               ]}
             >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: currentTab === 'active' ? '#FFFFFF' : COBALT },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.tabPillText,
-                  currentTab === 'active' ? styles.tabPillTextActiveSelected : styles.tabPillTextActiveUnselected,
-                ]}
-              >
-                Active ({activeOrders.length})
-              </Text>
-            </Pressable>
-          )}
+              Active {activeOrders.length}
+            </Text>
+          </Pressable>
 
           <Pressable
             onPress={() => {
@@ -73,30 +110,23 @@ export function MapStopsCarousel({
               setCurrentTab('pending');
             }}
             style={({ pressed }) => [
-              styles.tabPill,
-              currentTab === 'pending' ? styles.tabPillPendingSelected : styles.tabPillPendingUnselected,
+              styles.segmentTab,
               pressed && { opacity: 0.8 },
             ]}
           >
-            <View
-              style={[
-                styles.statusDot,
-                { backgroundColor: currentTab === 'pending' ? '#000000' : GOLD },
-              ]}
-            />
             <Text
               style={[
-                styles.tabPillText,
-                currentTab === 'pending' ? styles.tabPillTextPendingSelected : styles.tabPillTextPendingUnselected,
+                styles.segmentText,
+                currentTab === 'pending' && styles.segmentTextActiveGold,
               ]}
             >
-              Pending ({pendingOrders.length})
+              Pending {pendingOrders.length}
             </Text>
           </Pressable>
         </View>
 
         <View style={[styles.liveBadge, isConnected ? styles.liveBadgeOn : styles.liveBadgeOff]}>
-          {isConnected ? <Wifi size={11} color={GREEN} /> : <WifiOff size={11} color="#777" />}
+          {isConnected ? <Wifi size={10} color={GREEN} /> : <WifiOff size={10} color="#666" />}
           <Text style={[styles.liveText, isConnected ? styles.liveTextOn : styles.liveTextOff]}>
             {isConnected ? 'LIVE' : 'OFFLINE'}
           </Text>
@@ -225,72 +255,57 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 8,
   },
-  filterRow: {
+  segmentedControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderRadius: borderRadius.full,
+    padding: 3,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  tabPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  slidingPill: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    width: TAB_WIDTH,
     borderRadius: borderRadius.full,
     borderWidth: 1,
+    overflow: 'hidden',
   },
-  tabPillActiveSelected: {
-    backgroundColor: COBALT,
-    borderColor: COBALT,
-    ...shadows.cobaltGlow,
+  slidingGradient: {
+    flex: 1,
   },
-  tabPillActiveUnselected: {
-    backgroundColor: colors.primaryAlpha12,
-    borderColor: colors.primaryAlpha30,
+  segmentTab: {
+    width: TAB_WIDTH,
+    paddingVertical: 5,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
-  tabPillTextActiveSelected: {
+  segmentText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  tabPillTextActiveUnselected: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  tabPillPendingSelected: {
-    backgroundColor: GOLD,
-    borderColor: GOLD,
-    ...shadows.goldGlow,
-  },
-  tabPillPendingUnselected: {
-    backgroundColor: colors.accentAlpha12,
-    borderColor: colors.accentAlpha30,
-  },
-  tabPillTextPendingSelected: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#0A0E17',
-  },
-  tabPillTextPendingUnselected: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: GOLD,
-  },
-  tabPillText: {
+    fontWeight: '600',
+    color: '#8C90A1',
     letterSpacing: 0.2,
+  },
+  segmentTextActiveBlue: {
+    fontWeight: '800',
+    color: BLUE,
+  },
+  segmentTextActiveGold: {
+    fontWeight: '800',
+    color: GOLD_LIGHT,
   },
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: borderRadius.full,
     borderWidth: 1,
   },
@@ -303,9 +318,9 @@ const styles = StyleSheet.create({
     borderColor: colors.glassLevel2Border,
   },
   liveText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   liveTextOn: {
     color: GREEN,
