@@ -116,7 +116,7 @@ export function DriverOfflineView({
               {resolvedAvatarUrl ? (
                 <Image source={{ uri: resolvedAvatarUrl }} style={styles.avatarImage} />
               ) : (
-                <Text style={styles.avatarText}>{resolvedAvatar}</Text>
+                <MaterialIcons name="person" size={20} color="#FFE399" />
               )}
             </View>
           </TouchableOpacity>

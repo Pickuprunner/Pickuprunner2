@@ -373,7 +373,7 @@ export function CustomHeader({
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
                 ) : (
-                  <Text style={styles.avatarText}>{avatar}</Text>
+                  <MaterialIcons name="person" size={20} color="#FFE399" />
                 )}
               </View>
             </Pressable>

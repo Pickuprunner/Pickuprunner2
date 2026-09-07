@@ -9,6 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Avatar, Camera, Edit3, Check, X } from '@blinkdotnew/mobile-ui';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 const CARD_BG = 'rgba(255, 255, 255, 0.04)';
@@ -70,12 +71,19 @@ export function ProfileHeroCard({
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(displayName);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteBadge, setShowDeleteBadge] = useState(false);
 
   useEffect(() => {
     if (!editing) {
       setEditValue(displayName);
     }
   }, [displayName, editing]);
+
+  useEffect(() => {
+    if (!photoUrl) {
+      setShowDeleteBadge(false);
+    }
+  }, [photoUrl]);
 
   const startEdit = () => {
     haptic('light');
@@ -119,12 +127,28 @@ export function ProfileHeroCard({
     <View style={styles.heroCard}>
       <View style={styles.heroTopRow}>
         <View style={styles.avatarWrap}>
-          <Pressable onPress={onPickPhoto} disabled={isUploading || !onPickPhoto}>
-            <Avatar size="$7" borderRadius="$full" backgroundColor="#31353f" borderWidth={1} borderColor="#424656">
+          <Pressable
+            onPress={() => {
+              if (showDeleteBadge) {
+                setShowDeleteBadge(false);
+              } else if (onPickPhoto && !isUploading) {
+                onPickPhoto();
+              }
+            }}
+            onLongPress={() => {
+              if (photoUrl && onRemovePhoto && !isUploading) {
+                haptic('heavy');
+                setShowDeleteBadge((prev) => !prev);
+              }
+            }}
+            delayLongPress={400}
+            disabled={isUploading || (!onPickPhoto && !photoUrl)}
+          >
+            <Avatar size="$7" borderRadius="$full" backgroundColor="#181B25" borderWidth={1.5} borderColor="#31353F">
               {photoUrl ? (
                 <Avatar.Image source={{ uri: photoUrl }} />
               ) : (
-                <Text style={styles.heroAvatarText}>{initialsText}</Text>
+                <MaterialIcons name="person" size={38} color="#FFE399" />
               )}
             </Avatar>
             {isUploading && (
@@ -134,9 +158,23 @@ export function ProfileHeroCard({
             )}
           </Pressable>
 
-          {onPickPhoto && (
+          {onPickPhoto && !showDeleteBadge && (
             <Pressable onPress={onPickPhoto} style={styles.cameraBadge}>
               <Camera size={12} color="#FFFFFF" />
+            </Pressable>
+          )}
+
+          {photoUrl && onRemovePhoto && showDeleteBadge && !isUploading && (
+            <Pressable
+              onPress={() => {
+                haptic('medium');
+                setShowDeleteBadge(false);
+                onRemovePhoto();
+              }}
+              style={styles.removeBadge}
+              hitSlop={8}
+            >
+              <X size={12} color="#FFFFFF" />
             </Pressable>
           )}
         </View>
@@ -286,6 +324,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: BG,
+  },
+  removeBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: BG,
+    zIndex: 10,
   },
   infoCol: {
     flex: 1,
