@@ -27,6 +27,7 @@ export function MapSelectedCard({
 
   return (
     <View style={styles.detailCard}>
+      
       <View style={styles.detailCardHeader}>
         <View style={styles.userInfoCol}>
           <View
@@ -40,51 +41,67 @@ export function MapSelectedCard({
             </Text>
           </View>
           <View style={styles.customerTitleCol}>
-            <View style={styles.customerNameRow}>
-              <Text style={styles.detailCustomerName}>{selectedOrder.customerName || 'Customer'}</Text>
-              <View style={[styles.liveTag, !isPending && styles.activeTag]}>
-                <View style={[styles.liveTagDot, !isPending && { backgroundColor: colors.primary }]} />
-                <Text style={[styles.liveTagText, !isPending && { color: colors.primary }]}>
-                  {isPending ? 'AVAILABLE' : 'ACTIVE'}
-                </Text>
-              </View>
-            </View>
+            <Text style={styles.detailCustomerName} numberOfLines={1}>
+              {selectedOrder.customerName || 'Customer'}
+            </Text>
             <Text style={styles.detailOrderId}>
               #{selectedOrder.id ? selectedOrder.id.slice(-6).toUpperCase() : '------'}
             </Text>
           </View>
         </View>
-        <Pressable
-          onPress={() => {
-            haptic('light');
-            onClose();
-          }}
-          style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.6 }]}
-        >
-          <Text style={styles.closeButtonText}>✕</Text>
-        </Pressable>
+
+        <View style={styles.headerRightActions}>
+          <View style={styles.contactActionButtons}>
+            <Pressable
+              onPress={() => makePhoneCall(selectedOrder.customerPhone)}
+              style={({ pressed }) => [styles.contactIconBtn, pressed && { opacity: 0.7 }]}
+              accessibilityLabel="Call Customer"
+            >
+              <PhoneIcon size={14} color="#FFFFFF" />
+            </Pressable>
+            <Pressable
+              onPress={() => openSmsMessage(selectedOrder.customerPhone)}
+              style={({ pressed }) => [styles.contactIconBtn, styles.contactMessageBtn, pressed && { opacity: 0.7 }]}
+              accessibilityLabel="Message Customer"
+            >
+              <MessageIcon size={14} color="#FFFFFF" />
+            </Pressable>
+          </View>
+
+          <Pressable
+            onPress={() => {
+              haptic('light');
+              onClose();
+            }}
+            style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.6 }]}
+            accessibilityLabel="Close"
+          >
+            <Text style={styles.closeButtonText}>✕</Text>
+          </Pressable>
+        </View>
       </View>
-      <View style={styles.earningsContactRow}>
-        <View style={styles.priceContainer}>
+
+     
+      <View style={styles.payoutBanner}>
+        <View style={styles.payoutLeft}>
           <Text style={styles.detailPriceText}>${earnings.totalDisplay}</Text>
-          <Text style={styles.detailTipText}>
-            {tipAmount > 0 ? `+$${(tipAmount / 100).toFixed(2)} tip` : 'incl. tip'}
-          </Text>
+          {tipAmount > 0 ? (
+            <View style={styles.tipBadge}>
+              <Text style={styles.tipBadgeText}>+${(tipAmount / 100).toFixed(2)} tip</Text>
+            </View>
+          ) : (
+            <Text style={styles.detailTipText}>incl. tip</Text>
+          )}
         </View>
 
-        <View style={styles.contactActionButtons}>
-          <Pressable
-            onPress={() => makePhoneCall(selectedOrder.customerPhone)}
-            style={({ pressed }) => [styles.contactIconBtn, pressed && { opacity: 0.7 }]}
-          >
-            <PhoneIcon size={16} color="#FFFFFF" />
-          </Pressable>
-          <Pressable
-            onPress={() => openSmsMessage(selectedOrder.customerPhone)}
-            style={({ pressed }) => [styles.contactIconBtn, styles.contactMessageBtn, pressed && { opacity: 0.7 }]}
-          >
-            <MessageIcon size={16} color="#FFFFFF" />
-          </Pressable>
+        <View style={styles.payoutRight}>
+          <View style={[styles.liveTag, !isPending && styles.activeTag]}>
+            <View style={[styles.liveTagDot, !isPending && { backgroundColor: colors.primary }]} />
+            <Text style={[styles.liveTagText, !isPending && { color: colors.primary }]}>
+              {isPending ? 'AVAILABLE' : 'ACTIVE'}
+            </Text>
+          </View>
+          {miles > 0 && <Text style={styles.distanceBadge}>• {miles.toFixed(1)} mi</Text>}
         </View>
       </View>
 
@@ -169,18 +186,19 @@ const styles = StyleSheet.create({
   detailCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   userInfoCol: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     flex: 1,
+    marginRight: 8,
   },
   avatarCircleLarge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: colors.surfaceContainerLowest,
     borderWidth: 1.5,
     borderColor: colors.secondary,
@@ -189,21 +207,108 @@ const styles = StyleSheet.create({
   },
   avatarTextLarge: {
     color: colors.secondary,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   customerTitleCol: {
     flex: 1,
   },
-  customerNameRow: {
+  detailCustomerName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.onSurface,
+  },
+  detailOrderId: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    letterSpacing: 0.5,
+    marginTop: 1,
+  },
+  headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  detailCustomerName: {
-    fontSize: 18,
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.glassLevel3Bg,
+    borderWidth: 1,
+    borderColor: colors.glassLevel3Border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeButtonText: {
+    fontSize: 13,
+    color: colors.textSecondary,
     fontWeight: '700',
-    color: colors.onSurface,
+  },
+  contactActionButtons: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  contactIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceContainer,
+    borderColor: colors.glassLevel2Border,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contactMessageBtn: {
+    backgroundColor: COBALT,
+    borderColor: COBALT,
+    ...shadows.cobaltGlow,
+  },
+
+  /* Unified Payout & Status Banner */
+  payoutBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.glassLevel2Border,
+  },
+  payoutLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailPriceText: {
+    color: colors.secondary,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  tipBadge: {
+    backgroundColor: colors.greenAlpha15,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.25)',
+  },
+  tipBadgeText: {
+    color: colors.tertiary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  detailTipText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  payoutRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   liveTag: {
     flexDirection: 'row',
@@ -213,7 +318,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accentAlpha40,
     borderWidth: 1,
     paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: borderRadius.sm,
   },
   activeTag: {
@@ -232,70 +337,10 @@ const styles = StyleSheet.create({
     color: GOLD,
     letterSpacing: 0.5,
   },
-  detailOrderId: {
+  distanceBadge: {
     fontSize: 12,
+    color: colors.textSecondary,
     fontWeight: '500',
-    color: colors.textSecondary,
-    letterSpacing: 0.5,
-    marginTop: 2,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.glassLevel3Bg,
-    borderWidth: 1,
-    borderColor: colors.glassLevel3Border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeButtonText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '700',
-  },
-
-  /* Earnings & Contact Row */
-  earningsContactRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.glassLevel2Border,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-  },
-  detailPriceText: {
-    color: colors.secondary,
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  detailTipText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  contactActionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  contactIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surfaceContainer,
-    borderColor: colors.glassLevel2Border,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  contactMessageBtn: {
-    backgroundColor: COBALT,
-    borderColor: COBALT,
-    ...shadows.cobaltGlow,
   },
   detailRoutesContainer: {
     flexDirection: 'column',
