@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import {
   Animated,
   Easing,
@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Package } from '@blinkdotnew/mobile-ui';
+import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 
@@ -22,6 +24,7 @@ import { useDriverId } from '@/hooks/useDriverId';
 import { useAuth } from '@/hooks/useAuth';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { calcDriverEarnings } from '@/lib/config';
+import { isDeliveredToday } from '@/lib/driverQueue';
 import { colors } from '@/constants/design';
 import { SkeletonList, CustomLoading, CustomRefreshControl } from '@/components/core';
 
@@ -43,6 +46,64 @@ function getGreeting(name?: string) {
     hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const driverName = name ? name.split(' ')[0] : 'Driver';
   return `${timeGreeting}, ${driverName}`;
+}
+
+function getDeliveryDateLabel(order: any): string {
+  const rawDate =
+    order.deliveredAt ||
+    order.delivered_at ||
+    order.updatedAt ||
+    order.updated_at ||
+    order.createdAt ||
+    order.created_at;
+  if (!rawDate) return 'Past Deliveries';
+  const d = new Date(rawDate);
+  if (isNaN(d.getTime())) return 'Past Deliveries';
+
+  const today = new Date();
+  const isToday =
+    d.getDate() === today.getDate() &&
+    d.getMonth() === today.getMonth() &&
+    d.getFullYear() === today.getFullYear();
+
+  if (isToday) return 'Today';
+
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const isYesterday =
+    d.getDate() === yesterday.getDate() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getFullYear() === yesterday.getFullYear();
+
+  if (isYesterday) return 'Yesterday';
+
+  const isThisYear = d.getFullYear() === today.getFullYear();
+  if (isThisYear) {
+    return d.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function formatDeliveryTime(order: any): string {
+  const rawDate =
+    order.deliveredAt ||
+    order.delivered_at ||
+    order.updatedAt ||
+    order.updated_at ||
+    order.createdAt ||
+    order.created_at;
+  if (!rawDate) return '';
+  const d = new Date(rawDate);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 export default function MyOrdersScreen() {
@@ -82,7 +143,31 @@ export default function MyOrdersScreen() {
       .sort((a: any, b: any) => Number(a.distanceMiles ?? 0) - Number(b.distanceMiles ?? 0));
   }, [orders, driverId]);
 
-  const [selectedTab, setSelectedTab] = useState<'active' | 'completed'>('active');
+  const [selectedTab, setSelectedTab] = useState<'active' | 'delivered'>('active');
+  const [tabToggleWidth, setTabToggleWidth] = useState(0);
+  const tabSlideAnim = useRef(new Animated.Value(selectedTab === 'delivered' ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(tabSlideAnim, {
+      toValue: selectedTab === 'delivered' ? 1 : 0,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 50,
+    }).start();
+  }, [selectedTab, tabSlideAnim]);
+
+  const getOrderTimestamp = (o: any) => {
+    const raw =
+      o.deliveredAt ||
+      o.delivered_at ||
+      o.updatedAt ||
+      o.updated_at ||
+      o.createdAt ||
+      o.created_at;
+    if (!raw) return 0;
+    const t = new Date(raw).getTime();
+    return isNaN(t) ? 0 : t;
+  };
 
   const deliveredOrders = useMemo(() => {
     return (orders as any[])
@@ -91,22 +176,36 @@ export default function MyOrdersScreen() {
           o.status === 'delivered' &&
           (driverId ? o.driverUserId === driverId : true)
       )
-      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      .sort((a: any, b: any) => getOrderTimestamp(b) - getOrderTimestamp(a));
   }, [orders, driverId]);
 
-  const allDriverOrders = useMemo(() => {
-    return (orders as any[]).filter((o: any) => o.driverUserId === driverId || !o.driverUserId);
-  }, [orders, driverId]);
+  const todayDeliveredOrders = useMemo(() => {
+    return deliveredOrders.filter((o: any) => isDeliveredToday(o));
+  }, [deliveredOrders]);
 
-  // Compute Today's Stats from driver's completed and active deliveries
+  const deliveredGroupStats = useMemo(() => {
+    const statsMap: Record<string, { count: number; totalCents: number }> = {};
+    for (const order of deliveredOrders) {
+      const label = getDeliveryDateLabel(order);
+      const miles = Number(order.distanceMiles ?? 0);
+      const tip = Number(order.tipAmount ?? 0);
+      const earned = calcDriverEarnings(miles, tip);
+      if (!statsMap[label]) {
+        statsMap[label] = { count: 0, totalCents: 0 };
+      }
+      statsMap[label].count += 1;
+      statsMap[label].totalCents += earned.totalCents;
+    }
+    return statsMap;
+  }, [deliveredOrders]);
+
+  
   const todayStats = useMemo(() => {
-    const totalDeliveries = deliveredOrders.length;
     let totalCents = 0;
     let totalMiles = 0;
     let totalTipCents = 0;
 
-     const source = deliveredOrders.length > 0 ? deliveredOrders : allDriverOrders;
-    for (const o of source) {
+    for (const o of todayDeliveredOrders) {
       const miles = Number(o.distanceMiles) || 0;
       const tip = Number(o.tipAmount) || 0;
       const earned = calcDriverEarnings(miles, tip);
@@ -116,12 +215,12 @@ export default function MyOrdersScreen() {
     }
 
     return {
-      deliveries: totalDeliveries,
+      deliveries: todayDeliveredOrders.length,
       miles: totalMiles.toFixed(1),
       totalDisplay: (totalCents / 100).toFixed(2),
       tipsDisplay: (totalTipCents / 100).toFixed(2),
     };
-  }, [deliveredOrders, allDriverOrders]);
+  }, [todayDeliveredOrders]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -138,13 +237,13 @@ export default function MyOrdersScreen() {
       const minDelay = new Promise((resolve) => setTimeout(resolve, 550));
       await Promise.all([refetch(), minDelay]);
     } catch {
-      // Ignore network errors on refresh
+     
     } finally {
       setRefreshing(false);
     }
   }, [refetch, user?.role]);
 
-  // ─── 2. Header Layout Measurement ───
+ 
   const onHeaderLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const { height } = event.nativeEvent.layout;
@@ -155,12 +254,12 @@ export default function MyOrdersScreen() {
     [headerHeight]
   );
 
-  // ─── 3. Scroll Event Handler with Debounce ───
+ 
   const handleScroll = useCallback(
     (event: any) => {
       const currentScrollY = event.nativeEvent.contentOffset.y;
 
-      // Reset to visible at top of list
+     
       if (currentScrollY <= 0) {
         accumDelta.current = 0;
         if (!isHeaderVisible.current) {
@@ -194,7 +293,7 @@ export default function MyOrdersScreen() {
         return;
       }
 
-      // Hide header on scroll down
+     
       if (accumDelta.current > 35 && currentScrollY > 50 && isHeaderVisible.current) {
         isHeaderVisible.current = false;
         Animated.timing(headerTranslateY, {
@@ -204,7 +303,7 @@ export default function MyOrdersScreen() {
           useNativeDriver: true,
         }).start();
       }
-      // Show header on scroll up
+      
       else if (accumDelta.current < -60 && !isHeaderVisible.current) {
         isHeaderVisible.current = true;
         Animated.timing(headerTranslateY, {
@@ -225,50 +324,123 @@ export default function MyOrdersScreen() {
       <View>
         <View style={{ height: headerHeight + 4 }} />
 
-        <TodayEarningsCard stats={todayStats} />
+        <TodayEarningsCard
+          stats={todayStats}
+          onPress={() => {
+            haptic();
+            router.push('/(tabs)/earnings');
+          }}
+        />
 
         <View style={styles.sectionHeaderRow}>
-          <View style={styles.tabContainer}>
+          <View
+            style={styles.tabToggleContainer}
+            onLayout={(e) => setTabToggleWidth(e.nativeEvent.layout.width)}
+          >
+            {tabToggleWidth > 0 && (
+              <Animated.View
+                style={[
+                  styles.slidingTabPill,
+                  {
+                    width: (tabToggleWidth - 8) / 2,
+                    left: tabSlideAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [4, tabToggleWidth - 4 - (tabToggleWidth - 8) / 2],
+                    }),
+                    borderColor:
+                      selectedTab === 'active'
+                        ? 'rgba(255, 227, 153, 0.45)'
+                        : 'rgba(0, 226, 151, 0.45)',
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={
+                    selectedTab === 'active'
+                      ? ['rgba(255, 227, 153, 0.18)', 'rgba(255, 227, 153, 0.04)']
+                      : ['rgba(0, 226, 151, 0.20)', 'rgba(0, 226, 151, 0.04)']
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.slidingTabGradient}
+                />
+              </Animated.View>
+            )}
+
             <TouchableOpacity
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               onPress={() => {
                 haptic();
                 setSelectedTab('active');
               }}
-              style={[
-                styles.tabBtn,
-                selectedTab === 'active' && styles.tabBtnActive,
-              ]}
+              style={styles.tabBtn}
             >
+              <MaterialIcons
+                name="local-shipping"
+                size={16}
+                color={selectedTab === 'active' ? '#FFE399' : '#8C90A1'}
+              />
               <Text
                 style={[
                   styles.tabBtnText,
-                  selectedTab === 'active' && styles.tabBtnTextActive,
+                  selectedTab === 'active' && styles.tabBtnTextActiveGold,
                 ]}
               >
-                Active ({activeOrders.length})
+                Active
               </Text>
+              <View
+                style={[
+                  styles.tabBadge,
+                  selectedTab === 'active' && styles.tabBadgeActiveGold,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabBadgeText,
+                    selectedTab === 'active' && styles.tabBadgeTextActiveGold,
+                  ]}
+                >
+                  {activeOrders.length}
+                </Text>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               onPress={() => {
                 haptic();
-                setSelectedTab('completed');
+                setSelectedTab('delivered');
               }}
-              style={[
-                styles.tabBtn,
-                selectedTab === 'completed' && styles.tabBtnActive,
-              ]}
+              style={styles.tabBtn}
             >
+              <MaterialIcons
+                name="check-circle"
+                size={16}
+                color={selectedTab === 'delivered' ? '#00E297' : '#8C90A1'}
+              />
               <Text
                 style={[
                   styles.tabBtnText,
-                  selectedTab === 'completed' && styles.tabBtnTextActive,
+                  selectedTab === 'delivered' && styles.tabBtnTextActiveGreen,
                 ]}
               >
-                Completed ({deliveredOrders.length})
+                Delivered
               </Text>
+              <View
+                style={[
+                  styles.tabBadge,
+                  selectedTab === 'delivered' && styles.tabBadgeActiveGreen,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabBadgeText,
+                    selectedTab === 'delivered' && styles.tabBadgeTextActiveGreen,
+                  ]}
+                >
+                  {deliveredOrders.length}
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -276,21 +448,21 @@ export default function MyOrdersScreen() {
         {isLoading && <SkeletonList count={2} />}
       </View>
     ),
-    [headerHeight, todayStats, selectedTab, activeOrders.length, deliveredOrders.length, isLoading]
+    [headerHeight, todayStats, selectedTab, activeOrders.length, deliveredOrders.length, isLoading, tabToggleWidth, tabSlideAnim]
   );
 
   const EmptyView = !isLoading ? (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconWrapper}>
-        <Package size={52} color={selectedTab === 'completed' ? '#00E297' : '#FFE399'} />
+        <Package size={52} color={selectedTab === 'delivered' ? '#00E297' : '#FFE399'} />
       </View>
       <Text style={styles.emptyTitle}>
-        {selectedTab === 'active' ? 'No Active Orders' : 'No Completed Deliveries'}
+        {selectedTab === 'active' ? 'No Active Orders' : 'No Delivered Orders'}
       </Text>
       <Text style={styles.emptySubtitle}>
         {selectedTab === 'active'
           ? 'Claim available orders from the Orders tab to begin deliveries.'
-          : 'Completed and delivered orders will appear here.'}
+          : 'Delivered orders will appear here.'}
       </Text>
       {selectedTab === 'active' ? (
         <TouchableOpacity
@@ -332,50 +504,72 @@ export default function MyOrdersScreen() {
       <FlatList
         data={displayList}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
-          if (selectedTab === 'completed') {
+        renderItem={({ item, index }) => {
+          if (selectedTab === 'delivered') {
+            const dateLabel = getDeliveryDateLabel(item);
+            const prevItem = index > 0 ? (displayList as any[])[index - 1] : null;
+            const isFirstOfGroup = !prevItem || getDeliveryDateLabel(prevItem) !== dateLabel;
+            const groupStats = deliveredGroupStats[dateLabel];
+
             const miles = Number(item.distanceMiles ?? 0);
             const earnings = calcDriverEarnings(miles, Number(item.tipAmount ?? 0));
             const shortId = item.id ? item.id.slice(-6).toUpperCase() : '------';
             const customerName = item.customerName || (item as any).customer_name || 'Customer';
             const address = item.deliveryAddress || (item as any).delivery_address || 'Delivery Destination';
+            const deliveredTime = formatDeliveryTime(item);
 
             return (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => {
-                  haptic();
-                  setSelectedOrder(item);
-                  router.push(`/order/${item.id}`);
-                }}
-                style={styles.minimalCard}
-              >
-                <View style={styles.minimalCardLeft}>
-                  <View style={styles.minimalAvatar}>
-                    <Text style={styles.minimalAvatarText}>
-                      {customerName.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.minimalCustomerName} numberOfLines={1}>
-                        {customerName}
-                      </Text>
-                      <Text style={styles.minimalRefText}>#{shortId}</Text>
+              <View>
+                {isFirstOfGroup && (
+                  <View style={styles.dateGroupHeader}>
+                    <View style={styles.dateGroupBadge}>
+                      <MaterialIcons name="event" size={14} color="#FFE399" />
+                      <Text style={styles.dateGroupText}>{dateLabel}</Text>
                     </View>
-                    <Text style={styles.minimalAddress} numberOfLines={1}>
-                      {address}
-                    </Text>
+                    {groupStats && (
+                      <Text style={styles.dateGroupStatsText}>
+                        {groupStats.count} {groupStats.count === 1 ? 'order' : 'orders'} • ${(groupStats.totalCents / 100).toFixed(2)}
+                      </Text>
+                    )}
                   </View>
-                </View>
+                )}
 
-                <View style={styles.minimalCardRight}>
-                  <Text style={styles.minimalEarnings}>{earnings.totalDisplay}</Text>
-                  <View style={styles.deliveredPill}>
-                    <Text style={styles.deliveredPillText}>DELIVERED</Text>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    haptic();
+                    setSelectedOrder(item);
+                    router.push(`/order/${item.id}`);
+                  }}
+                  style={styles.minimalCard}
+                >
+                  <View style={styles.minimalCardLeft}>
+                    <View style={styles.minimalAvatar}>
+                      <Text style={styles.minimalAvatarText}>
+                        {customerName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.minimalCustomerName} numberOfLines={1}>
+                          {customerName}
+                        </Text>
+                        <Text style={styles.minimalRefText}>#{shortId}</Text>
+                      </View>
+                      <Text style={styles.minimalAddress} numberOfLines={1}>
+                        {address}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
+
+                  <View style={styles.minimalCardRight}>
+                    {!!deliveredTime && (
+                      <Text style={styles.deliveredTimeText}>{deliveredTime}</Text>
+                    )}
+                    <Text style={styles.minimalEarnings}>${earnings.totalDisplay}</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
             );
           }
 
@@ -429,33 +623,72 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 16,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 14,
-    padding: 4,
+  tabToggleContainer: {
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+    padding: 4,
+  },
+  slidingTabPill: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  slidingTabGradient: {
+    flex: 1,
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: 8,
+    height: '100%',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
-  },
-  tabBtnActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    gap: 7,
+    zIndex: 2,
   },
   tabBtnText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#8C90A1',
   },
-  tabBtnTextActive: {
-    color: '#DFE2EF',
+  tabBtnTextActiveGold: {
+    color: '#FFE399',
     fontWeight: '700',
+  },
+  tabBtnTextActiveGreen: {
+    color: '#00E297',
+    fontWeight: '700',
+  },
+  tabBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  tabBadgeActiveGold: {
+    backgroundColor: 'rgba(255, 227, 153, 0.15)',
+  },
+  tabBadgeActiveGreen: {
+    backgroundColor: 'rgba(0, 226, 151, 0.15)',
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8C90A1',
+  },
+  tabBadgeTextActiveGold: {
+    color: '#FFE399',
+  },
+  tabBadgeTextActiveGreen: {
+    color: '#00E297',
   },
   minimalCard: {
     marginHorizontal: 20,
@@ -508,26 +741,43 @@ const styles = StyleSheet.create({
   },
   minimalCardRight: {
     alignItems: 'flex-end',
-    gap: 4,
+    justifyContent: 'center',
+    gap: 3,
+  },
+  deliveredTimeText: {
+    fontSize: 11,
+    color: '#8C90A1',
+    fontWeight: '600',
   },
   minimalEarnings: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     color: '#DFE2EF',
+    letterSpacing: -0.3,
   },
-  deliveredPill: {
-    backgroundColor: 'rgba(0, 226, 151, 0.12)',
-    borderColor: 'rgba(0, 226, 151, 0.3)',
-    borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+  dateGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 22,
+    marginTop: 10,
+    marginBottom: 10,
   },
-  deliveredPillText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#00E297',
-    letterSpacing: 0.5,
+  dateGroupBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dateGroupText: {
+    color: '#DFE2EF',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  dateGroupStatsText: {
+    color: '#8C90A1',
+    fontSize: 12,
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',

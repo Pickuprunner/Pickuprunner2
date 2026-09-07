@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { CustomCard } from '@/components/core';
 
 export interface TodayStats {
@@ -12,12 +13,26 @@ export interface TodayStats {
 interface Props {
   stats: TodayStats;
   containerStyle?: StyleProp<ViewStyle>;
+  onPress?: () => void;
 }
 
-export function TodayEarningsCard({ stats, containerStyle }: Props) {
+export function TodayEarningsCard({ stats, containerStyle, onPress }: Props) {
   return (
-    <CustomCard variant="glass" style={[styles.card, containerStyle]}>
-      <Text style={styles.title}>Today's Earnings</Text>
+    <CustomCard
+      variant="glass"
+      style={[styles.card, containerStyle]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Today's Earnings</Text>
+        {onPress && (
+          <View style={styles.actionPill}>
+            <Text style={styles.actionText}>Total Earnings</Text>
+            <MaterialIcons name="chevron-right" size={14} color="#FFE399" />
+          </View>
+        )}
+      </View>
 
       <Text style={styles.amount}>${stats.totalDisplay}</Text>
 
@@ -51,12 +66,33 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   title: {
     color: '#8C90A1',
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
+  },
+  actionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: 'rgba(255, 227, 153, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 227, 153, 0.2)',
+  },
+  actionText: {
+    color: '#FFE399',
+    fontSize: 11,
+    fontWeight: '600',
   },
   amount: {
     color: '#FFE399',
@@ -90,3 +126,4 @@ const styles = StyleSheet.create({
     color: '#00E297',
   },
 });
+

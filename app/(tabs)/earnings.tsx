@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { blink } from '@/lib/blink';
 import { useOrders } from '@/lib/orders';
@@ -211,6 +213,12 @@ export default function EarningsScreen() {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <CustomHeader
         title="Earnings"
+        showBack
+        onBack={() => {
+          router.replace('/(tabs)/my-orders');
+        }}
+        backBtnStyle={styles.circleBackBtn}
+        backIcon={<MaterialIcons name="chevron-left" size={24} color="#DFE2EF" style={{ marginRight: 1 }} />}
         showAvatar={false}
         pills={
           <View style={styles.headerSubRow}>
@@ -294,5 +302,15 @@ const styles = StyleSheet.create({
     color: GREEN,
     fontSize: 11.5,
     fontWeight: '700',
+  },
+  circleBackBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
 });
