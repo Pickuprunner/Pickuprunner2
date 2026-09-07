@@ -56,9 +56,11 @@ export async function createCheckoutForOrder(
   }
 }
 
+WebBrowser.maybeCompleteAuthSession();
+
 export const STRIPE_PAYMENT_REDIRECT_URL = 'pickuprunner://payment/success';
 
-export async function openCheckoutUrl(url: string): Promise<boolean> {
+export async function openCheckoutUrl(url: string, orderId?: string): Promise<boolean> {
   if (!url) return false;
   const targetUrl = resolveApiUrl(url);
 
@@ -69,19 +71,57 @@ export async function openCheckoutUrl(url: string): Promise<boolean> {
     return true;
   }
 
-  try {
-    const result = await WebBrowser.openAuthSessionAsync(targetUrl, STRIPE_PAYMENT_REDIRECT_URL);
-    if (result.type === 'success') {
-      return true;
-    }
-  } catch (err) {
-    console.warn('[checkoutApi] openAuthSessionAsync failed, falling back to Linking:', err);
-  }
+  return new Promise<boolean>(async (resolve) => {
+    let resolved = false;
 
-  try {
-    await Linking.openURL(targetUrl);
-    return true;
-  } catch {
-    return false;
-  }
+    const cleanupAndResolve = (success: boolean) => {
+      if (resolved) return;
+      resolved = true;
+      try {
+        linkSubscription.remove();
+      } catch {}
+      try {
+        WebBrowser.dismissAuthSession();
+      } catch {}
+      resolve(success);
+    };
+
+    const linkSubscription = Linking.addEventListener('url', (event) => {
+      const incomingUrl = event?.url || '';
+      if (incomingUrl.includes('payment/success')) {
+        cleanupAndResolve(true);
+      } else if (incomingUrl.includes('payment/cancelled')) {
+        cleanupAndResolve(false);
+      }
+    });
+
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(targetUrl, STRIPE_PAYMENT_REDIRECT_URL, {
+        showInRecents: true,
+      });
+      if (!resolved) {
+        if (result.type === 'success') {
+          const returnUrl = (result as any)?.url || '';
+          cleanupAndResolve(!returnUrl.includes('payment/cancelled'));
+        } else {
+          // Fallback for Android Chrome Custom Tabs when dismissed or closed
+          if (orderId) {
+            try {
+              const res = await apiClient.get<any>(`/orders/${orderId}`);
+              const order = res?.data || res;
+              if (order?.paymentStatus === 'paid' || order?.payment_status === 'paid') {
+                return cleanupAndResolve(true);
+              }
+            } catch {}
+          }
+          cleanupAndResolve(false);
+        }
+      }
+    } catch (err) {
+      console.warn('[checkoutApi] openAuthSessionAsync failed:', err);
+      if (!resolved) {
+        cleanupAndResolve(false);
+      }
+    }
+  });
 }

@@ -74,6 +74,22 @@ export default function RootLayout() {
                   <Stack.Screen name="order/[id]" />
                   <Stack.Screen name="connect/onboarding/success" />
                   <Stack.Screen name="connect/onboarding/reauth" />
+                  <Stack.Screen
+                    name="payment/success"
+                    options={{
+                      presentation: 'transparentModal',
+                      animation: 'fade',
+                      contentStyle: { backgroundColor: 'transparent' },
+                    }}
+                  />
+                  <Stack.Screen
+                    name="payment/cancelled"
+                    options={{
+                      presentation: 'transparentModal',
+                      animation: 'fade',
+                      contentStyle: { backgroundColor: 'transparent' },
+                    }}
+                  />
                   <Stack.Screen name="delete-account" />
                   <Stack.Screen name="+not-found" />
                 </Stack>

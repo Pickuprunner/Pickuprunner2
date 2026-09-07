@@ -173,7 +173,7 @@ export function CustomerOrderCard({
         testMode: true,
       });
       if (res?.url) {
-        const paidSuccess = await openCheckoutUrl(res.url);
+        const paidSuccess = await openCheckoutUrl(res.url, order.id);
         if (paidSuccess) {
           setShowPaymentSuccessModal(true);
           useOrderStore.getState().updateOrder(order.id, {

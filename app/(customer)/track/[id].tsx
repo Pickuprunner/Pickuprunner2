@@ -539,7 +539,7 @@ export default function TrackOrderScreen() {
         testMode: true,
       });
       if (res?.url) {
-        const paidSuccess = await openCheckoutUrl(res.url);
+        const paidSuccess = await openCheckoutUrl(res.url, id);
         if (paidSuccess) {
           setShowPaymentSuccessModal(true);
           setOrder((prev) =>
