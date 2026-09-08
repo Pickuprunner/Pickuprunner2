@@ -7,7 +7,7 @@ import { deviceApi, DeviceTokenPayload } from '@/apis/device';
 const STORED_DEVICE_TOKEN_KEY = '@pickup_runner_registered_device_token';
 
 let activeSyncPromise: Promise<string | null> | null = null;
-let inMemorySyncedToken: string | null = null;
+let inMemorySyncedUserToken: { userId: string; token: string } | null = null;
 
 function getNotifications(): typeof import('expo-notifications') | null {
   if (Platform.OS === 'web') return null;
@@ -222,15 +222,28 @@ export async function registerAndSyncDeviceToken(userId?: string): Promise<strin
         return null;
       }
 
-      if (inMemorySyncedToken === token) {
+
+      if (
+        Platform.OS === 'android' &&
+        (token.startsWith('ExpoPushToken[') || token.startsWith('emulator_') || token.startsWith('web_'))
+      ) {
+        console.log('[notifications] Synthetic token detected on Android; skipping backend registration.');
         return token;
       }
 
-      const storageKey = `${STORED_DEVICE_TOKEN_KEY}_${userId || 'guest'}`;
+      const currentUserId = userId || 'guest';
+      if (
+        inMemorySyncedUserToken?.userId === currentUserId &&
+        inMemorySyncedUserToken?.token === token
+      ) {
+        return token;
+      }
+
+      const storageKey = `${STORED_DEVICE_TOKEN_KEY}_${currentUserId}`;
       const cachedToken = await AsyncStorage.getItem(storageKey);
 
       if (cachedToken === token) {
-        inMemorySyncedToken = token;
+        inMemorySyncedUserToken = { userId: currentUserId, token };
         return token;
       }
 
@@ -245,11 +258,10 @@ export async function registerAndSyncDeviceToken(userId?: string): Promise<strin
         model: Device.modelName || undefined,
       };
 
-      await AsyncStorage.setItem(storageKey, token);
-      inMemorySyncedToken = token;
-
       console.log('[notifications] Registering device token with backend:', payload);
       await deviceApi.registerDeviceToken(payload);
+      await AsyncStorage.setItem(storageKey, token);
+      inMemorySyncedUserToken = { userId: currentUserId, token };
       console.log('[notifications] Device token successfully registered & synced.');
 
       return token;
@@ -266,13 +278,15 @@ export async function registerAndSyncDeviceToken(userId?: string): Promise<strin
 
 export async function unregisterDeviceToken(userId?: string): Promise<void> {
   try {
-    const storageKey = `${STORED_DEVICE_TOKEN_KEY}_${userId || 'guest'}`;
-    const token = (await AsyncStorage.getItem(storageKey)) || inMemorySyncedToken;
+    const currentUserId = userId || 'guest';
+    const storageKey = `${STORED_DEVICE_TOKEN_KEY}_${currentUserId}`;
+    const token =
+      (await AsyncStorage.getItem(storageKey)) || inMemorySyncedUserToken?.token;
     if (token) {
       await deviceApi.removeDeviceToken(token).catch(() => {});
       await AsyncStorage.removeItem(storageKey).catch(() => {});
     }
-    inMemorySyncedToken = null;
+    inMemorySyncedUserToken = null;
   } catch (err) {
     console.warn('[notifications] Error unregistering device token:', err);
   }
