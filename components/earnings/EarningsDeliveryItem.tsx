@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 const GREEN = '#00E297';
 const CARD_BG = '#131722';
@@ -13,6 +14,7 @@ export interface EarningsDeliveryItemProps {
   tipAmount?: number;
   driverEarnedCents: number;
   dateStr: string;
+  onPress?: () => void;
 }
 
 export function EarningsDeliveryItem({
@@ -21,13 +23,26 @@ export function EarningsDeliveryItem({
   tipAmount = 0,
   driverEarnedCents,
   dateStr,
+  onPress,
 }: EarningsDeliveryItemProps) {
   const shortId = id ? id.slice(-4).toUpperCase() : '----';
   const miles = Number(distanceMiles) || 0;
   const tip = Number(tipAmount) || 0;
 
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    } else if (id) {
+      router.push(`/order/${id}`);
+    }
+  };
+
   return (
-    <View style={styles.deliveryCard}>
+    <TouchableOpacity
+      activeOpacity={0.82}
+      onPress={handlePress}
+      style={styles.deliveryCard}
+    >
       <LinearGradient
         colors={['#191E2A', '#131622']}
         start={{ x: 0, y: 0 }}
@@ -55,8 +70,7 @@ export function EarningsDeliveryItem({
             </Text>
             {tip > 0 ? (
               <View style={styles.tipRow}>
-                <Text style={styles.tipText}>+${(tip / 100).toFixed(2)} tip</Text>
-                <MaterialIcons name="arrow-upward" size={11} color="#00E297" />
+                <Text style={styles.tipText}>Incl. ${(tip / 100).toFixed(2)} tip</Text>
               </View>
             ) : (
               <Text style={styles.deliveryStatus}>Delivered ✓</Text>
@@ -65,7 +79,7 @@ export function EarningsDeliveryItem({
           <MaterialIcons name="chevron-right" size={18} color="rgba(255, 255, 255, 0.25)" />
         </View>
       </LinearGradient>
-    </View>
+    </TouchableOpacity>
   );
 }
 
