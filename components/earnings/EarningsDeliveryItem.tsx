@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Package } from '@blinkdotnew/mobile-ui';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const GREEN = '#00E297';
-const CARD_BG = '#151924';
-const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
+const CARD_BG = '#131722';
+const CARD_BORDER = 'rgba(255, 255, 255, 0.07)';
 
 export interface EarningsDeliveryItemProps {
   id: string;
@@ -29,32 +29,40 @@ export function EarningsDeliveryItem({
   return (
     <View style={styles.deliveryCard}>
       <LinearGradient
-        colors={['#1B2030', '#151924', '#0F121C']}
+        colors={['#191E2A', '#131622']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
+        end={{ x: 1, y: 1 }}
         style={styles.deliveryCardGradient}
       >
         <View style={styles.deliveryLeft}>
           <View style={styles.deliveryIconWrap}>
-            <Package size={20} color="#D1D5DB" />
+            <MaterialIcons name="inventory-2" size={20} color="#DFE2EF" />
           </View>
           <View style={styles.deliveryMeta}>
             <Text style={styles.deliveryId} numberOfLines={1} ellipsizeMode="tail">
               Order #{shortId}
             </Text>
             <Text style={styles.deliverySub} numberOfLines={1} ellipsizeMode="tail">
-              {dateStr} • {miles > 0 ? `${miles.toFixed(1)} mi` : 'Local'}
+              {dateStr}
             </Text>
           </View>
         </View>
 
         <View style={styles.deliveryRight}>
-          <Text style={styles.deliveryAmount} numberOfLines={1}>
-            ${(driverEarnedCents / 100).toFixed(2)}
-          </Text>
-          <Text style={styles.deliveryTip} numberOfLines={1}>
-            {tip > 0 ? `Incl. $${(tip / 100).toFixed(0)} tip` : 'Delivered ✓'}
-          </Text>
+          <View style={styles.amountCol}>
+            <Text style={styles.deliveryAmount} numberOfLines={1}>
+              ${(driverEarnedCents / 100).toFixed(2)}
+            </Text>
+            {tip > 0 ? (
+              <View style={styles.tipRow}>
+                <Text style={styles.tipText}>+${(tip / 100).toFixed(2)} tip</Text>
+                <MaterialIcons name="arrow-upward" size={11} color="#00E297" />
+              </View>
+            ) : (
+              <Text style={styles.deliveryStatus}>Delivered ✓</Text>
+            )}
+          </View>
+          <MaterialIcons name="chevron-right" size={18} color="rgba(255, 255, 255, 0.25)" />
         </View>
       </LinearGradient>
     </View>
@@ -64,10 +72,15 @@ export function EarningsDeliveryItem({
 const styles = StyleSheet.create({
   deliveryCard: {
     backgroundColor: CARD_BG,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: CARD_BORDER,
     overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 2,
   },
   deliveryCardGradient: {
     paddingHorizontal: 16,
@@ -79,14 +92,16 @@ const styles = StyleSheet.create({
   deliveryLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
     flex: 1,
   },
   deliveryIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 102, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(179, 197, 255, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -95,29 +110,44 @@ const styles = StyleSheet.create({
   },
   deliveryId: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
     letterSpacing: -0.2,
   },
   deliverySub: {
     color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '500',
     marginTop: 2,
   },
   deliveryRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  amountCol: {
     alignItems: 'flex-end',
+    gap: 2,
   },
   deliveryAmount: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 17,
+    fontWeight: '800',
     letterSpacing: -0.3,
   },
-  deliveryTip: {
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  tipText: {
     color: GREEN,
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
-    marginTop: 2,
+  },
+  deliveryStatus: {
+    color: 'rgba(255, 255, 255, 0.45)',
+    fontSize: 11.5,
+    fontWeight: '500',
   },
 });

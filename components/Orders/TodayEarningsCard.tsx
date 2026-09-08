@@ -81,13 +81,13 @@ const styles = StyleSheet.create({
   actionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 4,
     backgroundColor: 'rgba(255, 227, 153, 0.08)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 227, 153, 0.2)',
+    borderColor: 'rgba(255, 227, 153, 0.25)',
   },
   actionText: {
     color: '#FFE399',

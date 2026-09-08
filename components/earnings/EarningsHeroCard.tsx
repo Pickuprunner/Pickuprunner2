@@ -1,65 +1,44 @@
 import React from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import { FontAwesome5 } from '@expo/vector-icons';
 
-const BLUE = '#0066FF';
 const GOLD = '#F5C400';
-const CARD_BG = '#151924';
+const GOLD_LIGHT = '#FFE399';
+const CARD_BG = '#131722';
 const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
-
-function BanknoteIcon({ size = 18, color = '#FFFFFF' }: { size?: number; color?: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <Rect x="2" y="6" width="20" height="12" rx="2" />
-      <Circle cx="12" cy="12" r="2" />
-      <Path d="M6 12h.01M18 12h.01" />
-    </Svg>
-  );
-}
 
 export interface EarningsHeroCardProps {
   availableCents: number;
-  payingOut: boolean;
-  onInstantPayout: () => void;
+  payingOut?: boolean;
+  onInstantPayout?: () => void;
 }
 
 export function EarningsHeroCard({
   availableCents,
-  payingOut,
-  onInstantPayout,
 }: EarningsHeroCardProps) {
   const formattedBalance = (availableCents / 100).toFixed(2);
 
   return (
     <View style={styles.balanceCard}>
       <LinearGradient
-        colors={['#1B2030', '#151924', '#0F121C']}
+        colors={['#181D2B', '#121520', '#0D0F17']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
+        end={{ x: 1, y: 1 }}
         style={styles.balanceCardGradient}
       >
-        <Text style={styles.balanceLabel}>AVAILABLE BALANCE</Text>
-        <Text style={styles.balanceAmount}>${formattedBalance}</Text>
+        <View style={styles.heroRow}>
+          <View style={styles.coinBadge}>
+            <View style={styles.coinInnerCircle}>
+              <FontAwesome5 name="coins" size={28} color={GOLD} />
+            </View>
+          </View>
 
-        <Pressable
-          onPress={onInstantPayout}
-          disabled={payingOut}
-          style={({ pressed }) => [
-            styles.payoutButton,
-            pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
-            availableCents < 100 && { opacity: 0.65 },
-          ]}
-        >
-          {payingOut ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <>
-              <BanknoteIcon size={18} color="white" />
-              <Text style={styles.payoutButtonText}>Instant Payout</Text>
-            </>
-          )}
-        </Pressable>
+          <View style={styles.balanceMeta}>
+            <Text style={styles.balanceLabel}>YOUR PAYOUTS</Text>
+            <Text style={styles.balanceAmount}>${formattedBalance}</Text>
+          </View>
+        </View>
       </LinearGradient>
     </View>
   );
@@ -68,55 +47,60 @@ export function EarningsHeroCard({
 const styles = StyleSheet.create({
   balanceCard: {
     backgroundColor: CARD_BG,
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: CARD_BORDER,
     overflow: 'hidden',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
     elevation: 5,
   },
   balanceCardGradient: {
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-    alignItems: 'center',
+    paddingVertical: 22,
+    paddingHorizontal: 22,
     width: '100%',
   },
-  balanceLabel: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    letterSpacing: 1.4,
-    color: 'rgba(255, 255, 255, 0.55)',
-    marginBottom: 8,
-  },
-  balanceAmount: {
-    fontSize: 42,
-    fontWeight: '900',
-    color: GOLD,
-    letterSpacing: -1,
-    marginBottom: 20,
-  },
-  payoutButton: {
-    backgroundColor: BLUE,
-    borderRadius: 9999,
-    height: 50,
-    paddingHorizontal: 24,
-    width: '100%',
+  heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: BLUE,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
+    gap: 18,
   },
-  payoutButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15.5,
-    fontWeight: '800',
+  coinBadge: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 196, 0, 0.35)',
+    backgroundColor: 'rgba(245, 196, 0, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coinInnerCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(245, 196, 0, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  balanceMeta: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  balanceLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  balanceAmount: {
+    fontSize: 38,
+    fontWeight: '900',
+    color: GOLD,
+    letterSpacing: -0.8,
   },
 });

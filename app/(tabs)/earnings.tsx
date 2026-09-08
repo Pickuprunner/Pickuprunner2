@@ -222,7 +222,10 @@ export default function EarningsScreen() {
         showAvatar={false}
         pills={
           <View style={styles.headerSubRow}>
-            <Text style={styles.weekText}>This Week: {weekRange}</Text>
+            <View style={styles.weekWrap}>
+              <MaterialIcons name="date-range" size={14} color="rgba(255, 255, 255, 0.55)" />
+              <Text style={styles.weekText}>This Week: {weekRange}</Text>
+            </View>
             <View style={styles.verifiedPill}>
               <View style={styles.verifiedDot} />
               <Text style={styles.verifiedPillText}>Account Verified</Text>
@@ -276,21 +279,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
   },
+  weekWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   weekText: {
     color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '600',
   },
   verifiedPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    backgroundColor: 'rgba(0, 226, 151, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(0, 226, 151, 0.3)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
+    borderColor: 'rgba(0, 226, 151, 0.25)',
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 14,
   },
   verifiedDot: {
     width: 6,
@@ -300,7 +308,7 @@ const styles = StyleSheet.create({
   },
   verifiedPillText: {
     color: GREEN,
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
   },
   circleBackBtn: {
