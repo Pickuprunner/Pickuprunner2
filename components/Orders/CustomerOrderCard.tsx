@@ -88,6 +88,8 @@ export interface CustomerOrderData {
   paymentStatus?: string;
   distance_miles?: number;
   distanceMiles?: number;
+  amount_cents?: number;
+  amountCents?: number;
   driver_name?: string;
   driverName?: string;
   driver_photo_url?: string;
@@ -410,8 +412,12 @@ export function CustomerOrderCard({
                   pickupAddress: order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS,
                   customerName: customerName,
                   customerPhone: customerPhone,
+                  customerEmail: order.customerEmail || order.customer_email || '',
                   items: order.items || '',
                   status: currentStatus,
+                  distanceMiles: (order.distanceMiles ?? order.distance_miles ?? '').toString(),
+                  tipAmount: (order.tipAmount ?? order.tip_amount ?? '').toString(),
+                  amountCents: (order.amountCents ?? order.amount_cents ?? '').toString(),
                 },
               } as any);
             }}
@@ -434,8 +440,12 @@ export function CustomerOrderCard({
                   pickupAddress: order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS,
                   customerName: customerName,
                   customerPhone: customerPhone,
+                  customerEmail: order.customerEmail || order.customer_email || '',
                   items: order.items || '',
                   status: currentStatus,
+                  distanceMiles: (order.distanceMiles ?? order.distance_miles ?? '').toString(),
+                  tipAmount: (order.tipAmount ?? order.tip_amount ?? '').toString(),
+                  amountCents: (order.amountCents ?? order.amount_cents ?? '').toString(),
                 },
               } as any);
             }}
@@ -495,8 +505,12 @@ export function CustomerOrderCard({
         pickupAddress: order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS,
         customerName: customerName,
         customerPhone: customerPhone,
+        customerEmail: order.customerEmail || order.customer_email || '',
         items: order.items || '',
         status: currentStatus,
+        distanceMiles: (order.distanceMiles ?? order.distance_miles ?? '').toString(),
+        tipAmount: (order.tipAmount ?? order.tip_amount ?? '').toString(),
+        amountCents: (order.amountCents ?? order.amount_cents ?? '').toString(),
       },
     } as any);
   };

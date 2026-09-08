@@ -85,6 +85,8 @@ export interface Order {
   delivery_photo_url?: string;
   created_at?: string;
   updated_at?: string;
+  amountCents?: number;
+  amount_cents?: number;
 }
 
 export interface CreateOrderInput {
@@ -107,6 +109,8 @@ export interface CreateOrderInput {
   items: string;
   status?: OrderStatus;
   tipAmount?: number;
+  amountCents?: number;
+  amount_cents?: number;
   distanceMiles?: number;
   cityId?: string;
   storeId?: string;
@@ -238,6 +242,8 @@ export const useOrderStore = create<OrderStoreState>()(
             driverUserId: incoming.driverUserId || incoming.driver_user_id || existing?.driverUserId,
             driverName: incoming.driverName || incoming.driver_name || existing?.driverName,
             deliveryNotification: incoming.deliveryNotification || existing?.deliveryNotification,
+            amountCents: incoming.amountCents ?? incoming.amount_cents ?? existing?.amountCents,
+            amount_cents: incoming.amount_cents ?? incoming.amountCents ?? existing?.amount_cents,
           };
 
           finalOrder = normalized;
@@ -302,6 +308,8 @@ export const useOrderStore = create<OrderStoreState>()(
           orderScope: orderData.orderScope || ORDER_SCOPE,
           paymentStatus: 'paid',
           tipAmount: orderData.tipAmount ?? 1000,
+          amountCents: orderData.amountCents ?? orderData.amount_cents,
+          amount_cents: orderData.amount_cents ?? orderData.amountCents,
           distanceMiles: orderData.distanceMiles ?? 3.5,
           customerName: orderData.customerName,
           customerPhone: orderData.customerPhone || '(555) 000-0000',

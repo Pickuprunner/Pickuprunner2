@@ -143,6 +143,8 @@ export interface OrderItem {
   delivery_photo_url?: string;
   created_at?: string;
   updated_at?: string;
+  amountCents?: number;
+  amount_cents?: number;
 }
 
 export type OrderResponse = OrderItem | { success?: boolean; data: OrderItem };
@@ -165,6 +167,8 @@ function unwrapOrder(res: any): OrderItem {
     deliveryLng: raw.deliveryLng != null ? Number(raw.deliveryLng) : raw.delivery_lng != null ? Number(raw.delivery_lng) : undefined,
     pickupDistanceMiles: raw.pickupDistanceMiles ?? raw.pickup_distance_miles,
     earningsCents: raw.earningsCents ?? raw.earnings_cents,
+    amountCents: raw.amountCents ?? raw.amount_cents,
+    amount_cents: raw.amount_cents ?? raw.amountCents,
     items: raw.items || '',
     status: raw.status || 'pending',
     createdAt: raw.createdAt || raw.created_at || new Date().toISOString(),

@@ -52,6 +52,8 @@ interface TrackedOrder {
   customerName?: string;
   customer_phone?: string;
   customerPhone?: string;
+  customer_email?: string;
+  customerEmail?: string;
   pickup_address?: string;
   pickupAddress?: string;
   delivery_address?: string;
@@ -83,8 +85,12 @@ export default function TrackOrderScreen() {
     pickupAddress?: string;
     customerName?: string;
     customerPhone?: string;
+    customerEmail?: string;
     items?: string;
     status?: string;
+    distanceMiles?: string;
+    tipAmount?: string;
+    amountCents?: string;
   }>();
   const id = params.id;
   const storeOrder = useOrderStore((state) => state.orders.find((o) => o.id === id));
@@ -96,6 +102,8 @@ export default function TrackOrderScreen() {
         status: (storeOrder.status as any) || (params.status as any) || 'pending',
         customerName: storeOrder.customerName || params.customerName || 'Customer',
         customerPhone: storeOrder.customerPhone || params.customerPhone,
+        customerEmail: storeOrder.customerEmail || (storeOrder as any).customer_email || params.customerEmail,
+        customer_email: (storeOrder as any).customer_email || storeOrder.customerEmail || params.customerEmail,
         pickupAddress: storeOrder.pickupAddress || params.pickupAddress || APP_CONFIG.STORE_ADDRESS,
         pickup_address: storeOrder.pickupAddress || params.pickupAddress || APP_CONFIG.STORE_ADDRESS,
         deliveryAddress: storeOrder.deliveryAddress || params.deliveryAddress || '123 E Test Ave, Sahuarita, AZ 85629',
@@ -104,6 +112,12 @@ export default function TrackOrderScreen() {
         driverName: storeOrder.driverName,
         driver_name: storeOrder.driverName,
         deliveryPhotoUrl: storeOrder.deliveryPhotoUrl,
+        distanceMiles: storeOrder.distanceMiles ?? (storeOrder as any).distance_miles ?? (params.distanceMiles ? Number(params.distanceMiles) : undefined),
+        distance_miles: storeOrder.distanceMiles ?? (storeOrder as any).distance_miles ?? (params.distanceMiles ? Number(params.distanceMiles) : undefined),
+        tipAmount: storeOrder.tipAmount ?? (storeOrder as any).tip_amount ?? (params.tipAmount ? Number(params.tipAmount) : undefined),
+        tip_amount: storeOrder.tipAmount ?? (storeOrder as any).tip_amount ?? (params.tipAmount ? Number(params.tipAmount) : undefined),
+        amountCents: storeOrder.amountCents ?? (storeOrder as any).amount_cents ?? (params.amountCents ? Number(params.amountCents) : undefined),
+        amount_cents: storeOrder.amountCents ?? (storeOrder as any).amount_cents ?? (params.amountCents ? Number(params.amountCents) : undefined),
       };
     }
     if (params.id && (params.deliveryAddress || params.pickupAddress || params.status)) {
@@ -115,10 +129,18 @@ export default function TrackOrderScreen() {
         pickup_address: params.pickupAddress || APP_CONFIG.STORE_ADDRESS,
         customerName: params.customerName || 'Customer',
         customerPhone: params.customerPhone,
+        customerEmail: params.customerEmail,
+        customer_email: params.customerEmail,
         items: params.items,
         status: (params.status as any) || 'pending',
         paymentStatus: (params as any)?.paymentStatus || (params as any)?.payment_status,
         payment_status: (params as any)?.paymentStatus || (params as any)?.payment_status,
+        distanceMiles: params.distanceMiles ? Number(params.distanceMiles) : undefined,
+        distance_miles: params.distanceMiles ? Number(params.distanceMiles) : undefined,
+        tipAmount: params.tipAmount ? Number(params.tipAmount) : undefined,
+        tip_amount: params.tipAmount ? Number(params.tipAmount) : undefined,
+        amountCents: params.amountCents ? Number(params.amountCents) : undefined,
+        amount_cents: params.amountCents ? Number(params.amountCents) : undefined,
       };
     }
     return null;
@@ -142,6 +164,8 @@ export default function TrackOrderScreen() {
         status: (storeOrder.status as any) || prev?.status || 'pending',
         customerName: storeOrder.customerName || prev?.customerName || 'Customer',
         customerPhone: storeOrder.customerPhone || prev?.customerPhone,
+        customerEmail: storeOrder.customerEmail || (storeOrder as any).customer_email || prev?.customerEmail,
+        customer_email: (storeOrder as any).customer_email || storeOrder.customerEmail || prev?.customer_email,
         pickupAddress: storeOrder.pickupAddress || prev?.pickupAddress || APP_CONFIG.STORE_ADDRESS,
         pickup_address: storeOrder.pickupAddress || prev?.pickup_address || APP_CONFIG.STORE_ADDRESS,
         deliveryAddress: storeOrder.deliveryAddress || prev?.deliveryAddress || '123 E Test Ave, Sahuarita, AZ 85629',
@@ -156,6 +180,12 @@ export default function TrackOrderScreen() {
         delivery_photo_url: storeOrder.deliveryPhotoUrl || prev?.delivery_photo_url,
         paymentStatus: (storeOrder as any).paymentStatus || (storeOrder as any).payment_status || prev?.paymentStatus,
         payment_status: (storeOrder as any).payment_status || (storeOrder as any).paymentStatus || prev?.payment_status,
+        distanceMiles: storeOrder.distanceMiles ?? (storeOrder as any).distance_miles ?? prev?.distanceMiles,
+        distance_miles: (storeOrder as any).distance_miles ?? storeOrder.distanceMiles ?? prev?.distance_miles,
+        tipAmount: storeOrder.tipAmount ?? (storeOrder as any).tip_amount ?? prev?.tipAmount,
+        tip_amount: (storeOrder as any).tip_amount ?? storeOrder.tipAmount ?? prev?.tip_amount,
+        amountCents: storeOrder.amountCents ?? (storeOrder as any).amount_cents ?? prev?.amountCents,
+        amount_cents: (storeOrder as any).amount_cents ?? storeOrder.amountCents ?? prev?.amount_cents,
       }));
     }
   }, [storeOrder]);
@@ -270,6 +300,18 @@ export default function TrackOrderScreen() {
               foundOrder?.customer_phone ||
               storeCurrent?.customerPhone ||
               p?.customerPhone,
+            customerEmail:
+              foundOrder?.customerEmail ||
+              foundOrder?.customer_email ||
+              storeCurrent?.customerEmail ||
+              (storeCurrent as any)?.customer_email ||
+              p?.customerEmail,
+            customer_email:
+              foundOrder?.customer_email ||
+              foundOrder?.customerEmail ||
+              (storeCurrent as any)?.customer_email ||
+              storeCurrent?.customerEmail ||
+              p?.customerEmail,
             pickupAddress: resolvedPickup,
             pickup_address: resolvedPickup,
             deliveryAddress: resolvedDelivery,
@@ -282,6 +324,12 @@ export default function TrackOrderScreen() {
             deliveryPhotoUrl: resolvedPhoto,
             paymentStatus: foundOrder?.paymentStatus || foundOrder?.payment_status || storeCurrent?.paymentStatus || storeCurrent?.payment_status,
             payment_status: foundOrder?.payment_status || foundOrder?.paymentStatus || storeCurrent?.payment_status || storeCurrent?.paymentStatus,
+            distanceMiles: foundOrder?.distanceMiles ?? foundOrder?.distance_miles ?? storeCurrent?.distanceMiles ?? (storeCurrent as any)?.distance_miles ?? (p?.distanceMiles ? Number(p.distanceMiles) : undefined),
+            distance_miles: foundOrder?.distance_miles ?? foundOrder?.distanceMiles ?? (storeCurrent as any)?.distance_miles ?? storeCurrent?.distanceMiles ?? (p?.distanceMiles ? Number(p.distanceMiles) : undefined),
+            tipAmount: foundOrder?.tipAmount ?? foundOrder?.tip_amount ?? storeCurrent?.tipAmount ?? (storeCurrent as any)?.tip_amount ?? (p?.tipAmount ? Number(p.tipAmount) : undefined),
+            tip_amount: foundOrder?.tip_amount ?? foundOrder?.tipAmount ?? (storeCurrent as any)?.tip_amount ?? storeCurrent?.tipAmount ?? (p?.tipAmount ? Number(p.tipAmount) : undefined),
+            amountCents: foundOrder?.amountCents ?? foundOrder?.amount_cents ?? storeCurrent?.amountCents ?? storeCurrent?.amount_cents ?? (p?.amountCents ? Number(p.amountCents) : undefined),
+            amount_cents: foundOrder?.amount_cents ?? foundOrder?.amountCents ?? storeCurrent?.amount_cents ?? storeCurrent?.amountCents ?? (p?.amountCents ? Number(p.amountCents) : undefined),
           });
 
           // Sync fresh status to customer_local_orders in AsyncStorage
@@ -511,9 +559,10 @@ export default function TrackOrderScreen() {
   const MILEAGE_RATE_CENTS = APP_CONFIG.MILEAGE_RATE_CENTS;
 
   const miles = Number(order?.distanceMiles ?? order?.distance_miles ?? 0);
-  const tipAmount = Number(order?.tipAmount ?? order?.tip_amount ?? 500);
+  const tipAmount = Number(order?.tipAmount ?? order?.tip_amount ?? 0);
   const mileageCents = miles > MILEAGE_FREE_MILES ? Math.round((miles - MILEAGE_FREE_MILES) * MILEAGE_RATE_CENTS) : 0;
-  const totalCents = DELIVERY_FEE + mileageCents + tipAmount;
+  const calculatedTotal = DELIVERY_FEE + mileageCents + tipAmount;
+  const totalCents = Number(order?.amountCents ?? order?.amount_cents ?? calculatedTotal);
 
   const isPaid =
     order?.payment_status === 'paid' ||
