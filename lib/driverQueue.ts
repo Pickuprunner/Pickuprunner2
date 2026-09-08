@@ -59,7 +59,8 @@ export function useDriverQueue(orders: Order[], driverUserId: string | undefined
   const completedTodayCount = completedTodayOrders.length;
   const completedCount = completedTodayCount;
   const totalDailyCount = queueCount + completedTodayCount;
-  const atCapacity = totalDailyCount >= MAX_QUEUE;
+  // Rolling capacity: only active deliveries (assigned, accepted, shopping, picked_up, en_route) count against the limit of 3
+  const atCapacity = queueCount >= MAX_QUEUE;
 
   const myOrderIds = useMemo(() => new Set(myOrders.map((o) => o.id)), [myOrders]);
   const isMyOrder = (orderId: string) => myOrderIds.has(orderId);

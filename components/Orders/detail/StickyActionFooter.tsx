@@ -43,7 +43,7 @@ export function StickyActionFooter({
       {isPendingState && (
         <>
           <Text style={styles.stickyInstruction} numberOfLines={1}>
-            {atCapacity ? 'Order queue at capacity' : 'Ready to deliver? Accept this order'}
+            {atCapacity ? 'Active limit reached (3/3) — Deliver an order first' : 'Ready to deliver? Accept this order'}
           </Text>
           <TouchableOpacity
             activeOpacity={0.85}
@@ -63,7 +63,7 @@ export function StickyActionFooter({
                 color={atCapacity ? colors.outline : '#FFFFFF'}
               />
               <Text style={[styles.primaryActionText, atCapacity && styles.disabledText]}>
-                {atCapacity ? 'Queue Full (Max Orders)' : 'Accept Order'}
+                {atCapacity ? 'Max Active Deliveries (3)' : 'Accept Order'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>

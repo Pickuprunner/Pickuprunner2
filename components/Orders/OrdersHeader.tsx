@@ -81,22 +81,22 @@ export function OrdersHeader({
         <View
           style={[
             styles.pill,
-            completedCount !== undefined && completedCount > 0 && styles.pillCompleted,
+            queueCount > 0 && styles.pillCompleted,
             atCapacity && styles.pillCapacity,
           ]}
         >
           <MaterialIcons
-            name={completedCount !== undefined && completedCount > 0 ? 'task-alt' : 'inventory-2'}
+            name="inventory-2"
             size={15}
-            color={completedCount !== undefined && completedCount > 0 ? '#FFE399' : colors.onSurfaceVariant}
+            color={atCapacity ? '#FFA756' : queueCount > 0 ? '#FFE399' : colors.onSurfaceVariant}
           />
           <Text
             style={[
               styles.pillText,
-              completedCount !== undefined && completedCount > 0 && styles.pillCompletedText,
+              queueCount > 0 && styles.pillCompletedText,
             ]}
           >
-            My Queue {completedCount !== undefined ? completedCount : queueCount}/{MAX_QUEUE}
+            Active {queueCount}/{MAX_QUEUE}
           </Text>
         </View>
 

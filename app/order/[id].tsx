@@ -268,8 +268,8 @@ export default function OrderDetailScreen() {
     }
     if (atCapacity) {
       Alert.alert(
-        `Daily Limit Reached (${MAX_QUEUE}/${MAX_QUEUE})`,
-        `You have already reached the maximum limit of ${MAX_QUEUE} orders for today. You will be able to accept new orders tomorrow.`,
+        `Active Limit Reached (${MAX_QUEUE}/${MAX_QUEUE})`,
+        `You already have ${MAX_QUEUE} active deliveries. Please finish one of your current orders before taking another.`,
         [{ text: 'OK' }]
       );
       return;

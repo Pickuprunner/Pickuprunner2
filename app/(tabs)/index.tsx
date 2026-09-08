@@ -26,7 +26,7 @@ import { useDriverStore } from '@/store/useDriverStore';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useAuth } from '@/hooks/useAuth';
-import { useDriverQueue } from '@/lib/driverQueue';
+import { useDriverQueue, MAX_QUEUE } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
@@ -190,9 +190,9 @@ export default function OrdersScreen() {
       return;
     }
     if (atCapacity) {
-      showToast('Daily Limit Reached', {
+      showToast('Active Queue Limit Reached', {
         type: 'warning',
-        description: 'You have reached the maximum limit of 3 orders for today',
+        description: `You already have ${MAX_QUEUE} active deliveries. Complete an order to accept more.`,
       });
       return;
     }

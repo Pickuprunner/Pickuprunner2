@@ -57,9 +57,9 @@ export function DriverOrderCard({
 
   const handleDefaultAccept = async () => {
     if (driverAtCapacity) {
-      showToast('Queue Limit Reached', {
+      showToast('Active Queue Limit Reached', {
         type: 'warning',
-        description: 'Complete existing deliveries before accepting more',
+        description: 'You have 3 active deliveries. Complete one before accepting more.',
       });
       return;
     }
@@ -168,7 +168,7 @@ export function DriverOrderCard({
             {claimOrder.isPending
               ? 'Accepting…'
               : driverAtCapacity
-              ? 'Queue Full'
+              ? 'Max Active (3)'
               : 'Accept'}
           </Text>
         </TouchableOpacity>
