@@ -1,4 +1,4 @@
-import { apiClient, resolveApiUrl } from '@/lib/apiClient';
+import { apiClient, resolveApiUrl, getApiBaseUrl } from '@/lib/apiClient';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform, Linking } from 'react-native';
 
@@ -7,6 +7,7 @@ export interface CreateCheckoutPayload {
   amountCents?: number;
   customerEmail?: string;
   testMode?: boolean;
+  baseUrl?: string;
 }
 
 export interface SendPaymentLinkPayload {
@@ -44,6 +45,7 @@ export async function createCheckoutForOrder(
     const payload: CreateCheckoutPayload = {
       orderId,
       testMode: options.testMode ?? true,
+      baseUrl: getApiBaseUrl(),
       ...(options.amountCents !== undefined ? { amountCents: options.amountCents } : {}),
       ...(options.customerEmail ? { customerEmail: options.customerEmail } : {}),
     };
@@ -58,7 +60,7 @@ export async function createCheckoutForOrder(
 
 WebBrowser.maybeCompleteAuthSession();
 
-export const STRIPE_PAYMENT_REDIRECT_URL = 'pickuprunner://payment/success';
+export const STRIPE_PAYMENT_REDIRECT_URL = 'pickuprunner://payment';
 
 export async function openCheckoutUrl(url: string, orderId?: string): Promise<boolean> {
   if (!url) return false;
@@ -71,57 +73,25 @@ export async function openCheckoutUrl(url: string, orderId?: string): Promise<bo
     return true;
   }
 
-  return new Promise<boolean>(async (resolve) => {
-    let resolved = false;
-
-    const cleanupAndResolve = (success: boolean) => {
-      if (resolved) return;
-      resolved = true;
-      try {
-        linkSubscription.remove();
-      } catch {}
-      try {
-        WebBrowser.dismissAuthSession();
-      } catch {}
-      resolve(success);
-    };
-
-    const linkSubscription = Linking.addEventListener('url', (event) => {
-      const incomingUrl = event?.url || '';
-      if (incomingUrl.includes('payment/success')) {
-        cleanupAndResolve(true);
-      } else if (incomingUrl.includes('payment/cancelled')) {
-        cleanupAndResolve(false);
-      }
-    });
-
-    try {
-      const result = await WebBrowser.openAuthSessionAsync(targetUrl, STRIPE_PAYMENT_REDIRECT_URL, {
-        showInRecents: true,
-      });
-      if (!resolved) {
-        if (result.type === 'success') {
-          const returnUrl = (result as any)?.url || '';
-          cleanupAndResolve(!returnUrl.includes('payment/cancelled'));
-        } else {
-          // Fallback for Android Chrome Custom Tabs when dismissed or closed
-          if (orderId) {
-            try {
-              const res = await apiClient.get<any>(`/orders/${orderId}`);
-              const order = res?.data || res;
-              if (order?.paymentStatus === 'paid' || order?.payment_status === 'paid') {
-                return cleanupAndResolve(true);
-              }
-            } catch {}
-          }
-          cleanupAndResolve(false);
-        }
-      }
-    } catch (err) {
-      console.warn('[checkoutApi] openAuthSessionAsync failed:', err);
-      if (!resolved) {
-        cleanupAndResolve(false);
-      }
+  try {
+    const result = await WebBrowser.openAuthSessionAsync(targetUrl, STRIPE_PAYMENT_REDIRECT_URL);
+    if (result.type === 'success') {
+      const returnUrl = (result as any)?.url || '';
+      return !returnUrl.includes('payment/cancelled');
     }
-  });
+  } catch (err) {
+    console.warn('[checkoutApi] openAuthSessionAsync failed:', err);
+  }
+
+  if (orderId) {
+    try {
+      const res = await apiClient.get<any>(`/orders/${orderId}`);
+      const order = res?.data || res;
+      if (order?.paymentStatus === 'paid' || order?.payment_status === 'paid') {
+        return true;
+      }
+    } catch {}
+  }
+
+  return false;
 }

@@ -1,15 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 
-import { CustomConfirmModal } from '@/components/core';
 import { useOrderStore } from '@/store/useOrderStore';
 import { ordersApi } from '@/apis/orders';
 
 export default function PaymentSuccessScreen() {
   const { order } = useLocalSearchParams<{ order?: string }>();
-  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     WebBrowser.maybeCompleteAuthSession();
@@ -32,37 +29,16 @@ export default function PaymentSuccessScreen() {
         })
         .catch(() => {});
     }
-  }, [order]);
 
-  const handleClose = () => {
-    setVisible(false);
-    if (order) {
+    if (router.canGoBack()) {
+      router.back();
+    } else if (order) {
       router.replace(`/(customer)/track/${order}`);
     } else {
       router.replace('/(customer)');
     }
-  };
+  }, [order]);
 
-  return (
-    <View style={styles.container}>
-      <CustomConfirmModal
-        visible={visible}
-        variant="success"
-        title="Payment Successful"
-        message="Your payment was processed successfully. Thank you!"
-        confirmText="View Order Status"
-        singleButton
-        orderId={order}
-        onClose={handleClose}
-        onConfirm={handleClose}
-      />
-    </View>
-  );
+  return null;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-});
