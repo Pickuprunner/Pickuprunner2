@@ -16,18 +16,21 @@ export function DeliveredSuccessCard({
 }: DeliveredSuccessCardProps) {
   return (
     <View style={styles.container}>
-      <CustomCard variant="glass" style={styles.deliveredCard}>
+      <CustomCard
+        variant="glass"
+        style={styles.deliveredCard}
+        bodyStyle={styles.cardBody}
+        padding={0}
+      >
         <View style={styles.iconCircle}>
-          <MaterialIcons name="celebration" size={32} color={colors.tertiary} />
+          <MaterialIcons name="celebration" size={30} color={colors.tertiary} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.deliveredTitle}>Order Delivered!</Text>
-          {!!earningsTotalDisplay && (
-            <Text style={styles.deliveredSubtitle}>
-              You earned <Text style={styles.earningsHighlight}>{earningsTotalDisplay}</Text> on this delivery.
-            </Text>
-          )}
-        </View>
+        <Text style={styles.deliveredTitle}>Order Delivered!</Text>
+        {!!earningsTotalDisplay && (
+          <Text style={styles.deliveredSubtitle}>
+            You earned <Text style={styles.earningsHighlight}>{earningsTotalDisplay}</Text> on this delivery.
+          </Text>
+        )}
       </CustomCard>
 
       {!!photoUrl && (
@@ -55,34 +58,45 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   deliveredCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    padding: 20,
     backgroundColor: colors.greenAlpha10,
     borderColor: colors.greenAlpha30,
-    borderRadius: 20,
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  cardBody: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    gap: 6,
   },
   iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: colors.greenAlpha15,
     borderWidth: 1,
     borderColor: colors.greenAlpha40,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 6,
   },
   deliveredTitle: {
     color: colors.onSurface,
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: '800',
-    marginBottom: 4,
+    textAlign: 'center',
+    alignSelf: 'center',
+    letterSpacing: -0.3,
   },
   deliveredSubtitle: {
     color: colors.onSurfaceVariant,
-    fontSize: 13.5,
-    lineHeight: 19,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    alignSelf: 'center',
   },
   earningsHighlight: {
     color: colors.secondary,
@@ -115,3 +129,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
 });
+
+

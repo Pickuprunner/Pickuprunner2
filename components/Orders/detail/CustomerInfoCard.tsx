@@ -9,46 +9,91 @@ export interface CustomerInfoCardProps {
   order?: Order | null;
 }
 
+function formatDisplayPhone(phone?: string | null): string {
+  if (!phone) return '';
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    const d = digits.slice(1);
+    return `+1 (${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  }
+  return phone;
+}
+
+function parseOrderItemsData(rawItems?: string | null) {
+  if (!rawItems || rawItems === 'N/A') {
+    return { cleanItems: '', pickupInfo: '', isMeet: false, hasAlcohol: false };
+  }
+
+  const isMeet = /\[MEET\s*(AT\s*DOOR|CUSTOMER)\]/i.test(rawItems);
+  const hasAlcohol = /\[21\+\s*ALCOHOL/i.test(rawItems);
+
+  
+  let cleaned = rawItems.replace(/\[.*?\]/g, '').trim();
+
+ 
+  let pickupInfo = '';
+  const orderMatch = cleaned.match(/^(?:Order|Pickup|Order\s*#|#)\s*:?\s*([A-Za-z0-9#-]+)\s*(?:·|•|-)\s*/i);
+  if (orderMatch) {
+    pickupInfo = orderMatch[1].trim();
+    cleaned = cleaned.replace(orderMatch[0], '').trim();
+  }
+
+  
+  cleaned = cleaned.replace(/^[·•\-\s]+|[·•\-\s]+$/g, '').trim();
+
+  return {
+    cleanItems: cleaned || rawItems.replace(/\[.*?\]/g, '').trim(),
+    pickupInfo,
+    isMeet,
+    hasAlcohol,
+  };
+}
+
 function InfoRow({
   label,
   value,
   accent,
   onPress,
   icon,
-  actionIcon,
+  badge,
+  isLast = false,
 }: {
   label: string;
   value?: string | null;
   accent?: string;
   onPress?: () => void;
   icon?: keyof typeof MaterialIcons.glyphMap;
-  actionIcon?: keyof typeof MaterialIcons.glyphMap;
+  badge?: React.ReactNode;
+  isLast?: boolean;
 }) {
-  if (!value) return null;
+  if (!value && !badge) return null;
   return (
     <TouchableOpacity
       activeOpacity={onPress ? 0.7 : 1}
       onPress={onPress}
       disabled={!onPress}
-      style={styles.infoRow}
+      style={[styles.infoRow, isLast && styles.infoRowLast]}
     >
       <View style={styles.infoLeft}>
-        {icon && <MaterialIcons name={icon} size={16} color={colors.outline} />}
+        <View style={styles.iconBox}>
+          {icon && <MaterialIcons name={icon} size={15} color={colors.outline} />}
+        </View>
         <Text style={styles.infoLabel}>{label}</Text>
       </View>
       <View style={styles.infoRight}>
-        <Text
-          style={[styles.infoValue, accent ? { color: accent } : undefined]}
-          numberOfLines={2}
-        >
-          {value}
-        </Text>
-        {onPress && (
-          <MaterialIcons
-            name={actionIcon ?? 'chevron-right'}
-            size={18}
-            color={accent ?? colors.outline}
-          />
+        {badge ? (
+          badge
+        ) : (
+          <Text
+            style={[styles.infoValue, accent ? { color: accent } : undefined]}
+            numberOfLines={2}
+          >
+            {value}
+          </Text>
         )}
       </View>
     </TouchableOpacity>
@@ -56,7 +101,9 @@ function InfoRow({
 }
 
 export function CustomerInfoCard({ order }: CustomerInfoCardProps) {
-  const isMeetCustomer = !!order?.items?.includes('[MEET CUSTOMER]');
+  const { cleanItems, pickupInfo, isMeet } = parseOrderItemsData(order?.items);
+  const deliveryPref = isMeet ? 'Meet at Door' : 'Leave at Door';
+  const isGreen = !isMeet;
 
   return (
     <CustomCard variant="glass" style={styles.customerCard}>
@@ -65,28 +112,55 @@ export function CustomerInfoCard({ order }: CustomerInfoCardProps) {
         label="Name"
         value={order?.customerName}
       />
+
       <InfoRow
         icon="phone"
         label="Phone"
-        value={order?.customerPhone}
+        value={formatDisplayPhone(order?.customerPhone)}
         accent={colors.primary}
-        actionIcon="phone"
         onPress={() =>
           order?.customerPhone ? Linking.openURL(`tel:${order.customerPhone}`) : undefined
         }
       />
-      {!!order?.items && order.items !== 'N/A' && (
+
+      {!!pickupInfo && (
+        <InfoRow
+          icon="receipt-long"
+          label="Pickup / Order"
+          value={pickupInfo.replace(/^#/, '')}
+          accent="#DFE2EF"
+        />
+      )}
+
+      {!!cleanItems && cleanItems !== 'N/A' && (
         <InfoRow
           icon="shopping-bag"
           label="Items"
-          value={order.items}
+          value={cleanItems}
         />
       )}
+
       <InfoRow
         icon="meeting-room"
         label="Delivery Preference"
-        value={isMeetCustomer ? 'Meet at Door' : 'Leave at Door'}
-        accent={isMeetCustomer ? colors.secondary : colors.tertiary}
+        isLast
+        badge={
+          <View
+            style={[
+              styles.prefPill,
+              isGreen ? styles.prefPillGreen : styles.prefPillGold,
+            ]}
+          >
+            <Text
+              style={[
+                styles.prefPillText,
+                isGreen ? styles.prefTextGreen : styles.prefTextGold,
+              ]}
+            >
+              {deliveryPref}
+            </Text>
+          </View>
+        }
       />
     </CustomCard>
   );
@@ -95,22 +169,33 @@ export function CustomerInfoCard({ order }: CustomerInfoCardProps) {
 const styles = StyleSheet.create({
   customerCard: {
     marginHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    gap: 2,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: colors.glassLevel2Border,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  infoRowLast: {
+    borderBottomWidth: 0,
   },
   infoLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+    flexShrink: 0,
+  },
+  iconBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   infoLabel: {
     color: colors.onSurfaceVariant,
@@ -120,12 +205,43 @@ const styles = StyleSheet.create({
   infoRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    maxWidth: '65%',
+    justifyContent: 'flex-end',
+    maxWidth: '62%',
   },
   infoValue: {
     color: colors.onSurface,
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '600',
+    textAlign: 'right',
+  },
+  prefPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  prefPillGreen: {
+    backgroundColor: 'rgba(0, 226, 151, 0.1)',
+    borderColor: 'rgba(0, 226, 151, 0.25)',
+  },
+  prefPillGold: {
+    backgroundColor: 'rgba(255, 227, 153, 0.1)',
+    borderColor: 'rgba(255, 227, 153, 0.25)',
+  },
+  prefPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  prefTextGreen: {
+    color: colors.tertiary,
+  },
+  prefTextGold: {
+    color: colors.secondary,
   },
 });
+
+
+
