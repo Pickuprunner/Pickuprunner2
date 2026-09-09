@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Platform, View, StatusBar, ScrollView, Text } from 'react-native';
 import { Image } from 'expo-image';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
+import { router, Redirect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -21,15 +20,9 @@ export default function RoleSelectScreen() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [selecting, setSelecting] = useState<AppRole | null>(null);
 
-  useEffect(() => {
-    if (!isLoading && isAuthenticated && user) {
-      if (user.role === 'customer') {
-        router.replace('/(customer)/my-orders');
-      } else {
-        router.replace('/(tabs)');
-      }
-    }
-  }, [isAuthenticated, isLoading, user]);
+  if (!isLoading && isAuthenticated && user) {
+    return <Redirect href={user.role === 'customer' ? '/(customer)/my-orders' : '/(tabs)'} />;
+  }
 
   const handleSelect = async (role: AppRole) => {
     if (selecting) return;

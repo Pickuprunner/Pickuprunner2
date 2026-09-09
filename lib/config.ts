@@ -69,6 +69,9 @@ export const APP_CONFIG = {
   /** Extra charge per mile, in cents */
   MILEAGE_RATE_CENTS: 200,
 
+  /** Maximum delivery radius in miles from pickup location */
+  MAX_DELIVERY_RADIUS_MILES: 25,
+
 } as const;
 
 const rawFrontendUrl =

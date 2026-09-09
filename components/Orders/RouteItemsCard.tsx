@@ -296,19 +296,30 @@ export function RouteItemsCard({
               <Text style={styles.distanceTextMuted}>Calculating route distance…</Text>
             </View>
           ) : hasValidMiles ? (
-            <View style={[styles.distanceBox, styles.distanceBoxSuccess]}>
-              <MaterialIcons name="navigation" size={18} color={GREEN} />
-              <Text style={styles.distanceValueText}>{milesNum.toFixed(1)} miles</Text>
-              <Text style={styles.distanceDot}>·</Text>
-              <Text
-                style={[
-                  styles.distanceSurchargeText,
-                  mileageCents > 0 ? { color: GOLD } : { color: GREEN },
-                ]}
-              >
-                {mileageCents > 0 ? `+${fmt(mileageCents)} mileage surcharge` : 'Free mileage'}
-              </Text>
-            </View>
+            milesNum > APP_CONFIG.MAX_DELIVERY_RADIUS_MILES ? (
+              <View style={[styles.distanceBox, styles.distanceBoxError]}>
+                <MaterialIcons name="error-outline" size={18} color="#FF6B6B" />
+                <Text style={styles.distanceValueErrorText}>{milesNum.toFixed(1)} miles</Text>
+                <Text style={styles.distanceDot}>·</Text>
+                <Text style={styles.distanceErrorText}>
+                  Exceeds {APP_CONFIG.MAX_DELIVERY_RADIUS_MILES}-mile limit
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.distanceBox, styles.distanceBoxSuccess]}>
+                <MaterialIcons name="navigation" size={18} color={GREEN} />
+                <Text style={styles.distanceValueText}>{milesNum.toFixed(1)} miles</Text>
+                <Text style={styles.distanceDot}>·</Text>
+                <Text
+                  style={[
+                    styles.distanceSurchargeText,
+                    mileageCents > 0 ? { color: GOLD } : { color: GREEN },
+                  ]}
+                >
+                  {mileageCents > 0 ? `+${fmt(mileageCents)} mileage surcharge` : 'Free mileage'}
+                </Text>
+              </View>
+            )
           ) : (
             <View style={styles.distanceBox}>
               <MaterialIcons name="navigation" size={18} color={colors.outline} />
@@ -320,7 +331,7 @@ export function RouteItemsCard({
             </View>
           )}
           <Text style={styles.distanceFootnote}>
-            First {APP_CONFIG.FREE_MILES} miles free · $2.00/mile thereafter
+            Up to {APP_CONFIG.MAX_DELIVERY_RADIUS_MILES} miles from pickup · First {APP_CONFIG.FREE_MILES} miles free · $2.00/mile thereafter
           </Text>
         </View>
       </View>
@@ -456,6 +467,20 @@ const styles = StyleSheet.create({
   distanceBoxSuccess: {
     backgroundColor: 'rgba(0, 226, 151, 0.06)',
     borderColor: 'rgba(0, 226, 151, 0.3)',
+  },
+  distanceBoxError: {
+    backgroundColor: 'rgba(255, 107, 107, 0.08)',
+    borderColor: 'rgba(255, 107, 107, 0.4)',
+  },
+  distanceValueErrorText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FF6B6B',
+  },
+  distanceErrorText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FF6B6B',
   },
   distanceValueText: {
     fontSize: 14,

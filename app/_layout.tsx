@@ -74,6 +74,7 @@ export default function RootLayout() {
                   <Stack.Screen name="order/[id]" />
                   <Stack.Screen name="connect/onboarding/success" />
                   <Stack.Screen name="connect/onboarding/reauth" />
+                  <Stack.Screen name="auth/reset-password/[[...params]]" options={{ animation: 'none' }} />
                   <Stack.Screen
                     name="payment/success"
                     options={{

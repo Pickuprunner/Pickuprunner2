@@ -28,6 +28,7 @@ import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverQueue, MAX_QUEUE } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
+import { APP_CONFIG } from '@/lib/config';
 import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { useDriverAvailability, useSetDriverAvailability, useDriverLocationHeartbeat } from '@/lib/availability';
@@ -244,6 +245,7 @@ export default function OrdersScreen() {
   } = useAvailableOrders({
     lat: driverLocation.lat,
     lng: driverLocation.lng,
+    radiusMiles: APP_CONFIG.MAX_DELIVERY_RADIUS_MILES,
   });
   const { data: allOrders = [], isLoading: isLoadingAll, refetch: refetchAll } = useOrders();
   const { isConnected } = useOrdersRealtime();

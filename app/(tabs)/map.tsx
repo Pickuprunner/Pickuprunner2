@@ -9,6 +9,7 @@ import { useDriverQueue } from '@/lib/driverQueue';
 import { useDriverId } from '@/hooks/useDriverId';
 import { useAuth } from '@/hooks/useAuth';
 import { colors } from '@/constants/design';
+import { APP_CONFIG } from '@/lib/config';
 
 import {
   WebMap,
@@ -19,7 +20,9 @@ import {
 } from '@/components/map';
 
 export default function MapScreen() {
-  const { data: availableOrders = [] } = useAvailableOrders();
+  const { data: availableOrders = [] } = useAvailableOrders({
+    radiusMiles: APP_CONFIG.MAX_DELIVERY_RADIUS_MILES,
+  });
   const { data: allOrders = [] } = useOrders();
   const { isConnected } = useOrdersRealtime();
   const updateStatus = useUpdateOrderStatus();

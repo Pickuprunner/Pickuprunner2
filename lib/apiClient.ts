@@ -143,7 +143,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     throw new ApiError(0, networkError?.message || 'Network request failed');
   }
 
-  const isAuthEndpoint = /\/auth\/(login|register|refresh|forgot-password|reset-password)$/.test(
+  const isAuthEndpoint = /\/auth\/(login|register|refresh|forgot-password|reset-password)(\/|$)/.test(
     endpoint
   );
 

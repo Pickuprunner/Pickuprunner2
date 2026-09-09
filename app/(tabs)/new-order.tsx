@@ -134,6 +134,15 @@ export default function NewOrderScreen() {
       return;
     }
 
+    const milesNum = parseFloat(miles);
+    if (milesNum > APP_CONFIG.MAX_DELIVERY_RADIUS_MILES) {
+      showToast('Out of Delivery Range', {
+        description: `Delivery address must be within ${APP_CONFIG.MAX_DELIVERY_RADIUS_MILES} miles of pickup location.`,
+        type: 'error',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const formattedItems = `${deliveryType === 'meet' ? '[MEET AT DOOR] ' : '[LEAVE AT DOOR] '}${hasAlcohol ? '[21+ ALCOHOL ID REQUIRED] ' : ''

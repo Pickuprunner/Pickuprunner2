@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useToast } from '@/components/core';
 import { colors, spacing, borderRadius, shadows } from '@/constants/design';
 import { isValidEmail } from '@/lib/validation';
+import { APP_CONFIG } from '@/lib/config';
 
 import { RouteItemsCard } from './RouteItemsCard';
 import { PricingSummaryCard } from './PricingSummaryCard';
@@ -147,6 +148,13 @@ export function NewOrderWizardForm({
         showToast('Route Distance Missing', {
           description: 'Unable to calculate delivery distance. Please verify both addresses.',
           type: 'warning',
+        });
+        return;
+      }
+      if (milesNum > APP_CONFIG.MAX_DELIVERY_RADIUS_MILES) {
+        showToast('Out of Delivery Range', {
+          description: `Delivery address must be within ${APP_CONFIG.MAX_DELIVERY_RADIUS_MILES} miles of pickup location (current: ${milesNum.toFixed(1)} mi).`,
+          type: 'error',
         });
         return;
       }

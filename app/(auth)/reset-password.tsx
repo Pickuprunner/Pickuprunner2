@@ -71,8 +71,10 @@ export default function ResetPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const userId = params.userId || manualUserId;
-  const token = params.token || manualToken;
+  const paramUserId = Array.isArray(params.userId) ? params.userId[0] : params.userId;
+  const paramToken = Array.isArray(params.token) ? params.token[0] : params.token;
+  const userId = paramUserId || manualUserId;
+  const token = paramToken || manualToken;
 
   const handleTokenChange = (text: string) => {
     setRawTokenInput(text);
@@ -214,7 +216,7 @@ export default function ResetPasswordScreen() {
                 </View>
               ) : (
                 <View style={styles.formSection}>
-                  {(!params.userId || !params.token) && (
+                  {(!paramUserId || !paramToken) && (
                     <CustomInput
                       label="RESET LINK OR TOKEN"
                       value={rawTokenInput}
