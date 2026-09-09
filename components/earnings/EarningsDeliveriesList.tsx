@@ -31,7 +31,14 @@ export function EarningsDeliveriesList({
       {orders.length > 0 ? (
         orders.slice(0, 10).map((order) => {
           const driverEarned = calcOrderDriverCents(order);
-          const dateStr = relativeDate(order.createdAt || '');
+          const rawDate =
+            order.deliveredAt ||
+            order.delivered_at ||
+            order.updatedAt ||
+            order.updated_at ||
+            order.createdAt ||
+            '';
+          const dateStr = relativeDate(rawDate);
 
           return (
             <EarningsDeliveryItem

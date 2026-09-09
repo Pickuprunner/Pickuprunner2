@@ -53,14 +53,26 @@ interface PayoutRequest {
 function relativeDate(iso: string) {
   if (!iso) return 'Recent';
   const date = new Date(iso);
+  if (isNaN(date.getTime())) return 'Recent';
   const now = new Date();
-  const diffHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
 
-  if (diffHours < 24 && date.getDate() === now.getDate()) {
-    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    date.getDate() === yesterday.getDate() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getFullYear() === yesterday.getFullYear();
+
+  const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  if (isToday) {
     return `Today, ${timeStr}`;
-  } else if (diffHours < 48) {
-    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  } else if (isYesterday) {
     return `Yesterday, ${timeStr}`;
   }
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -119,8 +131,25 @@ export default function EarningsScreen() {
     setRefreshing(false);
   }, [refetchOrders, refetchPayouts]);
 
-  const deliveredOrders = useMemo(() => orders.filter((o) => o.status === 'delivered'), [orders]);
-  const paidOrders = useMemo(() => orders.filter((o) => o.paymentStatus === 'paid'), [orders]);
+  const getOrderTimestamp = (o: typeof orders[number]) => {
+    const raw = (o as any).deliveredAt || (o as any).delivered_at || (o as any).updatedAt || (o as any).updated_at || o.createdAt || (o as any).created_at || 0;
+    return new Date(raw).getTime() || 0;
+  };
+
+  const deliveredOrders = useMemo(
+    () =>
+      orders
+        .filter((o) => o.status === 'delivered')
+        .sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a)),
+    [orders]
+  );
+  const paidOrders = useMemo(
+    () =>
+      orders
+        .filter((o) => o.paymentStatus === 'paid')
+        .sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a)),
+    [orders]
+  );
   const allEarningOrders = deliveredOrders.length > 0 ? deliveredOrders : paidOrders;
 
   const calcOrderDriverCents = useCallback((o: typeof orders[number]) => {
