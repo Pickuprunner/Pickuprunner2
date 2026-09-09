@@ -21,13 +21,10 @@ export function MyOrdersHeader({
   avatarUrl,
   onAvatarPress,
 }: Props) {
-  const subtitleHighlight = isConnected ? 'Online • In Service' : 'Connecting…';
-
   return (
     <CustomHeader
       title="My Orders"
       subtitle={greetingText}
-      subtitleHighlight={subtitleHighlight}
       showAvatar={showAvatar}
       avatar={avatar}
       avatarUrl={avatarUrl}
@@ -36,7 +33,7 @@ export function MyOrdersHeader({
         <View style={styles.rightPills}>
           {activeCount > 0 && (
             <View style={styles.activePill}>
-              <View style={[styles.statusDot, isConnected && styles.statusDotOnline]} />
+              {/* <View style={[styles.statusDot, isConnected && styles.statusDotOnline]} /> */}
               <Text style={styles.activePillText}>{activeCount} ACTIVE</Text>
             </View>
           )}

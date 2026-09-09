@@ -200,8 +200,8 @@ export function OrdersHeader({
   return (
     <CustomHeader
       title="Orders"
-      subtitle="pending • Tap Accept to grab orders"
-      highlightText={pendingCount}
+      subtitle="Tap Accept to grab orders"
+     //highlightText={pendingCount}
       showAvatar={showAvatar}
       avatar={avatar}
       avatarUrl={avatarUrl}
