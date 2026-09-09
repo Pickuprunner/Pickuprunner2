@@ -328,8 +328,7 @@ export default function CustomerProfileScreen() {
 
       <CustomHeader
         title="Customer Profile"
-        subtitle="Manage profile & delivery requests"
-        subtitleHighlight={`${APP_CONFIG.APP_NAME} •`}
+        subtitle="Manage your profile"
         showAvatar={false}
         borderBottom
       />
@@ -393,9 +392,6 @@ export default function CustomerProfileScreen() {
           onResetPassword={handleResetPassword}
         />
 
-        <Text style={styles.versionTag}>
-          {APP_CONFIG.APP_NAME} v1.0.0 • Customer Portal
-        </Text>
       </ScrollView>
     </View>
   );
@@ -410,12 +406,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     gap: 18,
-  },
-  versionTag: {
-    textAlign: 'center',
-    color: 'rgba(255, 255, 255, 0.25)',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 8,
   },
 });
