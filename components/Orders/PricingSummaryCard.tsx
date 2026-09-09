@@ -7,6 +7,8 @@ import { CustomInput } from '@/components/core';
 import { APP_CONFIG, openTerms, openPrivacy } from '@/lib/config';
 import { colors, spacing } from '@/constants/design';
 
+import { cleanFormattedAddress } from '@/lib/distance';
+
 const TIP_OPTIONS = [
   { label: '$5', cents: 500 },
   { label: '$10', cents: 1000 },
@@ -25,12 +27,7 @@ function fmt(cents: number) {
 }
 
 function cleanAddress(addr: string): string {
-  if (!addr) return '';
-  return addr
-    .replace(/^[A-Z0-9]{4,8}\+[A-Z0-9]{2,4},\s*/i, '')
-    .replace(/^[A-Z0-9]{4,8}\+[A-Z0-9]{2,4}\s+/i, '')
-    .replace(/^unnamed road,\s*/i, '')
-    .trim();
+  return cleanFormattedAddress(addr);
 }
 
 interface PricingSummaryCardProps {

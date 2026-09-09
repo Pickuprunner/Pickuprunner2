@@ -24,7 +24,9 @@ interface LocationStoreState {
   searchCache: Record<string, AddressSuggestion[]>;
   distanceCache: Record<string, number>;
   currentLocation: { lat: number; lon: number; address?: string } | null;
+  recentSearches: AddressSuggestion[];
 
+  addRecentSearch: (item: AddressSuggestion) => void;
   setCachedCoords: (address: string, coords: LocationCoords) => void;
   getCachedCoords: (address: string) => LocationCoords | null;
 
@@ -49,6 +51,18 @@ export const useLocationStore = create<LocationStoreState>()(
       searchCache: {},
       distanceCache: {},
       currentLocation: null,
+      recentSearches: [],
+
+      addRecentSearch: (item) => {
+        if (!item || !item.displayName) return;
+        set((state) => {
+          const prev = state.recentSearches || [];
+          const filtered = prev.filter(
+            (s) => s.displayName.toLowerCase() !== item.displayName.toLowerCase()
+          );
+          return { recentSearches: [item, ...filtered].slice(0, 3) };
+        });
+      },
 
       setCachedCoords: (address, coords) => {
         const key = address.trim().toLowerCase();
@@ -118,6 +132,7 @@ export const useLocationStore = create<LocationStoreState>()(
         reverseGeocodeCache: state.reverseGeocodeCache,
         searchCache: state.searchCache,
         distanceCache: state.distanceCache,
+        recentSearches: state.recentSearches || [],
       }),
     }
   )

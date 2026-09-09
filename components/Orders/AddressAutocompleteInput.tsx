@@ -17,6 +17,7 @@ import {
   getPlaceCoordinates,
   setCachedCoords,
   AddressSuggestion,
+  cleanFormattedAddress,
 } from '@/lib/distance';
 import { MapLocationPickerModal } from './MapLocationPickerModal';
 import { CustomInput, useToast } from '@/components/core';
@@ -117,16 +118,17 @@ export function AddressAutocompleteInput({
     try {
       isSelectingRef.current = true;
       haptic();
-      onChangeText(item.displayName);
+      const clean = cleanFormattedAddress(item.displayName);
+      onChangeText(clean);
       setSuggestions([]);
       setShowDropdown(false);
 
       if (item.placeId) {
-        await getPlaceCoordinates(item.placeId, item.displayName).catch(() => {});
+        await getPlaceCoordinates(item.placeId, clean).catch(() => {});
       } else if (item.lat && item.lon) {
-        setCachedCoords(item.displayName, { lat: item.lat, lon: item.lon });
+        setCachedCoords(clean, { lat: item.lat, lon: item.lon });
       } else {
-        await geocode(item.displayName).catch(() => {});
+        await geocode(clean).catch(() => {});
       }
     } catch {}
   };
@@ -176,8 +178,14 @@ export function AddressAutocompleteInput({
         onBlur={() => {
           setTimeout(() => {
             setShowDropdown(false);
-            if (value && value.trim().length >= 5 && !useLocationStore.getState().getCachedCoords(value.trim())) {
-              geocode(value.trim()).catch(() => {});
+            if (value && value.trim().length >= 5) {
+              const clean = cleanFormattedAddress(value.trim());
+              if (clean && clean !== value) {
+                onChangeText(clean);
+              }
+              if (!useLocationStore.getState().getCachedCoords(clean || value.trim())) {
+                geocode(clean || value.trim()).catch(() => {});
+              }
             }
           }, 250);
         }}
@@ -253,14 +261,15 @@ export function AddressAutocompleteInput({
         title={`Pinpoint ${label.replace(' *', '')}`}
         onSelectAddress={(addr, coords) => {
           isSelectingRef.current = true;
-          onChangeText(addr);
+          const clean = cleanFormattedAddress(addr);
+          onChangeText(clean);
           if (coords) {
-            setCachedCoords(addr, coords);
+            setCachedCoords(clean, coords);
           }
           setSuggestions([]);
           setShowDropdown(false);
           showToast('Address Selected', {
-            description: addr,
+            description: clean,
             type: 'success',
           });
         }}

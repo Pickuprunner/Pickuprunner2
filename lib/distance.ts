@@ -18,6 +18,7 @@ import {
   getCachedSearch,
   setCachedSearch,
   generateQueryPermutations,
+  cleanFormattedAddress,
 } from './locationCalculations';
 
 export * from './locationCalculations';
@@ -72,6 +73,10 @@ export async function fetchOsmAutocomplete(
             const primary = houseNumber && road ? `${houseNumber} ${road}` : (item.namedetails?.name || item.name || road || suburb || city || getParts(item.display_name, 0, 2));
             const secondaryParts = [suburb !== primary ? suburb : '', city !== primary ? city : '', state, postcode].filter(Boolean);
             const secondary = Array.from(new Set(secondaryParts)).join(', ') || getParts(item.display_name, 2);
+            const rawDisplay = [primary, secondary].filter(Boolean).join(', ') || item.display_name || '';
+            const cleanDisplay = cleanFormattedAddress(prefix ? `${prefix} ${rawDisplay}` : rawDisplay);
+            const cleanPrimary = cleanFormattedAddress(prefix ? `${prefix} ${primary}` : primary);
+            const cleanSecondary = cleanFormattedAddress(secondary);
             const bbox: [number, number, number, number] | undefined =
               Array.isArray(item.boundingbox) && item.boundingbox.length >= 4
                 ? [
@@ -84,19 +89,16 @@ export async function fetchOsmAutocomplete(
 
             const coords: LocationCoords = { lat: parseFloat(item.lat) || 0, lon: parseFloat(item.lon) || 0, bbox };
 
-            if (item.display_name) {
-              setCachedCoords(item.display_name, coords);
-              if (prefix) {
-                setCachedCoords(`${prefix} ${item.display_name}`, coords);
-              }
+            if (cleanDisplay) {
+              setCachedCoords(cleanDisplay, coords);
             }
 
             return {
-              displayName: prefix ? `${prefix} ${item.display_name || ''}` : (item.display_name || ''),
+              displayName: cleanDisplay,
               lat: coords.lat,
               lon: coords.lon,
-              primaryText: prefix ? `${prefix} ${primary || ''}` : (primary || item.display_name || ''),
-              secondaryText: secondary,
+              primaryText: cleanPrimary || cleanDisplay,
+              secondaryText: cleanSecondary,
               bbox,
             };
           });
@@ -120,23 +122,29 @@ export async function fetchOsmAutocomplete(
             const coordsGeo = f.geometry?.coordinates || [0, 0];
             const lon = coordsGeo[0] || 0;
             const lat = coordsGeo[1] || 0;
-            const name = p.name || p.street || '';
-            const secParts = [p.district, p.city, p.state, p.postcode, p.country].filter(Boolean);
+            const streetLine = [p.housenumber, p.street].filter(Boolean).join(' ');
+            const name = p.name && p.name !== p.street
+              ? (streetLine ? `${p.name}, ${streetLine}` : p.name)
+              : (streetLine || p.name || '');
+            const secParts = [p.city, p.state, p.postcode].filter(Boolean);
             const secondary = Array.from(new Set(secParts)).join(', ');
-            const displayName = [name, secondary].filter(Boolean).join(', ');
+            const rawDisplay = [name, secondary].filter(Boolean).join(', ');
+            const cleanDisplay = cleanFormattedAddress(prefix ? `${prefix} ${rawDisplay}` : rawDisplay);
+            const cleanPrimary = cleanFormattedAddress(prefix ? `${prefix} ${name}` : name);
+            const cleanSecondary = cleanFormattedAddress(secondary);
             const extent = p.extent;
             const bbox: [number, number, number, number] | undefined =
               Array.isArray(extent) && extent.length === 4
                 ? [extent[3], extent[1], extent[0], extent[2]]
                 : undefined;
             const coords: LocationCoords = { lat, lon, bbox };
-            if (displayName) setCachedCoords(displayName, coords);
+            if (cleanDisplay) setCachedCoords(cleanDisplay, coords);
             return {
-              displayName: prefix ? `${prefix} ${displayName}` : displayName,
+              displayName: cleanDisplay,
               lat,
               lon,
-              primaryText: prefix ? `${prefix} ${name}` : name,
-              secondaryText: secondary,
+              primaryText: cleanPrimary || cleanDisplay,
+              secondaryText: cleanSecondary,
               bbox,
             };
           });
@@ -243,32 +251,48 @@ export async function nativeOrOsmReverseGeocode(lat: number, lon: number): Promi
     const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
     if (results && results.length > 0) {
       const r = results[0];
-      const street = r.streetNumber && r.street ? `${r.streetNumber} ${r.street}` : (r.street || '');
       const rawName = (r.name || '').trim();
-      const norm = (s: string) => normalizeAddressKey(s);
-      const name = rawName && norm(rawName) !== norm(street) && norm(rawName) !== norm(r.street || '') ? rawName : '';
-
-      const rawParts = [
-        name || street,
-        name && street && norm(name) !== norm(street) ? street : '',
-        r.district || r.subregion,
-        r.city,
-        r.region,
-        r.postalCode,
-        r.country,
-      ].filter(Boolean) as string[];
-
-      const deduplicated: string[] = [];
-      for (const p of rawParts) {
-        const pNorm = norm(p);
-        if (!pNorm) continue;
-        if (!deduplicated.some((existing) => norm(existing) === pNorm || (pNorm.length > 4 && norm(existing).includes(pNorm)))) {
-          deduplicated.push(p.trim());
-        }
+      const streetNumber = (r.streetNumber || '').trim() || (/^\d+[\w\-\/]*$/.test(rawName) ? rawName : '');
+      const streetName = (r.street || '').trim();
+      let streetLine = '';
+      if (streetNumber && streetName) {
+        streetLine = streetName.toLowerCase().startsWith(streetNumber.toLowerCase())
+          ? streetName
+          : `${streetNumber} ${streetName}`;
+      } else {
+        streetLine = streetName || streetNumber;
       }
 
-      const addr = deduplicated.join(', ');
-      if (addr.length > 3) {
+      const norm = (s: string) => normalizeAddressKey(s);
+      let landmark = '';
+      if (
+        rawName &&
+        rawName !== streetNumber &&
+        !/^\d+[\w\-\/]*$/.test(rawName) &&
+        !rawName.includes('+') &&
+        norm(rawName) !== norm(streetLine) &&
+        norm(rawName) !== norm(streetName) &&
+        !streetLine.toLowerCase().includes(rawName.toLowerCase())
+      ) {
+        landmark = rawName;
+      }
+
+      const city = (r.city || r.district || r.subregion || '').replace(/\s+County$/i, '').trim();
+      const state = r.region || '';
+      const zip = (r.postalCode || '').trim();
+
+      const rawParts = [
+        landmark,
+        streetLine,
+        city,
+        state,
+        zip,
+        r.isoCountryCode && r.isoCountryCode !== 'US' ? r.country : '',
+      ].filter(Boolean) as string[];
+
+      const rawJoined = rawParts.join(', ');
+      const addr = cleanFormattedAddress(rawJoined);
+      if (addr && addr.length > 3) {
         setCachedReverseGeocode(lat, lon, addr);
         setCachedCoords(addr, { lat, lon });
         return addr;
@@ -291,21 +315,22 @@ export async function nativeOrOsmReverseGeocode(lat: number, lon: number): Promi
         const name = a.amenity || a.shop || a.building || a.office || a.leisure || '';
         const street = a.house_number && a.road ? `${a.house_number} ${a.road}` : a.road || '';
         const neighborhood = a.neighbourhood || a.suburb || a.subdivision || '';
-        const city = a.city || a.town || a.village || a.county || '';
+        const city = a.city || a.town || a.village || '';
         const state = a.state || '';
         const postcode = a.postcode || '';
 
         const parts = Array.from(new Set([name, street, neighborhood, city, state, postcode].filter(Boolean)));
-        const resolved = parts.length >= 2 ? parts.join(', ') : (data.display_name || '');
+        const resolved = cleanFormattedAddress(parts.join(', ') || data.display_name || '');
         if (resolved) {
           setCachedReverseGeocode(lat, lon, resolved);
           setCachedCoords(resolved, { lat, lon });
           return resolved;
         }
       } else if (data?.display_name) {
-        setCachedReverseGeocode(lat, lon, data.display_name);
-        setCachedCoords(data.display_name, { lat, lon });
-        return data.display_name;
+        const resolved = cleanFormattedAddress(data.display_name);
+        setCachedReverseGeocode(lat, lon, resolved);
+        setCachedCoords(resolved, { lat, lon });
+        return resolved;
       }
     }
   } catch { }

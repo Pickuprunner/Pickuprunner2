@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '@/constants/design';
-import { reverseGeocode, geocode, searchAddressSuggestions, getPlaceCoordinates, getRegionFromBbox, AddressSuggestion } from '@/lib/distance';
+import { reverseGeocode, geocode, searchAddressSuggestions, getPlaceCoordinates, getRegionFromBbox, AddressSuggestion, cleanFormattedAddress } from '@/lib/distance';
 import { useLocationStore } from '@/store/useLocationStore';
 
 const DEFAULT_MAP_COORDS = { lat: 31.9576, lon: -110.9709 }; // Sahuarita, Arizona
@@ -63,6 +63,10 @@ export function MapLocationPickerModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSuggestions, setSearchSuggestions] = useState<AddressSuggestion[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+
+  const recentSearches = useLocationStore((state) => state.recentSearches || []);
+  const addRecentSearch = useLocationStore((state) => state.addRecentSearch);
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,7 +80,7 @@ export function MapLocationPickerModal({
     setLoadingAddress(false);
 
     if (initialAddress.trim()) {
-      setSelectedAddress(initialAddress);
+      setSelectedAddress(cleanFormattedAddress(initialAddress));
       geocode(initialAddress).then((coords) => {
         if (coords) {
           coordsRef.current = coords;
@@ -146,7 +150,7 @@ export function MapLocationPickerModal({
           ),
         ]);
         if (addr) {
-          setSelectedAddress(addr);
+          setSelectedAddress(cleanFormattedAddress(addr));
         }
       } catch {
         setSelectedAddress(`${lat}, ${lon}`);
@@ -197,10 +201,12 @@ export function MapLocationPickerModal({
 
   const handleSelectSearchSuggestion = async (item: AddressSuggestion) => {
     haptic();
+    addRecentSearch(item);
     Keyboard.dismiss();
+    setIsInputFocused(false);
     setSearchQuery(item.primaryText || item.displayName);
     setSearchSuggestions([]);
-    setSelectedAddress(item.displayName);
+    setSelectedAddress(cleanFormattedAddress(item.displayName));
 
     let lat = item.lat;
     let lon = item.lon;
@@ -267,10 +273,11 @@ export function MapLocationPickerModal({
   };
 
   const handleConfirm = () => {
-    if (selectedAddress.trim()) {
+    const clean = cleanFormattedAddress(selectedAddress.trim());
+    if (clean) {
       haptic();
-      useLocationStore.getState().setCachedCoords(selectedAddress.trim(), coordsRef.current);
-      onSelectAddress(selectedAddress.trim(), coordsRef.current);
+      useLocationStore.getState().setCachedCoords(clean, coordsRef.current);
+      onSelectAddress(clean, coordsRef.current);
       onClose();
     }
   };
@@ -308,11 +315,14 @@ export function MapLocationPickerModal({
                 placeholderTextColor="#6B7280"
                 value={searchQuery}
                 onChangeText={handleSearchChange}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setTimeout(() => setIsInputFocused(false), 200)}
                 autoCapitalize="words"
                 returnKeyType="search"
                 onSubmitEditing={async () => {
                   if (!searchQuery.trim()) return;
                   Keyboard.dismiss();
+                  setIsInputFocused(false);
                   if (searchSuggestions.length > 0) {
                     handleSelectSearchSuggestion(searchSuggestions[0]);
                     return;
@@ -321,7 +331,7 @@ export function MapLocationPickerModal({
                   const coords = await geocode(searchQuery);
                   setIsSearching(false);
                   if (coords) {
-                    setSelectedAddress(searchQuery.trim());
+                    setSelectedAddress(cleanFormattedAddress(searchQuery.trim()));
                     coordsRef.current = coords;
                     skipReverseGeocodeRef.current = true;
                     const target = getRegionFromBbox(coords.bbox, coords);
@@ -338,6 +348,7 @@ export function MapLocationPickerModal({
                   onPress={() => {
                     setSearchQuery('');
                     setSearchSuggestions([]);
+                    setIsInputFocused(false);
                   }}
                   hitSlop={8}
                 >
@@ -346,35 +357,46 @@ export function MapLocationPickerModal({
               ) : null}
             </View>
 
-            {searchSuggestions.length > 0 && (
-              <View style={styles.floatingDropdown}>
-                {searchSuggestions.map((item, idx) => (
-                  <Pressable
-                    key={`${item.displayName}-${idx}`}
-                    onPress={() => handleSelectSearchSuggestion(item)}
-                    style={({ pressed }) => [
-                      styles.suggestionItem,
-                      idx < searchSuggestions.length - 1 && styles.suggestionBorder,
-                      pressed && styles.suggestionPressed,
-                    ]}
-                  >
-                    <View style={styles.suggestionIconCircle}>
-                      <MaterialIcons name="place" size={16} color={GOLD} />
+            {(() => {
+              const showRecent = isInputFocused && !searchQuery.trim() && recentSearches.length > 0;
+              const suggestionsToShow = showRecent ? recentSearches.slice(0, 3) : searchSuggestions;
+              if (suggestionsToShow.length === 0) return null;
+
+              return (
+                <View style={styles.floatingDropdown}>
+                  {showRecent && (
+                    <View style={styles.recentHeader}>
+                      <Text style={styles.recentHeaderText}>RECENT SEARCHES</Text>
                     </View>
-                    <View style={styles.suggestionTextCol}>
-                      <Text style={styles.suggestionPrimary} numberOfLines={1}>
-                        {item.primaryText}
-                      </Text>
-                      {item.secondaryText ? (
-                        <Text style={styles.suggestionSecondary} numberOfLines={1}>
-                          {item.secondaryText}
+                  )}
+                  {suggestionsToShow.map((item, idx) => (
+                    <Pressable
+                      key={`${item.displayName}-${idx}`}
+                      onPress={() => handleSelectSearchSuggestion(item)}
+                      style={({ pressed }) => [
+                        styles.suggestionItem,
+                        idx < suggestionsToShow.length - 1 && styles.suggestionBorder,
+                        pressed && styles.suggestionPressed,
+                      ]}
+                    >
+                      <View style={styles.suggestionIconCircle}>
+                        <MaterialIcons name={showRecent ? 'history' : 'place'} size={16} color={GOLD} />
+                      </View>
+                      <View style={styles.suggestionTextCol}>
+                        <Text style={styles.suggestionPrimary} numberOfLines={1}>
+                          {item.primaryText}
                         </Text>
-                      ) : null}
-                    </View>
-                  </Pressable>
-                ))}
-              </View>
-            )}
+                        {item.secondaryText ? (
+                          <Text style={styles.suggestionSecondary} numberOfLines={1}>
+                            {item.secondaryText}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              );
+            })()}
           </View>
 
           <View style={styles.mapWrapper}>
@@ -569,7 +591,7 @@ const styles = StyleSheet.create({
   },
   floatingDropdown: {
     position: 'absolute',
-    top: 92,
+    top: 112,
     left: 16,
     right: 16,
     backgroundColor: '#181D2C',
@@ -583,6 +605,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
+  },
+  recentHeader: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  recentHeaderText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#8C90A1',
+    letterSpacing: 0.6,
   },
   suggestionItem: {
     flexDirection: 'row',

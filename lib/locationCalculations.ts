@@ -83,12 +83,135 @@ export function extractUnitOrFlatPrefix(addr: string): { prefix: string; baseAdd
   return { prefix: '', baseAddress: addr };
 }
 
+export const US_STATE_ABBR: Record<string, string> = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA',
+  hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA',
+  kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD',
+  massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO',
+  montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND', ohio: 'OH',
+  oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI', 'south carolina': 'SC',
+  'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT', vermont: 'VT',
+  virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY',
+  'district of columbia': 'DC', 'puerto rico': 'PR',
+};
+
 export function cleanFormattedAddress(addr: string): string {
   if (!addr) return '';
-  return addr
+  let clean = addr.trim();
+
+  if (/^-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+$/.test(clean)) return clean;
+
+  clean = clean
     .replace(PLUS_CODE_REGEX, '')
     .replace(UNNAMED_ROAD_REGEX, '')
-    .trim() || addr;
+    .trim();
+
+  const { prefix, baseAddress } = extractUnitOrFlatPrefix(clean);
+  const target = prefix && baseAddress.length >= 3 ? baseAddress : clean;
+
+  const rawParts = target.split(',').map((p) => p.trim()).filter(Boolean);
+  if (rawParts.length === 0) return clean;
+
+  while (
+    rawParts.length > 1 &&
+    /^(united states( of america)?|usa|us|india)$/i.test(rawParts[rawParts.length - 1])
+  ) {
+    rawParts.pop();
+  }
+
+  const mergedParts: string[] = [];
+  for (let i = 0; i < rawParts.length; i++) {
+    const curr = rawParts[i];
+    const next = rawParts[i + 1];
+
+    const isHouseNum = /^\d+[\w\-\/]*$/.test(curr);
+
+    if (isHouseNum && next) {
+      const nextNorm = next.toLowerCase();
+      const currNorm = curr.toLowerCase();
+
+      if (nextNorm.startsWith(currNorm + ' ') || nextNorm === currNorm) {
+        continue;
+      }
+
+      if (!/^\d/.test(next)) {
+        mergedParts.push(`${curr} ${next}`);
+        i++;
+        continue;
+      }
+    }
+
+    if (next && next.toLowerCase().startsWith(curr.toLowerCase() + ' ')) {
+      continue;
+    }
+
+    mergedParts.push(curr);
+  }
+
+  const filtered: string[] = [];
+  for (let i = 0; i < mergedParts.length; i++) {
+    const part = mergedParts[i];
+
+    if (/\b(county|parish)\b/i.test(part) && mergedParts.length > 2) {
+      continue;
+    }
+
+    const partNorm = part.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!partNorm) continue;
+
+    const alreadyExists = filtered.some((existing) => {
+      const existNorm = existing.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return existNorm === partNorm;
+    });
+
+    if (!alreadyExists) {
+      filtered.push(part);
+    }
+  }
+
+  if (filtered.length >= 2) {
+    const last = filtered[filtered.length - 1];
+    const prev = filtered[filtered.length - 2];
+
+    const isPostal =
+      /^\d{5}(-\d{4})?$/.test(last) ||
+      /^\d{6}$/.test(last) ||
+      /^[A-Z]\d[A-Z]\s?\d[A-Z]\d$/i.test(last);
+
+    const prevLower = prev.toLowerCase();
+    const stateAbbr =
+      US_STATE_ABBR[prevLower] ||
+      (/^[a-z]{2}$/i.test(prev) && Object.values(US_STATE_ABBR).includes(prev.toUpperCase())
+        ? prev.toUpperCase()
+        : null);
+
+    if (isPostal && stateAbbr) {
+      filtered.splice(filtered.length - 2, 2, `${stateAbbr} ${last}`);
+    } else if (stateAbbr) {
+      filtered[filtered.length - 1] = stateAbbr;
+    }
+  } else if (filtered.length === 1 && US_STATE_ABBR[filtered[0].toLowerCase()]) {
+    filtered[0] = US_STATE_ABBR[filtered[0].toLowerCase()];
+  }
+
+  if (filtered.length >= 1) {
+    const lastIdx = filtered.length - 1;
+    const lastPart = filtered[lastIdx];
+    const stateZipMatch = lastPart.match(/^([a-zA-Z\s]+)\s+(\d{5}(?:-\d{4})?|\d{6})$/);
+    if (stateZipMatch) {
+      const st = stateZipMatch[1].trim().toLowerCase();
+      const zip = stateZipMatch[2].trim();
+      const abbr = US_STATE_ABBR[st];
+      if (abbr) {
+        filtered[lastIdx] = `${abbr} ${zip}`;
+      }
+    }
+  }
+
+  const result = filtered.join(', ');
+  return prefix ? `${prefix}, ${result}` : result;
 }
 
 export function normalizeAddressKey(s: string): string {
