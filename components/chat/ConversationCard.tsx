@@ -96,7 +96,9 @@ export function ConversationCard({ item, role = 'driver', onPress, style }: Conv
             )}
             {item.orderNumber && item.orderMetaText && <View style={styles.metaDot} />}
             {item.orderMetaText && (
-              <Text style={styles.orderMetaText}>{item.orderMetaText}</Text>
+              <Text style={styles.orderMetaText} numberOfLines={1} ellipsizeMode="tail">
+                {item.orderMetaText}
+              </Text>
             )}
           </View>
         )}
@@ -240,17 +242,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#B3C5FF',
+    flexShrink: 0,
   },
   metaDot: {
     width: 3,
     height: 3,
     borderRadius: 1.5,
     backgroundColor: 'rgba(194, 198, 216, 0.5)',
+    flexShrink: 0,
   },
   orderMetaText: {
     fontSize: 12,
     fontWeight: '500',
     color: 'rgba(194, 198, 216, 0.7)',
+    flex: 1,
   },
   addressRow: {
     flexDirection: 'row',
