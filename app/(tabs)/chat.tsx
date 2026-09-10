@@ -264,9 +264,51 @@ export default function ChatScreen() {
     (o) => o.driverUserId === driverId && o.status === 'delivered'
   );
 
+  const formatChatTime = (dateInput?: string | number | Date | null): string | undefined => {
+    if (!dateInput) return undefined;
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return undefined;
+
+    const now = new Date();
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    const timeStr = date.toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    if (isToday) {
+      return `Today, ${timeStr}`;
+    }
+    if (isYesterday) {
+      return `Yesterday, ${timeStr}`;
+    }
+    return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+  };
+
   const mapApiChatToItem = (chat: ApiChatSummary): ChatConversationItem => {
     const shortId = chat.orderId ? chat.orderId.slice(-6).toUpperCase() : '------';
     const isDelivered = chat.orderStatus === 'delivered';
+    const rawTime =
+      chat.lastMessage?.createdAt ||
+      (chat as any).lastMessageCreatedAt ||
+      (chat as any).last_created_at ||
+      (chat as any).updatedAt ||
+      (chat as any).updated_at ||
+      (chat as any).createdAt ||
+      (chat as any).created_at;
+
     return {
       id: chat.orderId,
       name: chat.counterpartyName || 'Customer',
@@ -278,13 +320,21 @@ export default function ChatScreen() {
       avatarVariant: isDelivered ? 'gray' : 'amber',
       unreadCount: chat.unread || 0,
       orderMetaText: chat.lastMessage?.body,
-      time: chat.lastMessage?.createdAt ? new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+      time: formatChatTime(rawTime),
     };
   };
 
   const mapOrderToItem = (item: Order): ChatConversationItem => {
     const shortId = item?.id ? item.id.slice(-6).toUpperCase() : '------';
     const isDelivered = item.status === 'delivered';
+    const rawTime =
+      item.deliveredAt ||
+      (item as any).delivered_at ||
+      (item as any).updatedAt ||
+      (item as any).updated_at ||
+      item.createdAt ||
+      (item as any).created_at;
+
     return {
       id: item.id,
       name: item.customerName || 'Customer',
@@ -295,6 +345,7 @@ export default function ChatScreen() {
       statusVariant: isDelivered ? 'gray' : item.status === 'accepted' ? 'amber' : 'emerald',
       avatarVariant: isDelivered ? 'gray' : 'amber',
       distanceMiles: Number(item.distanceMiles ?? 0),
+      time: formatChatTime(rawTime),
     };
   };
 

@@ -346,16 +346,58 @@ export default function CustomerChatScreen() {
   const activeOrders = orders.filter((o) => o.status !== 'delivered');
   const recentOrders = orders.filter((o) => o.status === 'delivered');
 
+  const formatChatTime = (dateInput?: string | number | Date | null): string | undefined => {
+    if (!dateInput) return undefined;
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return undefined;
+
+    const now = new Date();
+    const isToday =
+      date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear();
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday =
+      date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear();
+
+    const timeStr = date.toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    if (isToday) {
+      return `Today, ${timeStr}`;
+    }
+    if (isYesterday) {
+      return `Yesterday, ${timeStr}`;
+    }
+    return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+  };
+
   const mapApiChatToItem = (chat: ApiChatSummary): ChatConversationItem => {
     const shortId = chat.orderId ? chat.orderId.slice(-6).toUpperCase() : '------';
     const isDelivered = chat.orderStatus === 'delivered';
+    const rawTime =
+      chat.lastMessage?.createdAt ||
+      (chat as any).lastMessageCreatedAt ||
+      (chat as any).last_created_at ||
+      (chat as any).updatedAt ||
+      (chat as any).updated_at ||
+      (chat as any).createdAt ||
+      (chat as any).created_at;
+
     return {
       id: chat.orderId,
       name: chat.counterpartyName || 'Driver',
       orderNumber: `#ORD-${shortId}`,
       orderMetaText: chat.lastMessage?.body || (isDelivered ? 'Delivered' : 'Active order'),
       address: chat.deliveryAddress || 'Delivery Address',
-      time: chat.lastMessage?.createdAt ? new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined,
+      time: formatChatTime(rawTime),
       status: chat.orderStatus,
       statusLabel: isDelivered ? 'Delivered' : 'Active order',
       statusVariant: isDelivered ? 'gray' : 'emerald',
@@ -368,14 +410,21 @@ export default function CustomerChatScreen() {
     const shortId = item.id ? item.id.slice(-6).toUpperCase() : '------';
     const driverName = item.driverName || item.driver_name || 'Driver';
     const isDelivered = item.status === 'delivered';
+    const rawTime =
+      (item as any).deliveredAt ||
+      (item as any).delivered_at ||
+      (item as any).updatedAt ||
+      (item as any).updated_at ||
+      item.createdAt ||
+      (item as any).created_at;
 
     return {
       id: item.id,
       name: driverName,
       orderNumber: `#ORD-${shortId}`,
-      orderMetaText: isDelivered ? 'Delivered 12 min ago' : 'Started 8 min ago',
-      address: item.deliveryAddress || item.delivery_address || 'Sahuarita, AZ',
-      time: isDelivered ? '12m' : '8m',
+      orderMetaText: isDelivered ? 'Delivered' : 'Active order',
+      address: item.deliveryAddress || item.delivery_address || 'Delivery Address',
+      time: formatChatTime(rawTime),
       status: item.status,
       statusLabel: isDelivered ? 'Delivered' : 'Active order',
       statusVariant: isDelivered ? 'gray' : 'emerald',
