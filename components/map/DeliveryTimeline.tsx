@@ -1,7 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Order } from '@/lib/orders';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isCompact = SCREEN_WIDTH < 380;
 
 interface StepConfig {
   key: string;
@@ -77,11 +80,11 @@ export function DeliveryTimeline({ status }: { status: Order['status'] }) {
                   ]}
                 >
                   {isCompleted ? (
-                    <MaterialIcons name="check" size={15} color="#07121E" />
+                    <MaterialIcons name="check" size={isCompact ? 12 : 14} color="#07121E" />
                   ) : (
                     <MaterialIcons
                       name={step.iconName}
-                      size={isActive ? 15 : 13}
+                      size={isActive ? (isCompact ? 12 : 14) : (isCompact ? 10 : 12)}
                       color={isActive ? BLUE : 'rgba(255, 255, 255, 0.35)'}
                     />
                   )}
@@ -198,9 +201,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   nodeCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: isCompact ? 22 : 26,
+    height: isCompact ? 22 : 26,
+    borderRadius: isCompact ? 11 : 13,
     backgroundColor: '#111724',
     borderColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 1.5,
@@ -218,11 +221,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   stepLabel: {
-    fontSize: 10,
+    fontSize: isCompact ? 9 : 10,
     fontWeight: '600',
     color: '#64748B',
     textAlign: 'center',
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   labelCompleted: {
     color: GREEN,

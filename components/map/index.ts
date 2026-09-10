@@ -4,3 +4,6 @@ export * from './NativeMap';
 export * from './DeliveryTimeline';
 export * from './MapSelectedCard';
 export * from './MapStopsCarousel';
+export * from './mapApproachUtils';
+export * from './DestinationPin';
+export * from './hooks/useMapState';

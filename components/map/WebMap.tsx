@@ -1,8 +1,10 @@
 import React, { useMemo, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import Svg, { Circle, Path, Line, Rect, G, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Path, Line, Rect, G, Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { Order } from '@/lib/orders';
-import { CENTER, getCoords, getPickupCoords, getDeliveryCoords, haptic, CYAN, GOLD } from './mapTypes';
+import { ACTIVE_STATUSES } from '@/lib/driverQueue';
+import { CENTER, getCoords, getPickupCoords, getDeliveryCoords, haptic, CYAN, GOLD, COBALT, ROUTE_PENDING } from './mapTypes';
+import { getStreetOnly } from './mapApproachUtils';
 import { TargetIcon } from '@/assets/icons/MapIcons';
 
 export function WebMap({
@@ -11,27 +13,49 @@ export function WebMap({
   onSelect,
   currentTab = 'pending',
   driverLocation,
+  activeOrders: passedActiveOrders,
 }: {
   orders: Order[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   currentTab?: 'active' | 'pending';
   driverLocation?: { lat?: number; lng?: number };
+  activeOrders?: Order[];
 }) {
-  const active = orders.filter((o) => o.status === 'accepted' || o.status === 'picked_up');
-  const pending = orders.filter((o) => o.status === 'pending');
+  const active = useMemo(
+    () => passedActiveOrders || orders.filter((o) => ACTIVE_STATUSES.includes(o.status)),
+    [passedActiveOrders, orders]
+  );
+  const pending = useMemo(
+    () => orders.filter((o) => o.status === 'pending'),
+    [orders]
+  );
 
-  const selectedOrder =
-    orders.find((o) => o.id === selectedId) ||
-    (currentTab === 'active' && active.length > 0 ? active[0] : null) ||
-    (currentTab === 'pending' && pending.length > 0 ? pending[0] : null) ||
-    orders[0];
+  const visibleOrders = useMemo(() => {
+    if (currentTab === 'active') {
+      return active;
+    }
+    if (selectedId) {
+      const selected = pending.find((o) => o.id === selectedId);
+      if (selected) return [selected];
+    }
+    return pending.length > 0 ? [pending[0]] : [];
+  }, [currentTab, active, pending, selectedId]);
+
+  const selectedOrder = useMemo(() => {
+    if (selectedId) {
+      const found = visibleOrders.find((o) => o.id === selectedId);
+      if (found) return found;
+    }
+    return visibleOrders[0] || null;
+  }, [selectedId, visibleOrders]);
+
   const originCenter =
     (driverLocation?.lat != null && driverLocation?.lng != null
       ? { lat: driverLocation.lat, lng: driverLocation.lng }
       : null) ||
     getPickupCoords(selectedOrder) ||
-    getPickupCoords(orders[0]) ||
+    getPickupCoords(visibleOrders[0]) ||
     CENTER;
 
   const width = 400;
@@ -115,12 +139,27 @@ export function WebMap({
           <Circle r={4} fill="#FFFFFF" />
         </G>
 
-        {orders.map((order) => {
+        {selectedCoords && selectedOrder && (
+          <Line
+            x1={storeX}
+            y1={storeY}
+            x2={selectedCoords.x}
+            y2={selectedCoords.y}
+            stroke={ACTIVE_STATUSES.includes(selectedOrder.status) ? COBALT : ROUTE_PENDING}
+            strokeWidth={3}
+            strokeDasharray={ACTIVE_STATUSES.includes(selectedOrder.status) ? undefined : "6,6"}
+          />
+        )}
+
+        {visibleOrders.map((order) => {
           if (order.status === 'delivered') return null;
           const pt = getCanvasCoords(order);
           const isSelected = order.id === selectedId;
-          const isActive = order.status === 'accepted' || order.status === 'picked_up';
-          const pinColor = isActive ? CYAN : GOLD;
+          const activeIndex = active.findIndex((a) => a.id === order.id);
+          const isActive = activeIndex >= 0;
+          const stopNumber = isActive ? activeIndex + 1 : null;
+          const pinColor = isActive ? COBALT : GOLD;
+          const streetLabel = getStreetOnly(order.deliveryAddress);
 
           return (
             <G
@@ -135,16 +174,62 @@ export function WebMap({
               <Circle
                 r={isSelected ? 18 : 14}
                 fill={pinColor}
-                opacity={isSelected ? 0.35 : 0.2}
+                opacity={isSelected ? 0.4 : 0.25}
               />
-              <Path
-                d="M 0 -16 C -8 -16 -12 -10 -12 -2 C -12 6 0 16 0 16 C 0 16 12 6 12 -2 C 12 -10 8 -16 0 -16 Z"
-                fill={pinColor}
-                stroke="#FFFFFF"
-                strokeWidth={1.5}
-              />
-              <Circle cx={0} cy={-4} r={4} fill="#000000" opacity={0.7} />
-              <Circle cx={0} cy={-4} r={2.5} fill="#FFFFFF" />
+              {isActive ? (
+                <>
+                  <Circle
+                    r={12}
+                    fill={COBALT}
+                    stroke="#FFFFFF"
+                    strokeWidth={2}
+                  />
+                  <SvgText
+                    x={0}
+                    y={4}
+                    fill="#FFFFFF"
+                    fontSize={11}
+                    fontWeight="bold"
+                    textAnchor="middle"
+                  >
+                    {stopNumber}
+                  </SvgText>
+                </>
+              ) : (
+                <>
+                  <Path
+                    d="M 0 -16 C -8 -16 -12 -10 -12 -2 C -12 6 0 16 0 16 C 0 16 12 6 12 -2 C 12 -10 8 -16 0 -16 Z"
+                    fill={pinColor}
+                    stroke="#FFFFFF"
+                    strokeWidth={1.5}
+                  />
+                  <Circle cx={0} cy={-4} r={4} fill="#000000" opacity={0.7} />
+                  <Circle cx={0} cy={-4} r={2.5} fill="#FFFFFF" />
+                </>
+              )}
+              {isSelected && streetLabel ? (
+                <G transform="translate(18, -4)">
+                  <Rect
+                    x={0}
+                    y={-10}
+                    width={Math.min(150, streetLabel.length * 7 + 14)}
+                    height={20}
+                    rx={5}
+                    fill="rgba(15, 19, 28, 0.9)"
+                    stroke="rgba(255, 255, 255, 0.2)"
+                    strokeWidth={1}
+                  />
+                  <SvgText
+                    x={6}
+                    y={4}
+                    fill="#FFFFFF"
+                    fontSize={10}
+                    fontWeight="700"
+                  >
+                    {streetLabel}
+                  </SvgText>
+                </G>
+              ) : null}
             </G>
           );
         })}

@@ -5,7 +5,7 @@ import { Order } from './orders';
 export const MAX_QUEUE = 3;
 
 
-const ACTIVE_STATUSES: Order['status'][] = [
+export const ACTIVE_STATUSES: Order['status'][] = [
   'assigned',
   'accepted',
   'shopping',

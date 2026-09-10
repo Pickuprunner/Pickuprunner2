@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { StyleSheet, View, Text, Pressable, Platform, StatusBar } from 'react-native';
+import { StyleSheet, View, Text, Pressable, Platform, StatusBar, Dimensions } from 'react-native';
 import { YStack, SizableText, Button, MapPin, Navigation } from '@blinkdotnew/mobile-ui';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -15,11 +15,16 @@ import {
   openMapsNavigation,
   GOLD,
   COBALT,
+  ROUTE_ACTIVE,
+  ROUTE_PENDING,
   DARK_MAP_STYLE,
   haptic,
 } from './mapTypes';
+import { ACTIVE_STATUSES } from '@/lib/driverQueue';
 import { geocode, fetchDrivingRoute } from '@/lib/distance';
 import { useLocationStore } from '@/store/useLocationStore';
+import { isStreetZoomLevel, getApproachArcCoordinates } from './mapApproachUtils';
+import { DestinationPin } from './DestinationPin';
 
 function NativeFallbackMap({
   orders,
@@ -47,7 +52,7 @@ function NativeFallbackMap({
         Delivery Routes
       </SizableText>
       <SizableText size="$2" color={colors.textSecondary} textAlign="center" paddingHorizontal="$4">
-        {pending.length} pending deliveries available. Tap any order below to view route details or open in maps.
+        {pending.length} orders available. Tap any order below to view route details or open in maps.
       </SizableText>
       <Button
         size="$3"
@@ -59,7 +64,7 @@ function NativeFallbackMap({
         icon={<Navigation size={14} color={GOLD} />}
         onPress={() => openMapsNavigation(APP_CONFIG.STORE_ADDRESS)}
       >
-        Directions to Store Hub
+        Directions to Pickup Point
       </Button>
     </YStack>
   );
@@ -71,15 +76,24 @@ export function NativeMap({
   onSelect,
   currentTab = 'pending',
   driverLocation,
+  activeOrders: passedActiveOrders,
 }: {
   orders: Order[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   currentTab?: 'active' | 'pending';
   driverLocation?: { lat?: number; lng?: number };
+  activeOrders?: Order[];
 }) {
   const insets = useSafeAreaInsets();
   const mapRef = useRef<any>(null);
+  const { width: winWidth, height: winHeight } = Dimensions.get('window');
+  const dynamicEdgePadding = useMemo(() => ({
+    top: Math.max(25, Math.min(50, Math.round(winHeight * 0.06))),
+    bottom: Math.max(35, Math.min(65, Math.round(winHeight * 0.08))),
+    left: Math.max(20, Math.min(40, Math.round(winWidth * 0.08))),
+    right: Math.max(20, Math.min(40, Math.round(winWidth * 0.08))),
+  }), [winWidth, winHeight]);
   const regionRef = useRef<{
     latitude: number;
     longitude: number;
@@ -115,16 +129,19 @@ export function NativeMap({
   }, [driverLocation?.lat, driverLocation?.lng, storedLocation?.lat, storedLocation?.lon]);
 
   const hasCenteredDriverRef = useRef(false);
+  const attemptedAddressesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let mounted = true;
     orders.forEach((o) => {
-      if (o.pickupAddress && !getPickupCoords(o)) {
+      if (o.pickupAddress && !getPickupCoords(o) && !attemptedAddressesRef.current.has(o.pickupAddress)) {
+        attemptedAddressesRef.current.add(o.pickupAddress);
         geocode(o.pickupAddress).then(() => {
           if (mounted) setGeocodeTick((n) => n + 1);
         }).catch(() => {});
       }
-      if (o.deliveryAddress && !getDeliveryCoords(o)) {
+      if (o.deliveryAddress && !getDeliveryCoords(o) && !attemptedAddressesRef.current.has(o.deliveryAddress)) {
+        attemptedAddressesRef.current.add(o.deliveryAddress);
         geocode(o.deliveryAddress).then(() => {
           if (mounted) setGeocodeTick((n) => n + 1);
         }).catch(() => {});
@@ -135,12 +152,33 @@ export function NativeMap({
     };
   }, [orders]);
 
-  const active = orders.filter((o) => o.status === 'accepted' || o.status === 'picked_up');
-  const pending = orders.filter((o) => o.status === 'pending');
+  const active = useMemo(
+    () => passedActiveOrders || orders.filter((o) => ACTIVE_STATUSES.includes(o.status)),
+    [passedActiveOrders, orders]
+  );
+  const pending = useMemo(
+    () => orders.filter((o) => o.status === 'pending'),
+    [orders]
+  );
+
+
+
+  const visibleOrders = useMemo(() => {
+    if (currentTab === 'active') {
+      return active;
+    }
+    if (selectedId) {
+      const selected = pending.find((o) => o.id === selectedId);
+      if (selected) return [selected];
+    }
+    return pending.length > 0 ? [pending[0]] : [];
+  }, [currentTab, active, pending, selectedId]);
+
+  const hubColor = currentTab === 'pending' ? GOLD : COBALT;
 
   const pickupHubs = useMemo(() => {
     const hubMap = new Map<string, { lat: number; lng: number; address: string; orderIds: string[] }>();
-    orders.forEach((o) => {
+    visibleOrders.forEach((o) => {
       const p = getPickupCoords(o);
       if (!p) return;
       const key = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
@@ -157,7 +195,38 @@ export function NativeMap({
       }
     });
     return Array.from(hubMap.values());
-  }, [orders]);
+  }, [visibleOrders]);
+
+
+  const pinCollisionOffsets = useMemo(() => {
+    const coordsList: { id: string; lat: number; lng: number }[] = [];
+    pickupHubs.forEach((h) => {
+      coordsList.push({ id: `hub-${h.lat.toFixed(4)}-${h.lng.toFixed(4)}`, lat: h.lat, lng: h.lng });
+    });
+    visibleOrders.forEach((o) => {
+      const d = getDeliveryCoords(o);
+      if (d) coordsList.push({ id: `delivery-${o.id}`, lat: d.lat, lng: d.lng });
+    });
+
+    const offsetMap = new Map<string, { lat: number; lng: number }>();
+    coordsList.forEach((item) => {
+      const collisions = coordsList.filter(
+        (other) =>
+          Math.abs(other.lat - item.lat) < 0.00025 &&
+          Math.abs(other.lng - item.lng) < 0.00025
+      );
+      if (collisions.length > 1) {
+        const idx = collisions.findIndex((c) => c.id === item.id);
+        const angle = (2 * Math.PI * idx) / collisions.length;
+        const offsetDist = 0.00018; // ~18-20m
+        offsetMap.set(item.id, {
+          lat: item.lat + offsetDist * Math.cos(angle),
+          lng: item.lng + offsetDist * Math.sin(angle),
+        });
+      }
+    });
+    return offsetMap;
+  }, [pickupHubs, visibleOrders]);
 
   const initialCenter =
     driverCoords ||
@@ -193,7 +262,7 @@ export function NativeMap({
               lat: last.coords.latitude,
               lon: last.coords.longitude,
             });
-            if (mapRef.current && !selectedId && !hasCenteredDriverRef.current) {
+            if (mapRef.current && !hasCenteredDriverRef.current) {
               hasCenteredDriverRef.current = true;
               mapRef.current.animateToRegion({
                 latitude: last.coords.latitude,
@@ -209,7 +278,7 @@ export function NativeMap({
               lat: pos.coords.latitude,
               lon: pos.coords.longitude,
             });
-            if (mapRef.current && !selectedId && !hasCenteredDriverRef.current) {
+            if (mapRef.current && !hasCenteredDriverRef.current) {
               hasCenteredDriverRef.current = true;
               mapRef.current.animateToRegion({
                 latitude: pos.coords.latitude,
@@ -227,10 +296,21 @@ export function NativeMap({
     return () => {
       mounted = false;
     };
-  }, [selectedId]);
+  }, []);
+
+  const lastFittedOrderIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!mapRef.current || !selectedId) return;
+    if (!mapRef.current) return;
+    if (!selectedId) {
+      lastFittedOrderIdRef.current = null;
+      return;
+    }
+
+    if (lastFittedOrderIdRef.current === selectedId) {
+      return;
+    }
+
     const selected = orders.find((o) => o.id === selectedId);
     if (!selected) return;
 
@@ -241,19 +321,36 @@ export function NativeMap({
     if (d) coordsToFit.push({ latitude: d.lat, longitude: d.lng });
 
     if (coordsToFit.length >= 2) {
-      mapRef.current.fitToCoordinates(coordsToFit, {
-        edgePadding: { top: 90, right: 60, bottom: 130, left: 60 },
-        animated: true,
-      });
+      lastFittedOrderIdRef.current = selectedId;
+      const latDiff = Math.abs(coordsToFit[0].latitude - coordsToFit[1].latitude);
+      const lngDiff = Math.abs(coordsToFit[0].longitude - coordsToFit[1].longitude);
+      try {
+        if (latDiff < 0.0005 && lngDiff < 0.0005) {
+          mapRef.current.animateToRegion({
+            latitude: coordsToFit[0].latitude,
+            longitude: coordsToFit[0].longitude,
+            latitudeDelta: 0.03,
+            longitudeDelta: 0.03,
+          });
+        } else {
+          mapRef.current.fitToCoordinates(coordsToFit, {
+            edgePadding: dynamicEdgePadding,
+            animated: true,
+          });
+        }
+      } catch {}
     } else if (coordsToFit.length === 1) {
-      mapRef.current.animateToRegion({
-        latitude: coordsToFit[0].latitude,
-        longitude: coordsToFit[0].longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      });
+      lastFittedOrderIdRef.current = selectedId;
+      try {
+        mapRef.current.animateToRegion({
+          latitude: coordsToFit[0].latitude,
+          longitude: coordsToFit[0].longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        });
+      } catch {}
     }
-  }, [selectedId, orders]);
+  }, [selectedId, orders, dynamicEdgePadding]);
 
   const prevTabRef = useRef(currentTab);
   useEffect(() => {
@@ -270,17 +367,32 @@ export function NativeMap({
           if (d) coordsToFit.push({ latitude: d.lat, longitude: d.lng });
 
           if (coordsToFit.length >= 2) {
-            mapRef.current.fitToCoordinates(coordsToFit, {
-              edgePadding: { top: 90, right: 60, bottom: 130, left: 60 },
-              animated: true,
-            });
+            const latDiff = Math.abs(coordsToFit[0].latitude - coordsToFit[1].latitude);
+            const lngDiff = Math.abs(coordsToFit[0].longitude - coordsToFit[1].longitude);
+            try {
+              if (latDiff < 0.0005 && lngDiff < 0.0005) {
+                mapRef.current.animateToRegion({
+                  latitude: coordsToFit[0].latitude,
+                  longitude: coordsToFit[0].longitude,
+                  latitudeDelta: 0.04,
+                  longitudeDelta: 0.04,
+                });
+              } else {
+                mapRef.current.fitToCoordinates(coordsToFit, {
+                  edgePadding: dynamicEdgePadding,
+                  animated: true,
+                });
+              }
+            } catch {}
           } else if (coordsToFit.length === 1) {
-            mapRef.current.animateToRegion({
-              latitude: coordsToFit[0].latitude,
-              longitude: coordsToFit[0].longitude,
-              latitudeDelta: 0.04,
-              longitudeDelta: 0.04,
-            });
+            try {
+              mapRef.current.animateToRegion({
+                latitude: coordsToFit[0].latitude,
+                longitude: coordsToFit[0].longitude,
+                latitudeDelta: 0.04,
+                longitudeDelta: 0.04,
+              });
+            } catch {}
           }
         }
       }
@@ -328,14 +440,8 @@ export function NativeMap({
     haptic('light');
     if (!mapRef.current) return;
     const allCoords: { latitude: number; longitude: number }[] = [];
-    const relevantOrders =
-      currentTab === 'active' && active.length > 0
-        ? active
-        : currentTab === 'pending' && pending.length > 0
-          ? pending
-          : orders;
 
-    relevantOrders.forEach((o) => {
+    visibleOrders.forEach((o) => {
       const p = getPickupCoords(o);
       const d = getDeliveryCoords(o);
       if (p) allCoords.push({ latitude: p.lat, longitude: p.lng });
@@ -344,7 +450,7 @@ export function NativeMap({
 
     if (allCoords.length >= 2) {
       mapRef.current.fitToCoordinates(allCoords, {
-        edgePadding: { top: 70, right: 40, bottom: 130, left: 40 },
+        edgePadding: dynamicEdgePadding,
         animated: true,
       });
     } else if (allCoords.length === 1) {
@@ -363,15 +469,8 @@ export function NativeMap({
     haptic('light');
     if (!mapRef.current) return;
 
-    const selected = selectedId ? orders.find((o) => o.id === selectedId) : null;
-    const targetOrder =
-      selected ||
-      (currentTab === 'active' && active.length > 0 ? active[0] : null) ||
-      (currentTab === 'pending' && pending.length > 0 ? pending[0] : null) ||
-      active[0] ||
-      pending[0] ||
-      orders[0];
-
+    const selected = selectedId ? visibleOrders.find((o) => o.id === selectedId) : null;
+    const targetOrder = selected || visibleOrders[0];
     const targetCoords = targetOrder ? getPickupCoords(targetOrder) : null;
     const target = targetCoords || pickupHubs[0];
 
@@ -423,13 +522,27 @@ export function NativeMap({
     mapRef.current.animateToRegion(next, 200);
   };
 
-  const targetRouteOrder =
-    (selectedId ? orders.find((o) => o.id === selectedId) : null) ||
-    (currentTab === 'active' ? active[0] : (pending[0] || active[0]));
+  const targetRouteOrder = useMemo(() => {
+    if (selectedId) {
+      const found = visibleOrders.find((o) => o.id === selectedId);
+      if (found) return found;
+    }
+    return visibleOrders[0] || null;
+  }, [selectedId, visibleOrders]);
   const routePickup = targetRouteOrder ? getPickupCoords(targetRouteOrder) : null;
   const routeDelivery = targetRouteOrder ? getDeliveryCoords(targetRouteOrder) : null;
 
   const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [isZoomedIn, setIsZoomedIn] = useState(false);
+
+  const curbPoint = routeCoordinates.length >= 2 ? routeCoordinates[routeCoordinates.length - 1] : null;
+  const approachCoordinates = useMemo(() => {
+    if (!curbPoint || !routeDelivery) return [];
+    return getApproachArcCoordinates(curbPoint, {
+      latitude: routeDelivery.lat,
+      longitude: routeDelivery.lng,
+    });
+  }, [curbPoint, routeDelivery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -472,46 +585,77 @@ export function NativeMap({
         onRegionChangeComplete={(region: any) => {
           if (region && region.latitudeDelta > 0 && region.longitudeDelta > 0) {
             regionRef.current = region;
+            const zoomed = isStreetZoomLevel(region.latitudeDelta);
+            setIsZoomedIn((prev) => (prev !== zoomed ? zoomed : prev));
           }
         }}
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
+        toolbarEnabled={false}
       >
       
         {Polyline && routeCoordinates.length >= 2 && (
           <>
             <Polyline
               coordinates={routeCoordinates}
-              strokeColor="rgba(0, 0, 0, 0.65)"
+              strokeColor="rgba(0, 0, 0, 0.7)"
               strokeWidth={Platform.OS === 'ios' ? 6 : 7}
             />
             <Polyline
               coordinates={routeCoordinates}
-              strokeColor={targetRouteOrder?.status === 'accepted' || targetRouteOrder?.status === 'picked_up' ? colors.tertiary : COBALT}
-              strokeWidth={Platform.OS === 'ios' ? 3.5 : 4}
+              strokeColor={
+                targetRouteOrder?.status && ACTIVE_STATUSES.includes(targetRouteOrder.status)
+                  ? ROUTE_ACTIVE
+                  : ROUTE_PENDING
+              }
+              strokeWidth={Platform.OS === 'ios' ? 3.8 : 4.2}
             />
           </>
         )}
 
+        {Polyline && approachCoordinates.length >= 2 && (
+          <Polyline
+            coordinates={approachCoordinates}
+            strokeColor={
+              targetRouteOrder?.status && ACTIVE_STATUSES.includes(targetRouteOrder.status)
+                ? 'rgba(179, 197, 255, 0.95)'
+                : 'rgba(255, 227, 153, 0.95)'
+            }
+            strokeWidth={Platform.OS === 'ios' ? 2.5 : 3}
+            lineDashPattern={[5, 5]}
+            lineCap="round"
+          />
+        )}
+
         {pickupHubs.map((hub, idx) => {
           const isSelected = Boolean(selectedId && hub.orderIds.includes(selectedId));
+          const hubKey = `hub-${hub.lat.toFixed(4)}-${hub.lng.toFixed(4)}`;
+          const offset = pinCollisionOffsets.get(hubKey);
+          const coord = offset || { latitude: hub.lat, longitude: hub.lng };
           return (
             <Marker
-              key={`hub-${hub.lat}-${hub.lng}-${idx}`}
-              coordinate={{ latitude: hub.lat, longitude: hub.lng }}
-              title="Pickup Store"
+              key={`${hubKey}-${idx}`}
+              coordinate={coord}
+              title="Pickup Point"
               description={hub.address}
+              zIndex={isSelected ? 150 : 50}
               onPress={() => {
                 if (hub.orderIds.length > 0) {
                   onSelect(hub.orderIds[0]);
                 }
               }}
             >
-              <View style={[styles.pickupHubPinContainer, isSelected && styles.pickupHubPinSelected]}>
-                <MaterialIcons name="storefront" size={16} color={colors.primary} />
+              <View
+                style={[
+                  styles.pickupHubPinContainer,
+                  { borderColor: hubColor },
+                  isSelected && { transform: [{ scale: 1.15 }] },
+                ]}
+              >
+                <MaterialIcons name="storefront" size={16} color={hubColor} />
                 {hub.orderIds.length > 1 && (
-                  <View style={styles.hubBadge}>
+                  <View style={[styles.hubBadge, { backgroundColor: hubColor }]}>
                     <Text style={styles.hubBadgeText}>{hub.orderIds.length}</Text>
                   </View>
                 )}
@@ -520,7 +664,7 @@ export function NativeMap({
                 <Callout tooltip onPress={() => onSelect(hub.orderIds[0])} style={{ width: 200, alignItems: 'center' }}>
                   <View style={styles.calloutCard}>
                     <Text style={styles.calloutTitle} numberOfLines={1}>
-                      Pickup: Store {hub.orderIds.length > 1 ? `(${hub.orderIds.length} orders)` : ''}
+                      Pickup Point {hub.orderIds.length > 1 ? `(${hub.orderIds.length} orders)` : ''}
                     </Text>
                     <Text style={styles.calloutSub} numberOfLines={2}>
                       {hub.address}
@@ -533,37 +677,39 @@ export function NativeMap({
           );
         })}
 
-        {orders.map((order) => {
+        {visibleOrders.map((order) => {
           const dCoords = getDeliveryCoords(order);
           if (!dCoords) return null;
           const isSelected = Boolean(selectedId && order.id === selectedId);
-          const isActive = order.status === 'accepted' || order.status === 'picked_up';
+          const activeIndex = active.findIndex((a) => a.id === order.id);
+          const isActive = activeIndex >= 0;
+          const stopNumber = isActive ? activeIndex + 1 : null;
+          const offset = pinCollisionOffsets.get(`delivery-${order.id}`);
+          const coord = offset || { latitude: dCoords.lat, longitude: dCoords.lng };
+          const markerZIndex = isSelected ? 200 : (isActive ? 100 - activeIndex : 10);
+
           return (
             <Marker
               key={`delivery-${order.id}`}
-              coordinate={{ latitude: dCoords.lat, longitude: dCoords.lng }}
-              title={order.customerName || 'Customer Destination'}
+              coordinate={coord}
+              title={isActive ? `Stop #${stopNumber}: Drop Point` : 'Drop Point'}
               description={order.deliveryAddress}
+              zIndex={markerZIndex}
               onPress={() => onSelect(order.id)}
             >
-              <View
-                style={[
-                  styles.deliveryPinContainer,
-                  isActive && styles.deliveryPinActive,
-                  isSelected && (isActive ? styles.deliveryPinSelectedActive : styles.deliveryPinSelectedPending),
-                ]}
-              >
-                <MaterialIcons
-                  name="location-on"
-                  size={15}
-                  color={isActive ? colors.tertiary : GOLD}
-                />
-              </View>
+              <DestinationPin
+                order={order}
+                isActive={isActive}
+                stopNumber={stopNumber}
+                isSelected={isSelected}
+                isZoomedIn={isZoomedIn}
+                isTargetRoute={targetRouteOrder?.id === order.id}
+              />
               {Callout ? (
                 <Callout tooltip onPress={() => onSelect(order.id)} style={{ width: 200, alignItems: 'center' }}>
                   <View style={styles.calloutCard}>
                     <Text style={styles.calloutTitle} numberOfLines={1}>
-                      {order.customerName || (isActive ? 'Active Order' : 'Delivery')}
+                      {isActive ? `Stop #${stopNumber}: Drop Point` : 'Drop Point'}
                     </Text>
                     <Text style={styles.calloutSub} numberOfLines={2}>
                       {order.deliveryAddress}
@@ -584,7 +730,7 @@ export function NativeMap({
           onPress={handleRecenterDriver}
           accessibilityLabel="Recenter on Driver Location"
         >
-          <MaterialIcons name="my-location" size={20} color={colors.tertiary} />
+          <MaterialIcons name="my-location" size={20} color={COBALT} />
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.mapFab, pressed && { opacity: 0.8 }]}
@@ -596,9 +742,9 @@ export function NativeMap({
         <Pressable
           style={({ pressed }) => [styles.mapFab, pressed && { opacity: 0.8 }]}
           onPress={handleRecenterStore}
-          accessibilityLabel="Recenter Store Hub"
+          accessibilityLabel="Recenter Pickup Point"
         >
-          <MaterialIcons name="storefront" size={18} color={colors.primary} />
+          <MaterialIcons name="storefront" size={18} color={hubColor} />
         </Pressable>
       </View>
 
@@ -713,45 +859,6 @@ const styles = StyleSheet.create({
     shadowColor: colors.primary,
     shadowRadius: 10,
     shadowOpacity: 0.8,
-  },
-  deliveryPinContainer: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.surfaceContainerLowest,
-    borderWidth: 2,
-    borderColor: GOLD,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.sm,
-  },
-  deliveryPinActive: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderColor: colors.tertiary,
-    borderWidth: 2.5,
-    shadowColor: colors.tertiary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  deliveryPinSelectedPending: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderColor: GOLD,
-    shadowColor: GOLD,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.85,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  deliveryPinSelectedActive: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderColor: colors.tertiary,
-    shadowColor: colors.tertiary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 10,
-    elevation: 8,
   },
   calloutCard: {
     width: 200,

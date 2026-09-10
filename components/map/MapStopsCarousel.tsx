@@ -5,12 +5,13 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Order } from '@/lib/orders';
 import { APP_CONFIG, calcDriverEarnings } from '@/lib/config';
+import { MAX_QUEUE, ACTIVE_STATUSES } from '@/lib/driverQueue';
 import { colors, shadows, borderRadius } from '@/constants/design';
 import { haptic, GOLD, GOLD_LIGHT, GREEN, COBALT } from './mapTypes';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BLUE = '#00A8FF';
-const TAB_WIDTH = 92;
+const TAB_WIDTH = Math.min(118, Math.max(96, Math.floor((SCREEN_WIDTH - 110) / 2)));
 
 export function MapStopsCarousel({
   pendingOrders,
@@ -20,6 +21,8 @@ export function MapStopsCarousel({
   onSelectId,
   currentTab: controlledTab,
   onTabChange,
+  atCapacity,
+  queueCount,
 }: {
   pendingOrders: Order[];
   activeOrders: Order[];
@@ -28,6 +31,8 @@ export function MapStopsCarousel({
   onSelectId: (id: string) => void;
   currentTab?: 'active' | 'pending';
   onTabChange?: (tab: 'active' | 'pending') => void;
+  atCapacity?: boolean;
+  queueCount?: number;
 }) {
   const [internalTab, setInternalTab] = useState<'active' | 'pending'>('pending');
   const currentTab = controlledTab ?? internalTab;
@@ -44,10 +49,23 @@ export function MapStopsCarousel({
     }).start();
   }, [currentTab]);
 
+  const hasInitializedTabRef = useRef(false);
+  const prevActiveCountRef = useRef(activeOrders.length);
+
   useEffect(() => {
-    if (activeOrders.length === 0 && pendingOrders.length > 0 && currentTab === 'active') {
+    if (!hasInitializedTabRef.current) {
+      hasInitializedTabRef.current = true;
+      if (activeOrders.length === 0 && pendingOrders.length > 0 && currentTab === 'active') {
+        setCurrentTab('pending');
+      }
+      prevActiveCountRef.current = activeOrders.length;
+      return;
+    }
+
+    if (prevActiveCountRef.current > 0 && activeOrders.length === 0 && currentTab === 'active') {
       setCurrentTab('pending');
     }
+    prevActiveCountRef.current = activeOrders.length;
   }, [activeOrders.length, pendingOrders.length, currentTab]);
 
   const displayOrders = currentTab === 'active' ? activeOrders : pendingOrders;
@@ -61,6 +79,7 @@ export function MapStopsCarousel({
             style={[
               styles.slidingPill,
               {
+                width: TAB_WIDTH,
                 left: slideAnim.interpolate({
                   inputRange: [0, 1],
                   outputRange: [3, 3 + TAB_WIDTH],
@@ -91,6 +110,7 @@ export function MapStopsCarousel({
             }}
             style={({ pressed }) => [
               styles.segmentTab,
+              { width: TAB_WIDTH },
               pressed && { opacity: 0.8 },
             ]}
           >
@@ -99,6 +119,7 @@ export function MapStopsCarousel({
                 styles.segmentText,
                 currentTab === 'active' && styles.segmentTextActiveBlue,
               ]}
+              numberOfLines={1}
             >
               Active {activeOrders.length}
             </Text>
@@ -111,6 +132,7 @@ export function MapStopsCarousel({
             }}
             style={({ pressed }) => [
               styles.segmentTab,
+              { width: TAB_WIDTH },
               pressed && { opacity: 0.8 },
             ]}
           >
@@ -119,8 +141,9 @@ export function MapStopsCarousel({
                 styles.segmentText,
                 currentTab === 'pending' && styles.segmentTextActiveGold,
               ]}
+              numberOfLines={1}
             >
-              Pending {pendingOrders.length}
+              Discover {pendingOrders.length}
             </Text>
           </Pressable>
         </View>
@@ -145,7 +168,7 @@ export function MapStopsCarousel({
           const miles = Number(order.distanceMiles ?? 0);
           const tipAmount = Number(order.tipAmount ?? 0);
           const earnings = calcDriverEarnings(miles, tipAmount);
-          const isActive = order.status === 'accepted' || order.status === 'picked_up';
+          const isActive = Boolean(order.status && ACTIVE_STATUSES.includes(order.status));
 
           return (
             <Pressable
@@ -234,8 +257,8 @@ export function MapStopsCarousel({
             <CheckCircle size={20} color={GREEN} />
             <Text style={styles.emptyStopsText}>
               {currentTab === 'active'
-                ? 'No active deliveries. Check pending tab.'
-                : 'All pending deliveries complete!'}
+                ? 'No active deliveries. Check Discover tab.'
+                : 'No available orders right now.'}
             </Text>
           </View>
         )}
@@ -333,13 +356,13 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   stopCard: {
-    width: Math.min(SCREEN_WIDTH * 0.82, 300),
+    width: Math.min(SCREEN_WIDTH * 0.84, 300),
     backgroundColor: colors.glassLevel2Bg,
     borderColor: colors.glassLevel2Border,
     borderWidth: 1,
     borderRadius: borderRadius.md,
-    padding: 16,
-    gap: 10,
+    padding: SCREEN_WIDTH < 380 ? 12 : 16,
+    gap: SCREEN_WIDTH < 380 ? 8 : 10,
   },
   stopCardSingle: {
     width: SCREEN_WIDTH - 32,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
 import { Navigation, CheckCircle } from '@blinkdotnew/mobile-ui';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Order } from '@/lib/orders';
@@ -9,16 +9,20 @@ import { haptic, openMapsNavigation, makePhoneCall, openSmsMessage, GOLD, COBALT
 import { PhoneIcon, MessageIcon } from '@/assets/icons/MapIcons';
 import { DeliveryTimeline } from './DeliveryTimeline';
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 export function MapSelectedCard({
   selectedOrder,
   onClose,
   onAccept,
   onOpenOrder,
+  atCapacity,
 }: {
   selectedOrder: Order;
   onClose: () => void;
   onAccept: (order: Order) => void;
   onOpenOrder: (order: Order) => void;
+  atCapacity?: boolean;
 }) {
   const miles = Number(selectedOrder.distanceMiles ?? 0);
   const tipAmount = Number(selectedOrder.tipAmount ?? 0);
@@ -95,13 +99,17 @@ export function MapSelectedCard({
         </View>
 
         <View style={styles.payoutRight}>
-          <View style={[styles.liveTag, !isPending && styles.activeTag]}>
-            <View style={[styles.liveTagDot, !isPending && { backgroundColor: colors.primary }]} />
-            <Text style={[styles.liveTagText, !isPending && { color: colors.primary }]}>
-              {isPending ? 'AVAILABLE' : 'ACTIVE'}
+          {!isPending && (
+            <View style={[styles.liveTag, styles.activeTag]}>
+              <View style={[styles.liveTagDot, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.liveTagText, { color: colors.primary }]}>ACTIVE</Text>
+            </View>
+          )}
+          {miles > 0 && (
+            <Text style={styles.distanceBadge}>
+              {!isPending ? '• ' : ''}{miles.toFixed(1)} mi
             </Text>
-          </View>
-          {miles > 0 && <Text style={styles.distanceBadge}>• {miles.toFixed(1)} mi</Text>}
+          )}
         </View>
       </View>
 
@@ -151,10 +159,20 @@ export function MapSelectedCard({
         {isPending ? (
           <Pressable
             onPress={() => onAccept(selectedOrder)}
-            style={({ pressed }) => [styles.acceptButton, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [
+              styles.acceptButton,
+              atCapacity && styles.acceptButtonDisabled,
+              pressed && { opacity: 0.85 },
+            ]}
           >
-            <MaterialIcons name="local-shipping" size={18} color="#FFFFFF" />
-            <Text style={styles.acceptButtonText}>ACCEPT ORDER</Text>
+            <MaterialIcons
+              name={atCapacity ? 'warning' : 'local-shipping'}
+              size={18}
+              color="#FFFFFF"
+            />
+            <Text style={styles.acceptButtonText} numberOfLines={1}>
+              {atCapacity ? 'QUEUE FULL (3/3)' : 'ACCEPT ORDER'}
+            </Text>
           </Pressable>
         ) : (
           <Pressable
@@ -173,14 +191,14 @@ export function MapSelectedCard({
 
 const styles = StyleSheet.create({
   detailCard: {
-    marginHorizontal: 16,
+    marginHorizontal: SCREEN_WIDTH < 380 ? 10 : 16,
     alignSelf: 'stretch',
     backgroundColor: colors.glassLevel2Bg,
     borderColor: colors.glassLevel2Border,
     borderWidth: 1,
     borderRadius: borderRadius.md,
-    padding: 18,
-    gap: 14,
+    padding: SCREEN_WIDTH < 380 ? 12 : 16,
+    gap: SCREEN_HEIGHT < 700 ? 8 : 12,
     ...shadows.lg,
   },
   detailCardHeader: {
@@ -390,11 +408,11 @@ const styles = StyleSheet.create({
   /* Action Buttons */
   actionRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   navButton: {
     flex: 1,
-    height: 48,
+    height: SCREEN_HEIGHT < 700 ? 42 : 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -411,7 +429,7 @@ const styles = StyleSheet.create({
   },
   openOrderButton: {
     flex: 1.5,
-    height: 48,
+    height: SCREEN_HEIGHT < 700 ? 42 : 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -428,7 +446,7 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     flex: 1.5,
-    height: 48,
+    height: SCREEN_HEIGHT < 700 ? 42 : 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -437,8 +455,13 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     ...shadows.cobaltGlow,
   },
+  acceptButtonDisabled: {
+    backgroundColor: 'rgba(180, 83, 9, 0.4)',
+    borderColor: 'rgba(245, 158, 11, 0.6)',
+    borderWidth: 1,
+  },
   acceptButtonText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.3,
