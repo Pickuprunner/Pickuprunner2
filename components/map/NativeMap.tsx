@@ -298,106 +298,90 @@ export function NativeMap({
     };
   }, []);
 
-  const lastFittedOrderIdRef = useRef<string | null>(null);
+  const cameraTimeoutRef = useRef<any>(null);
+
+  const safeAnimateToCoords = (coords: { latitude: number; longitude: number }[], offsetBottom = false) => {
+    if (!mapRef.current || coords.length === 0) return;
+    const validCoords = coords.filter((c) => Number.isFinite(c?.latitude) && Number.isFinite(c?.longitude));
+    if (validCoords.length === 0) return;
+
+    if (validCoords.length === 1) {
+      try {
+        mapRef.current.animateToRegion({
+          latitude: validCoords[0].latitude,
+          longitude: validCoords[0].longitude,
+          latitudeDelta: 0.04,
+          longitudeDelta: 0.04,
+        }, 350);
+      } catch {}
+      return;
+    }
+
+    const lats = validCoords.map((c) => c.latitude);
+    const lngs = validCoords.map((c) => c.longitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+
+    const latDelta = Math.max(0.025, (maxLat - minLat) * 1.7);
+    const lngDelta = Math.max(0.025, (maxLng - minLng) * 1.7);
+    const centerLat = (minLat + maxLat) / 2 - (offsetBottom ? latDelta * 0.18 : 0);
+    const centerLng = (minLng + maxLng) / 2;
+
+    try {
+      mapRef.current.animateToRegion({
+        latitude: centerLat,
+        longitude: centerLng,
+        latitudeDelta: latDelta,
+        longitudeDelta: lngDelta,
+      }, 350);
+    } catch {}
+  };
+
+  useEffect(() => {
+    return () => {
+      if (cameraTimeoutRef.current) {
+        clearTimeout(cameraTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const lastTargetKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!mapRef.current) return;
-    if (!selectedId) {
-      lastFittedOrderIdRef.current = null;
+    const targetOrder = selectedId
+      ? orders.find((o) => o.id === selectedId)
+      : (currentTab === 'active' ? active[0] : pending[0]);
+
+    if (!targetOrder) {
+      lastTargetKeyRef.current = null;
       return;
     }
 
-    if (lastFittedOrderIdRef.current === selectedId) {
+    const targetKey = `${currentTab}-${selectedId || 'none'}-${targetOrder.id}`;
+    if (lastTargetKeyRef.current === targetKey) {
       return;
     }
+    lastTargetKeyRef.current = targetKey;
 
-    const selected = orders.find((o) => o.id === selectedId);
-    if (!selected) return;
-
-    const p = getPickupCoords(selected);
-    const d = getDeliveryCoords(selected);
+    const p = getPickupCoords(targetOrder);
+    const d = getDeliveryCoords(targetOrder);
     const coordsToFit: { latitude: number; longitude: number }[] = [];
     if (p) coordsToFit.push({ latitude: p.lat, longitude: p.lng });
     if (d) coordsToFit.push({ latitude: d.lat, longitude: d.lng });
 
-    if (coordsToFit.length >= 2) {
-      lastFittedOrderIdRef.current = selectedId;
-      const latDiff = Math.abs(coordsToFit[0].latitude - coordsToFit[1].latitude);
-      const lngDiff = Math.abs(coordsToFit[0].longitude - coordsToFit[1].longitude);
-      try {
-        if (latDiff < 0.0005 && lngDiff < 0.0005) {
-          mapRef.current.animateToRegion({
-            latitude: coordsToFit[0].latitude,
-            longitude: coordsToFit[0].longitude,
-            latitudeDelta: 0.03,
-            longitudeDelta: 0.03,
-          });
-        } else {
-          mapRef.current.fitToCoordinates(coordsToFit, {
-            edgePadding: dynamicEdgePadding,
-            animated: true,
-          });
-        }
-      } catch {}
-    } else if (coordsToFit.length === 1) {
-      lastFittedOrderIdRef.current = selectedId;
-      try {
-        mapRef.current.animateToRegion({
-          latitude: coordsToFit[0].latitude,
-          longitude: coordsToFit[0].longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        });
-      } catch {}
-    }
-  }, [selectedId, orders, dynamicEdgePadding]);
+    if (coordsToFit.length === 0) return;
 
-  const prevTabRef = useRef(currentTab);
-  useEffect(() => {
-    if (!mapRef.current) return;
-    if (prevTabRef.current !== currentTab) {
-      prevTabRef.current = currentTab;
-      if (!selectedId) {
-        const targetOrder = currentTab === 'active' ? active[0] : pending[0];
-        if (targetOrder) {
-          const p = getPickupCoords(targetOrder);
-          const d = getDeliveryCoords(targetOrder);
-          const coordsToFit: { latitude: number; longitude: number }[] = [];
-          if (p) coordsToFit.push({ latitude: p.lat, longitude: p.lng });
-          if (d) coordsToFit.push({ latitude: d.lat, longitude: d.lng });
-
-          if (coordsToFit.length >= 2) {
-            const latDiff = Math.abs(coordsToFit[0].latitude - coordsToFit[1].latitude);
-            const lngDiff = Math.abs(coordsToFit[0].longitude - coordsToFit[1].longitude);
-            try {
-              if (latDiff < 0.0005 && lngDiff < 0.0005) {
-                mapRef.current.animateToRegion({
-                  latitude: coordsToFit[0].latitude,
-                  longitude: coordsToFit[0].longitude,
-                  latitudeDelta: 0.04,
-                  longitudeDelta: 0.04,
-                });
-              } else {
-                mapRef.current.fitToCoordinates(coordsToFit, {
-                  edgePadding: dynamicEdgePadding,
-                  animated: true,
-                });
-              }
-            } catch {}
-          } else if (coordsToFit.length === 1) {
-            try {
-              mapRef.current.animateToRegion({
-                latitude: coordsToFit[0].latitude,
-                longitude: coordsToFit[0].longitude,
-                latitudeDelta: 0.04,
-                longitudeDelta: 0.04,
-              });
-            } catch {}
-          }
-        }
-      }
+    if (cameraTimeoutRef.current) {
+      clearTimeout(cameraTimeoutRef.current);
     }
-  }, [currentTab, active, pending, selectedId]);
+
+    cameraTimeoutRef.current = setTimeout(() => {
+      safeAnimateToCoords(coordsToFit, Boolean(selectedId));
+    }, 120);
+  }, [selectedId, currentTab, active, pending, orders]);
 
   if (!MapView || !Marker) {
     return <NativeFallbackMap orders={orders} selectedId={selectedId} onSelect={onSelect} />;
@@ -635,7 +619,7 @@ export function NativeMap({
           const coord = offset || { latitude: hub.lat, longitude: hub.lng };
           return (
             <Marker
-              key={`${hubKey}-${idx}`}
+              key={currentTab === 'pending' ? 'hub-discover' : `${hubKey}-${idx}`}
               coordinate={coord}
               title="Pickup Point"
               description={hub.address}
@@ -690,7 +674,7 @@ export function NativeMap({
 
           return (
             <Marker
-              key={`delivery-${order.id}`}
+              key={currentTab === 'pending' ? 'delivery-discover' : `delivery-${order.id}`}
               coordinate={coord}
               title={isActive ? `Stop #${stopNumber}: Drop Point` : 'Drop Point'}
               description={order.deliveryAddress}
