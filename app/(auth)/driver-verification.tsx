@@ -221,6 +221,7 @@ export default function DriverVerificationScreen() {
         licenseExpDate: prev.licenseExpDate || p.licenseExpirationDate || p.license_expiration_date || p.licenseExpDate || '',
 
         fcraAgreed: prev.fcraAgreed || Boolean(p.backgroundConsentAt || p.background_consent_at),
+        ssnLast4: prev.ssnLast4 || p.ssnLast4 || p.ssn_last4 || (existing as any)?.ssn_last4 || '',
 
         insuranceCompany: prev.insuranceCompany || p.insuranceCompany || p.insurance_company || '',
         naicNumber: prev.naicNumber || p.insuranceNaicNumber || p.insurance_naic_number || p.naicNumber || '',
@@ -402,6 +403,7 @@ export default function DriverVerificationScreen() {
       await recordConsentMutation.mutateAsync({
         authorized: formData.fcraAgreed,
         legalName: formData.licenseFullName.trim() || user?.displayName || undefined,
+        ssnLast4: formData.ssnLast4.trim() || undefined,
       });
       setCurrentStep(4);
     } catch (e: any) {
@@ -469,6 +471,7 @@ export default function DriverVerificationScreen() {
         await recordConsentMutation.mutateAsync({
           authorized: formData.fcraAgreed,
           legalName: formData.licenseFullName.trim() || user?.displayName || undefined,
+          ssnLast4: formData.ssnLast4.trim() || undefined,
         });
       }
 
@@ -513,6 +516,7 @@ export default function DriverVerificationScreen() {
             insuranceEffectiveDate: normalizeDateToISO(formData.effectiveDate),
             insuranceExpirationDate: normalizeDateToISO(formData.expirationDate),
             vehicleVin: formData.vinNumber.trim() || undefined,
+            ssnLast4: formData.ssnLast4.trim() || undefined,
             authorized: formData.fcraAgreed ? 'true' : 'false',
             submit: 'true',
           },
@@ -554,6 +558,12 @@ export default function DriverVerificationScreen() {
             })
             .catch((e) => console.warn('[Accreditation] upload insurance_card error:', e));
         }
+
+        await recordConsentMutation.mutateAsync({
+          authorized: formData.fcraAgreed,
+          legalName: formData.licenseFullName.trim() || user?.displayName || undefined,
+          ssnLast4: formData.ssnLast4.trim() || undefined,
+        }).catch(() => {});
 
         await submitAccreditationMutation.mutateAsync().catch((submitErr: any) => {
           if (submitErr?.message?.includes('already been submitted') || submitErr?.message?.includes('under review')) {
