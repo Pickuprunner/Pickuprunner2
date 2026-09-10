@@ -19,6 +19,7 @@ import {
   haptic,
 } from './mapTypes';
 import { geocode, fetchDrivingRoute } from '@/lib/distance';
+import { useLocationStore } from '@/store/useLocationStore';
 
 function NativeFallbackMap({
   orders,
@@ -68,10 +69,14 @@ export function NativeMap({
   orders,
   selectedId,
   onSelect,
+  currentTab = 'pending',
+  driverLocation,
 }: {
   orders: Order[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  currentTab?: 'active' | 'pending';
+  driverLocation?: { lat?: number; lng?: number };
 }) {
   const insets = useSafeAreaInsets();
   const mapRef = useRef<any>(null);
@@ -98,7 +103,19 @@ export function NativeMap({
     console.warn('[map] react-native-maps not available, using fallback view');
   }
 
-  // Pre-geocode any orders missing coordinates in the background
+  const storedLocation = useLocationStore((state) => state.currentLocation);
+  const driverCoords = useMemo(() => {
+    if (driverLocation?.lat != null && driverLocation?.lng != null) {
+      return { lat: driverLocation.lat, lng: driverLocation.lng };
+    }
+    if (storedLocation?.lat != null && storedLocation?.lon != null) {
+      return { lat: storedLocation.lat, lng: storedLocation.lon };
+    }
+    return null;
+  }, [driverLocation?.lat, driverLocation?.lng, storedLocation?.lat, storedLocation?.lon]);
+
+  const hasCenteredDriverRef = useRef(false);
+
   useEffect(() => {
     let mounted = true;
     orders.forEach((o) => {
@@ -143,9 +160,74 @@ export function NativeMap({
   }, [orders]);
 
   const initialCenter =
+    driverCoords ||
+    (currentTab === 'active' && active[0] && (getPickupCoords(active[0]) || getDeliveryCoords(active[0]))) ||
+    (currentTab === 'pending' && pending[0] && (getPickupCoords(pending[0]) || getDeliveryCoords(pending[0]))) ||
     getPickupCoords(active[0] || pending[0] || orders[0]) ||
     getDeliveryCoords(active[0] || pending[0] || orders[0]) ||
     CENTER;
+
+  
+  useEffect(() => {
+    if (hasCenteredDriverRef.current || selectedId) return;
+    if (driverCoords && mapRef.current) {
+      hasCenteredDriverRef.current = true;
+      mapRef.current.animateToRegion({
+        latitude: driverCoords.lat,
+        longitude: driverCoords.lng,
+        latitudeDelta: 0.04,
+        longitudeDelta: 0.04,
+      });
+    }
+  }, [driverCoords, selectedId]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted' && mounted) {
+          const last = await Location.getLastKnownPositionAsync().catch(() => null);
+          if (mounted && last?.coords) {
+            useLocationStore.getState().setCurrentLocation({
+              lat: last.coords.latitude,
+              lon: last.coords.longitude,
+            });
+            if (mapRef.current && !selectedId && !hasCenteredDriverRef.current) {
+              hasCenteredDriverRef.current = true;
+              mapRef.current.animateToRegion({
+                latitude: last.coords.latitude,
+                longitude: last.coords.longitude,
+                latitudeDelta: 0.04,
+                longitudeDelta: 0.04,
+              });
+            }
+          }
+          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null);
+          if (mounted && pos?.coords) {
+            useLocationStore.getState().setCurrentLocation({
+              lat: pos.coords.latitude,
+              lon: pos.coords.longitude,
+            });
+            if (mapRef.current && !selectedId && !hasCenteredDriverRef.current) {
+              hasCenteredDriverRef.current = true;
+              mapRef.current.animateToRegion({
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                latitudeDelta: 0.03,
+                longitudeDelta: 0.03,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[NativeMap] Driver default location error:', err);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedId]);
 
   useEffect(() => {
     if (!mapRef.current || !selectedId) return;
@@ -173,56 +255,62 @@ export function NativeMap({
     }
   }, [selectedId, orders]);
 
+  const prevTabRef = useRef(currentTab);
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (prevTabRef.current !== currentTab) {
+      prevTabRef.current = currentTab;
+      if (!selectedId) {
+        const targetOrder = currentTab === 'active' ? active[0] : pending[0];
+        if (targetOrder) {
+          const p = getPickupCoords(targetOrder);
+          const d = getDeliveryCoords(targetOrder);
+          const coordsToFit: { latitude: number; longitude: number }[] = [];
+          if (p) coordsToFit.push({ latitude: p.lat, longitude: p.lng });
+          if (d) coordsToFit.push({ latitude: d.lat, longitude: d.lng });
+
+          if (coordsToFit.length >= 2) {
+            mapRef.current.fitToCoordinates(coordsToFit, {
+              edgePadding: { top: 90, right: 60, bottom: 130, left: 60 },
+              animated: true,
+            });
+          } else if (coordsToFit.length === 1) {
+            mapRef.current.animateToRegion({
+              latitude: coordsToFit[0].latitude,
+              longitude: coordsToFit[0].longitude,
+              latitudeDelta: 0.04,
+              longitudeDelta: 0.04,
+            });
+          }
+        }
+      }
+    }
+  }, [currentTab, active, pending, selectedId]);
+
   if (!MapView || !Marker) {
     return <NativeFallbackMap orders={orders} selectedId={selectedId} onSelect={onSelect} />;
   }
-
-  const handleFitAllStops = () => {
-    haptic('light');
-    if (!mapRef.current) return;
-    const allCoords: { latitude: number; longitude: number }[] = [];
-    orders.forEach((o) => {
-      const p = getPickupCoords(o);
-      const d = getDeliveryCoords(o);
-      if (p) allCoords.push({ latitude: p.lat, longitude: p.lng });
-      if (d) allCoords.push({ latitude: d.lat, longitude: d.lng });
-    });
-
-    if (allCoords.length > 0) {
-      mapRef.current.fitToCoordinates(allCoords, {
-        edgePadding: { top: 70, right: 40, bottom: 130, left: 40 },
-        animated: true,
-      });
-    } else {
-      mapRef.current.animateToRegion({
-        latitude: initialCenter.lat,
-        longitude: initialCenter.lng,
-        latitudeDelta: 0.08,
-        longitudeDelta: 0.08,
-      });
-    }
-  };
-
-  const handleRecenterStore = () => {
-    haptic('light');
-    if (!mapRef.current) return;
-    const target = pickupHubs[0] || initialCenter;
-    mapRef.current.animateToRegion({
-      latitude: target.lat,
-      longitude: target.lng,
-      latitudeDelta: 0.04,
-      longitudeDelta: 0.04,
-    });
-  };
 
   const handleRecenterDriver = async () => {
     haptic('light');
     if (!mapRef.current) return;
     try {
+      if (driverCoords) {
+        mapRef.current.animateToRegion({
+          latitude: driverCoords.lat,
+          longitude: driverCoords.lng,
+          latitudeDelta: 0.03,
+          longitudeDelta: 0.03,
+        });
+      }
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
         const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         if (pos?.coords) {
+          useLocationStore.getState().setCurrentLocation({
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+          });
           mapRef.current.animateToRegion({
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
@@ -233,6 +321,69 @@ export function NativeMap({
       }
     } catch (err) {
       console.warn('[NativeMap] Failed to get driver location:', err);
+    }
+  };
+
+  const handleFitAllStops = () => {
+    haptic('light');
+    if (!mapRef.current) return;
+    const allCoords: { latitude: number; longitude: number }[] = [];
+    const relevantOrders =
+      currentTab === 'active' && active.length > 0
+        ? active
+        : currentTab === 'pending' && pending.length > 0
+          ? pending
+          : orders;
+
+    relevantOrders.forEach((o) => {
+      const p = getPickupCoords(o);
+      const d = getDeliveryCoords(o);
+      if (p) allCoords.push({ latitude: p.lat, longitude: p.lng });
+      if (d) allCoords.push({ latitude: d.lat, longitude: d.lng });
+    });
+
+    if (allCoords.length >= 2) {
+      mapRef.current.fitToCoordinates(allCoords, {
+        edgePadding: { top: 70, right: 40, bottom: 130, left: 40 },
+        animated: true,
+      });
+    } else if (allCoords.length === 1) {
+      mapRef.current.animateToRegion({
+        latitude: allCoords[0].latitude,
+        longitude: allCoords[0].longitude,
+        latitudeDelta: 0.04,
+        longitudeDelta: 0.04,
+      });
+    } else {
+      handleRecenterDriver();
+    }
+  };
+
+  const handleRecenterStore = () => {
+    haptic('light');
+    if (!mapRef.current) return;
+
+    const selected = selectedId ? orders.find((o) => o.id === selectedId) : null;
+    const targetOrder =
+      selected ||
+      (currentTab === 'active' && active.length > 0 ? active[0] : null) ||
+      (currentTab === 'pending' && pending.length > 0 ? pending[0] : null) ||
+      active[0] ||
+      pending[0] ||
+      orders[0];
+
+    const targetCoords = targetOrder ? getPickupCoords(targetOrder) : null;
+    const target = targetCoords || pickupHubs[0];
+
+    if (target) {
+      mapRef.current.animateToRegion({
+        latitude: target.lat,
+        longitude: target.lng,
+        latitudeDelta: 0.04,
+        longitudeDelta: 0.04,
+      });
+    } else {
+      handleRecenterDriver();
     }
   };
 
@@ -265,15 +416,16 @@ export function NativeMap({
     };
     const next = {
       ...cur,
-      latitudeDelta: Math.min(80, cur.latitudeDelta * 2),
-      longitudeDelta: Math.min(80, cur.longitudeDelta * 2),
+      latitudeDelta: Math.min(2.0, cur.latitudeDelta * 2.0),
+      longitudeDelta: Math.min(2.0, cur.longitudeDelta * 2.0),
     };
     regionRef.current = next;
     mapRef.current.animateToRegion(next, 200);
   };
 
-  const activeOrder = active[0];
-  const targetRouteOrder = (selectedId ? orders.find((o) => o.id === selectedId) : null) || activeOrder;
+  const targetRouteOrder =
+    (selectedId ? orders.find((o) => o.id === selectedId) : null) ||
+    (currentTab === 'active' ? active[0] : (pending[0] || active[0]));
   const routePickup = targetRouteOrder ? getPickupCoords(targetRouteOrder) : null;
   const routeDelivery = targetRouteOrder ? getDeliveryCoords(targetRouteOrder) : null;
 

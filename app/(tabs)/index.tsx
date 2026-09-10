@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { useOrders, useAvailableOrders, useUpdateOrderStatus, useClaimOrder } from '@/lib/orders';
+import { haversineMiles } from '@/lib/locationCalculations';
 import { useOrderStore } from '@/store/useOrderStore';
 import { useDriverStore } from '@/store/useDriverStore';
 import { useOrdersRealtime } from '@/lib/realtime';
@@ -59,6 +60,7 @@ export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest');
   const [driverLocation, setDriverLocation] = useState<{ lat?: number; lng?: number }>({});
+  const [locationReady, setLocationReady] = useState(false);
   const { isConnected: isNetworkConnected, isChecking: isCheckingNetwork, checkConnection } = useNetworkStatus();
 
   const [headerHeight, setHeaderHeight] = useState(200);
@@ -105,25 +107,36 @@ export default function OrdersScreen() {
                 if (isMounted && pos?.coords) {
                   setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
                 }
+                if (isMounted) setLocationReady(true);
               },
               (err) => {
                 console.warn('[OrdersScreen] Geolocation error:', err);
+                if (isMounted) setLocationReady(true);
               },
               { timeout: 8000, enableHighAccuracy: true }
             );
+          } else {
+            if (isMounted) setLocationReady(true);
           }
           return;
         }
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
+          const last = await Location.getLastKnownPositionAsync().catch(() => null);
+          if (isMounted && last?.coords) {
+            setDriverLocation({ lat: last.coords.latitude, lng: last.coords.longitude });
+          }
           const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
           if (isMounted && pos?.coords) {
             setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-            return;
           }
         }
       } catch (err) {
         console.log('[OrdersScreen] GPS unavailable:', err);
+      } finally {
+        if (isMounted) {
+          setLocationReady(true);
+        }
       }
     }
     initLocation();
@@ -238,15 +251,22 @@ export default function OrdersScreen() {
     }
   };
 
+  const hasCoordinates = driverLocation.lat != null && driverLocation.lng != null;
+
   const {
     data: availableOrders = [],
     isLoading: isLoadingAvailable,
     refetch: refetchAvailable,
-  } = useAvailableOrders({
-    lat: driverLocation.lat,
-    lng: driverLocation.lng,
-    radiusMiles: APP_CONFIG.MAX_DELIVERY_RADIUS_MILES,
-  });
+  } = useAvailableOrders(
+    {
+      lat: driverLocation.lat,
+      lng: driverLocation.lng,
+      radiusMiles: APP_CONFIG.MAX_DELIVERY_RADIUS_MILES,
+    },
+    {
+      enabled: hasCoordinates || locationReady,
+    }
+  );
   const { data: allOrders = [], isLoading: isLoadingAll, refetch: refetchAll } = useOrders();
   const { isConnected } = useOrdersRealtime();
 
@@ -256,12 +276,26 @@ export default function OrdersScreen() {
         .filter((o) => o.status !== 'pending' || !!o.driverUserId)
         .map((o) => o.id)
     );
-    return (availableOrders || []).filter(
+    let list = (availableOrders || []).filter(
       (o) => o.status === 'pending' && !o.driverUserId && !activeOrClaimedIds.has(o.id)
     );
-  }, [availableOrders, allOrders]);
 
-  const isLoading = isLoadingAvailable && orders.length === 0;
+    if (driverLocation.lat != null && driverLocation.lng != null) {
+      list = list.filter((o) => {
+        const pLat = o.pickupLat ?? (o as any).pickup_lat;
+        const pLng = o.pickupLng ?? (o as any).pickup_lng;
+        if (pLat == null || pLng == null) return true;
+        return (
+          haversineMiles(driverLocation.lat!, driverLocation.lng!, Number(pLat), Number(pLng)) <=
+          APP_CONFIG.MAX_DELIVERY_RADIUS_MILES
+        );
+      });
+    }
+
+    return list;
+  }, [availableOrders, allOrders, driverLocation.lat, driverLocation.lng]);
+
+  const isLoading = (isLoadingAvailable || (!hasCoordinates && !locationReady)) && orders.length === 0;
 
   const { queueCount, completedCount, atCapacity } = useDriverQueue(allOrders, driverId);
 

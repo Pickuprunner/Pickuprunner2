@@ -14,7 +14,8 @@ export interface RegisterDeviceResponse {
     device?: {
       id?: string;
       userId?: string;
-      token: string;
+      token?: string;
+      tokenEnding?: string;
       platform: string;
       lastSeenAt?: string;
       createdAt?: string;
@@ -27,9 +28,15 @@ export interface RegisterDeviceResponse {
 
 export interface NotificationItem {
   id: string;
+  type?: 'chat_message' | 'order_status' | string;
+  orderId?: string | null;
+  messageId?: string | null;
   title: string;
   body: string;
   data?: Record<string, any>;
+  deliveredVia?: 'in_app' | 'push' | 'suppressed';
+  pushedAt?: string | null;
+  readAt?: string | null;
   read: boolean;
   createdAt: string;
 }
@@ -38,7 +45,11 @@ export interface NotificationsListResponse {
   success?: boolean;
   data: {
     notifications: NotificationItem[];
+    unread?: number;
     unreadCount?: number;
+    limit?: number;
+    offset?: number;
+    pushConfigured?: boolean;
   };
 }
 

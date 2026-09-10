@@ -3,11 +3,12 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deviceApi, DeviceTokenPayload } from '@/apis/device';
+import { getApiBaseUrl } from '@/lib/apiClient';
 
 const STORED_DEVICE_TOKEN_KEY = '@pickup_runner_registered_device_token';
 
 let activeSyncPromise: Promise<string | null> | null = null;
-let inMemorySyncedUserToken: { userId: string; token: string } | null = null;
+let inMemorySyncedUserToken: { userId: string; token: string; apiUrl: string } | null = null;
 
 function getNotifications(): typeof import('expo-notifications') | null {
   if (Platform.OS === 'web') return null;
@@ -232,18 +233,20 @@ export async function registerAndSyncDeviceToken(userId?: string): Promise<strin
       }
 
       const currentUserId = userId || 'guest';
+      const currentApiUrl = getApiBaseUrl();
       if (
         inMemorySyncedUserToken?.userId === currentUserId &&
-        inMemorySyncedUserToken?.token === token
+        inMemorySyncedUserToken?.token === token &&
+        inMemorySyncedUserToken?.apiUrl === currentApiUrl
       ) {
         return token;
       }
 
-      const storageKey = `${STORED_DEVICE_TOKEN_KEY}_${currentUserId}`;
+      const storageKey = `${STORED_DEVICE_TOKEN_KEY}_${currentApiUrl}_${currentUserId}`;
       const cachedToken = await AsyncStorage.getItem(storageKey);
 
       if (cachedToken === token) {
-        inMemorySyncedUserToken = { userId: currentUserId, token };
+        inMemorySyncedUserToken = { userId: currentUserId, token, apiUrl: currentApiUrl };
         return token;
       }
 
@@ -261,7 +264,7 @@ export async function registerAndSyncDeviceToken(userId?: string): Promise<strin
       console.log('[notifications] Registering device token with backend:', payload);
       await deviceApi.registerDeviceToken(payload);
       await AsyncStorage.setItem(storageKey, token);
-      inMemorySyncedUserToken = { userId: currentUserId, token };
+      inMemorySyncedUserToken = { userId: currentUserId, token, apiUrl: currentApiUrl };
       console.log('[notifications] Device token successfully registered & synced.');
 
       return token;
@@ -279,7 +282,8 @@ export async function registerAndSyncDeviceToken(userId?: string): Promise<strin
 export async function unregisterDeviceToken(userId?: string): Promise<void> {
   try {
     const currentUserId = userId || 'guest';
-    const storageKey = `${STORED_DEVICE_TOKEN_KEY}_${currentUserId}`;
+    const currentApiUrl = getApiBaseUrl();
+    const storageKey = `${STORED_DEVICE_TOKEN_KEY}_${currentApiUrl}_${currentUserId}`;
     const token =
       (await AsyncStorage.getItem(storageKey)) || inMemorySyncedUserToken?.token;
     if (token) {

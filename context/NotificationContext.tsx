@@ -27,6 +27,7 @@ export interface NotificationContextType {
   notifications: NotificationItem[];
   unreadCount: number;
   isLoading: boolean;
+  pushConfigured?: boolean;
   fetchNotifications: () => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   requestUserPermission: () => Promise<boolean>;
@@ -38,6 +39,7 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [pushConfigured, setPushConfigured] = useState<boolean | undefined>(undefined);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -50,7 +52,11 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       const response = await notificationApi.getNotifications({ limit: 40 });
       if (response && response.data) {
         setNotifications(response.data.notifications || []);
-        setUnreadCount(response.data.unreadCount ?? 0);
+        const unread = response.data.unread ?? response.data.unreadCount ?? 0;
+        setUnreadCount(unread);
+        if (response.data.pushConfigured !== undefined) {
+          setPushConfigured(response.data.pushConfigured);
+        }
       }
     } catch (error) {
       console.warn('[NotificationContext] Fetch notifications error:', error);
@@ -82,11 +88,12 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   useEffect(() => {
     if (isAuthenticated) {
       requestUserPermission();
+      fetchNotifications();
     } else {
       setNotifications([]);
       setUnreadCount(0);
     }
-  }, [isAuthenticated, userId, requestUserPermission]);
+  }, [isAuthenticated, userId, requestUserPermission, fetchNotifications]);
 
   const handleNotificationTap = useCallback((response: any) => {
     console.log('[NotificationContext] Notification tapped:', response);
@@ -172,6 +179,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
         notifications,
         unreadCount,
         isLoading,
+        pushConfigured,
         fetchNotifications,
         markAsRead,
         requestUserPermission,

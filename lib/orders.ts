@@ -6,16 +6,20 @@ import { createCheckoutForOrder } from '@/apis/checkout';
 import { getSelectedOrder } from './selectedOrder';
 import { publishOrderChange } from './realtime';
 import { APP_CONFIG } from './config';
+import { haversineMiles } from './locationCalculations';
 
 export type { Order, OrderStatus };
 
-export function useAvailableOrders(params?: AvailableOrdersParams) {
+export function useAvailableOrders(
+  params?: AvailableOrdersParams,
+  options?: { enabled?: boolean }
+) {
   const token = useAuthStore((state) => state.token);
   const storeOrders = useOrderStore((state) => state.orders);
 
   return useQuery({
     queryKey: ['orders', 'available', params?.lat, params?.lng, params?.radiusMiles, params?.cityId],
-    enabled: Boolean(token),
+    enabled: Boolean(token) && options?.enabled !== false,
     queryFn: async () => {
       try {
         const availableItems = await ordersApi.getAvailable(params);
@@ -29,7 +33,21 @@ export function useAvailableOrders(params?: AvailableOrdersParams) {
 
       return useOrderStore.getState().orders.filter((o) => o.status === 'pending' && !o.driverUserId);
     },
-    placeholderData: () => storeOrders.filter((o) => o.status === 'pending' && !o.driverUserId),
+    placeholderData: () => {
+      if (params?.radiusMiles && (params?.lat == null || params?.lng == null)) {
+        return undefined;
+      }
+      const pending = storeOrders.filter((o) => o.status === 'pending' && !o.driverUserId);
+      if (params?.lat != null && params?.lng != null && params?.radiusMiles) {
+        return pending.filter((o) => {
+          const pLat = o.pickupLat ?? (o as any).pickup_lat;
+          const pLng = o.pickupLng ?? (o as any).pickup_lng;
+          if (pLat == null || pLng == null) return true;
+          return haversineMiles(params.lat!, params.lng!, Number(pLat), Number(pLng)) <= params.radiusMiles!;
+        });
+      }
+      return pending;
+    },
     staleTime: 2000,
     refetchInterval: 30000,
     refetchOnWindowFocus: true,

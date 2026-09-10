@@ -9,13 +9,30 @@ export function WebMap({
   orders,
   selectedId,
   onSelect,
+  currentTab = 'pending',
+  driverLocation,
 }: {
   orders: Order[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  currentTab?: 'active' | 'pending';
+  driverLocation?: { lat?: number; lng?: number };
 }) {
-  const selectedOrder = orders.find((o) => o.id === selectedId) || orders[0];
-  const originCenter = getPickupCoords(selectedOrder) || getPickupCoords(orders[0]) || CENTER;
+  const active = orders.filter((o) => o.status === 'accepted' || o.status === 'picked_up');
+  const pending = orders.filter((o) => o.status === 'pending');
+
+  const selectedOrder =
+    orders.find((o) => o.id === selectedId) ||
+    (currentTab === 'active' && active.length > 0 ? active[0] : null) ||
+    (currentTab === 'pending' && pending.length > 0 ? pending[0] : null) ||
+    orders[0];
+  const originCenter =
+    (driverLocation?.lat != null && driverLocation?.lng != null
+      ? { lat: driverLocation.lat, lng: driverLocation.lng }
+      : null) ||
+    getPickupCoords(selectedOrder) ||
+    getPickupCoords(orders[0]) ||
+    CENTER;
 
   const width = 400;
   const height = 320;

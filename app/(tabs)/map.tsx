@@ -1,8 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Platform, StyleSheet, View, StatusBar } from 'react-native';
 import { router } from 'expo-router';
+import * as Location from 'expo-location';
 
 import { useOrders, useAvailableOrders, Order, useUpdateOrderStatus } from '@/lib/orders';
+import { haversineMiles } from '@/lib/locationCalculations';
 import { useOrdersRealtime } from '@/lib/realtime';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import { useDriverQueue } from '@/lib/driverQueue';
@@ -20,7 +22,30 @@ import {
 } from '@/components/map';
 
 export default function MapScreen() {
+  const [driverLocation, setDriverLocation] = useState<{ lat?: number; lng?: number }>({});
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const last = await Location.getLastKnownPositionAsync().catch(() => null);
+        if (mounted && last?.coords) {
+          setDriverLocation({ lat: last.coords.latitude, lng: last.coords.longitude });
+        }
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null);
+        if (mounted && pos?.coords) {
+          setDriverLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        }
+      } catch {}
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const { data: availableOrders = [] } = useAvailableOrders({
+    lat: driverLocation.lat,
+    lng: driverLocation.lng,
     radiusMiles: APP_CONFIG.MAX_DELIVERY_RADIUS_MILES,
   });
   const { data: allOrders = [] } = useOrders();
@@ -33,6 +58,18 @@ export default function MapScreen() {
     const orderMap = new Map<string, Order>();
     (availableOrders || []).forEach((o) => {
       if (o?.id && o.status === 'pending') {
+        if (driverLocation.lat != null && driverLocation.lng != null) {
+          const pLat = o.pickupLat ?? (o as any).pickup_lat;
+          const pLng = o.pickupLng ?? (o as any).pickup_lng;
+          if (
+            pLat != null &&
+            pLng != null &&
+            haversineMiles(driverLocation.lat, driverLocation.lng, Number(pLat), Number(pLng)) >
+              APP_CONFIG.MAX_DELIVERY_RADIUS_MILES
+          ) {
+            return;
+          }
+        }
         orderMap.set(o.id, o);
       }
     });
@@ -45,7 +82,7 @@ export default function MapScreen() {
       }
     });
     return Array.from(orderMap.values());
-  }, [availableOrders, allOrders, driverId]);
+  }, [availableOrders, allOrders, driverId, driverLocation.lat, driverLocation.lng]);
 
   const { isMyOrder } = useDriverQueue(orders, driverId);
 
@@ -103,9 +140,21 @@ export default function MapScreen() {
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <View style={styles.mapWrapper}>
         {Platform.OS === 'web' ? (
-          <WebMap orders={orders} selectedId={selectedId} onSelect={handleSelectId} />
+          <WebMap
+            orders={orders}
+            selectedId={selectedId}
+            onSelect={handleSelectId}
+            currentTab={currentTab}
+            driverLocation={driverLocation}
+          />
         ) : (
-          <NativeMap orders={orders} selectedId={selectedId} onSelect={handleSelectId} />
+          <NativeMap
+            orders={orders}
+            selectedId={selectedId}
+            onSelect={handleSelectId}
+            currentTab={currentTab}
+            driverLocation={driverLocation}
+          />
         )}
       </View>
       <View style={styles.bottomSection}>
