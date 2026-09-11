@@ -27,6 +27,7 @@ import { colors, spacing, borderRadius } from '@/constants/design';
 import { useAuth } from '@/hooks/useAuth';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { useMyVerification } from '@/lib/verification';
+import { useResponsive } from '@/hooks/useResponsive';
 import { useToast, CustomLoading, CustomRefreshControl } from '@/components/core';
 
 import { isAccreditationFullyApproved } from '@/apis/accreditation';
@@ -38,6 +39,7 @@ export interface DriverProfileStatusScreenProps {
 
 export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: DriverProfileStatusScreenProps = {}) {
   const insets = useSafeAreaInsets();
+  const { select } = useResponsive();
   const { user, logout } = useAuth();
   const { data: accreditation, refetch: refetchAccred, isFetching: isFetchingAccred } = useDriverAccreditation();
   const { data: verification, refetch: refetchVerif, isFetching: isFetchingVerif } = useMyVerification(user?.id);
@@ -122,7 +124,7 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
       const [accredRes] = await Promise.all([refetchAccred(), refetchVerif(), minDelay]);
       const isNowFullyApproved = isAccreditationFullyApproved(accredRes.data);
       if (isNowFullyApproved) {
-        showToast('Accreditation Approved! Welcome to PickupRunner.', 'success');
+        showToast('Verification Approved! Welcome to PickupRunner.', 'success');
         if (router.canDismiss()) router.dismissAll();
         router.replace('/(tabs)');
       } else if (accredRes.data?.profile?.accreditationStatus === 'rejected') {
@@ -143,7 +145,7 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
     }
 
     if (isApproved) {
-      showToast('Accreditation is already approved.', 'success');
+      showToast('Verification is already approved.', 'success');
       return;
     }
 
@@ -197,8 +199,10 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: insets.top + spacing.lg,
-            paddingBottom: insets.bottom + spacing.xl,
+            paddingHorizontal: select(spacing.gutter, 14, 10),
+            paddingTop: insets.top + select(spacing.lg, spacing.md, spacing.sm),
+            paddingBottom: insets.bottom + select(spacing.xl, spacing.lg, spacing.md),
+            gap: select(spacing.lg, 14, 10),
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -209,16 +213,21 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
           <View
             style={[
               styles.iconGlowWrapper,
+              {
+                width: select(80, 64, 52),
+                height: select(80, 64, 52),
+                borderRadius: select(40, 32, 26),
+              },
               isApproved && styles.iconGlowWrapperApproved,
               isAnyStepRejected && styles.iconGlowWrapperRejected,
             ]}
           >
             {isApproved ? (
-              <CheckCircle size={52} color="#22C55E" />
+              <CheckCircle size={select(52, 40, 32)} color="#22C55E" />
             ) : isAnyStepRejected ? (
-              <X size={52} color="#EF4444" />
+              <X size={select(52, 40, 32)} color="#EF4444" />
             ) : (
-              <Clock size={52} color="#FFE399" />
+              <Clock size={select(52, 40, 32)} color="#FFE399" />
             )}
           </View>
 
@@ -230,8 +239,10 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
             ]}
           >
             <Text
+              maxFontSizeMultiplier={1.2}
               style={[
                 styles.statusPillText,
+                { fontSize: select(12, 11, 10) },
                 isApproved && styles.statusPillTextApproved,
                 isAnyStepRejected && styles.statusPillTextRejected,
               ]}
@@ -246,19 +257,26 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
             </Text>
           </View>
 
-          <Text style={styles.heroTitle}>
-            {isApproved
-              ? 'Accreditation Approved'
-              : isAnyStepRejected
-                ? 'Accreditation Action Required'
-                : isSubmitted
-                  ? 'Accreditation Under Review'
-                  : 'Accreditation In Progress'}
+          <Text
+            maxFontSizeMultiplier={1.25}
+            style={[styles.heroTitle, { fontSize: select(24, 20, 18) }]}
+          >
+            Driver Verification
           </Text>
 
-          <Text style={styles.heroSubtitle}>
+          <Text
+            maxFontSizeMultiplier={1.2}
+            style={[
+              styles.heroSubtitle,
+              {
+                fontSize: select(14, 13, 12),
+                lineHeight: select(20, 18, 16),
+                paddingHorizontal: select(4, 2, 0),
+              },
+            ]}
+          >
             {isApproved
-              ? 'Your driver accreditation has been approved. You are ready to receive delivery orders.'
+              ? 'Your driver verification has been approved. You are ready to receive delivery orders.'
               : isAnyStepRejected
                 ? profile?.rejectionReason ||
                 'One or more verification steps require updated documentation. Please review the checklist below and tap to update your details.'
@@ -269,9 +287,9 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
         </View>
 
         {/* CHECKLIST ITEMS */}
-        <View style={styles.checklistCard}>
+        <View style={[styles.checklistCard, { padding: select(spacing.md, 12, 10), gap: select(spacing.sm, 6, 4) }]}>
           <View style={styles.checklistHeaderRow}>
-            <Text style={styles.checklistHeader}>VERIFICATION CHECKLIST</Text>
+            <Text maxFontSizeMultiplier={1.2} style={styles.checklistHeader}>VERIFICATION CHECKLIST</Text>
             {isAnyStepRejected && (
               <Text style={styles.tapToEditHint}>Tap any item to edit</Text>
             )}
@@ -389,21 +407,21 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
         </View>
 
         {/* ACTIONS */}
-        <View style={styles.actionsContainer}>
+        <View style={[styles.actionsContainer, { gap: select(spacing.sm, 8, 6) }]}>
           {isAnyStepRejected ? (
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => handleEditDocuments(1)}
-              style={styles.primaryActionBtn}
+              style={[styles.primaryActionBtn, { height: select(50, 46, 42) }]}
             >
               <FileText size={18} color="#0F131C" />
-              <Text style={styles.primaryActionBtnText}>Update Documentation</Text>
+              <Text maxFontSizeMultiplier={1.2} style={styles.primaryActionBtnText}>Update Documentation</Text>
               <ArrowRight size={18} color="#0F131C" />
             </TouchableOpacity>
           ) : rawAccredStatus === 'under_review' ? (
-            <View style={styles.lockedNoticeBox}>
-              <Clock size={16} color="#FFE399" />
-              <Text style={styles.lockedNoticeText}>
+            <View style={[styles.lockedNoticeBox, { paddingVertical: select(12, 10, 8), paddingHorizontal: select(16, 12, 8) }]}>
+              <Clock size={select(16, 15, 14)} color="#FFE399" />
+              <Text maxFontSizeMultiplier={1.2} style={[styles.lockedNoticeText, { fontSize: select(12, 11.5, 10.5) }]}>
                 Application locked during safety & compliance review
               </Text>
             </View>
@@ -411,10 +429,10 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => handleEditDocuments(1)}
-              style={styles.primaryActionBtn}
+              style={[styles.primaryActionBtn, { height: select(50, 46, 42) }]}
             >
               <FileText size={18} color="#0F131C" />
-              <Text style={styles.primaryActionBtnText}>Edit Application Details</Text>
+              <Text maxFontSizeMultiplier={1.2} style={styles.primaryActionBtnText}>Edit Application Details</Text>
               <ArrowRight size={18} color="#0F131C" />
             </TouchableOpacity>
           )}
@@ -423,14 +441,20 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
             activeOpacity={0.85}
             onPress={handleRefresh}
             disabled={refreshing}
-            style={rawAccredStatus === 'under_review' && !isAnyStepRejected ? styles.primaryActionBtn : styles.secondaryActionBtn}
+            style={[
+              rawAccredStatus === 'under_review' && !isAnyStepRejected ? styles.primaryActionBtn : styles.secondaryActionBtn,
+              { height: select(50, 46, 42) },
+            ]}
           >
             {refreshing ? (
               <ActivityIndicator size="small" color={rawAccredStatus === 'under_review' && !isAnyStepRejected ? '#0F131C' : '#FFE399'} />
             ) : (
               <>
                 <RefreshCw size={16} color={rawAccredStatus === 'under_review' && !isAnyStepRejected ? '#0F131C' : '#FFE399'} />
-                <Text style={rawAccredStatus === 'under_review' && !isAnyStepRejected ? styles.primaryActionBtnText : styles.secondaryActionBtnText}>
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  style={rawAccredStatus === 'under_review' && !isAnyStepRejected ? styles.primaryActionBtnText : styles.secondaryActionBtnText}
+                >
                   Check Approval Status
                 </Text>
               </>
@@ -449,7 +473,6 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexGrow: 1,
-    justifyContent: 'center',
     paddingHorizontal: spacing.gutter,
     gap: spacing.lg,
   },
@@ -531,7 +554,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.onSurfaceVariant,
     textAlign: 'center',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 0,
   },
   checklistCard: {
     backgroundColor: '#191E2B',

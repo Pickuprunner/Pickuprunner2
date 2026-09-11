@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, View, Text, StyleSheet, Platform } from 'react-native';
 import { ChevronRight } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const TEXT_PRIMARY = '#DFE2EF';
 const TEXT_MUTED = '#94A3B8';
@@ -45,6 +46,8 @@ export function ProfileActionRow({
   disabled = false,
   hapticStyle = 'medium',
 }: ProfileActionRowProps) {
+  const { select } = useResponsive();
+
   const handlePress = () => {
     if (!onPress || disabled) return;
     haptic(hapticStyle);
@@ -55,20 +58,44 @@ export function ProfileActionRow({
     <Pressable
       onPress={handlePress}
       disabled={disabled || !onPress}
-      style={({ pressed }) => [styles.actionRow, pressed && onPress && { opacity: 0.8 }]}
+      style={({ pressed }) => [
+        styles.actionRow,
+        {
+          paddingHorizontal: select(16, 12, 10),
+          paddingVertical: select(14, 12, 10),
+          gap: select(12, 10, 8),
+        },
+        pressed && onPress && { opacity: 0.8 },
+      ]}
     >
       <View
         style={[
           styles.actionIconWrap,
-          { backgroundColor: iconBg },
+          {
+            backgroundColor: iconBg,
+            width: select(38, 34, 30),
+            height: select(38, 34, 30),
+          },
           iconBorder ? { borderColor: iconBorder, borderWidth: 1 } : null,
         ]}
       >
         {icon}
       </View>
       <View style={styles.actionTextCol}>
-        <Text style={[styles.actionTitle, { color: titleColor }]}>{title}</Text>
-        {subtitle ? <Text style={styles.actionSubtitle}>{subtitle}</Text> : null}
+        <Text
+          maxFontSizeMultiplier={1.2}
+          style={[styles.actionTitle, { color: titleColor, fontSize: select(14.5, 13.5, 12.5) }]}
+        >
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text
+            maxFontSizeMultiplier={1.2}
+            style={[styles.actionSubtitle, { fontSize: select(12, 11, 10) }]}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
       {rightControl ? (
         rightControl

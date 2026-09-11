@@ -77,6 +77,13 @@ export function DriversLicenseStep({
         const asset = result.assets[0];
         setUploading(true);
         const fileName = asset.fileName || (side === 'front' ? 'drivers_license_front.jpg' : 'drivers_license_back.jpg');
+        if (onUploadDoc) {
+          await onUploadDoc(side === 'front' ? 'license_front' : 'license_back', {
+            uri: asset.uri,
+            name: fileName,
+          });
+        }
+
         if (side === 'front') {
           onChange({
             licenseFrontUrl: asset.uri,
@@ -89,12 +96,6 @@ export function DriversLicenseStep({
           });
         }
 
-        if (onUploadDoc) {
-          await onUploadDoc(side === 'front' ? 'license_front' : 'license_back', {
-            uri: asset.uri,
-            name: fileName,
-          });
-        }
         showToast(
           side === 'front' ? 'License Front Uploaded' : 'License Back Uploaded',
           { type: 'success', description: `${side === 'front' ? 'Front' : 'Back'} of driver’s license uploaded.` }
@@ -238,7 +239,7 @@ export function DriversLicenseStep({
 
           {/* BACK */}
           <View style={styles.uploadBox}>
-            <Text style={styles.uploadBoxLabel}>Back of License</Text>
+            <Text style={styles.uploadBoxLabel}>Back of License *</Text>
             {data.licenseBackUrl ? (
               <View style={styles.previewContainer}>
                 <Image source={{ uri: data.licenseBackUrl }} style={styles.previewImage} />

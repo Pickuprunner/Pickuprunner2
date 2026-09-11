@@ -13,6 +13,7 @@ import {
   StyleProp,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export type InputVariant = 'pill' | 'rounded' | 'square';
 export type InputStatus = 'default' | 'success' | 'error';
@@ -81,6 +82,7 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
     },
     ref
   ) => {
+    const { select, isNarrow } = useResponsive();
     const inputRef = useRef<TextInput>(null);
     const [isFocused, setIsFocused] = useState(false);
     const [internalShowPassword, setInternalShowPassword] = useState(false);
@@ -183,7 +185,14 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
 
     return (
       <View style={[styles.container, containerStyle]}>
-        {label && <Text style={[styles.label, labelStyle]}>{label}</Text>}
+        {label && (
+          <Text
+            maxFontSizeMultiplier={1.2}
+            style={[styles.label, isNarrow && { fontSize: 11 }, labelStyle]}
+          >
+            {label}
+          </Text>
+        )}
 
         <Pressable
           onPress={handleWrapperPress}
@@ -193,6 +202,9 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
             {
               borderRadius: getBorderRadius(),
               backgroundColor: getBgColor(),
+              height: select(52, 48, 44),
+              minHeight: select(52, 48, 44),
+              paddingHorizontal: select(16, 14, 10),
             },
             getDynamicWrapperStyle(),
             restProps.multiline && styles.multilineWrapper,
@@ -204,6 +216,7 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
             <View
               style={[
                 styles.leftIconContainer,
+                isNarrow && { marginRight: 8 },
                 restProps.multiline && styles.multilineLeftIcon,
               ]}
             >
@@ -218,12 +231,14 @@ export const CustomInput = forwardRef<TextInput, CustomInputProps>(
             placeholderTextColor={placeholderTextColor}
             secureTextEntry={isPassword && !isPasswordVisible}
             editable={isEditable}
+            maxFontSizeMultiplier={restProps.maxFontSizeMultiplier ?? 1.25}
             onFocus={handleFocus}
             onBlur={handleBlur}
             returnKeyType={restProps.returnKeyType || (restProps.multiline ? 'default' : 'done')}
             blurOnSubmit={restProps.blurOnSubmit ?? !restProps.multiline}
             style={[
               styles.input,
+              isNarrow && { fontSize: 14 },
               restProps.multiline && styles.multilineInput,
               Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null,
               disabled && styles.disabledInput,

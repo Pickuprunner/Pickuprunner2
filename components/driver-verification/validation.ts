@@ -159,7 +159,10 @@ export function validateLicenseStep(data: DriverWizardData): ValidationResult {
     return { isValid: false, title: 'License Expired', message: "Your driver's license must be valid and unexpired." };
   }
   if (!data.licenseFrontUrl?.trim()) {
-    return { isValid: false, title: 'License Photo Needed', message: "Please upload a photo of the front of your license." };
+    return { isValid: false, title: 'Front License Needed', message: "Please upload the front of your driver's license." };
+  }
+  if (!data.licenseBackUrl?.trim()) {
+    return { isValid: false, title: 'Back License Needed', message: "Please upload the back of your driver's license." };
   }
   return { isValid: true };
 }

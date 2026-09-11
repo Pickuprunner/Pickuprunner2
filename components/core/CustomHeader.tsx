@@ -21,6 +21,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/constants/design';
+import { useResponsive } from '@/hooks/useResponsive';
 
 export type HeaderVariant = 'glass' | 'solid' | 'transparent';
 export type TitleSize = 'large' | 'medium' | 'small';
@@ -274,15 +275,17 @@ export function CustomHeader({
     }
   };
 
+  const { select, isNarrow, isCompact } = useResponsive();
+
   const getTitleFontSize = () => {
     switch (titleSize) {
       case 'small':
-        return { fontSize: 17, lineHeight: 22, fontWeight: '600' as const };
+        return { fontSize: select(17, 16, 15), lineHeight: select(22, 20, 19), fontWeight: '600' as const };
       case 'medium':
-        return { fontSize: 20, lineHeight: 26, fontWeight: '700' as const };
+        return { fontSize: select(20, 18, 17), lineHeight: select(26, 24, 22), fontWeight: '700' as const };
       case 'large':
       default:
-        return { fontSize: 28, lineHeight: 36, fontWeight: '700' as const };
+        return { fontSize: select(28, 24, 21), lineHeight: select(36, 30, 27), fontWeight: '700' as const };
     }
   };
 
@@ -299,6 +302,7 @@ export function CustomHeader({
         {
           backgroundColor: getContainerBg(),
           paddingTop: topInset + 12,
+          paddingHorizontal: select(20, 16, 12),
         },
         sticky && styles.stickyHeader,
         borderBottom && styles.borderBottom,
@@ -323,7 +327,11 @@ export function CustomHeader({
 
         <View style={styles.titleColumn}>
           {typeof title === 'string' ? (
-            <Text style={[styles.title, getTitleFontSize(), titleStyle]} numberOfLines={1}>
+            <Text
+              maxFontSizeMultiplier={1.25}
+              style={[styles.title, getTitleFontSize(), titleStyle]}
+              numberOfLines={1}
+            >
               {title}
             </Text>
           ) : (
@@ -331,7 +339,11 @@ export function CustomHeader({
           )}
 
           {activeHighlight !== undefined || subtitle ? (
-            <Text style={[styles.subtitle, subtitleStyle]} numberOfLines={2}>
+            <Text
+              maxFontSizeMultiplier={1.2}
+              style={[styles.subtitle, isNarrow && { fontSize: 11, lineHeight: 14 }, subtitleStyle]}
+              numberOfLines={2}
+            >
               {activeHighlight !== undefined && (
                 <Text style={styles.highlightText}>{activeHighlight} </Text>
               )}

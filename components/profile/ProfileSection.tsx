@@ -15,7 +15,7 @@ export function ProfileSection({ title, badgeNode, children }: ProfileSectionPro
   return (
     <View style={styles.sectionWrap}>
       <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text maxFontSizeMultiplier={1.2} style={styles.sectionTitle}>{title}</Text>
         {badgeNode}
       </View>
       <View style={styles.card}>{children}</View>
@@ -23,7 +23,7 @@ export function ProfileSection({ title, badgeNode, children }: ProfileSectionPro
   );
 }
 
-export function ItemDivider({ marginLeft = 66 }: { marginLeft?: number }) {
+export function ItemDivider({ marginLeft = 54 }: { marginLeft?: number }) {
   return <View style={[styles.itemDivider, { marginLeft }]} />;
 }
 
@@ -35,13 +35,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
   },
   sectionTitle: {
     color: TEXT_MUTED,
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     paddingHorizontal: 4,
+    flexShrink: 1,
   },
   card: {
     backgroundColor: CARD_BG,

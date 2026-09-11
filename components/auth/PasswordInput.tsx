@@ -194,13 +194,13 @@ export function PasswordInput({
             <CircularMeter metCount={metCount} total={5} />
 
             {unmetCriteria.length === 0 ? (
-              <Text style={styles.headerTitleMet}>Strong password</Text>
+              <Text maxFontSizeMultiplier={1.2} style={styles.headerTitleMet}>Strong password</Text>
             ) : (
               <View style={styles.criteriaWrap}>
                 {unmetCriteria.map((item, idx) => (
                   <View key={idx} style={styles.chip}>
                     <Text style={styles.asterisk}>*</Text>
-                    <Text style={styles.chipText}>{item.label}</Text>
+                    <Text maxFontSizeMultiplier={1.2} style={styles.chipText}>{item.label}</Text>
                   </View>
                 ))}
               </View>

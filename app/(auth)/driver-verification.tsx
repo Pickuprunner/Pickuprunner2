@@ -699,7 +699,7 @@ export default function DriverVerificationScreen() {
           )}
 
           <View style={styles.headerTitleCol}>
-            <Text style={styles.headerTitle}>Driver Accreditation</Text>
+            <Text style={styles.headerTitle}>Driver Verification</Text>
             <Text style={styles.headerSubtitle}>
               {`Step ${currentStep} of 4`}
             </Text>

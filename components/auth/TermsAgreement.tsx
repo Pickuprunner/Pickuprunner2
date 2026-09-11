@@ -37,7 +37,7 @@ export function TermsAgreement({
         </View>
       </Pressable>
 
-      <Text style={styles.label}>
+      <Text maxFontSizeMultiplier={1.2} style={styles.label}>
         I agree to the{' '}
         <Text
           onPress={openTerms}

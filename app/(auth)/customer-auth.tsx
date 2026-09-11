@@ -26,6 +26,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/hooks/useAuth';
+import { useResponsive } from '@/hooks/useResponsive';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
 import { AuthHero, TermsAgreement, PasswordInput } from '@/components/auth';
 import CustomInput from '@/components/core/CustomInput';
@@ -46,6 +47,7 @@ type Mode = 'signin' | 'signup';
 
 export default function CustomerAuthScreen() {
   const insets = useSafeAreaInsets();
+  const { select, isNarrow, isCompact } = useResponsive();
   const { showToast } = useToast();
   const { login, register, logout, user, isAuthenticated, isLoading } = useAuth();
   const [mode, setMode] = useState<Mode>('signin');
@@ -53,9 +55,9 @@ export default function CustomerAuthScreen() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
@@ -187,6 +189,7 @@ export default function CustomerAuthScreen() {
 
   const switchMode = () => {
     setAgreedToTerms(false);
+    setIsPasswordFocused(false);
     setMode((m) => (m === 'signin' ? 'signup' : 'signin'));
     scrollViewRef.current?.scrollTo({ y: 0, animated: false });
   };
@@ -223,13 +226,14 @@ export default function CustomerAuthScreen() {
             contentContainerStyle={[
               styles.scroll,
               {
+                paddingHorizontal: select(spacing.marginMobile, 14, 10),
                 paddingTop: isSignUp
                   ? Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 20) : 10)
                   : Math.max(
                       insets.top + spacing.sm,
                       Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + spacing.sm : spacing.lg
                     ),
-                paddingBottom: Math.max(insets.bottom, 16),
+                paddingBottom: Math.max(insets.bottom, 16) + (isPasswordFocused ? (Platform.OS === 'android' ? 140 : 40) : (isSignUp ? 24 : 16)),
               },
             ]}
             keyboardShouldPersistTaps="handled"
@@ -245,18 +249,19 @@ export default function CustomerAuthScreen() {
                     router.replace('/(landing)/role-select');
                   }
                 }}
-                style={({ pressed }) => [styles.backBtn, isSignUp && styles.backBtnCompact, pressed && { opacity: 0.6 }]}
+                style={({ pressed }) => [styles.backBtn, (isSignUp || isCompact) && styles.backBtnCompact, pressed && { opacity: 0.6 }]}
                 hitSlop={12}
               >
                 <ChevronLeft size={24} color={colors.onSurface} />
               </Pressable>
 
               <AuthHero
-                icon={<ShoppingBag size={isSignUp ? 30 : 42} color="#0F131C" />}
+                icon={<ShoppingBag size={select(isSignUp ? 30 : 42, isSignUp ? 26 : 34, 22)} color="#0F131C" />}
                 iconBgColor={colors.secondaryContainer}
                 iconBorderColor={colors.secondaryContainer}
                 glowType="gold"
-                compact={isSignUp}
+                compact={isSignUp || isCompact}
+                hideSubtitle={isNarrow}
                 title={isSignUp ? 'Create Account' : 'Welcome Back'}
                 subtitle={
                   isSignUp
@@ -265,7 +270,7 @@ export default function CustomerAuthScreen() {
                 }
               />
 
-              <View style={[styles.formSection, isSignUp && styles.formSectionCompact]}>
+              <View style={[styles.formSection, isSignUp && styles.formSectionCompact, { gap: select(isSignUp ? 12 : 16, 10, 8) }]}>
                 {isSignUp && (
                   <>
                     <CustomInput
@@ -312,6 +317,17 @@ export default function CustomerAuthScreen() {
                   showRequirements={isSignUp}
                   accentColor={colors.secondaryContainer}
                   onSubmitEditing={handleSubmit}
+                  onFocus={() => {
+                    setIsPasswordFocused(true);
+                    if (isSignUp) {
+                      setTimeout(() => {
+                        scrollViewRef.current?.scrollToEnd({ animated: true });
+                      }, 120);
+                    }
+                  }}
+                  onBlur={() => {
+                    setIsPasswordFocused(false);
+                  }}
                 />
 
                 {isSignUp && (
@@ -341,6 +357,7 @@ export default function CustomerAuthScreen() {
                   disabled={loading}
                   style={({ pressed }) => [
                     styles.submitBtn,
+                    { height: select(54, 48, 44) },
                     pressed && styles.submitBtnPressed,
                     loading && styles.submitBtnDisabled,
                   ]}
@@ -348,18 +365,27 @@ export default function CustomerAuthScreen() {
                   {loading ? (
                     <ActivityIndicator color={colors.onPrimaryContainer} />
                   ) : (
-                    <Text style={styles.submitBtnText}>
+                    <Text
+                      maxFontSizeMultiplier={1.2}
+                      style={[styles.submitBtnText, isNarrow && { fontSize: 14 }]}
+                    >
                       {isSignUp ? 'Create Account' : 'Sign In'}
                     </Text>
                   )}
                 </Pressable>
 
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchModePrompt}>
+                <View style={[styles.switchRow, isNarrow && { flexWrap: 'wrap' }]}>
+                  <Text
+                    maxFontSizeMultiplier={1.2}
+                    style={styles.switchModePrompt}
+                  >
                     {isSignUp ? 'Already have an account?' : "Don't have an account?"}
                   </Text>
                   <Pressable onPress={switchMode}>
-                    <Text style={styles.switchModeLink}>
+                    <Text
+                      maxFontSizeMultiplier={1.2}
+                      style={styles.switchModeLink}
+                    >
                       {isSignUp ? 'Sign In' : 'Sign Up'}
                     </Text>
                   </Pressable>

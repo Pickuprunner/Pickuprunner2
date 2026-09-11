@@ -8,8 +8,9 @@ interface AuthHeroProps {
   iconBorderColor?: string;
   glowType?: 'gold' | 'cobalt';
   title: string;
-  subtitle: string;
+  subtitle?: string;
   compact?: boolean;
+  hideSubtitle?: boolean;
 }
 
 export function AuthHero({
@@ -20,6 +21,7 @@ export function AuthHero({
   title,
   subtitle,
   compact = false,
+  hideSubtitle = false,
 }: AuthHeroProps) {
   const glowStyle = glowType === 'gold' ? shadows.goldGlow : shadows.cobaltGlow;
 
@@ -43,8 +45,20 @@ export function AuthHero({
         {icon}
       </View>
       <View style={[styles.textContainer, compact && styles.textContainerCompact]}>
-        <Text style={[styles.title, compact && styles.titleCompact]}>{title}</Text>
-        <Text style={[styles.subtitle, compact && styles.subtitleCompact]}>{subtitle}</Text>
+        <Text
+          maxFontSizeMultiplier={1.25}
+          style={[styles.title, compact && styles.titleCompact]}
+        >
+          {title}
+        </Text>
+        {!hideSubtitle && Boolean(subtitle) && (
+          <Text
+            maxFontSizeMultiplier={1.2}
+            style={[styles.subtitle, compact && styles.subtitleCompact]}
+          >
+            {subtitle}
+          </Text>
+        )}
       </View>
     </View>
   );

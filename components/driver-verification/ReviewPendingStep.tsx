@@ -73,7 +73,7 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
 
         <View style={styles.badgeRow}>
           <Text style={[styles.badgeText, isApproved && styles.badgeTextApproved]}>
-            {isApproved ? 'ACCREDITATION APPROVED' : 'UNDER REVIEW'}
+            {isApproved ? 'VERIFICATION APPROVED' : 'UNDER REVIEW'}
           </Text>
         </View>
 
@@ -83,7 +83,7 @@ export function ReviewPendingStep({ data, onDone }: ReviewPendingStepProps) {
         <Text style={styles.heroSubtitle}>
           {isApproved
             ? 'Your documents have been verified and approved. You can now access available delivery orders.'
-            : 'We are currently reviewing your documents and profile details. We will shortly update and notify you once your accreditation is confirmed.'}
+            : 'We are currently reviewing your documents and profile details. We will shortly update and notify you once your verification is confirmed.'}
         </Text>
       </View>
 

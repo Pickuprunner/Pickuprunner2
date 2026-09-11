@@ -26,6 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getSavedDisplayName, saveDisplayName } from '@/lib/chat';
 import { useAuth } from '@/hooks/useAuth';
+import { useResponsive } from '@/hooks/useResponsive';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { useMyVerification } from '@/lib/verification';
 import { useMyBackgroundCheck } from '@/lib/backgroundCheck';
@@ -67,6 +68,7 @@ function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const { select, isNarrow, isCompact } = useResponsive();
   const { showToast } = useToast();
   const {
     user,
@@ -341,7 +343,14 @@ export default function ProfileScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[
+          styles.scroll,
+          {
+            paddingHorizontal: select(16, 12, 10),
+            gap: select(18, 14, 12),
+            paddingBottom: insets.bottom + 100,
+          },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {Platform.OS === 'web' && (
@@ -411,7 +420,7 @@ export default function ProfileScreen() {
         </ProfileSection>
 
         <ProfileSection
-          title="DRIVER ACCREDITATION"
+          title="DRIVER VERIFICATION"
           badgeNode={
             <View
               style={[
@@ -420,8 +429,10 @@ export default function ProfileScreen() {
               ]}
             >
               <Text
+                maxFontSizeMultiplier={1.2}
                 style={[
                   styles.overallBadgeText,
+                  { fontSize: select(10, 9, 8.5) },
                   isAccredApproved ? { color: GREEN } : { color: GOLD_ACCENT },
                 ]}
               >

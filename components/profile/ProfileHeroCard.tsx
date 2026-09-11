@@ -11,6 +11,7 @@ import {
 import { Avatar, Camera, Edit3, Check, X } from '@blinkdotnew/mobile-ui';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useResponsive } from '@/hooks/useResponsive';
 
 const CARD_BG = 'rgba(255, 255, 255, 0.04)';
 const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
@@ -68,6 +69,7 @@ export function ProfileHeroCard({
   metrics,
   initialsFallback = 'PR',
 }: ProfileHeroCardProps) {
+  const { select } = useResponsive();
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(displayName);
   const [isSaving, setIsSaving] = useState(false);
@@ -124,8 +126,8 @@ export function ProfileHeroCard({
   const initialsText = getInitials(displayName, initialsFallback);
 
   return (
-    <View style={styles.heroCard}>
-      <View style={styles.heroTopRow}>
+    <View style={[styles.heroCard, { padding: select(18, 14, 10) }]}>
+      <View style={[styles.heroTopRow, { gap: select(16, 12, 8) }]}>
         <View style={styles.avatarWrap}>
           <Pressable
             onPress={() => {
@@ -225,7 +227,12 @@ export function ProfileHeroCard({
             </View>
           ) : (
             <View style={styles.nameRow}>
-              <Text style={styles.nameText} numberOfLines={1} ellipsizeMode="tail">
+              <Text
+                maxFontSizeMultiplier={1.2}
+                style={[styles.nameText, { fontSize: select(18, 16, 14) }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {displayName}
               </Text>
               <Pressable
@@ -241,14 +248,27 @@ export function ProfileHeroCard({
             </View>
           )}
 
-          <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
+          <Text
+            maxFontSizeMultiplier={1.2}
+            style={[styles.emailText, { fontSize: select(12.5, 11.5, 11) }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {emailText}
           </Text>
         </View>
       </View>
 
       {metrics && metrics.length > 0 && (
-        <View style={styles.metricsRow}>
+        <View
+          style={[
+            styles.metricsRow,
+            {
+              marginTop: select(16, 12, 10),
+              paddingTop: select(14, 10, 8),
+            },
+          ]}
+        >
           {metrics.map((item, idx) => (
             <React.Fragment key={item.label}>
               {item.onPress ? (
@@ -262,13 +282,33 @@ export function ProfileHeroCard({
                     pressed && { opacity: 0.7 },
                   ]}
                 >
-                  <Text style={styles.metricLabel}>{item.label}</Text>
-                  <Text style={[styles.metricValue, { color: item.color }]}>{item.value}</Text>
+                  <Text
+                    maxFontSizeMultiplier={1.2}
+                    style={[styles.metricLabel, { fontSize: select(10, 9, 8.5) }]}
+                  >
+                    {item.label}
+                  </Text>
+                  <Text
+                    maxFontSizeMultiplier={1.2}
+                    style={[styles.metricValue, { color: item.color, fontSize: select(15.5, 14, 12.5) }]}
+                  >
+                    {item.value}
+                  </Text>
                 </Pressable>
               ) : (
                 <View style={styles.metricItem}>
-                  <Text style={styles.metricLabel}>{item.label}</Text>
-                  <Text style={[styles.metricValue, { color: item.color }]}>{item.value}</Text>
+                  <Text
+                    maxFontSizeMultiplier={1.2}
+                    style={[styles.metricLabel, { fontSize: select(10, 9, 8.5) }]}
+                  >
+                    {item.label}
+                  </Text>
+                  <Text
+                    maxFontSizeMultiplier={1.2}
+                    style={[styles.metricValue, { color: item.color, fontSize: select(15.5, 14, 12.5) }]}
+                  >
+                    {item.value}
+                  </Text>
                 </View>
               )}
               {idx < metrics.length - 1 && <View style={styles.metricDivider} />}
