@@ -6,6 +6,7 @@ import { ACTIVE_STATUSES } from '@/lib/driverQueue';
 import { CENTER, getCoords, getPickupCoords, getDeliveryCoords, haptic, CYAN, GOLD, COBALT, ROUTE_PENDING } from './mapTypes';
 import { getStreetOnly } from './mapApproachUtils';
 import { TargetIcon } from '@/assets/icons/MapIcons';
+import { useMapOverlays } from './hooks/useMapOverlays';
 
 export function WebMap({
   orders,
@@ -22,33 +23,12 @@ export function WebMap({
   driverLocation?: { lat?: number; lng?: number };
   activeOrders?: Order[];
 }) {
-  const active = useMemo(
-    () => passedActiveOrders || orders.filter((o) => ACTIVE_STATUSES.includes(o.status)),
-    [passedActiveOrders, orders]
-  );
-  const pending = useMemo(
-    () => orders.filter((o) => o.status === 'pending'),
-    [orders]
-  );
-
-  const visibleOrders = useMemo(() => {
-    if (currentTab === 'active') {
-      return active;
-    }
-    if (selectedId) {
-      const selected = pending.find((o) => o.id === selectedId);
-      if (selected) return [selected];
-    }
-    return pending.length > 0 ? [pending[0]] : [];
-  }, [currentTab, active, pending, selectedId]);
-
-  const selectedOrder = useMemo(() => {
-    if (selectedId) {
-      const found = visibleOrders.find((o) => o.id === selectedId);
-      if (found) return found;
-    }
-    return visibleOrders[0] || null;
-  }, [selectedId, visibleOrders]);
+  const { visibleOrders, targetRouteOrder: selectedOrder, active } = useMapOverlays({
+    orders,
+    currentTab,
+    selectedId,
+    activeOrders: passedActiveOrders,
+  });
 
   const originCenter =
     (driverLocation?.lat != null && driverLocation?.lng != null

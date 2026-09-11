@@ -63,8 +63,11 @@ export function useMapState() {
   const { user } = useAuth();
   const { showToast } = useToast();
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeSelectedId, setActiveSelectedId] = useState<string | null>(null);
+  const [discoverSelectedId, setDiscoverSelectedId] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<'active' | 'pending'>('pending');
+
+  const selectedId = currentTab === 'active' ? activeSelectedId : discoverSelectedId;
 
   const orders = useMemo(() => {
     const orderMap = new Map<string, Order>();
@@ -133,27 +136,26 @@ export function useMapState() {
   );
 
   const handleSelectId = (id: string | null) => {
-    setSelectedId(id);
     if (id) {
       const order = orders.find((o) => o.id === id);
       if (order?.status === 'pending') {
+        setDiscoverSelectedId(id);
         setCurrentTab('pending');
       } else if (order?.status && ACTIVE_STATUSES.includes(order.status)) {
+        setActiveSelectedId(id);
         setCurrentTab('active');
+      } else {
+        if (currentTab === 'active') setActiveSelectedId(id);
+        else setDiscoverSelectedId(id);
       }
+    } else {
+      if (currentTab === 'active') setActiveSelectedId(null);
+      else setDiscoverSelectedId(null);
     }
   };
 
   const handleTabChange = (tab: 'active' | 'pending') => {
     setCurrentTab(tab);
-    if (selectedId) {
-      const order = orders.find((o) => o.id === selectedId);
-      if (tab === 'active' && order && !ACTIVE_STATUSES.includes(order.status)) {
-        setSelectedId(null);
-      } else if (tab === 'pending' && order && order.status !== 'pending') {
-        setSelectedId(null);
-      }
-    }
   };
 
   const handleOpenOrder = (order: Order) => {

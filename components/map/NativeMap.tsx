@@ -21,10 +21,11 @@ import {
   haptic,
 } from './mapTypes';
 import { ACTIVE_STATUSES } from '@/lib/driverQueue';
-import { geocode, fetchDrivingRoute } from '@/lib/distance';
+import { geocode } from '@/lib/distance';
 import { useLocationStore } from '@/store/useLocationStore';
-import { isStreetZoomLevel, getApproachArcCoordinates } from './mapApproachUtils';
+import { isStreetZoomLevel } from './mapApproachUtils';
 import { DestinationPin } from './DestinationPin';
+import { useMapOverlays } from './hooks/useMapOverlays';
 
 function NativeFallbackMap({
   orders,
@@ -152,81 +153,26 @@ export function NativeMap({
     };
   }, [orders]);
 
-  const active = useMemo(
-    () => passedActiveOrders || orders.filter((o) => ACTIVE_STATUSES.includes(o.status)),
-    [passedActiveOrders, orders]
-  );
-  const pending = useMemo(
-    () => orders.filter((o) => o.status === 'pending'),
-    [orders]
-  );
-
-
-
-  const visibleOrders = useMemo(() => {
-    if (currentTab === 'active') {
-      return active;
-    }
-    if (selectedId) {
-      const selected = pending.find((o) => o.id === selectedId);
-      if (selected) return [selected];
-    }
-    return pending.length > 0 ? [pending[0]] : [];
-  }, [currentTab, active, pending, selectedId]);
+  const {
+    active,
+    pending,
+    visibleOrders,
+    validDeliveryOrders,
+    targetRouteOrder,
+    hasActiveRoute,
+    pickupHubs,
+    pinCollisionOffsets,
+    routeCoordinates,
+    approachCoordinates,
+    targetCoordinatesToFit,
+  } = useMapOverlays({
+    orders,
+    currentTab,
+    selectedId,
+    activeOrders: passedActiveOrders,
+  });
 
   const hubColor = currentTab === 'pending' ? GOLD : COBALT;
-
-  const pickupHubs = useMemo(() => {
-    const hubMap = new Map<string, { lat: number; lng: number; address: string; orderIds: string[] }>();
-    visibleOrders.forEach((o) => {
-      const p = getPickupCoords(o);
-      if (!p) return;
-      const key = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
-      const existing = hubMap.get(key);
-      if (existing) {
-        existing.orderIds.push(o.id);
-      } else {
-        hubMap.set(key, {
-          lat: p.lat,
-          lng: p.lng,
-          address: o.pickupAddress || APP_CONFIG.STORE_ADDRESS,
-          orderIds: [o.id],
-        });
-      }
-    });
-    return Array.from(hubMap.values());
-  }, [visibleOrders]);
-
-
-  const pinCollisionOffsets = useMemo(() => {
-    const coordsList: { id: string; lat: number; lng: number }[] = [];
-    pickupHubs.forEach((h) => {
-      coordsList.push({ id: `hub-${h.lat.toFixed(4)}-${h.lng.toFixed(4)}`, lat: h.lat, lng: h.lng });
-    });
-    visibleOrders.forEach((o) => {
-      const d = getDeliveryCoords(o);
-      if (d) coordsList.push({ id: `delivery-${o.id}`, lat: d.lat, lng: d.lng });
-    });
-
-    const offsetMap = new Map<string, { lat: number; lng: number }>();
-    coordsList.forEach((item) => {
-      const collisions = coordsList.filter(
-        (other) =>
-          Math.abs(other.lat - item.lat) < 0.00025 &&
-          Math.abs(other.lng - item.lng) < 0.00025
-      );
-      if (collisions.length > 1) {
-        const idx = collisions.findIndex((c) => c.id === item.id);
-        const angle = (2 * Math.PI * idx) / collisions.length;
-        const offsetDist = 0.00018; // ~18-20m
-        offsetMap.set(item.id, {
-          lat: item.lat + offsetDist * Math.cos(angle),
-          lng: item.lng + offsetDist * Math.sin(angle),
-        });
-      }
-    });
-    return offsetMap;
-  }, [pickupHubs, visibleOrders]);
 
   const initialCenter =
     driverCoords ||
@@ -329,6 +275,10 @@ export function NativeMap({
     const centerLat = (minLat + maxLat) / 2 - (offsetBottom ? latDelta * 0.18 : 0);
     const centerLng = (minLng + maxLng) / 2;
 
+    if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng) || !Number.isFinite(latDelta) || !Number.isFinite(lngDelta)) {
+      return;
+    }
+
     try {
       mapRef.current.animateToRegion({
         latitude: centerLat,
@@ -343,6 +293,7 @@ export function NativeMap({
     return () => {
       if (cameraTimeoutRef.current) {
         clearTimeout(cameraTimeoutRef.current);
+        cameraTimeoutRef.current = null;
       }
     };
   }, []);
@@ -350,38 +301,26 @@ export function NativeMap({
   const lastTargetKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!mapRef.current) return;
-    const targetOrder = selectedId
-      ? orders.find((o) => o.id === selectedId)
-      : (currentTab === 'active' ? active[0] : pending[0]);
+    if (cameraTimeoutRef.current) {
+      clearTimeout(cameraTimeoutRef.current);
+      cameraTimeoutRef.current = null;
+    }
 
-    if (!targetOrder) {
+    if (!mapRef.current || targetCoordinatesToFit.length === 0) {
       lastTargetKeyRef.current = null;
       return;
     }
 
-    const targetKey = `${currentTab}-${selectedId || 'none'}-${targetOrder.id}`;
+    const targetKey = `${currentTab}-${selectedId || 'none'}-${targetRouteOrder?.id || 'none'}`;
     if (lastTargetKeyRef.current === targetKey) {
       return;
     }
     lastTargetKeyRef.current = targetKey;
 
-    const p = getPickupCoords(targetOrder);
-    const d = getDeliveryCoords(targetOrder);
-    const coordsToFit: { latitude: number; longitude: number }[] = [];
-    if (p) coordsToFit.push({ latitude: p.lat, longitude: p.lng });
-    if (d) coordsToFit.push({ latitude: d.lat, longitude: d.lng });
-
-    if (coordsToFit.length === 0) return;
-
-    if (cameraTimeoutRef.current) {
-      clearTimeout(cameraTimeoutRef.current);
-    }
-
     cameraTimeoutRef.current = setTimeout(() => {
-      safeAnimateToCoords(coordsToFit, Boolean(selectedId));
+      safeAnimateToCoords(targetCoordinatesToFit, Boolean(selectedId));
     }, 120);
-  }, [selectedId, currentTab, active, pending, orders]);
+  }, [selectedId, currentTab, targetCoordinatesToFit, targetRouteOrder?.id]);
 
   if (!MapView || !Marker) {
     return <NativeFallbackMap orders={orders} selectedId={selectedId} onSelect={onSelect} />;
@@ -506,52 +445,7 @@ export function NativeMap({
     mapRef.current.animateToRegion(next, 200);
   };
 
-  const targetRouteOrder = useMemo(() => {
-    if (selectedId) {
-      const found = visibleOrders.find((o) => o.id === selectedId);
-      if (found) return found;
-    }
-    return visibleOrders[0] || null;
-  }, [selectedId, visibleOrders]);
-  const routePickup = targetRouteOrder ? getPickupCoords(targetRouteOrder) : null;
-  const routeDelivery = targetRouteOrder ? getDeliveryCoords(targetRouteOrder) : null;
-
-  const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
   const [isZoomedIn, setIsZoomedIn] = useState(false);
-
-  const curbPoint = routeCoordinates.length >= 2 ? routeCoordinates[routeCoordinates.length - 1] : null;
-  const approachCoordinates = useMemo(() => {
-    if (!curbPoint || !routeDelivery) return [];
-    return getApproachArcCoordinates(curbPoint, {
-      latitude: routeDelivery.lat,
-      longitude: routeDelivery.lng,
-    });
-  }, [curbPoint, routeDelivery]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!routePickup || !routeDelivery) {
-      setRouteCoordinates([]);
-      return;
-    }
-
-    setRouteCoordinates([
-      { latitude: routePickup.lat, longitude: routePickup.lng },
-      { latitude: routeDelivery.lat, longitude: routeDelivery.lng },
-    ]);
-
-    fetchDrivingRoute(routePickup, routeDelivery)
-      .then((coords) => {
-        if (!cancelled && coords.length >= 2) {
-          setRouteCoordinates(coords);
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [routePickup?.lat, routePickup?.lng, routeDelivery?.lat, routeDelivery?.lng]);
 
   return (
     <View style={styles.mapContainer}>
@@ -579,27 +473,30 @@ export function NativeMap({
         toolbarEnabled={false}
       >
       
-        {Polyline && routeCoordinates.length >= 2 && (
-          <>
-            <Polyline
-              coordinates={routeCoordinates}
-              strokeColor="rgba(0, 0, 0, 0.7)"
-              strokeWidth={Platform.OS === 'ios' ? 6 : 7}
-            />
-            <Polyline
-              coordinates={routeCoordinates}
-              strokeColor={
-                targetRouteOrder?.status && ACTIVE_STATUSES.includes(targetRouteOrder.status)
-                  ? ROUTE_ACTIVE
-                  : ROUTE_PENDING
-              }
-              strokeWidth={Platform.OS === 'ios' ? 3.8 : 4.2}
-            />
-          </>
+        {Boolean(Polyline && hasActiveRoute && targetRouteOrder && routeCoordinates.length >= 2) && (
+          <Polyline
+            key={`${currentTab}-route-base-${targetRouteOrder?.id}`}
+            coordinates={routeCoordinates}
+            strokeColor="rgba(0, 0, 0, 0.7)"
+            strokeWidth={Platform.OS === 'ios' ? 6 : 7}
+          />
+        )}
+        {Boolean(Polyline && hasActiveRoute && targetRouteOrder && routeCoordinates.length >= 2) && (
+          <Polyline
+            key={`${currentTab}-route-color-${targetRouteOrder?.id}`}
+            coordinates={routeCoordinates}
+            strokeColor={
+              targetRouteOrder?.status && ACTIVE_STATUSES.includes(targetRouteOrder.status)
+                ? ROUTE_ACTIVE
+                : ROUTE_PENDING
+            }
+            strokeWidth={Platform.OS === 'ios' ? 3.8 : 4.2}
+          />
         )}
 
-        {Polyline && approachCoordinates.length >= 2 && (
+        {Boolean(Polyline && hasActiveRoute && targetRouteOrder && approachCoordinates.length >= 2) && (
           <Polyline
+            key={`${currentTab}-route-approach-${targetRouteOrder?.id}`}
             coordinates={approachCoordinates}
             strokeColor={
               targetRouteOrder?.status && ACTIVE_STATUSES.includes(targetRouteOrder.status)
@@ -612,17 +509,15 @@ export function NativeMap({
           />
         )}
 
-        {pickupHubs.map((hub, idx) => {
+        {pickupHubs.map((hub) => {
           const isSelected = Boolean(selectedId && hub.orderIds.includes(selectedId));
           const hubKey = `hub-${hub.lat.toFixed(4)}-${hub.lng.toFixed(4)}`;
           const offset = pinCollisionOffsets.get(hubKey);
           const coord = offset || { latitude: hub.lat, longitude: hub.lng };
           return (
             <Marker
-              key={currentTab === 'pending' ? 'hub-discover' : `${hubKey}-${idx}`}
+              key={`${currentTab}-${hubKey}`}
               coordinate={coord}
-              title="Pickup Point"
-              description={hub.address}
               zIndex={isSelected ? 150 : 50}
               onPress={() => {
                 if (hub.orderIds.length > 0) {
@@ -661,9 +556,8 @@ export function NativeMap({
           );
         })}
 
-        {visibleOrders.map((order) => {
-          const dCoords = getDeliveryCoords(order);
-          if (!dCoords) return null;
+        {validDeliveryOrders.map((order) => {
+          const dCoords = getDeliveryCoords(order)!;
           const isSelected = Boolean(selectedId && order.id === selectedId);
           const activeIndex = active.findIndex((a) => a.id === order.id);
           const isActive = activeIndex >= 0;
@@ -674,10 +568,8 @@ export function NativeMap({
 
           return (
             <Marker
-              key={currentTab === 'pending' ? 'delivery-discover' : `delivery-${order.id}`}
+              key={`${currentTab}-delivery-${order.id}`}
               coordinate={coord}
-              title={isActive ? `Stop #${stopNumber}: Drop Point` : 'Drop Point'}
-              description={order.deliveryAddress}
               zIndex={markerZIndex}
               onPress={() => onSelect(order.id)}
             >

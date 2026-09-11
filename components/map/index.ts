@@ -7,3 +7,4 @@ export * from './MapStopsCarousel';
 export * from './mapApproachUtils';
 export * from './DestinationPin';
 export * from './hooks/useMapState';
+export * from './hooks/useMapOverlays';
