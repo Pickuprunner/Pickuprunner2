@@ -60,4 +60,6 @@ export {
   CustomStatePickerModal,
   type CustomStatePickerModalProps,
 } from './CustomStatePickerModal';
+export { AppSplashScreen } from './AppSplashScreen';
+
 

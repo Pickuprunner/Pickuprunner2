@@ -57,16 +57,14 @@ export default function SignInScreen() {
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated && user) {
+    if (!loading && !isLoading && isAuthenticated && user) {
       if (user.role === 'customer') {
-        if (router.canDismiss()) router.dismissAll();
         router.replace('/(customer)/my-orders');
       } else {
-        if (router.canDismiss()) router.dismissAll();
         router.replace('/(tabs)');
       }
     }
-  }, [isAuthenticated, isLoading, user]);
+  }, [isAuthenticated, isLoading, user, loading]);
 
   useEffect(() => {
     return subscribeTermsAgreed((agreed) => {
@@ -151,10 +149,6 @@ export default function SignInScreen() {
 
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
-      }
-
-      if (router.canDismiss()) {
-        router.dismissAll();
       }
 
       if (isSignUp) {

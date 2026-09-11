@@ -97,11 +97,11 @@ export default function ProfileScreen() {
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const webFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!authLoading && (!isAuthenticated || !user)) {
-      if (router.canDismiss()) router.dismissAll();
       router.replace('/(landing)/role-select');
     }
   }, [authLoading, isAuthenticated, user]);
@@ -244,16 +244,17 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
     try {
       haptic('heavy');
       await logout();
       await AsyncStorage.removeItem('app_role');
-      if (router.canDismiss()) {
-        router.dismissAll();
-      }
       router.replace('/(landing)/role-select');
     } catch (err) {
       console.warn('[auth] sign out failed:', err);
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -572,6 +573,7 @@ export default function ProfileScreen() {
           onSignOut={handleSignOut}
           onResetPassword={handleResetPassword}
           isDriver
+          isSigningOut={isSigningOut}
         />
 
         <Text style={styles.versionTag}>

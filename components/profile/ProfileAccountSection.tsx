@@ -13,6 +13,7 @@ export interface ProfileAccountSectionProps {
   onSignOut: () => void;
   onResetPassword?: () => void;
   isDriver?: boolean;
+  isSigningOut?: boolean;
 }
 
 export function ProfileAccountSection({
@@ -20,6 +21,7 @@ export function ProfileAccountSection({
   onSignOut,
   onResetPassword,
   isDriver = false,
+  isSigningOut = false,
 }: ProfileAccountSectionProps) {
   return (
     <ProfileSection title="ACCOUNT">
@@ -49,6 +51,7 @@ export function ProfileAccountSection({
             subtitle={isDriver ? 'End current driver session' : 'Log out of current account'}
             onPress={onSignOut}
             showChevron={false}
+            loading={isSigningOut}
             hapticStyle="heavy"
           />
 

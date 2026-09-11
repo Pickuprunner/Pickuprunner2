@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Clock,
@@ -37,7 +37,11 @@ export interface DriverProfileStatusScreenProps {
   onEditStep?: (step: number) => void;
 }
 
-export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: DriverProfileStatusScreenProps = {}) {
+export function DriverProfileStatusScreen({
+  onEditDocuments,
+  onEditStep,
+}: DriverProfileStatusScreenProps = {}) {
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { select } = useResponsive();
   const { user, logout } = useAuth();
@@ -108,11 +112,12 @@ export function DriverProfileStatusScreen({ onEditDocuments, onEditStep }: Drive
     verification?.status === 'approved';
 
   useEffect(() => {
-    if (user?.role === 'driver' && isApproved) {
+    const isAlreadyOnTabs = pathname.startsWith('/(tabs)') || pathname === '/';
+    if (!isAlreadyOnTabs && user?.role === 'driver' && isApproved) {
       if (router.canDismiss()) router.dismissAll();
       router.replace('/(tabs)');
     }
-  }, [user?.role, isApproved]);
+  }, [user?.role, isApproved, pathname]);
 
   const handleRefresh = async () => {
     if (Platform.OS !== 'web') {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, View, Text, StyleSheet, Platform } from 'react-native';
+import { Pressable, View, Text, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { ChevronRight } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -30,6 +30,7 @@ export interface ProfileActionRowProps {
   rightControl?: React.ReactNode;
   showChevron?: boolean;
   disabled?: boolean;
+  loading?: boolean;
   hapticStyle?: 'light' | 'medium' | 'heavy';
 }
 
@@ -44,12 +45,13 @@ export function ProfileActionRow({
   rightControl,
   showChevron = true,
   disabled = false,
+  loading = false,
   hapticStyle = 'medium',
 }: ProfileActionRowProps) {
   const { select } = useResponsive();
 
   const handlePress = () => {
-    if (!onPress || disabled) return;
+    if (!onPress || disabled || loading) return;
     haptic(hapticStyle);
     onPress();
   };
@@ -57,7 +59,7 @@ export function ProfileActionRow({
   return (
     <Pressable
       onPress={handlePress}
-      disabled={disabled || !onPress}
+      disabled={disabled || loading || !onPress}
       style={({ pressed }) => [
         styles.actionRow,
         {
@@ -97,7 +99,9 @@ export function ProfileActionRow({
           </Text>
         ) : null}
       </View>
-      {rightControl ? (
+      {loading ? (
+        <ActivityIndicator size="small" color={titleColor || TEXT_PRIMARY} />
+      ) : rightControl ? (
         rightControl
       ) : showChevron && onPress ? (
         <ChevronRight size={16} color="rgba(255, 255, 255, 0.4)" />

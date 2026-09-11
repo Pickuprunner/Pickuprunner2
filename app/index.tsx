@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '@/store/useAuthStore';
+import { AppSplashScreen } from '@/components/core';
 
 export default function Index() {
   const { isHydrated, isAuthenticated, user } = useAuthStore();
@@ -15,7 +16,9 @@ export default function Index() {
     }
   }, [isHydrated, isAuthenticated, user]);
 
-  if (!isHydrated) return null;
+  if (!isHydrated) {
+    return <AppSplashScreen />;
+  }
 
   if (isAuthenticated && user) {
     return <Redirect href={user.role === 'customer' ? '/(customer)/my-orders' : '/(tabs)'} />;
@@ -23,5 +26,6 @@ export default function Index() {
 
   return <Redirect href="/(landing)/role-select" />;
 }
+
 
 

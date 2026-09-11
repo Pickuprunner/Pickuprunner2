@@ -72,11 +72,11 @@ export default function CustomerProfileScreen() {
 
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const webFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || !user)) {
-      if (router.canDismiss()) router.dismissAll();
       router.replace('/(landing)/role-select');
     }
   }, [isLoading, isAuthenticated, user]);
@@ -309,16 +309,17 @@ export default function CustomerProfileScreen() {
   };
 
   const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
     try {
       haptic('heavy');
       await logout();
       await AsyncStorage.removeItem('app_role');
-      if (router.canDismiss()) {
-        router.dismissAll();
-      }
       router.replace('/(landing)/role-select');
     } catch (err) {
       console.warn('[auth] sign out failed:', err);
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -390,6 +391,7 @@ export default function CustomerProfileScreen() {
           isAuthenticated={isAuthenticated}
           onSignOut={handleSignOut}
           onResetPassword={handleResetPassword}
+          isSigningOut={isSigningOut}
         />
 
       </ScrollView>
