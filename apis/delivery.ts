@@ -11,7 +11,7 @@ export interface UploadPhotoPayload {
   path?: string;
 }
 
-export interface UploadPhotoResponse {
+export interface DeliveryUploadPhotoResponse {
   url: string;
   publicUrl?: string;
   orderId: string;
@@ -19,7 +19,7 @@ export interface UploadPhotoResponse {
 }
 
 export const deliveryApi = {
-  uploadPhoto: async (payload: UploadPhotoPayload): Promise<UploadPhotoResponse> => {
+  uploadPhoto: async (payload: UploadPhotoPayload): Promise<DeliveryUploadPhotoResponse> => {
     const baseUrl = getApiBaseUrl();
     const token = useAuthStore.getState().token;
 
@@ -52,7 +52,7 @@ export const deliveryApi = {
       throw new Error(data?.error || data?.message || 'Failed to upload photo');
     }
 
-    return data as UploadPhotoResponse;
+    return data as DeliveryUploadPhotoResponse;
   },
 
   getPhotoUrl: async (orderId: string): Promise<string | null> => {
