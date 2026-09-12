@@ -77,6 +77,19 @@ export interface DriverProfileData {
   };
 }
 
+export interface DocumentExpiryItem {
+  expirationDate: string | null;
+  expired: boolean;
+  daysLeft: number | null;
+  expiringSoon: boolean;
+}
+
+export interface DriverExpiryData {
+  license?: DocumentExpiryItem;
+  insurance?: DocumentExpiryItem;
+  anyExpired?: boolean;
+}
+
 export interface AccreditationResponseData {
   profile: DriverProfileData;
   steps: {
@@ -89,6 +102,7 @@ export interface AccreditationResponseData {
     code: EligibilityCode;
     reason: string | null;
   };
+  expiry?: DriverExpiryData;
   missing: string[];
 }
 
@@ -96,6 +110,85 @@ export interface AccreditationApiResponse {
   success: boolean;
   data: AccreditationResponseData;
   message?: string;
+}
+
+export type AccreditationGateState =
+  | { type: 'license_expired'; title: string; message: string; actionStep: 2; actionLabel: string }
+  | { type: 'insurance_expired'; title: string; message: string; actionStep: 4; actionLabel: string }
+  | { type: 'under_review'; title: string; message: string }
+  | { type: 'ineligible'; title: string; message: string }
+  | { type: 'not_onboarded'; title: string; message: string }
+  | { type: 'eligible'; expiringWarnings: Array<{ document: 'license' | 'insurance'; daysLeft: number | null; message: string }> };
+
+export function getDriverAccreditationGateState(data?: AccreditationResponseData | null): AccreditationGateState {
+  if (!data) {
+    return { type: 'not_onboarded', title: 'Driver Verification Required', message: 'Please complete your driver onboarding.' };
+  }
+  const { steps, eligibility, expiry, profile } = data;
+
+  // 1. Expiry check for license
+  if (expiry?.license?.expired) {
+    return {
+      type: 'license_expired',
+      title: 'Licence Expired',
+      message: 'Your licence has expired. Upload a new one.',
+      actionStep: 2,
+      actionLabel: 'Renew licence',
+    };
+  }
+
+  // 2. Expiry check for insurance
+  if (expiry?.insurance?.expired) {
+    return {
+      type: 'insurance_expired',
+      title: 'Insurance Expired',
+      message: 'Your insurance has expired. Upload a new one.',
+      actionStep: 4,
+      actionLabel: 'Renew insurance',
+    };
+  }
+
+  // 3. Pending review check
+  if (steps?.license === 'pending' || steps?.insurance === 'pending' || profile?.accreditationStatus === 'under_review') {
+    return {
+      type: 'under_review',
+      title: 'Under Review',
+      message: 'Your new document is being reviewed.',
+    };
+  }
+
+  // 4. Eligibility check
+  if (!eligibility?.eligible) {
+    return {
+      type: 'ineligible',
+      title: 'Action Required',
+      message: eligibility?.reason || 'Your driver account is not currently eligible to take orders.',
+    };
+  }
+
+  // 5. Eligible (with optional expiringSoon warnings)
+  const expiringWarnings: Array<{ document: 'license' | 'insurance'; daysLeft: number | null; message: string }> = [];
+  if (expiry?.license?.expiringSoon) {
+    const days = expiry.license.daysLeft ?? 0;
+    expiringWarnings.push({
+      document: 'license',
+      daysLeft: days,
+      message: `Your licence expires in ${days} ${days === 1 ? 'day' : 'days'}`,
+    });
+  }
+  if (expiry?.insurance?.expiringSoon) {
+    const days = expiry.insurance.daysLeft ?? 0;
+    expiringWarnings.push({
+      document: 'insurance',
+      daysLeft: days,
+      message: `Your insurance expires in ${days} ${days === 1 ? 'day' : 'days'}`,
+    });
+  }
+
+  return {
+    type: 'eligible',
+    expiringWarnings,
+  };
 }
 
 export function isAccreditationFullyApproved(data?: AccreditationResponseData | null): boolean {
@@ -113,7 +206,10 @@ export function isAccreditationFullyApproved(data?: AccreditationResponseData | 
   const isStep3Approved = bgStatus === 'approved';
   const isStep4Approved = insuranceStatus === 'approved';
 
-  return isStep1Approved && isStep2Approved && isStep3Approved && isStep4Approved;
+  const notExpired = !data.expiry?.anyExpired && !data.expiry?.license?.expired && !data.expiry?.insurance?.expired;
+  const isEligible = data.eligibility ? Boolean(data.eligibility.eligible) : true;
+
+  return isStep1Approved && isStep2Approved && isStep3Approved && isStep4Approved && notExpired && isEligible;
 }
 
 export interface SaveStepResponse {

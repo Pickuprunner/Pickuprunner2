@@ -29,6 +29,7 @@ import { useOrderStore } from '@/store/useOrderStore';
 import { ordersApi } from '@/apis/orders';
 import { deliveryApi } from '@/apis/delivery';
 
+import { useDriverAccreditation } from '@/lib/accreditation';
 import {
   StepBar,
   RouteTimelineCard,
@@ -63,6 +64,8 @@ export default function OrderDetailScreen() {
   const driverId = useDriverId();
   const { data: allOrders = [] } = useOrders();
   const { queueCount, atCapacity } = useDriverQueue(allOrders, driverId);
+  const { data: accreditation } = useDriverAccreditation();
+  const isEligible = accreditation?.eligibility ? Boolean(accreditation.eligibility.eligible) : true;
 
   const { data: connectStatus, refetch: refetchConnect } = useConnectStatus(driverId);
   const connectOnboard = useConnectOnboard();
@@ -274,6 +277,21 @@ export default function OrderDetailScreen() {
       );
       return;
     }
+
+    if (!isEligible) {
+      const reason = accreditation?.eligibility?.reason || 'Accreditation action required before accepting orders.';
+      const isExpired = Boolean(accreditation?.expiry?.anyExpired);
+      const step = accreditation?.expiry?.license?.expired ? '2' : accreditation?.expiry?.insurance?.expired ? '4' : '1';
+      Alert.alert(isExpired ? 'Document Expired' : 'Accreditation Required', reason, [
+        {
+          text: isExpired ? 'Renew Document' : 'Update Details',
+          onPress: () => router.push({ pathname: '/(auth)/driver-verification', params: { edit: 'true', step } } as any),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+
     haptic('medium');
 
     if (order) {
@@ -309,11 +327,18 @@ export default function OrderDetailScreen() {
             code === 'under_review' ||
             code === 'rejected' ||
             code === 'license_expired' ||
-            code === 'insurance_expired');
+            code === 'insurance_expired' ||
+            code === 'license_not_approved' ||
+            code === 'insurance_not_approved');
 
         if (isAccreditationError) {
-          Alert.alert('Accreditation Required', errorMsg, [
-            { text: 'Complete Accreditation', onPress: () => router.push('/(auth)/driver-verification') },
+          const step = code === 'license_expired' || code === 'license_not_approved' ? '2' : code === 'insurance_expired' || code === 'insurance_not_approved' ? '4' : '1';
+          const isRenew = code?.includes('expired') || code?.includes('not_approved');
+          Alert.alert(isRenew ? 'Document Renewal Required' : 'Accreditation Required', errorMsg, [
+            {
+              text: isRenew ? 'Renew Document' : 'Complete Accreditation',
+              onPress: () => router.push({ pathname: '/(auth)/driver-verification', params: { edit: 'true', step } } as any),
+            },
             { text: 'Cancel', style: 'cancel' }
           ]);
         } else {
@@ -555,6 +580,8 @@ export default function OrderDetailScreen() {
             uploadingPhoto={uploadingPhoto}
             atCapacity={atCapacity}
             bottomInset={insets.bottom}
+            isEligible={isEligible}
+            eligibilityReason={accreditation?.eligibility?.reason}
             onAccept={doAccept}
             onPickUp={doPickUp}
             onDeliver={doDeliver}

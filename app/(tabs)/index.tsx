@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import {
   Package,
+  AlertTriangle,
 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -36,7 +37,7 @@ import { useDriverAvailability, useSetDriverAvailability, useDriverLocationHeart
 import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
 import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast, CustomLoading, CustomRefreshControl } from '@/components/core';
 
-import { isAccreditationFullyApproved } from '@/apis/accreditation';
+import { isAccreditationFullyApproved, getDriverAccreditationGateState } from '@/apis/accreditation';
 import {
   OrdersHeader,
   OrdersSearchBar,
@@ -160,6 +161,8 @@ export default function OrdersScreen() {
   const { data: accreditation, isLoading: isLoadingAccred } = useDriverAccreditation();
 
   const isApproved = isAccreditationFullyApproved(accreditation);
+  const gateState = getDriverAccreditationGateState(accreditation);
+  const expiringWarnings = gateState.type === 'eligible' ? gateState.expiringWarnings : [];
 
   const isSubmitted =
     Boolean(accreditation?.profile?.isSubmitted) ||
@@ -210,6 +213,15 @@ export default function OrdersScreen() {
       });
       return;
     }
+
+    if (accreditation?.eligibility && !accreditation.eligibility.eligible) {
+      showToast(accreditation.eligibility.reason || 'Accreditation action required before accepting orders.', {
+        type: 'error',
+      });
+      router.push('/(auth)/driver-verification');
+      return;
+    }
+
     haptic();
     const uid = driverId || `guest-${Date.now()}`;
     const uname = user?.displayName ?? user?.email ?? 'Driver';
@@ -240,7 +252,9 @@ export default function OrdersScreen() {
           code === 'under_review' ||
           code === 'rejected' ||
           code === 'license_expired' ||
-          code === 'insurance_expired');
+          code === 'insurance_expired' ||
+          code === 'license_not_approved' ||
+          code === 'insurance_not_approved');
 
       if (isAccreditationError) {
         showToast(errorMsg, { type: 'error' });
@@ -462,7 +476,7 @@ export default function OrdersScreen() {
     [headerHeight, headerTranslateY]
   );
 
-  useEffect(() => {
+    useEffect(() => {
     isHeaderVisible.current = true;
     Animated.timing(headerTranslateY, {
       toValue: 0,
@@ -471,15 +485,47 @@ export default function OrdersScreen() {
     }).start();
   }, [search, headerTranslateY]);
 
+  const ExpiringDocumentsBanner = () => {
+    if (!expiringWarnings.length) return null;
+    return (
+      <View style={styles.expiringBannerContainer}>
+        {expiringWarnings.map((warning, idx) => (
+          <TouchableOpacity
+            key={idx}
+            activeOpacity={0.85}
+            onPress={() => {
+              router.push({
+                pathname: '/(auth)/driver-verification',
+                params: { edit: 'true', step: warning.document === 'license' ? '2' : '4' },
+              } as any);
+            }}
+            style={styles.expiringBanner}
+          >
+            <View style={styles.expiringBannerLeft}>
+              <AlertTriangle size={18} color="#FFE399" />
+              <Text style={styles.expiringBannerText}>
+                {warning.message}
+              </Text>
+            </View>
+            <View style={styles.expiringBannerBtn}>
+              <Text style={styles.expiringBannerBtnText}>Renew</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
   const listHeader = useMemo(
     () => (
       <View>
         <View style={{ height: headerHeight + 4 }} />
+        <ExpiringDocumentsBanner />
         <StripeSetupBanner />
         {isLoading && <SkeletonList count={3} />}
       </View>
     ),
-    [headerHeight, isLoading]
+    [headerHeight, isLoading, expiringWarnings]
   );
 
   const isOnline = useDriverStore((s) => s.isOnline);
@@ -730,5 +776,47 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0F131C',
     letterSpacing: 0.2,
+  },
+  expiringBannerContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+    gap: 8,
+  },
+  expiringBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 227, 153, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 227, 153, 0.35)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 12,
+  },
+  expiringBannerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  expiringBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFE399',
+    lineHeight: 18,
+  },
+  expiringBannerBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: '#FFE399',
+  },
+  expiringBannerBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0F131C',
   },
 });

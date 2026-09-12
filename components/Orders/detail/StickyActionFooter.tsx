@@ -11,6 +11,8 @@ export interface StickyActionFooterProps {
   uploadingPhoto: boolean;
   atCapacity: boolean;
   bottomInset: number;
+  isEligible?: boolean;
+  eligibilityReason?: string | null;
   onAccept: () => void;
   onPickUp: () => void;
   onDeliver: () => void;
@@ -23,6 +25,8 @@ export function StickyActionFooter({
   uploadingPhoto,
   atCapacity,
   bottomInset,
+  isEligible = true,
+  eligibilityReason,
   onAccept,
   onPickUp,
   onDeliver,
@@ -32,6 +36,7 @@ export function StickyActionFooter({
   const isPickupState = status === 'assigned' || status === 'accepted';
   const isEnRouteState = status === 'picked_up' || status === 'shopping' || status === 'en_route';
   const isDeliveredState = status === 'delivered';
+  const isAcceptDisabled = atCapacity || !isEligible;
 
   return (
     <View
@@ -43,16 +48,20 @@ export function StickyActionFooter({
       {isPendingState && (
         <>
           <Text style={styles.stickyInstruction} numberOfLines={1}>
-            {atCapacity ? 'Active limit reached (3/3) — Deliver an order first' : 'Ready to deliver? Accept this order'}
+            {atCapacity
+              ? 'Active limit reached (3/3) — Deliver an order first'
+              : !isEligible
+                ? eligibilityReason || 'Accreditation renewal required'
+                : 'Ready to deliver? Accept this order'}
           </Text>
           <TouchableOpacity
             activeOpacity={0.85}
-            style={[styles.primaryActionBtn, atCapacity && styles.disabledBtn]}
-            onPress={atCapacity ? undefined : onAccept}
-            disabled={atCapacity}
+            style={[styles.primaryActionBtn, isAcceptDisabled && styles.disabledBtn]}
+            onPress={isAcceptDisabled ? undefined : onAccept}
+            disabled={isAcceptDisabled}
           >
             <LinearGradient
-              colors={atCapacity ? ['#2D3344', '#1E2330'] : ['#1E75FF', colors.primaryContainer, '#004ECC']}
+              colors={isAcceptDisabled ? ['#2D3344', '#1E2330'] : ['#1E75FF', colors.primaryContainer, '#004ECC']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.gradientFill}
@@ -60,10 +69,14 @@ export function StickyActionFooter({
               <MaterialIcons
                 name="local-shipping"
                 size={20}
-                color={atCapacity ? colors.outline : '#FFFFFF'}
+                color={isAcceptDisabled ? colors.outline : '#FFFFFF'}
               />
-              <Text style={[styles.primaryActionText, atCapacity && styles.disabledText]}>
-                {atCapacity ? 'Max Active Deliveries (3)' : 'Accept Order'}
+              <Text style={[styles.primaryActionText, isAcceptDisabled && styles.disabledText]}>
+                {atCapacity
+                  ? 'Max Active Deliveries (3)'
+                  : !isEligible
+                    ? 'Accreditation Required'
+                    : 'Accept Order'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>

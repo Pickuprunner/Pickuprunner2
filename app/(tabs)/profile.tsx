@@ -53,6 +53,7 @@ const BLUE = '#0066FF';
 const GOLD = '#FFE399';
 const GOLD_ACCENT = '#E5A93C';
 const GREEN = '#22C55E';
+const RED = '#EF4444';
 
 function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
   if (Platform.OS !== 'web') {
@@ -271,23 +272,37 @@ export default function ProfileScreen() {
   const hasInsuranceData = Boolean(accredProfile?.insurancePolicyNumber || accredProfile?.documents?.insuranceCard);
   const hasConsentData = Boolean(accredProfile?.backgroundConsentAt);
 
+  const expiry = accreditation?.expiry;
+  const isLicenseExpired = Boolean(expiry?.license?.expired);
+  const isLicenseExpiringSoon = Boolean(expiry?.license?.expiringSoon);
+  const isInsuranceExpired = Boolean(expiry?.insurance?.expired);
+  const isInsuranceExpiringSoon = Boolean(expiry?.insurance?.expiringSoon);
+
   const licenseStatus: DocStatus =
-    accredSteps?.license === 'approved' || verification?.status === 'approved'
-      ? 'approved'
-      : accredSteps?.license === 'rejected'
-        ? 'rejected'
-        : hasLicenseData || isProfileSubmitted
-          ? 'pending'
-          : undefined;
+    isLicenseExpired
+      ? 'expired'
+      : isLicenseExpiringSoon
+        ? 'expiring_soon'
+        : accredSteps?.license === 'approved' || verification?.status === 'approved'
+          ? 'approved'
+          : accredSteps?.license === 'rejected'
+            ? 'rejected'
+            : hasLicenseData || isProfileSubmitted
+              ? 'pending'
+              : undefined;
 
   const insuranceStatus: DocStatus =
-    accredSteps?.insurance === 'approved' || verification?.status === 'approved'
-      ? 'approved'
-      : accredSteps?.insurance === 'rejected'
-        ? 'rejected'
-        : hasInsuranceData || isProfileSubmitted
-          ? 'pending'
-          : undefined;
+    isInsuranceExpired
+      ? 'expired'
+      : isInsuranceExpiringSoon
+        ? 'expiring_soon'
+        : accredSteps?.insurance === 'approved' || verification?.status === 'approved'
+          ? 'approved'
+          : accredSteps?.insurance === 'rejected'
+            ? 'rejected'
+            : hasInsuranceData || isProfileSubmitted
+              ? 'pending'
+              : undefined;
 
   const bgStatus: DocStatus =
     accredSteps?.backgroundCheck === 'approved' || bgCheck?.status === 'approved'
@@ -299,9 +314,11 @@ export default function ProfileScreen() {
           : undefined;
 
   const isAccredApproved =
-    accreditation?.eligibility?.eligible ||
-    accredProfile?.accreditationStatus === 'approved' ||
-    verification?.status === 'approved';
+    Boolean(accreditation?.eligibility?.eligible) &&
+    !expiry?.anyExpired &&
+    !isLicenseExpired &&
+    !isInsuranceExpired &&
+    (accredProfile?.accreditationStatus === 'approved' || verification?.status === 'approved');
 
   const isAccredUnderReview =
     !isAccredApproved &&
@@ -426,7 +443,7 @@ export default function ProfileScreen() {
             <View
               style={[
                 styles.overallBadge,
-                isAccredApproved ? styles.overallBadgeSuccess : styles.overallBadgeWarning,
+                isAccredApproved ? styles.overallBadgeSuccess : isLicenseExpired || isInsuranceExpired ? styles.overallBadgeError : styles.overallBadgeWarning,
               ]}
             >
               <Text
@@ -434,10 +451,16 @@ export default function ProfileScreen() {
                 style={[
                   styles.overallBadgeText,
                   { fontSize: select(10, 9, 8.5) },
-                  isAccredApproved ? { color: GREEN } : { color: GOLD_ACCENT },
+                  isAccredApproved ? { color: GREEN } : isLicenseExpired || isInsuranceExpired ? { color: RED } : { color: GOLD_ACCENT },
                 ]}
               >
-                {isAccredApproved ? 'FULLY CLEARED' : isAccredUnderReview ? 'UNDER REVIEW' : 'IN PROGRESS'}
+                {isAccredApproved
+                  ? 'FULLY CLEARED'
+                  : isLicenseExpired || isInsuranceExpired
+                    ? 'ACTION REQUIRED'
+                    : isAccredUnderReview
+                      ? 'UNDER REVIEW'
+                      : 'IN PROGRESS'}
               </Text>
             </View>
           }
@@ -445,15 +468,32 @@ export default function ProfileScreen() {
           <DocStatusItem
             title="Driver's License"
             subtitle={
-              licenseStatus === 'approved'
-                ? 'Valid license on file'
-                : licenseStatus === 'rejected'
-                  ? 'Resubmission required'
-                  : licenseStatus === 'pending' || licenseStatus === 'in_review'
-                    ? 'Under review'
-                    : 'Upload driver license'
+              isLicenseExpired
+                ? `Licence expired${expiry?.license?.expirationDate ? ` on ${expiry.license.expirationDate}` : ''} • Tap to renew`
+                : isLicenseExpiringSoon
+                  ? `Expires in ${expiry?.license?.daysLeft} days • Tap to renew`
+                  : licenseStatus === 'approved'
+                    ? 'Valid license on file'
+                    : licenseStatus === 'rejected'
+                      ? 'Resubmission required'
+                      : licenseStatus === 'pending'
+                        ? 'Under review'
+                        : 'Upload driver license'
             }
             status={licenseStatus}
+            customLabel={
+              isLicenseExpired
+                ? 'Expired'
+                : isLicenseExpiringSoon
+                  ? `Exp. in ${expiry?.license?.daysLeft}d`
+                  : undefined
+            }
+            onPress={() => {
+              router.push({
+                pathname: '/(auth)/driver-verification',
+                params: { edit: 'true', step: '2' },
+              } as any);
+            }}
           />
 
           <ItemDivider />
@@ -461,15 +501,32 @@ export default function ProfileScreen() {
           <DocStatusItem
             title="Vehicle Insurance"
             subtitle={
-              insuranceStatus === 'approved'
-                ? 'Current policy verified'
-                : insuranceStatus === 'rejected'
-                  ? 'Resubmission required'
-                  : insuranceStatus === 'pending' || insuranceStatus === 'in_review'
-                    ? 'Under review'
-                    : 'Upload insurance policy'
+              isInsuranceExpired
+                ? `Policy expired${expiry?.insurance?.expirationDate ? ` on ${expiry.insurance.expirationDate}` : ''} • Tap to renew`
+                : isInsuranceExpiringSoon
+                  ? `Expires in ${expiry?.insurance?.daysLeft} days • Tap to renew`
+                  : insuranceStatus === 'approved'
+                    ? 'Current policy verified'
+                    : insuranceStatus === 'rejected'
+                      ? 'Resubmission required'
+                      : insuranceStatus === 'pending'
+                        ? 'Under review'
+                        : 'Upload insurance policy'
             }
             status={insuranceStatus}
+            customLabel={
+              isInsuranceExpired
+                ? 'Expired'
+                : isInsuranceExpiringSoon
+                  ? `Exp. in ${expiry?.insurance?.daysLeft}d`
+                  : undefined
+            }
+            onPress={() => {
+              router.push({
+                pathname: '/(auth)/driver-verification',
+                params: { edit: 'true', step: '4' },
+              } as any);
+            }}
           />
 
           <ItemDivider />
@@ -486,6 +543,12 @@ export default function ProfileScreen() {
                     : 'FCRA authorization needed'
             }
             status={bgStatus}
+            onPress={() => {
+              router.push({
+                pathname: '/(auth)/driver-verification',
+                params: { edit: 'true', step: '3' },
+              } as any);
+            }}
           />
         </ProfileSection>
 
@@ -607,6 +670,10 @@ const styles = StyleSheet.create({
   overallBadgeWarning: {
     backgroundColor: 'rgba(229, 169, 60, 0.1)',
     borderColor: 'rgba(229, 169, 60, 0.3)',
+  },
+  overallBadgeError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
   },
   overallBadgeText: {
     fontSize: 10,
