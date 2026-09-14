@@ -548,8 +548,9 @@ export default function DriverVerificationScreen() {
       // If in editing/renewal mode for an existing approved/submitted driver, use per-step routes
       const isRenewalMode = isEditing || profile?.accreditationStatus === 'approved' || profile?.isSubmitted;
       if (isRenewalMode) {
-        // Save license
-        if (formData.licenseNumber) {
+        // Save license only if unapproved or expired
+        const needsLicenseRenewal = profile?.licenseStatus !== 'approved' || isLicenseExpired;
+        if (needsLicenseRenewal && formData.licenseNumber) {
           await saveStepMutation.mutateAsync({
             step: 'license',
             payload: {
@@ -574,8 +575,9 @@ export default function DriverVerificationScreen() {
           }
         }
 
-        // Save insurance
-        if (formData.insuranceCompany || formData.policyNumber) {
+        // Save insurance only if unapproved or expired
+        const needsInsuranceRenewal = profile?.insuranceStatus !== 'approved' || isInsuranceExpired;
+        if (needsInsuranceRenewal && (formData.insuranceCompany || formData.policyNumber)) {
           await saveStepMutation.mutateAsync({
             step: 'insurance',
             payload: {
@@ -736,16 +738,13 @@ export default function DriverVerificationScreen() {
   };
 
   const handleHeaderBack = () => {
-    if (isEditing && params.step) {
+    if (isEditing) {
       setIsEditing(false);
       setIsSubmitted(true);
       return;
     }
     if (currentStep > 1) {
       setCurrentStep((s) => s - 1);
-    } else if (isEditing) {
-      setIsEditing(false);
-      setIsSubmitted(true);
     } else {
       if (router.canDismiss()) {
         router.dismissAll();
@@ -866,7 +865,14 @@ export default function DriverVerificationScreen() {
                 data={formData}
                 onChange={updateFormData}
                 onNext={handleStep2Next}
-                onBack={() => setCurrentStep(1)}
+                onBack={() => {
+                  if (isEditing) {
+                    setIsEditing(false);
+                    setIsSubmitted(true);
+                  } else {
+                    setCurrentStep(1);
+                  }
+                }}
                 onUploadDoc={(type, file) =>
                   uploadDocMutation.mutateAsync({ type, file })
                 }
@@ -882,7 +888,14 @@ export default function DriverVerificationScreen() {
                 data={formData}
                 onChange={updateFormData}
                 onNext={handleStep3Next}
-                onBack={() => setCurrentStep(2)}
+                onBack={() => {
+                  if (isEditing) {
+                    setIsEditing(false);
+                    setIsSubmitted(true);
+                  } else {
+                    setCurrentStep(2);
+                  }
+                }}
                 isEditing={isEditing}
                 canDirectSubmit={canDirectSubmitStep(3)}
                 onSubmitDirect={() => handleDirectSubmitFromStep(3)}
@@ -894,8 +907,15 @@ export default function DriverVerificationScreen() {
               <InsuranceStep
                 data={formData}
                 onChange={updateFormData}
-                onSubmit={handleSubmitAll}
-                onBack={() => setCurrentStep(3)}
+                onSubmit={isEditing ? () => handleDirectSubmitFromStep(4) : handleSubmitAll}
+                onBack={() => {
+                  if (isEditing) {
+                    setIsEditing(false);
+                    setIsSubmitted(true);
+                  } else {
+                    setCurrentStep(3);
+                  }
+                }}
                 onUploadDoc={(type, file) =>
                   uploadDocMutation.mutateAsync({ type, file })
                 }
