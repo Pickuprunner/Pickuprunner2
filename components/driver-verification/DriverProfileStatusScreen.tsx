@@ -67,7 +67,6 @@ export function DriverProfileStatusScreen({
 
   const isLicensePending = rawLicenseStatus === 'pending' || rawLicenseStatus === 'in_review';
   const isInsurancePending = rawInsuranceStatus === 'pending' || rawInsuranceStatus === 'in_review';
-  const isAnyRenewalPending = isLicensePending || isInsurancePending;
 
   const isLicenseExpired = Boolean(expiry?.license?.expired);
   const isInsuranceExpired = Boolean(expiry?.insurance?.expired);
@@ -106,6 +105,16 @@ export function DriverProfileStatusScreen({
         : rawInsuranceStatus === 'rejected'
           ? 'rejected'
           : 'in_review';
+
+
+  const isExistingApprovedDriver =
+    rawAccredStatus === 'approved' ||
+    Boolean(profile?.reviewedAt) ||
+    (vehicleStatus === 'approved' && bgStatus === 'approved');
+
+  const isLicenseRenewalPending = isExistingApprovedDriver && isLicensePending;
+  const isInsuranceRenewalPending = isExistingApprovedDriver && isInsurancePending;
+  const isAnyRenewalPending = isLicenseRenewalPending || isInsuranceRenewalPending;
 
   const isApproved = isAccreditationFullyApproved(accreditation);
 
@@ -164,7 +173,7 @@ export function DriverProfileStatusScreen({
     const isStep1Edit = step === 1 && vehicleStatus !== 'approved';
     const isStep3Edit = step === 3 && bgStatus !== 'approved';
 
-    if ((step === 2 && isLicensePending) || (step === 4 && isInsurancePending)) {
+    if ((step === 2 && isLicenseRenewalPending) || (step === 4 && isInsuranceRenewalPending)) {
       showToast('Renewal document is currently under review by our compliance team.', 'info');
       return;
     }
@@ -174,7 +183,7 @@ export function DriverProfileStatusScreen({
       return;
     }
 
-    // Backend locks accreditation when under review unless a specific item is rejected or expiring/renewable
+   
     if (!isAnyStepRejected && !isAnyStepExpiring && !isStep2Renewal && !isStep4Renewal && rawAccredStatus === 'under_review') {
       showToast('Application is locked while under review by our compliance team.', 'info');
       return;
@@ -417,10 +426,14 @@ export function DriverProfileStatusScreen({
               <Text style={[styles.itemSubtitle, isLicenseExpired ? { color: '#EF4444' } : isLicenseExpiringSoon ? { color: '#38BDF8' } : null]}>
                 {isLicenseExpired
                   ? `Expired${expiry?.license?.expirationDate ? ` on ${expiry.license.expirationDate}` : ''} — Tap to renew licence`
-                  : isLicensePending
+                  : isLicenseRenewalPending
                     ? profile?.licenseNumber
                       ? `${profile?.licenseState || 'AZ'} • #${'••••' + String(profile.licenseNumber).slice(-4)} (Renewal Under Review)`
                       : 'Renewal document submitted • Under Review'
+                    : isLicensePending
+                      ? profile?.licenseNumber
+                        ? `${profile?.licenseState || 'AZ'} • #${'••••' + String(profile.licenseNumber).slice(-4)} (Under Review)`
+                        : 'Document submitted • Under Review'
                     : expiry?.license?.expiringSoon
                       ? (expiry.license.daysLeft ?? 0) <= 0
                         ? 'Expires today — Tap to renew'
@@ -483,10 +496,14 @@ export function DriverProfileStatusScreen({
               <Text style={[styles.itemSubtitle, isInsuranceExpired ? { color: '#EF4444' } : isInsuranceExpiringSoon ? { color: '#38BDF8' } : null]}>
                 {isInsuranceExpired
                   ? `Expired${expiry?.insurance?.expirationDate ? ` on ${expiry.insurance.expirationDate}` : ''} — Tap to renew insurance`
-                  : isInsurancePending
+                  : isInsuranceRenewalPending
                     ? profile?.insuranceCompany
                       ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'} (Renewal Under Review)`
                       : 'Renewal policy submitted • Under Review'
+                    : isInsurancePending
+                      ? profile?.insuranceCompany
+                        ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'} (Under Review)`
+                        : 'Policy document submitted • Under Review'
                     : expiry?.insurance?.expiringSoon
                       ? (expiry.insurance.daysLeft ?? 0) <= 0
                         ? 'Expires today — Tap to renew'
