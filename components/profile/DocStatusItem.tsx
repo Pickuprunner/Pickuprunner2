@@ -8,7 +8,7 @@ const GOLD_ACCENT = '#E5A93C';
 const RED = '#EF4444';
 const TEXT_MUTED = '#94A3B8';
 
-export type DocStatus = 'approved' | 'rejected' | 'pending' | 'in_review' | undefined;
+export type DocStatus = 'approved' | 'rejected' | 'pending' | 'in_review' | 'expired' | 'expiring_soon' | undefined;
 
 export interface StatusCfg {
   label: string;
@@ -18,11 +18,27 @@ export interface StatusCfg {
   icon: React.ReactNode;
 }
 
-export function getStatusCfg(s: DocStatus): StatusCfg {
+export function getStatusCfg(s: DocStatus, customLabel?: string): StatusCfg {
   switch (s) {
+    case 'expired':
+      return {
+        label: customLabel || 'Expired',
+        color: RED,
+        bg: 'rgba(239, 68, 68, 0.14)',
+        border: 'rgba(239, 68, 68, 0.35)',
+        icon: <ShieldAlert size={15} color={RED} />,
+      };
+    case 'expiring_soon':
+      return {
+        label: customLabel || 'Expiring Soon',
+        color: GOLD_ACCENT,
+        bg: 'rgba(229, 169, 60, 0.14)',
+        border: 'rgba(229, 169, 60, 0.35)',
+        icon: <AlertTriangle size={15} color={GOLD_ACCENT} />,
+      };
     case 'approved':
       return {
-        label: 'Approved',
+        label: customLabel || 'Approved',
         color: GREEN,
         bg: 'rgba(34, 197, 94, 0.12)',
         border: 'rgba(34, 197, 94, 0.35)',
@@ -30,7 +46,7 @@ export function getStatusCfg(s: DocStatus): StatusCfg {
       };
     case 'rejected':
       return {
-        label: 'Action Needed',
+        label: customLabel || 'Action Needed',
         color: RED,
         bg: 'rgba(239, 68, 68, 0.12)',
         border: 'rgba(239, 68, 68, 0.35)',
@@ -39,7 +55,7 @@ export function getStatusCfg(s: DocStatus): StatusCfg {
     case 'in_review':
     case 'pending':
       return {
-        label: 'In Review',
+        label: customLabel || 'In Review',
         color: GOLD_ACCENT,
         bg: 'rgba(229, 169, 60, 0.12)',
         border: 'rgba(229, 169, 60, 0.35)',
@@ -47,7 +63,7 @@ export function getStatusCfg(s: DocStatus): StatusCfg {
       };
     default:
       return {
-        label: 'Required',
+        label: customLabel || 'Required',
         color: TEXT_MUTED,
         bg: 'rgba(148, 163, 184, 0.1)',
         border: 'rgba(148, 163, 184, 0.25)',
@@ -60,11 +76,12 @@ export interface DocStatusItemProps {
   title: string;
   subtitle: string;
   status: DocStatus;
+  customLabel?: string;
   onPress?: () => void;
 }
 
-export function DocStatusItem({ title, subtitle, status, onPress }: DocStatusItemProps) {
-  const cfg = getStatusCfg(status);
+export function DocStatusItem({ title, subtitle, status, customLabel, onPress }: DocStatusItemProps) {
+  const cfg = getStatusCfg(status, customLabel);
 
   return (
     <ProfileActionRow

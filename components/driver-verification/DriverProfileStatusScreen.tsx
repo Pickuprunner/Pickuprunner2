@@ -30,7 +30,7 @@ import { useMyVerification } from '@/lib/verification';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useToast, CustomLoading, CustomRefreshControl } from '@/components/core';
 
-import { isAccreditationFullyApproved } from '@/apis/accreditation';
+import { isAccreditationFullyApproved, getDriverAccreditationGateState } from '@/apis/accreditation';
 
 export interface DriverProfileStatusScreenProps {
   onEditDocuments?: () => void;
@@ -51,6 +51,8 @@ export function DriverProfileStatusScreen({
   const [refreshing, setRefreshing] = useState(false);
 
   const profile = accreditation?.profile;
+  const expiry = accreditation?.expiry;
+  const gateState = getDriverAccreditationGateState(accreditation);
 
   const rawLicenseStatus = String(profile?.licenseStatus || accreditation?.steps?.license || '');
   const rawInsuranceStatus = String(profile?.insuranceStatus || accreditation?.steps?.insurance || '');
@@ -63,6 +65,15 @@ export function DriverProfileStatusScreen({
   const hasConsent = Boolean(profile?.backgroundConsentAt);
   const hasInsurance = Boolean(profile?.insurancePolicyNumber || profile?.insuranceCompany);
 
+  const isLicensePending = rawLicenseStatus === 'pending' || rawLicenseStatus === 'in_review';
+  const isInsurancePending = rawInsuranceStatus === 'pending' || rawInsuranceStatus === 'in_review';
+
+  const isLicenseExpired = Boolean(expiry?.license?.expired);
+  const isInsuranceExpired = Boolean(expiry?.insurance?.expired);
+  const isLicenseExpiringSoon = Boolean(expiry?.license?.expiringSoon) && !isLicenseExpired && !isLicensePending;
+  const isInsuranceExpiringSoon = Boolean(expiry?.insurance?.expiringSoon) && !isInsuranceExpired && !isInsurancePending;
+  const isAnyStepExpiring = isLicenseExpiringSoon || isInsuranceExpiringSoon;
+
   const vehicleStatus: 'approved' | 'rejected' | 'in_review' =
     rawAccredStatus === 'approved' || rawVehicleStatus === 'approved'
       ? 'approved'
@@ -71,11 +82,13 @@ export function DriverProfileStatusScreen({
         : 'in_review';
 
   const licenseStatus: 'approved' | 'rejected' | 'in_review' =
-    rawLicenseStatus === 'approved'
-      ? 'approved'
-      : rawLicenseStatus === 'rejected'
-        ? 'rejected'
-        : 'in_review';
+    isLicenseExpired
+      ? 'rejected'
+      : rawLicenseStatus === 'approved'
+        ? 'approved'
+        : rawLicenseStatus === 'rejected'
+          ? 'rejected'
+          : 'in_review';
 
   const bgStatus: 'approved' | 'rejected' | 'in_review' =
     rawBgStatus === 'approved'
@@ -85,19 +98,29 @@ export function DriverProfileStatusScreen({
         : 'in_review';
 
   const insuranceStatus: 'approved' | 'rejected' | 'in_review' =
-    rawInsuranceStatus === 'approved'
-      ? 'approved'
-      : rawInsuranceStatus === 'rejected'
-        ? 'rejected'
-        : 'in_review';
+    isInsuranceExpired
+      ? 'rejected'
+      : rawInsuranceStatus === 'approved'
+        ? 'approved'
+        : rawInsuranceStatus === 'rejected'
+          ? 'rejected'
+          : 'in_review';
 
-  const isApproved =
-    vehicleStatus === 'approved' &&
-    licenseStatus === 'approved' &&
-    bgStatus === 'approved' &&
-    insuranceStatus === 'approved';
+
+  const isExistingApprovedDriver =
+    rawAccredStatus === 'approved' ||
+    Boolean(profile?.reviewedAt) ||
+    (vehicleStatus === 'approved' && bgStatus === 'approved');
+
+  const isLicenseRenewalPending = isExistingApprovedDriver && isLicensePending;
+  const isInsuranceRenewalPending = isExistingApprovedDriver && isInsurancePending;
+  const isAnyRenewalPending = isLicenseRenewalPending || isInsuranceRenewalPending;
+
+  const isApproved = isAccreditationFullyApproved(accreditation);
 
   const isAnyStepRejected =
+    isLicenseExpired ||
+    isInsuranceExpired ||
     vehicleStatus === 'rejected' ||
     licenseStatus === 'rejected' ||
     bgStatus === 'rejected' ||
@@ -110,14 +133,6 @@ export function DriverProfileStatusScreen({
     rawAccredStatus === 'in_progress' ||
     verification?.status === 'pending' ||
     verification?.status === 'approved';
-
-  useEffect(() => {
-    const isAlreadyOnTabs = pathname.startsWith('/(tabs)') || pathname === '/';
-    if (!isAlreadyOnTabs && user?.role === 'driver' && isApproved) {
-      if (router.canDismiss()) router.dismissAll();
-      router.replace('/(tabs)');
-    }
-  }, [user?.role, isApproved, pathname]);
 
   const handleRefresh = async () => {
     if (Platform.OS !== 'web') {
@@ -132,6 +147,10 @@ export function DriverProfileStatusScreen({
         showToast('Verification Approved! Welcome to PickupRunner.', 'success');
         if (router.canDismiss()) router.dismissAll();
         router.replace('/(tabs)');
+      } else if (accredRes.data?.expiry?.license?.expired) {
+        showToast('Your driver licence has expired. Please renew.', 'error');
+      } else if (accredRes.data?.expiry?.insurance?.expired) {
+        showToast('Your vehicle insurance has expired. Please renew.', 'error');
       } else if (accredRes.data?.profile?.accreditationStatus === 'rejected') {
         showToast('Application needs review. Please update documentation.', 'error');
       } else {
@@ -149,13 +168,23 @@ export function DriverProfileStatusScreen({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     }
 
-    if (isApproved) {
-      showToast('Verification is already approved.', 'success');
+    const isStep2Renewal = step === 2 && (isLicenseExpiringSoon || isLicenseExpired || licenseStatus !== 'approved');
+    const isStep4Renewal = step === 4 && (isInsuranceExpiringSoon || isInsuranceExpired || insuranceStatus !== 'approved');
+    const isStep1Edit = step === 1 && vehicleStatus !== 'approved';
+    const isStep3Edit = step === 3 && bgStatus !== 'approved';
+
+    if ((step === 2 && isLicenseRenewalPending) || (step === 4 && isInsuranceRenewalPending)) {
+      showToast('Renewal document is currently under review by our compliance team.', 'info');
       return;
     }
 
-    // Backend locks accreditation when under review unless a specific item is rejected
-    if (!isAnyStepRejected && rawAccredStatus === 'under_review') {
+    if (isApproved && !isStep2Renewal && !isStep4Renewal && !isStep1Edit && !isStep3Edit) {
+      showToast('This step is already verified and approved.', 'success');
+      return;
+    }
+
+   
+    if (!isAnyStepRejected && !isAnyStepExpiring && !isStep2Renewal && !isStep4Renewal && rawAccredStatus === 'under_review') {
       showToast('Application is locked while under review by our compliance team.', 'info');
       return;
     }
@@ -174,17 +203,27 @@ export function DriverProfileStatusScreen({
 
   const isChecking = isFetchingAccred || isFetchingVerif || refreshing;
 
-  const getItemVisuals = (status: 'approved' | 'rejected' | 'in_review') => {
+  const getItemVisuals = (
+    status: 'approved' | 'rejected' | 'in_review',
+    isExpired?: boolean,
+    isExpiringSoon?: boolean
+  ) => {
+    if (isExpired || status === 'rejected') {
+      return {
+        iconColor: '#EF4444',
+        badgeNode: <X size={16} color="#EF4444" />,
+      };
+    }
+    if (isExpiringSoon) {
+      return {
+        iconColor: '#38BDF8',
+        badgeNode: <Clock size={16} color="#38BDF8" />,
+      };
+    }
     if (status === 'approved') {
       return {
         iconColor: '#22C55E',
         badgeNode: <CheckCircle size={16} color="#22C55E" />,
-      };
-    }
-    if (status === 'rejected') {
-      return {
-        iconColor: '#EF4444',
-        badgeNode: <X size={16} color="#EF4444" />,
       };
     }
     return {
@@ -194,9 +233,38 @@ export function DriverProfileStatusScreen({
   };
 
   const vehicleVisuals = getItemVisuals(vehicleStatus);
-  const licenseVisuals = getItemVisuals(licenseStatus);
+  const licenseVisuals = getItemVisuals(licenseStatus, isLicenseExpired, isLicenseExpiringSoon);
   const consentVisuals = getItemVisuals(bgStatus);
-  const insuranceVisuals = getItemVisuals(insuranceStatus);
+  const insuranceVisuals = getItemVisuals(insuranceStatus, isInsuranceExpired, isInsuranceExpiringSoon);
+
+  const heroPillText = isAnyStepRejected
+    ? 'ACTION REQUIRED'
+    : isAnyStepExpiring
+      ? 'RENEWAL REQUIRED'
+      : isApproved
+        ? 'APPROVED'
+        : isAnyRenewalPending
+          ? 'UNDER REVIEW'
+          : isSubmitted
+            ? 'UNDER REVIEW'
+            : 'IN PROGRESS';
+
+  const heroSubtitleText = isAnyStepRejected
+    ? profile?.rejectionReason ||
+      'One or more verification steps require updated documentation. Please review the checklist below and tap to update your details.'
+    : isAnyStepExpiring
+      ? isLicenseExpiringSoon && isInsuranceExpiringSoon
+        ? "Your driver's license and vehicle insurance are expiring soon. Tap the checklist below to upload your renewed documents."
+        : isLicenseExpiringSoon
+          ? "Your driver's license is expiring soon. Tap the checklist below to upload your renewed license."
+          : 'Your vehicle insurance policy is expiring soon. Tap the checklist below to upload your renewed policy.'
+      : isApproved
+        ? 'Your driver verification has been approved. You are ready to receive delivery orders.'
+        : isAnyRenewalPending
+          ? 'Your renewed documentation has been submitted and is currently being reviewed by our compliance team.'
+          : isSubmitted
+            ? 'Our safety compliance team is reviewing your vehicle details, driver license, background check, and insurance. Most reviews complete within 2–24 hours.'
+            : 'Please complete all required steps to activate your driver account and start receiving delivery orders.';
 
   return (
     <View style={styles.root}>
@@ -223,14 +291,21 @@ export function DriverProfileStatusScreen({
                 height: select(80, 64, 52),
                 borderRadius: select(40, 32, 26),
               },
-              isApproved && styles.iconGlowWrapperApproved,
-              isAnyStepRejected && styles.iconGlowWrapperRejected,
+              isAnyStepRejected
+                ? styles.iconGlowWrapperRejected
+                : isAnyStepExpiring
+                  ? styles.iconGlowWrapperExpiring
+                  : isApproved
+                    ? styles.iconGlowWrapperApproved
+                    : null,
             ]}
           >
-            {isApproved ? (
-              <CheckCircle size={select(52, 40, 32)} color="#22C55E" />
-            ) : isAnyStepRejected ? (
+            {isAnyStepRejected ? (
               <X size={select(52, 40, 32)} color="#EF4444" />
+            ) : isAnyStepExpiring ? (
+              <Clock size={select(52, 40, 32)} color="#38BDF8" />
+            ) : isApproved ? (
+              <CheckCircle size={select(52, 40, 32)} color="#22C55E" />
             ) : (
               <Clock size={select(52, 40, 32)} color="#FFE399" />
             )}
@@ -239,8 +314,13 @@ export function DriverProfileStatusScreen({
           <View
             style={[
               styles.statusPill,
-              isApproved && styles.statusPillApproved,
-              isAnyStepRejected && styles.statusPillRejected,
+              isAnyStepRejected
+                ? styles.statusPillRejected
+                : isAnyStepExpiring
+                  ? styles.statusPillExpiring
+                  : isApproved
+                    ? styles.statusPillApproved
+                    : null,
             ]}
           >
             <Text
@@ -248,17 +328,16 @@ export function DriverProfileStatusScreen({
               style={[
                 styles.statusPillText,
                 { fontSize: select(12, 11, 10) },
-                isApproved && styles.statusPillTextApproved,
-                isAnyStepRejected && styles.statusPillTextRejected,
+                isAnyStepRejected
+                  ? styles.statusPillTextRejected
+                  : isAnyStepExpiring
+                    ? styles.statusPillTextExpiring
+                    : isApproved
+                      ? styles.statusPillTextApproved
+                      : null,
               ]}
             >
-              {isApproved
-                ? 'APPROVED'
-                : isAnyStepRejected
-                  ? 'ACTION REQUIRED'
-                  : isSubmitted
-                    ? 'UNDER REVIEW'
-                    : 'IN PROGRESS'}
+              {heroPillText}
             </Text>
           </View>
 
@@ -266,7 +345,15 @@ export function DriverProfileStatusScreen({
             maxFontSizeMultiplier={1.25}
             style={[styles.heroTitle, { fontSize: select(24, 20, 18) }]}
           >
-            Driver Verification
+            {isAnyStepRejected
+              ? 'Action Required'
+              : isAnyStepExpiring
+                ? 'Renewal Required'
+                : isApproved
+                  ? 'Verification Approved'
+                  : isAnyRenewalPending
+                    ? 'Renewal Under Review'
+                    : 'Driver Verification'}
           </Text>
 
           <Text
@@ -280,14 +367,7 @@ export function DriverProfileStatusScreen({
               },
             ]}
           >
-            {isApproved
-              ? 'Your driver verification has been approved. You are ready to receive delivery orders.'
-              : isAnyStepRejected
-                ? profile?.rejectionReason ||
-                'One or more verification steps require updated documentation. Please review the checklist below and tap to update your details.'
-                : isSubmitted
-                  ? 'Our safety compliance team is reviewing your vehicle details, driver license, background check, and insurance. Most reviews complete within 2–24 hours.'
-                  : 'Please complete all required steps to activate your driver account and start receiving delivery orders.'}
+            {heroSubtitleText}
           </Text>
         </View>
 
@@ -295,9 +375,11 @@ export function DriverProfileStatusScreen({
         <View style={[styles.checklistCard, { padding: select(spacing.md, 12, 10), gap: select(spacing.sm, 6, 4) }]}>
           <View style={styles.checklistHeaderRow}>
             <Text maxFontSizeMultiplier={1.2} style={styles.checklistHeader}>VERIFICATION CHECKLIST</Text>
-            {isAnyStepRejected && (
+            {isAnyStepRejected ? (
               <Text style={styles.tapToEditHint}>Tap any item to edit</Text>
-            )}
+            ) : isAnyStepExpiring ? (
+              <Text style={[styles.tapToEditHint, { color: '#38BDF8' }]}>Tap item to renew</Text>
+            ) : null}
           </View>
 
           {/* 1. Vehicle Info */}
@@ -341,16 +423,32 @@ export function DriverProfileStatusScreen({
             </View>
             <View style={styles.itemTextCol}>
               <Text style={styles.itemTitle}>Driver's License</Text>
-              <Text style={styles.itemSubtitle}>
-                {licenseStatus === 'approved'
-                  ? profile?.licenseNumber
-                    ? `${profile?.licenseState || 'AZ'} • #${profile.licenseNumber}`
-                    : 'Driver License Verified & Approved'
-                  : licenseStatus === 'rejected'
-                    ? 'Action Required — Tap to re-upload license'
-                    : profile?.licenseNumber
-                      ? `${profile?.licenseState || 'AZ'} • #${'••••' + String(profile.licenseNumber).slice(-4)} (Under Review)`
-                      : 'Document submitted • Under Review'}
+              <Text style={[styles.itemSubtitle, isLicenseExpired ? { color: '#EF4444' } : isLicenseExpiringSoon ? { color: '#38BDF8' } : null]}>
+                {isLicenseExpired
+                  ? `Expired${expiry?.license?.expirationDate ? ` on ${expiry.license.expirationDate}` : ''} — Tap to renew licence`
+                  : isLicenseRenewalPending
+                    ? profile?.licenseNumber
+                      ? `${profile?.licenseState || 'AZ'} • #${'••••' + String(profile.licenseNumber).slice(-4)} (Renewal Under Review)`
+                      : 'Renewal document submitted • Under Review'
+                    : isLicensePending
+                      ? profile?.licenseNumber
+                        ? `${profile?.licenseState || 'AZ'} • #${'••••' + String(profile.licenseNumber).slice(-4)} (Under Review)`
+                        : 'Document submitted • Under Review'
+                    : expiry?.license?.expiringSoon
+                      ? (expiry.license.daysLeft ?? 0) <= 0
+                        ? 'Expires today — Tap to renew'
+                        : expiry.license.daysLeft === 1
+                          ? 'Expires tomorrow (in 24 hrs) — Tap to renew'
+                          : `Expires in ${expiry.license.daysLeft} days — Tap to renew`
+                      : licenseStatus === 'approved'
+                        ? profile?.licenseNumber
+                          ? `${profile?.licenseState || 'AZ'} • #${profile.licenseNumber}`
+                          : 'Driver License Verified & Approved'
+                        : licenseStatus === 'rejected'
+                          ? 'Action Required — Tap to re-upload license'
+                          : profile?.licenseNumber
+                            ? `${profile?.licenseState || 'AZ'} • #${'••••' + String(profile.licenseNumber).slice(-4)} (Under Review)`
+                            : 'Document submitted • Under Review'}
               </Text>
             </View>
             {licenseVisuals.badgeNode}
@@ -395,16 +493,32 @@ export function DriverProfileStatusScreen({
             </View>
             <View style={styles.itemTextCol}>
               <Text style={styles.itemTitle}>Vehicle Insurance Policy</Text>
-              <Text style={styles.itemSubtitle}>
-                {insuranceStatus === 'approved'
-                  ? profile?.insuranceCompany
-                    ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'}`
-                    : 'Insurance Policy Verified & Approved'
-                  : insuranceStatus === 'rejected'
-                    ? 'Action Required — Tap to update insurance'
-                    : profile?.insuranceCompany
-                      ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'} (Under Review)`
-                      : 'Policy document submitted • Under Review'}
+              <Text style={[styles.itemSubtitle, isInsuranceExpired ? { color: '#EF4444' } : isInsuranceExpiringSoon ? { color: '#38BDF8' } : null]}>
+                {isInsuranceExpired
+                  ? `Expired${expiry?.insurance?.expirationDate ? ` on ${expiry.insurance.expirationDate}` : ''} — Tap to renew insurance`
+                  : isInsuranceRenewalPending
+                    ? profile?.insuranceCompany
+                      ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'} (Renewal Under Review)`
+                      : 'Renewal policy submitted • Under Review'
+                    : isInsurancePending
+                      ? profile?.insuranceCompany
+                        ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'} (Under Review)`
+                        : 'Policy document submitted • Under Review'
+                    : expiry?.insurance?.expiringSoon
+                      ? (expiry.insurance.daysLeft ?? 0) <= 0
+                        ? 'Expires today — Tap to renew'
+                        : expiry.insurance.daysLeft === 1
+                          ? 'Expires tomorrow (in 24 hrs) — Tap to renew'
+                          : `Expires in ${expiry.insurance.daysLeft} days — Tap to renew`
+                      : insuranceStatus === 'approved'
+                        ? profile?.insuranceCompany
+                          ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'}`
+                          : 'Insurance Policy Verified & Approved'
+                        : insuranceStatus === 'rejected'
+                          ? 'Action Required — Tap to update insurance'
+                          : profile?.insuranceCompany
+                            ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'} (Under Review)`
+                            : 'Policy document submitted • Under Review'}
               </Text>
             </View>
             {insuranceVisuals.badgeNode}
@@ -416,18 +530,60 @@ export function DriverProfileStatusScreen({
           {isAnyStepRejected ? (
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => handleEditDocuments(1)}
+              onPress={() => handleEditDocuments(isLicenseExpired ? 2 : isInsuranceExpired ? 4 : 1)}
               style={[styles.primaryActionBtn, { height: select(50, 46, 42) }]}
             >
               <FileText size={18} color="#0F131C" />
               <Text maxFontSizeMultiplier={1.2} style={styles.primaryActionBtnText}>Update Documentation</Text>
               <ArrowRight size={18} color="#0F131C" />
             </TouchableOpacity>
-          ) : rawAccredStatus === 'under_review' ? (
+          ) : isAnyStepExpiring ? (
+            <>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => handleEditDocuments(isLicenseExpiringSoon ? 2 : 4)}
+                style={[
+                  styles.primaryActionBtn,
+                  { backgroundColor: '#38BDF8', height: select(50, 46, 42) },
+                ]}
+              >
+                <Clock size={18} color="#0F131C" />
+                <Text maxFontSizeMultiplier={1.2} style={[styles.primaryActionBtnText, { color: '#0F131C' }]}>
+                  Renew Expiring Document{isLicenseExpiringSoon && isInsuranceExpiringSoon ? 's' : ''}
+                </Text>
+                <ArrowRight size={18} color="#0F131C" />
+              </TouchableOpacity>
+              {isApproved && (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (router.canDismiss()) router.dismissAll();
+                    router.replace('/(tabs)');
+                  }}
+                  style={[styles.secondaryActionBtn, { height: select(50, 46, 42) }]}
+                >
+                  <Text maxFontSizeMultiplier={1.2} style={styles.secondaryActionBtnText}>Continue to App</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          ) : isApproved ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                if (router.canDismiss()) router.dismissAll();
+                router.replace('/(tabs)');
+              }}
+              style={[styles.primaryActionBtn, { height: select(50, 46, 42) }]}
+            >
+              <CheckCircle size={18} color="#0F131C" />
+              <Text maxFontSizeMultiplier={1.2} style={styles.primaryActionBtnText}>Continue to App</Text>
+              <ArrowRight size={18} color="#0F131C" />
+            </TouchableOpacity>
+          ) : isSubmitted ? (
             <View style={[styles.lockedNoticeBox, { paddingVertical: select(12, 10, 8), paddingHorizontal: select(16, 12, 8) }]}>
               <Clock size={select(16, 15, 14)} color="#FFE399" />
               <Text maxFontSizeMultiplier={1.2} style={[styles.lockedNoticeText, { fontSize: select(12, 11.5, 10.5) }]}>
-                Application locked during safety & compliance review
+                Application is locked while under review
               </Text>
             </View>
           ) : (
@@ -442,29 +598,31 @@ export function DriverProfileStatusScreen({
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={handleRefresh}
-            disabled={refreshing}
-            style={[
-              rawAccredStatus === 'under_review' && !isAnyStepRejected ? styles.primaryActionBtn : styles.secondaryActionBtn,
-              { height: select(50, 46, 42) },
-            ]}
-          >
-            {refreshing ? (
-              <ActivityIndicator size="small" color={rawAccredStatus === 'under_review' && !isAnyStepRejected ? '#0F131C' : '#FFE399'} />
-            ) : (
-              <>
-                <RefreshCw size={16} color={rawAccredStatus === 'under_review' && !isAnyStepRejected ? '#0F131C' : '#FFE399'} />
-                <Text
-                  maxFontSizeMultiplier={1.2}
-                  style={rawAccredStatus === 'under_review' && !isAnyStepRejected ? styles.primaryActionBtnText : styles.secondaryActionBtnText}
-                >
-                  Check Approval Status
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {!isApproved && !isAnyStepExpiring && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleRefresh}
+              disabled={refreshing}
+              style={[
+                isSubmitted && !isAnyStepRejected ? styles.primaryActionBtn : styles.secondaryActionBtn,
+                { height: select(50, 46, 42) },
+              ]}
+            >
+              {refreshing ? (
+                <ActivityIndicator size="small" color={isSubmitted && !isAnyStepRejected ? '#0F131C' : '#FFE399'} />
+              ) : (
+                <>
+                  <RefreshCw size={16} color={isSubmitted && !isAnyStepRejected ? '#0F131C' : '#FFE399'} />
+                  <Text
+                    maxFontSizeMultiplier={1.2}
+                    style={isSubmitted && !isAnyStepRejected ? styles.primaryActionBtnText : styles.secondaryActionBtnText}
+                  >
+                    Check Approval Status
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -504,6 +662,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.14)',
     borderColor: 'rgba(239, 68, 68, 0.35)',
   },
+  statusPillExpiring: {
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    borderColor: 'rgba(56, 189, 248, 0.35)',
+  },
   statusPillText: {
     fontSize: 12,
     fontWeight: '800',
@@ -515,6 +677,9 @@ const styles = StyleSheet.create({
   },
   statusPillTextRejected: {
     color: '#EF4444',
+  },
+  statusPillTextExpiring: {
+    color: '#38BDF8',
   },
   iconGlowWrapper: {
     marginBottom: spacing.sm,
@@ -530,6 +695,9 @@ const styles = StyleSheet.create({
   },
   iconGlowWrapperRejected: {
     backgroundColor: 'rgba(239, 68, 68, 0.12)',
+  },
+  iconGlowWrapperExpiring: {
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
   },
   title: {
     fontSize: 24,

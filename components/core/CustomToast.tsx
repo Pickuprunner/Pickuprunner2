@@ -30,6 +30,10 @@ export interface ToastOptions {
   type?: ToastType;
   duration?: number;
   description?: string;
+  persistent?: boolean;
+  onPress?: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 interface ToastContextValue {
@@ -64,6 +68,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [description, setDescription] = useState<string | undefined>(undefined);
   const [type, setType] = useState<ToastType>('info');
   const [duration, setDuration] = useState(2500);
+  const [persistent, setPersistent] = useState(false);
+  const [actionLabel, setActionLabel] = useState<string | undefined>(undefined);
+  const onPressRef = useRef<(() => void) | undefined>(undefined);
+  const onActionRef = useRef<(() => void) | undefined>(undefined);
 
   const toastY = useRef(new Animated.Value(-100)).current;
   const toastScale = useRef(new Animated.Value(0.88)).current;
@@ -96,6 +104,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       setVisible(false);
       setMessage('');
       setDescription(undefined);
+      setActionLabel(undefined);
+      onActionRef.current = undefined;
     });
   }, [toastY, toastScale, toastOpacity]);
 
@@ -109,14 +119,25 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       let toastType: ToastType = 'info';
       let toastDuration = 2500;
       let toastDesc: string | undefined = undefined;
+      let isPersistent = false;
+      let actionOnPress: (() => void) | undefined = undefined;
+      let actLabel: string | undefined = undefined;
+      let actFn: (() => void) | undefined = undefined;
 
       if (typeof typeOrOptions === 'string') {
         toastType = typeOrOptions;
       } else if (typeOrOptions && typeof typeOrOptions === 'object') {
         toastType = typeOrOptions.type || 'info';
-        toastDuration = typeOrOptions.duration || 2500;
+        toastDuration = typeOrOptions.duration ?? 2500;
         toastDesc = typeOrOptions.description;
+        isPersistent = Boolean(typeOrOptions.persistent);
+        actionOnPress = typeOrOptions.onPress;
+        actLabel = typeOrOptions.actionLabel;
+        actFn = typeOrOptions.onAction;
       }
+
+      onPressRef.current = actionOnPress;
+      onActionRef.current = actFn;
 
       if (visibleRef.current) {
         hideToast();
@@ -125,6 +146,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           setDescription(toastDesc);
           setType(toastType);
           setDuration(toastDuration);
+          setPersistent(isPersistent);
+          setActionLabel(actLabel);
           setVisible(true);
         }, 220);
       } else {
@@ -132,6 +155,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         setDescription(toastDesc);
         setType(toastType);
         setDuration(toastDuration);
+        setPersistent(isPersistent);
+        setActionLabel(actLabel);
         setVisible(true);
       }
     },
@@ -179,10 +204,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       );
       beamLoop.start();
 
-      // 3. Auto dismiss timer
-      timerRef.current = setTimeout(() => {
-        hideToast();
-      }, duration);
+      // 3. Auto dismiss timer (skipped if persistent)
+      if (!persistent && duration > 0) {
+        timerRef.current = setTimeout(() => {
+          hideToast();
+        }, duration);
+      }
 
       return () => {
         beamLoop.stop();
@@ -192,7 +219,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         }
       };
     }
-  }, [visible, duration, type, toastY, toastScale, toastOpacity, beamRotate, hideToast]);
+  }, [visible, duration, type, persistent, toastY, toastScale, toastOpacity, beamRotate, hideToast]);
 
   const getToastConfig = () => {
     switch (type) {
@@ -276,7 +303,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <View style={[styles.innerCard, { backgroundColor: config.bg }]}>
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={hideToast}
+                onPress={() => {
+                  if (onPressRef.current) {
+                    onPressRef.current();
+                  }
+                  hideToast();
+                }}
                 style={styles.toastInner}
               >
                 <View style={[styles.iconBox, { backgroundColor: `${config.color}1C` }]}>
@@ -294,7 +326,29 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   )}
                 </View>
 
-                <MaterialIcons name="close" size={16} color="rgba(194, 198, 216, 0.5)" />
+                {!!actionLabel && (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      if (onActionRef.current) {
+                        onActionRef.current();
+                      }
+                      hideToast();
+                    }}
+                    style={styles.actionPillBtn}
+                  >
+                    <Text style={styles.actionPillBtnText}>{actionLabel}</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  hitSlop={8}
+                  onPress={hideToast}
+                  style={styles.closeBtnBox}
+                >
+                  <MaterialIcons name="close" size={16} color="rgba(194, 198, 216, 0.5)" />
+                </TouchableOpacity>
               </TouchableOpacity>
             </View>
           </View>
@@ -382,5 +436,23 @@ const styles = StyleSheet.create({
     color: '#C2C6D8',
     fontSize: 12,
     lineHeight: 16,
+  },
+  actionPillBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: '#FFE399',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionPillBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0F131C',
+  },
+  closeBtnBox: {
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -58,7 +58,7 @@ export default function DriverVerificationScreen() {
     }
   }, [isLoading, isAuthenticated, user, token]);
 
-  const { data: accreditationData, isLoading: accreditationLoading } = useDriverAccreditation();
+  const { data: accreditationData, isLoading: accreditationLoading, refetch: refetchAccreditation } = useDriverAccreditation();
   const saveStepMutation = useSaveAccreditationStep();
   const uploadDocMutation = useUploadAccreditationDocument();
   const recordConsentMutation = useRecordAccreditationConsent();
@@ -74,7 +74,16 @@ export default function DriverVerificationScreen() {
   const rawInsuranceStatus = String(profile?.insuranceStatus || accreditationData?.steps?.insurance || '');
   const rawBgStatus = String(profile?.backgroundStatus || accreditationData?.steps?.backgroundCheck || '');
   const rawVehicleStatus = String((profile as any)?.vehicleStatus || (profile as any)?.vehicle_status || '');
+  const expiry = accreditationData?.expiry;
+  const isLicenseExpired = Boolean(expiry?.license?.expired);
+  const isInsuranceExpired = Boolean(expiry?.insurance?.expired);
+  const isLicenseExpiringSoon = Boolean(expiry?.license?.expiringSoon);
+  const isInsuranceExpiringSoon = Boolean(expiry?.insurance?.expiringSoon);
+  const isAnyStepExpiring = isLicenseExpiringSoon || isInsuranceExpiringSoon;
+
   const isAnyStepRejected =
+    isLicenseExpired ||
+    isInsuranceExpired ||
     profile?.accreditationStatus === 'rejected' ||
     rawVehicleStatus === 'rejected' ||
     rawLicenseStatus === 'rejected' ||
@@ -82,7 +91,7 @@ export default function DriverVerificationScreen() {
     rawBgStatus === 'rejected';
 
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(Boolean(params.edit === 'true'));
   const [isSubmittingAll, setIsSubmittingAll] = useState(false);
   const [currentStep, setCurrentStep] = useState(params.step ? Number(params.step) : 1);
   const [keyboardPadding, setKeyboardPadding] = useState(0);
@@ -99,34 +108,31 @@ export default function DriverVerificationScreen() {
   const rejectedStepNumbers = useMemo(() => {
     const list: number[] = [];
     if (rawVehicleStatus === 'rejected') list.push(1);
-    if (rawLicenseStatus === 'rejected') list.push(2);
+    if (rawLicenseStatus === 'rejected' || isLicenseExpired || isLicenseExpiringSoon) list.push(2);
     if (rawBgStatus === 'rejected') list.push(3);
-    if (rawInsuranceStatus === 'rejected') list.push(4);
+    if (rawInsuranceStatus === 'rejected' || isInsuranceExpired || isInsuranceExpiringSoon) list.push(4);
     return list;
-  }, [rawVehicleStatus, rawLicenseStatus, rawBgStatus, rawInsuranceStatus]);
+  }, [rawVehicleStatus, rawLicenseStatus, isLicenseExpired, isLicenseExpiringSoon, rawBgStatus, rawInsuranceStatus, isInsuranceExpired, isInsuranceExpiringSoon]);
 
   const canDirectSubmitStep = (stepNum: number) => {
     if (!isEditing) return false;
     if (stepNum === 4) return true;
+    if (stepNum === 2 && (isLicenseExpiringSoon || isLicenseExpired) && rawBgStatus !== 'rejected') {
+      return true;
+    }
     const remainingRejected = rejectedStepNumbers.filter((s) => s > stepNum);
     return remainingRejected.length === 0;
   };
 
   useEffect(() => {
     if (params.edit === 'true') {
-      const isUnderReviewLocked = profile?.accreditationStatus === 'under_review' && !isAnyStepRejected;
-      if (isUnderReviewLocked) {
-        setIsEditing(false);
-        setIsSubmitted(true);
-      } else {
-        setIsEditing(true);
-        setIsSubmitted(false);
-        if (params.step) {
-          setCurrentStep(Number(params.step));
-        }
+      setIsEditing(true);
+      setIsSubmitted(false);
+      if (params.step) {
+        setCurrentStep(Number(params.step));
       }
     }
-  }, [params.edit, params.step, profile?.accreditationStatus, isAnyStepRejected]);
+  }, [params.edit, params.step]);
 
   useEffect(() => {
     const showSub = Keyboard.addListener(
@@ -432,7 +438,13 @@ export default function DriverVerificationScreen() {
             postalCode: formData.zip.trim(),
           },
         });
+        await refetchAccreditation().catch(() => {});
+        showToast('Vehicle details updated successfully.', 'success');
+        setIsSubmitted(true);
+        setIsEditing(false);
+        return;
       } else if (stepNum === 2) {
+        // Isolated License Renewal: PATCH /driver/accreditation/license + POST /driver/accreditation/documents
         await saveStepMutation.mutateAsync({
           step: 'license',
           payload: {
@@ -467,12 +479,54 @@ export default function DriverVerificationScreen() {
             })
             .catch((e) => console.warn('[Accreditation] upload license_back error:', e));
         }
+
+        await refetchAccreditation().catch(() => {});
+        showToast('Licence renewed! Your new document is being reviewed.', 'success');
+        setIsSubmitted(true);
+        setIsEditing(false);
+        return;
       } else if (stepNum === 3) {
         await recordConsentMutation.mutateAsync({
           authorized: formData.fcraAgreed,
           legalName: formData.licenseFullName.trim() || user?.displayName || undefined,
           ssnLast4: formData.ssnLast4.trim() || undefined,
         });
+        await refetchAccreditation().catch(() => {});
+        showToast('Consent updated successfully.', 'success');
+        setIsSubmitted(true);
+        setIsEditing(false);
+        return;
+      } else if (stepNum === 4) {
+        // Isolated Insurance Renewal: PATCH /driver/accreditation/insurance + POST /driver/accreditation/documents
+        await saveStepMutation.mutateAsync({
+          step: 'insurance',
+          payload: {
+            insuranceCompany: formData.insuranceCompany.trim(),
+            insuranceNaicNumber: formData.naicNumber.trim() || undefined,
+            insurancePolicyNumber: formData.policyNumber.trim(),
+            insuranceEffectiveDate: normalizeDateToISO(formData.effectiveDate),
+            insuranceExpirationDate: normalizeDateToISO(formData.expirationDate),
+            vehicleVin: formData.vinNumber.trim() || undefined,
+          },
+        });
+
+        if (formData.insuranceDocUrl && !formData.insuranceDocUrl.startsWith('http')) {
+          await uploadDocMutation
+            .mutateAsync({
+              type: 'insurance_card',
+              file: {
+                uri: formData.insuranceDocUrl,
+                name: formData.insuranceDocName || 'insurance_card.jpg',
+              },
+            })
+            .catch((e) => console.warn('[Accreditation] upload insurance_card error:', e));
+        }
+
+        await refetchAccreditation().catch(() => {});
+        showToast('Insurance renewed! Your new document is being reviewed.', 'success');
+        setIsSubmitted(true);
+        setIsEditing(false);
+        return;
       }
 
       await handleSubmitAll();
@@ -491,7 +545,66 @@ export default function DriverVerificationScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
       }
 
-      // Try bulk /complete endpoint first, with fallback to step-by-step
+      // If in editing/renewal mode for an existing approved/submitted driver, use per-step routes
+      const isRenewalMode = isEditing || profile?.accreditationStatus === 'approved' || profile?.isSubmitted;
+      if (isRenewalMode) {
+        // Save license only if unapproved or expired
+        const needsLicenseRenewal = profile?.licenseStatus !== 'approved' || isLicenseExpired;
+        if (needsLicenseRenewal && formData.licenseNumber) {
+          await saveStepMutation.mutateAsync({
+            step: 'license',
+            payload: {
+              licenseState: formData.licenseState.trim().toUpperCase(),
+              licenseNumber: formData.licenseNumber.trim(),
+              legalName: formData.licenseFullName.trim(),
+              dateOfBirth: normalizeDateToISO(formData.licenseDob),
+              licenseExpirationDate: normalizeDateToISO(formData.licenseExpDate),
+            },
+          }).catch(() => {});
+          if (formData.licenseFrontUrl && !formData.licenseFrontUrl.startsWith('http')) {
+            await uploadDocMutation.mutateAsync({
+              type: 'license_front',
+              file: { uri: formData.licenseFrontUrl, name: formData.licenseFrontName || 'license_front.jpg' },
+            }).catch(() => {});
+          }
+          if (formData.licenseBackUrl && !formData.licenseBackUrl.startsWith('http')) {
+            await uploadDocMutation.mutateAsync({
+              type: 'license_back',
+              file: { uri: formData.licenseBackUrl, name: formData.licenseBackName || 'license_back.jpg' },
+            }).catch(() => {});
+          }
+        }
+
+        // Save insurance only if unapproved or expired
+        const needsInsuranceRenewal = profile?.insuranceStatus !== 'approved' || isInsuranceExpired;
+        if (needsInsuranceRenewal && (formData.insuranceCompany || formData.policyNumber)) {
+          await saveStepMutation.mutateAsync({
+            step: 'insurance',
+            payload: {
+              insuranceCompany: formData.insuranceCompany.trim(),
+              insuranceNaicNumber: formData.naicNumber.trim() || undefined,
+              insurancePolicyNumber: formData.policyNumber.trim(),
+              insuranceEffectiveDate: normalizeDateToISO(formData.effectiveDate),
+              insuranceExpirationDate: normalizeDateToISO(formData.expirationDate),
+              vehicleVin: formData.vinNumber.trim() || undefined,
+            },
+          }).catch(() => {});
+          if (formData.insuranceDocUrl && !formData.insuranceDocUrl.startsWith('http')) {
+            await uploadDocMutation.mutateAsync({
+              type: 'insurance_card',
+              file: { uri: formData.insuranceDocUrl, name: formData.insuranceDocName || 'insurance_card.jpg' },
+            }).catch(() => {});
+          }
+        }
+
+        await refetchAccreditation().catch(() => {});
+        showToast('Documentation updated! Documents are under review.', 'success');
+        setIsSubmitted(true);
+        setIsEditing(false);
+        return;
+      }
+
+      // Initial Onboarding: Try bulk /complete endpoint first, with fallback to step-by-step
       try {
         await completeAccreditationMutation.mutateAsync({
           fields: {
@@ -612,6 +725,7 @@ export default function DriverVerificationScreen() {
         insuranceFilename: formData.insuranceDocName || 'insurance_card.pdf',
       }).catch(() => {});
 
+      await refetchAccreditation().catch(() => {});
       setIsSubmitted(true);
       setIsEditing(false);
       showToast('Profile & documents submitted for admin approval!', 'success');
@@ -624,11 +738,13 @@ export default function DriverVerificationScreen() {
   };
 
   const handleHeaderBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep((s) => s - 1);
-    } else if (isEditing) {
+    if (isEditing) {
       setIsEditing(false);
       setIsSubmitted(true);
+      return;
+    }
+    if (currentStep > 1) {
+      setCurrentStep((s) => s - 1);
     } else {
       if (router.canDismiss()) {
         router.dismissAll();
@@ -650,16 +766,19 @@ export default function DriverVerificationScreen() {
     return (
       <DriverProfileStatusScreen
         onEditDocuments={() => {
-          if (profile?.accreditationStatus === 'under_review' && !isAnyStepRejected) {
+          if (profile?.accreditationStatus === 'under_review' && !isAnyStepRejected && !isAnyStepExpiring) {
             showToast('Application is locked while under review.', 'info');
             return;
           }
           setIsEditing(true);
           setIsSubmitted(false);
-          setCurrentStep(1);
+          setCurrentStep(isLicenseExpiringSoon ? 2 : isInsuranceExpiringSoon ? 4 : 1);
         }}
         onEditStep={(step) => {
-          if (profile?.accreditationStatus === 'under_review' && !isAnyStepRejected) {
+          const isStepRenewal =
+            (step === 2 && (isLicenseExpiringSoon || isLicenseExpired || rawLicenseStatus === 'rejected')) ||
+            (step === 4 && (isInsuranceExpiringSoon || isInsuranceExpired || rawInsuranceStatus === 'rejected'));
+          if (profile?.accreditationStatus === 'under_review' && !isAnyStepRejected && !isStepRenewal) {
             showToast('Application is locked while under review.', 'info');
             return;
           }
@@ -746,7 +865,14 @@ export default function DriverVerificationScreen() {
                 data={formData}
                 onChange={updateFormData}
                 onNext={handleStep2Next}
-                onBack={() => setCurrentStep(1)}
+                onBack={() => {
+                  if (isEditing) {
+                    setIsEditing(false);
+                    setIsSubmitted(true);
+                  } else {
+                    setCurrentStep(1);
+                  }
+                }}
                 onUploadDoc={(type, file) =>
                   uploadDocMutation.mutateAsync({ type, file })
                 }
@@ -762,7 +888,14 @@ export default function DriverVerificationScreen() {
                 data={formData}
                 onChange={updateFormData}
                 onNext={handleStep3Next}
-                onBack={() => setCurrentStep(2)}
+                onBack={() => {
+                  if (isEditing) {
+                    setIsEditing(false);
+                    setIsSubmitted(true);
+                  } else {
+                    setCurrentStep(2);
+                  }
+                }}
                 isEditing={isEditing}
                 canDirectSubmit={canDirectSubmitStep(3)}
                 onSubmitDirect={() => handleDirectSubmitFromStep(3)}
@@ -774,8 +907,15 @@ export default function DriverVerificationScreen() {
               <InsuranceStep
                 data={formData}
                 onChange={updateFormData}
-                onSubmit={handleSubmitAll}
-                onBack={() => setCurrentStep(3)}
+                onSubmit={isEditing ? () => handleDirectSubmitFromStep(4) : handleSubmitAll}
+                onBack={() => {
+                  if (isEditing) {
+                    setIsEditing(false);
+                    setIsSubmitted(true);
+                  } else {
+                    setCurrentStep(3);
+                  }
+                }}
                 onUploadDoc={(type, file) =>
                   uploadDocMutation.mutateAsync({ type, file })
                 }
