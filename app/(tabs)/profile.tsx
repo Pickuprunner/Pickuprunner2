@@ -471,7 +471,11 @@ export default function ProfileScreen() {
               isLicenseExpired
                 ? `Licence expired${expiry?.license?.expirationDate ? ` on ${expiry.license.expirationDate}` : ''} • Tap to renew`
                 : isLicenseExpiringSoon
-                  ? `Expires in ${expiry?.license?.daysLeft} days • Tap to renew`
+                  ? (expiry?.license?.daysLeft ?? 0) <= 0
+                    ? 'Expires today • Tap to renew'
+                    : expiry?.license?.daysLeft === 1
+                      ? 'Expires tomorrow (in 24 hrs) • Tap to renew'
+                      : `Expires in ${expiry?.license?.daysLeft} days • Tap to renew`
                   : licenseStatus === 'approved'
                     ? 'Valid license on file'
                     : licenseStatus === 'rejected'
@@ -485,7 +489,9 @@ export default function ProfileScreen() {
               isLicenseExpired
                 ? 'Expired'
                 : isLicenseExpiringSoon
-                  ? `Exp. in ${expiry?.license?.daysLeft}d`
+                  ? (expiry?.license?.daysLeft ?? 0) <= 0
+                    ? 'Today'
+                    : `Exp. in ${expiry?.license?.daysLeft}d`
                   : undefined
             }
             onPress={() => {
@@ -504,7 +510,11 @@ export default function ProfileScreen() {
               isInsuranceExpired
                 ? `Policy expired${expiry?.insurance?.expirationDate ? ` on ${expiry.insurance.expirationDate}` : ''} • Tap to renew`
                 : isInsuranceExpiringSoon
-                  ? `Expires in ${expiry?.insurance?.daysLeft} days • Tap to renew`
+                  ? (expiry?.insurance?.daysLeft ?? 0) <= 0
+                    ? 'Expires today • Tap to renew'
+                    : expiry?.insurance?.daysLeft === 1
+                      ? 'Expires tomorrow (in 24 hrs) • Tap to renew'
+                      : `Expires in ${expiry?.insurance?.daysLeft} days • Tap to renew`
                   : insuranceStatus === 'approved'
                     ? 'Current policy verified'
                     : insuranceStatus === 'rejected'
@@ -518,7 +528,9 @@ export default function ProfileScreen() {
               isInsuranceExpired
                 ? 'Expired'
                 : isInsuranceExpiringSoon
-                  ? `Exp. in ${expiry?.insurance?.daysLeft}d`
+                  ? (expiry?.insurance?.daysLeft ?? 0) <= 0
+                    ? 'Today'
+                    : `Exp. in ${expiry?.insurance?.daysLeft}d`
                   : undefined
             }
             onPress={() => {

@@ -170,18 +170,30 @@ export function getDriverAccreditationGateState(data?: AccreditationResponseData
   const expiringWarnings: Array<{ document: 'license' | 'insurance'; daysLeft: number | null; message: string }> = [];
   if (expiry?.license?.expiringSoon) {
     const days = expiry.license.daysLeft ?? 0;
+    const msg =
+      days <= 0
+        ? 'Your licence expires today'
+        : days === 1
+          ? 'Your licence expires tomorrow (in 24 hrs)'
+          : `Your licence expires in ${days} days`;
     expiringWarnings.push({
       document: 'license',
       daysLeft: days,
-      message: `Your licence expires in ${days} ${days === 1 ? 'day' : 'days'}`,
+      message: msg,
     });
   }
   if (expiry?.insurance?.expiringSoon) {
     const days = expiry.insurance.daysLeft ?? 0;
+    const msg =
+      days <= 0
+        ? 'Your insurance expires today'
+        : days === 1
+          ? 'Your insurance expires tomorrow (in 24 hrs)'
+          : `Your insurance expires in ${days} days`;
     expiringWarnings.push({
       document: 'insurance',
       daysLeft: days,
-      message: `Your insurance expires in ${days} ${days === 1 ? 'day' : 'days'}`,
+      message: msg,
     });
   }
 

@@ -364,7 +364,11 @@ export function DriverProfileStatusScreen({
                 {isLicenseExpired
                   ? `Expired${expiry?.license?.expirationDate ? ` on ${expiry.license.expirationDate}` : ''} — Tap to renew licence`
                   : expiry?.license?.expiringSoon
-                    ? `Expires in ${expiry.license.daysLeft} days — Tap to renew`
+                    ? (expiry.license.daysLeft ?? 0) <= 0
+                      ? 'Expires today — Tap to renew'
+                      : expiry.license.daysLeft === 1
+                        ? 'Expires tomorrow (in 24 hrs) — Tap to renew'
+                        : `Expires in ${expiry.license.daysLeft} days — Tap to renew`
                     : licenseStatus === 'approved'
                       ? profile?.licenseNumber
                         ? `${profile?.licenseState || 'AZ'} • #${profile.licenseNumber}`
@@ -422,7 +426,11 @@ export function DriverProfileStatusScreen({
                 {isInsuranceExpired
                   ? `Expired${expiry?.insurance?.expirationDate ? ` on ${expiry.insurance.expirationDate}` : ''} — Tap to renew insurance`
                   : expiry?.insurance?.expiringSoon
-                    ? `Expires in ${expiry.insurance.daysLeft} days — Tap to renew`
+                    ? (expiry.insurance.daysLeft ?? 0) <= 0
+                      ? 'Expires today — Tap to renew'
+                      : expiry.insurance.daysLeft === 1
+                        ? 'Expires tomorrow (in 24 hrs) — Tap to renew'
+                        : `Expires in ${expiry.insurance.daysLeft} days — Tap to renew`
                     : insuranceStatus === 'approved'
                       ? profile?.insuranceCompany
                         ? `${profile.insuranceCompany} • Policy #${profile.insurancePolicyNumber || '••••'}`
@@ -450,7 +458,7 @@ export function DriverProfileStatusScreen({
               style={[styles.primaryActionBtn, { height: select(50, 46, 42) }]}
             >
               <CheckCircle size={18} color="#0F131C" />
-              <Text maxFontSizeMultiplier={1.2} style={styles.primaryActionBtnText}>Continue to Dashboard</Text>
+              <Text maxFontSizeMultiplier={1.2} style={styles.primaryActionBtnText}>Continue to App</Text>
               <ArrowRight size={18} color="#0F131C" />
             </TouchableOpacity>
           ) : isAnyStepRejected ? (

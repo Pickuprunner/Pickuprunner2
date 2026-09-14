@@ -35,7 +35,8 @@ import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { useDriverAvailability, useSetDriverAvailability, useDriverLocationHeartbeat } from '@/lib/availability';
 import { useConnectStatus, useConnectOnboard, openStripeOnboardingSession } from '@/lib/stripeConnect';
-import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast, CustomLoading, CustomRefreshControl } from '@/components/core';
+import { SkeletonList, StripeSetupBanner, CustomConfirmModal, useToast, CustomLoading, CustomRefreshControl, CustomPop, sessionDismissedPops } from '@/components/core';
+import { spacing } from '@/constants/design';
 
 import { isAccreditationFullyApproved, getDriverAccreditationGateState } from '@/apis/accreditation';
 import {
@@ -169,6 +170,7 @@ export default function OrdersScreen() {
     accreditation?.profile?.accreditationStatus === 'under_review' ||
     accreditation?.profile?.accreditationStatus === 'approved' ||
     verification?.status === 'pending';
+
 
   useEffect(() => {
     if (
@@ -485,33 +487,38 @@ export default function OrdersScreen() {
     }).start();
   }, [search, headerTranslateY]);
 
+  const [dismissedWarningKeys, setDismissedWarningKeys] = useState<Record<string, boolean>>({});
+
   const ExpiringDocumentsBanner = () => {
-    if (!expiringWarnings.length) return null;
+    const visibleWarnings = expiringWarnings.filter((warning) => {
+      const key = warning.document ? `expiring_${warning.document}` : warning.message;
+      return !dismissedWarningKeys[key] && !sessionDismissedPops.has(key);
+    });
+
+    if (!visibleWarnings.length) return null;
+
     return (
       <View style={styles.expiringBannerContainer}>
-        {expiringWarnings.map((warning, idx) => (
-          <TouchableOpacity
-            key={idx}
-            activeOpacity={0.85}
-            onPress={() => {
-              router.push({
-                pathname: '/(auth)/driver-verification',
-                params: { edit: 'true', step: warning.document === 'license' ? '2' : '4' },
-              } as any);
-            }}
-            style={styles.expiringBanner}
-          >
-            <View style={styles.expiringBannerLeft}>
-              <AlertTriangle size={18} color="#FFE399" />
-              <Text style={styles.expiringBannerText}>
-                {warning.message}
-              </Text>
-            </View>
-            <View style={styles.expiringBannerBtn}>
-              <Text style={styles.expiringBannerBtnText}>Renew</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+        {visibleWarnings.map((warning, idx) => {
+          const key = warning.document ? `expiring_${warning.document}` : warning.message;
+          return (
+            <CustomPop
+              key={key || idx}
+              id={key}
+              warning={warning}
+              actionLabel="Renew"
+              onClose={() => {
+                setDismissedWarningKeys((prev) => ({ ...prev, [key]: true }));
+              }}
+              onPress={() => {
+                router.push({
+                  pathname: '/(auth)/driver-verification',
+                  params: { edit: 'true', step: warning.document === 'license' ? '2' : '4' },
+                } as any);
+              }}
+            />
+          );
+        })}
       </View>
     );
   };
@@ -525,7 +532,7 @@ export default function OrdersScreen() {
         {isLoading && <SkeletonList count={3} />}
       </View>
     ),
-    [headerHeight, isLoading, expiringWarnings]
+    [headerHeight, isLoading, expiringWarnings, dismissedWarningKeys]
   );
 
   const isOnline = useDriverStore((s) => s.isOnline);
@@ -778,10 +785,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   expiringBannerContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
-    gap: 8,
+    paddingHorizontal: spacing.marginMobile,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
   },
   expiringBanner: {
     flexDirection: 'row',
