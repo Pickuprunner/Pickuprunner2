@@ -77,6 +77,9 @@ export default function DriverVerificationScreen() {
   const expiry = accreditationData?.expiry;
   const isLicenseExpired = Boolean(expiry?.license?.expired);
   const isInsuranceExpired = Boolean(expiry?.insurance?.expired);
+  const isLicenseExpiringSoon = Boolean(expiry?.license?.expiringSoon);
+  const isInsuranceExpiringSoon = Boolean(expiry?.insurance?.expiringSoon);
+  const isAnyStepExpiring = isLicenseExpiringSoon || isInsuranceExpiringSoon;
 
   const isAnyStepRejected =
     isLicenseExpired ||
@@ -105,15 +108,18 @@ export default function DriverVerificationScreen() {
   const rejectedStepNumbers = useMemo(() => {
     const list: number[] = [];
     if (rawVehicleStatus === 'rejected') list.push(1);
-    if (rawLicenseStatus === 'rejected' || isLicenseExpired) list.push(2);
+    if (rawLicenseStatus === 'rejected' || isLicenseExpired || isLicenseExpiringSoon) list.push(2);
     if (rawBgStatus === 'rejected') list.push(3);
-    if (rawInsuranceStatus === 'rejected' || isInsuranceExpired) list.push(4);
+    if (rawInsuranceStatus === 'rejected' || isInsuranceExpired || isInsuranceExpiringSoon) list.push(4);
     return list;
-  }, [rawVehicleStatus, rawLicenseStatus, isLicenseExpired, rawBgStatus, rawInsuranceStatus, isInsuranceExpired]);
+  }, [rawVehicleStatus, rawLicenseStatus, isLicenseExpired, isLicenseExpiringSoon, rawBgStatus, rawInsuranceStatus, isInsuranceExpired, isInsuranceExpiringSoon]);
 
   const canDirectSubmitStep = (stepNum: number) => {
     if (!isEditing) return false;
     if (stepNum === 4) return true;
+    if (stepNum === 2 && (isLicenseExpiringSoon || isLicenseExpired) && rawBgStatus !== 'rejected') {
+      return true;
+    }
     const remainingRejected = rejectedStepNumbers.filter((s) => s > stepNum);
     return remainingRejected.length === 0;
   };
@@ -730,6 +736,11 @@ export default function DriverVerificationScreen() {
   };
 
   const handleHeaderBack = () => {
+    if (isEditing && params.step) {
+      setIsEditing(false);
+      setIsSubmitted(true);
+      return;
+    }
     if (currentStep > 1) {
       setCurrentStep((s) => s - 1);
     } else if (isEditing) {
@@ -756,16 +767,19 @@ export default function DriverVerificationScreen() {
     return (
       <DriverProfileStatusScreen
         onEditDocuments={() => {
-          if (profile?.accreditationStatus === 'under_review' && !isAnyStepRejected) {
+          if (profile?.accreditationStatus === 'under_review' && !isAnyStepRejected && !isAnyStepExpiring) {
             showToast('Application is locked while under review.', 'info');
             return;
           }
           setIsEditing(true);
           setIsSubmitted(false);
-          setCurrentStep(1);
+          setCurrentStep(isLicenseExpiringSoon ? 2 : isInsuranceExpiringSoon ? 4 : 1);
         }}
         onEditStep={(step) => {
-          if (profile?.accreditationStatus === 'under_review' && !isAnyStepRejected) {
+          const isStepRenewal =
+            (step === 2 && (isLicenseExpiringSoon || isLicenseExpired || rawLicenseStatus === 'rejected')) ||
+            (step === 4 && (isInsuranceExpiringSoon || isInsuranceExpired || rawInsuranceStatus === 'rejected'));
+          if (profile?.accreditationStatus === 'under_review' && !isAnyStepRejected && !isStepRenewal) {
             showToast('Application is locked while under review.', 'info');
             return;
           }
