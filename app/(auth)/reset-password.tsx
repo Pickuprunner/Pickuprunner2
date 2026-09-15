@@ -24,38 +24,6 @@ import CustomInput from '@/components/core/CustomInput';
 import { useToast } from '@/components/core';
 import { checkPasswordRequirements } from '@/lib/validation';
 
-function parseTokenOrUrl(input: string): { userId?: string; token?: string } {
-  const trimmed = input.trim();
-  if (!trimmed) return {};
-
-  const pathMatch = trimmed.match(/\/auth\/reset-password\/([^/?#]+)\/([^/?#]+)/);
-  if (pathMatch) {
-    return { userId: pathMatch[1], token: pathMatch[2] };
-  }
-
-  if (trimmed.includes('userId=') && trimmed.includes('token=')) {
-    const userIdMatch = trimmed.match(/[?&]userId=([^&#]+)/);
-    const tokenMatch = trimmed.match(/[?&]token=([^&#]+)/);
-    if (userIdMatch && tokenMatch) {
-      return { userId: decodeURIComponent(userIdMatch[1]), token: decodeURIComponent(tokenMatch[1]) };
-    }
-  }
-
-  const parts = trimmed.split('.');
-  if (parts.length === 3) {
-    try {
-      const payloadBase64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const json = atob(payloadBase64);
-      const parsed = JSON.parse(json);
-      if (parsed.id) {
-        return { userId: parsed.id, token: trimmed };
-      }
-    } catch {}
-    return { token: trimmed };
-  }
-
-  return { token: trimmed };
-}
 
 export default function ResetPasswordScreen() {
   const insets = useSafeAreaInsets();
@@ -63,33 +31,20 @@ export default function ResetPasswordScreen() {
   const { showToast } = useToast();
   const { resetPassword } = useAuth();
 
-  const [rawTokenInput, setRawTokenInput] = useState('');
-  const [manualUserId, setManualUserId] = useState('');
-  const [manualToken, setManualToken] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const paramUserId = Array.isArray(params.userId) ? params.userId[0] : params.userId;
-  const paramToken = Array.isArray(params.token) ? params.token[0] : params.token;
-  const userId = paramUserId || manualUserId;
-  const token = paramToken || manualToken;
-
-  const handleTokenChange = (text: string) => {
-    setRawTokenInput(text);
-    const parsed = parseTokenOrUrl(text);
-    if (parsed.userId) setManualUserId(parsed.userId);
-    if (parsed.token) setManualToken(parsed.token);
-  };
+  const userId = Array.isArray(params.userId) ? params.userId[0] : params.userId;
+  const token = Array.isArray(params.token) ? params.token[0] : params.token;
 
   const passwordCheck = checkPasswordRequirements(password);
   const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
 
   const handleSubmit = async () => {
-    console.log('[Auth:ResetPassword] Attempting password reset with params:', { userId, hasToken: !!token });
     if (!userId || !token) {
-      showToast('Please paste your reset link or token.', 'error');
+      showToast('Invalid or expired reset link. Please request a new one.', 'error');
       return;
     }
     if (!passwordCheck.isValid) {
@@ -214,19 +169,26 @@ export default function ResetPasswordScreen() {
                     <Text style={styles.submitBtnText}>Proceed to Sign In</Text>
                   </Pressable>
                 </View>
+              ) : !userId || !token ? (
+                <View style={styles.successCard}>
+                  <KeyRound size={36} color={colors.error || '#EF4444'} />
+                  <Text style={styles.successTitle}>Invalid Reset Link</Text>
+                  <Text style={styles.successSubtitle}>
+                    This password reset link is missing required details or has expired. Please request a new link.
+                  </Text>
+                  <Pressable
+                    onPress={() => router.replace('/(auth)/forgot-password' as any)}
+                    style={({ pressed }) => [
+                      styles.submitBtn,
+                      styles.backToSignBtn,
+                      pressed && styles.submitBtnPressed,
+                    ]}
+                  >
+                    <Text style={styles.submitBtnText}>Request New Link</Text>
+                  </Pressable>
+                </View>
               ) : (
                 <View style={styles.formSection}>
-                  {(!paramUserId || !paramToken) && (
-                    <CustomInput
-                      label="RESET LINK OR TOKEN"
-                      value={rawTokenInput}
-                      onChangeText={handleTokenChange}
-                      placeholder="Paste reset link or token here"
-                      autoCapitalize="none"
-                      status={token ? 'success' : 'default'}
-                    />
-                  )}
-
                   <PasswordInput
                     value={password}
                     onChangeText={setPassword}

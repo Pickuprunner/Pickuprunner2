@@ -11,6 +11,7 @@ import { setupNotificationHandler } from '@/lib/notifications';
 import { NotificationProvider } from '@/context/NotificationContext';
 import { colors } from '@/constants/design';
 import { ToastProvider } from '@/components/core';
+import { useDeepLinks } from '@/hooks/useDeepLinks';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +46,7 @@ function WebStyleReset() {
 
 export default function RootLayout() {
   useFrameworkReady();
+  useDeepLinks();
 
   useEffect(() => {
     setupNotificationHandler();
@@ -74,7 +76,6 @@ export default function RootLayout() {
                   <Stack.Screen name="order/[id]" />
                   <Stack.Screen name="connect/onboarding/success" />
                   <Stack.Screen name="connect/onboarding/reauth" />
-                  <Stack.Screen name="auth/reset-password/[[...params]]" options={{ animation: 'none' }} />
                   <Stack.Screen
                     name="payment/success"
                     options={{

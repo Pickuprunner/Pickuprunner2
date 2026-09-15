@@ -40,7 +40,21 @@ export function MapStopsCarousel({
 
   const slideAnim = useRef(new Animated.Value(currentTab === 'pending' ? 1 : 0)).current;
 
+  const lastTabSwitchRef = useRef<number>(0);
+
+  const handleSwitchTab = (tab: 'active' | 'pending') => {
+    if (tab === currentTab) return;
+    const now = Date.now();
+    if (now - lastTabSwitchRef.current < 250) return;
+    lastTabSwitchRef.current = now;
+
+    haptic('light');
+    slideAnim.stopAnimation();
+    setCurrentTab(tab);
+  };
+
   useEffect(() => {
+    slideAnim.stopAnimation();
     Animated.spring(slideAnim, {
       toValue: currentTab === 'pending' ? 1 : 0,
       useNativeDriver: false,
@@ -66,7 +80,7 @@ export function MapStopsCarousel({
       setCurrentTab('pending');
     }
     prevActiveCountRef.current = activeOrders.length;
-  }, [activeOrders.length, pendingOrders.length, currentTab]);
+  }, [activeOrders.length]);
 
   const displayOrders = currentTab === 'active' ? activeOrders : pendingOrders;
 
@@ -104,10 +118,7 @@ export function MapStopsCarousel({
           </Animated.View>
 
           <Pressable
-            onPress={() => {
-              haptic('light');
-              setCurrentTab('active');
-            }}
+            onPress={() => handleSwitchTab('active')}
             style={({ pressed }) => [
               styles.segmentTab,
               { width: TAB_WIDTH },
@@ -126,10 +137,7 @@ export function MapStopsCarousel({
           </Pressable>
 
           <Pressable
-            onPress={() => {
-              haptic('light');
-              setCurrentTab('pending');
-            }}
+            onPress={() => handleSwitchTab('pending')}
             style={({ pressed }) => [
               styles.segmentTab,
               { width: TAB_WIDTH },

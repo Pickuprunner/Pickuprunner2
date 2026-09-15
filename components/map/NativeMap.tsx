@@ -319,7 +319,7 @@ export function NativeMap({
 
     cameraTimeoutRef.current = setTimeout(() => {
       safeAnimateToCoords(targetCoordinatesToFit, Boolean(selectedId));
-    }, 120);
+    }, 250);
   }, [selectedId, currentTab, targetCoordinatesToFit, targetRouteOrder?.id]);
 
   if (!MapView || !Marker) {
@@ -475,7 +475,7 @@ export function NativeMap({
       
         {Boolean(Polyline && hasActiveRoute && targetRouteOrder && routeCoordinates.length >= 2) && (
           <Polyline
-            key={`${currentTab}-route-base-${targetRouteOrder?.id}`}
+            key={`route-base-${targetRouteOrder?.id}`}
             coordinates={routeCoordinates}
             strokeColor="rgba(0, 0, 0, 0.7)"
             strokeWidth={Platform.OS === 'ios' ? 6 : 7}
@@ -483,7 +483,7 @@ export function NativeMap({
         )}
         {Boolean(Polyline && hasActiveRoute && targetRouteOrder && routeCoordinates.length >= 2) && (
           <Polyline
-            key={`${currentTab}-route-color-${targetRouteOrder?.id}`}
+            key={`route-color-${targetRouteOrder?.id}`}
             coordinates={routeCoordinates}
             strokeColor={
               targetRouteOrder?.status && ACTIVE_STATUSES.includes(targetRouteOrder.status)
@@ -496,7 +496,7 @@ export function NativeMap({
 
         {Boolean(Polyline && hasActiveRoute && targetRouteOrder && approachCoordinates.length >= 2) && (
           <Polyline
-            key={`${currentTab}-route-approach-${targetRouteOrder?.id}`}
+            key={`route-approach-${targetRouteOrder?.id}`}
             coordinates={approachCoordinates}
             strokeColor={
               targetRouteOrder?.status && ACTIVE_STATUSES.includes(targetRouteOrder.status)
@@ -516,7 +516,7 @@ export function NativeMap({
           const coord = offset || { latitude: hub.lat, longitude: hub.lng };
           return (
             <Marker
-              key={`${currentTab}-${hubKey}`}
+              key={hubKey}
               coordinate={coord}
               zIndex={isSelected ? 150 : 50}
               onPress={() => {
@@ -568,7 +568,7 @@ export function NativeMap({
 
           return (
             <Marker
-              key={`${currentTab}-delivery-${order.id}`}
+              key={`delivery-${order.id}`}
               coordinate={coord}
               zIndex={markerZIndex}
               onPress={() => onSelect(order.id)}

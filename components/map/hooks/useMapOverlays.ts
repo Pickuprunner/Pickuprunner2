@@ -141,12 +141,17 @@ export function useMapOverlays({
   }, [pickupHubs, validDeliveryOrders]);
 
   
-  const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [routeState, setRouteState] = useState<{
+    orderId: string | null;
+    coords: { latitude: number; longitude: number }[];
+  }>({ orderId: null, coords: [] });
 
   useEffect(() => {
     let cancelled = false;
-    if (!routePickup || !routeDelivery) {
-      setRouteCoordinates([]);
+    const currentOrderId = targetRouteOrder?.id || null;
+
+    if (!currentOrderId || !routePickup || !routeDelivery) {
+      setRouteState({ orderId: null, coords: [] });
       return;
     }
 
@@ -169,7 +174,10 @@ export function useMapOverlays({
           );
         });
 
-        setRouteCoordinates(nodeToNode.length >= 2 ? nodeToNode : []);
+        setRouteState({
+          orderId: currentOrderId,
+          coords: nodeToNode.length >= 2 ? nodeToNode : [],
+        });
       })
       .catch(() => {
         if (cancelled) return;
@@ -177,13 +185,20 @@ export function useMapOverlays({
           { latitude: routePickup.lat, longitude: routePickup.lng },
           { latitude: routeDelivery.lat, longitude: routeDelivery.lng },
         ].filter((c) => isValidCoord(c.latitude, c.longitude));
-        setRouteCoordinates(fallback.length >= 2 ? fallback : []);
+        setRouteState({
+          orderId: currentOrderId,
+          coords: fallback.length >= 2 ? fallback : [],
+        });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [routePickup?.lat, routePickup?.lng, routeDelivery?.lat, routeDelivery?.lng]);
+  }, [targetRouteOrder?.id, routePickup?.lat, routePickup?.lng, routeDelivery?.lat, routeDelivery?.lng]);
+
+  const routeCoordinates = useMemo(() => {
+    return routeState.orderId === targetRouteOrder?.id ? routeState.coords : [];
+  }, [routeState, targetRouteOrder?.id]);
 
   
   const curbPoint = routeCoordinates.length >= 2 ? routeCoordinates[routeCoordinates.length - 1] : null;

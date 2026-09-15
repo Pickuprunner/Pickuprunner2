@@ -167,7 +167,9 @@ export default function CustomerAuthScreen() {
       router.replace('/(customer)/my-orders');
     } catch (err: any) {
       const msg: string = err?.message ?? '';
-      if (msg.includes('already exists') || msg.includes('EMAIL_ALREADY_EXISTS') || msg.includes('duplicate')) {
+      if (msg.toLowerCase().includes('phone') && (msg.includes('already exists') || msg.includes('duplicate'))) {
+        showToast('An account with this phone number already exists.', 'error');
+      } else if (msg.includes('already exists') || msg.includes('EMAIL_ALREADY_EXISTS') || msg.includes('duplicate')) {
         showToast('An account with this email already exists. Try signing in.', 'error');
       } else if (msg.includes('INVALID_CREDENTIALS') || msg.includes('invalid') || msg.includes('Invalid credentials')) {
         showToast('Incorrect email or password.', 'error');
