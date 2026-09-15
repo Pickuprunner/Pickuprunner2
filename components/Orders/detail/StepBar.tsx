@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, typography } from '@/constants/design';
+import { MaterialIcons } from '@expo/vector-icons';
+import { colors } from '@/constants/design';
 
 export const STEP_INDEX_MAP: Record<string, number> = {
   pending: 0,
@@ -10,9 +11,9 @@ export const STEP_INDEX_MAP: Record<string, number> = {
 };
 
 export const STEPS = [
-  { label: 'Accept', index: 0 },
-  { label: 'Pick Up', index: 1 },
-  { label: 'Deliver', index: 2 },
+  { label: 'Accept', index: 0, icon: 'how-to-reg' as const },
+  { label: 'Pick Up', index: 1, icon: 'inventory-2' as const },
+  { label: 'Deliver', index: 2, icon: 'local-shipping' as const },
 ];
 
 export function StepBar({ status }: { status: string }) {
@@ -24,6 +25,7 @@ export function StepBar({ status }: { status: string }) {
         {STEPS.map((step, idx) => {
           const isDone = currentStep > step.index;
           const isActive = currentStep === step.index;
+          const iconColor = isDone || isActive ? colors.background : colors.outline;
 
           return (
             <React.Fragment key={step.label}>
@@ -51,16 +53,11 @@ export function StepBar({ status }: { status: string }) {
                       : styles.stepFuture,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.stepNum,
-                      isDone || isActive
-                        ? { color: colors.background }
-                        : { color: colors.outline },
-                    ]}
-                  >
-                    {isDone ? '✓' : step.index + 1}
-                  </Text>
+                  {isDone ? (
+                    <MaterialIcons name="check" size={17} color={colors.background} />
+                  ) : (
+                    <MaterialIcons name={step.icon} size={17} color={iconColor} />
+                  )}
                 </View>
                 <Text
                   style={[

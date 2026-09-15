@@ -126,29 +126,7 @@ export function getDriverAccreditationGateState(data?: AccreditationResponseData
   }
   const { steps, eligibility, expiry, profile } = data;
 
-  // 1. Expiry check for license
-  if (expiry?.license?.expired) {
-    return {
-      type: 'license_expired',
-      title: 'Licence Expired',
-      message: 'Your licence has expired. Upload a new one.',
-      actionStep: 2,
-      actionLabel: 'Renew licence',
-    };
-  }
-
-  // 2. Expiry check for insurance
-  if (expiry?.insurance?.expired) {
-    return {
-      type: 'insurance_expired',
-      title: 'Insurance Expired',
-      message: 'Your insurance has expired. Upload a new one.',
-      actionStep: 4,
-      actionLabel: 'Renew insurance',
-    };
-  }
-
-  // 3. Pending review check
+  // 1. Pending review check
   if (steps?.license === 'pending' || steps?.insurance === 'pending' || profile?.accreditationStatus === 'under_review') {
     return {
       type: 'under_review',
@@ -157,7 +135,7 @@ export function getDriverAccreditationGateState(data?: AccreditationResponseData
     };
   }
 
-  // 4. Eligibility check
+  // 2. Eligibility check
   if (!eligibility?.eligible) {
     return {
       type: 'ineligible',
@@ -166,9 +144,16 @@ export function getDriverAccreditationGateState(data?: AccreditationResponseData
     };
   }
 
-  // 5. Eligible (with optional expiringSoon warnings)
+  // 3. Eligible (with optional expired / expiringSoon warnings)
   const expiringWarnings: Array<{ document: 'license' | 'insurance'; daysLeft: number | null; message: string }> = [];
-  if (expiry?.license?.expiringSoon) {
+
+  if (expiry?.license?.expired) {
+    expiringWarnings.push({
+      document: 'license',
+      daysLeft: 0,
+      message: 'Your licence is expired. Please renew.',
+    });
+  } else if (expiry?.license?.expiringSoon) {
     const days = expiry.license.daysLeft ?? 0;
     const msg =
       days <= 0
@@ -182,7 +167,14 @@ export function getDriverAccreditationGateState(data?: AccreditationResponseData
       message: msg,
     });
   }
-  if (expiry?.insurance?.expiringSoon) {
+
+  if (expiry?.insurance?.expired) {
+    expiringWarnings.push({
+      document: 'insurance',
+      daysLeft: 0,
+      message: 'Your vehicle insurance is expired. Please renew.',
+    });
+  } else if (expiry?.insurance?.expiringSoon) {
     const days = expiry.insurance.daysLeft ?? 0;
     const msg =
       days <= 0
@@ -218,10 +210,9 @@ export function isAccreditationFullyApproved(data?: AccreditationResponseData | 
   const isStep3Approved = bgStatus === 'approved';
   const isStep4Approved = insuranceStatus === 'approved';
 
-  const notExpired = !data.expiry?.anyExpired && !data.expiry?.license?.expired && !data.expiry?.insurance?.expired;
   const isEligible = data.eligibility ? Boolean(data.eligibility.eligible) : true;
 
-  return isStep1Approved && isStep2Approved && isStep3Approved && isStep4Approved && notExpired && isEligible;
+  return isStep1Approved && isStep2Approved && isStep3Approved && isStep4Approved && isEligible;
 }
 
 export interface SaveStepResponse {

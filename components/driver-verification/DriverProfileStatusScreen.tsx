@@ -528,15 +528,29 @@ export function DriverProfileStatusScreen({
         {/* ACTIONS */}
         <View style={[styles.actionsContainer, { gap: select(spacing.sm, 8, 6) }]}>
           {isAnyStepRejected ? (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => handleEditDocuments(isLicenseExpired ? 2 : isInsuranceExpired ? 4 : 1)}
-              style={[styles.primaryActionBtn, { height: select(50, 46, 42) }]}
-            >
-              <FileText size={18} color="#0F131C" />
-              <Text maxFontSizeMultiplier={1.2} style={styles.primaryActionBtnText}>Update Documentation</Text>
-              <ArrowRight size={18} color="#0F131C" />
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => handleEditDocuments(isLicenseExpired ? 2 : isInsuranceExpired ? 4 : 1)}
+                style={[styles.primaryActionBtn, { height: select(50, 46, 42) }]}
+              >
+                <FileText size={18} color="#0F131C" />
+                <Text maxFontSizeMultiplier={1.2} style={styles.primaryActionBtnText}>Update Documentation</Text>
+                <ArrowRight size={18} color="#0F131C" />
+              </TouchableOpacity>
+              {isApproved && (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (router.canDismiss()) router.dismissAll();
+                    router.replace('/(tabs)');
+                  }}
+                  style={[styles.secondaryActionBtn, { height: select(50, 46, 42) }]}
+                >
+                  <Text maxFontSizeMultiplier={1.2} style={styles.secondaryActionBtnText}>Continue to App</Text>
+                </TouchableOpacity>
+              )}
+            </>
           ) : isAnyStepExpiring ? (
             <>
               <TouchableOpacity

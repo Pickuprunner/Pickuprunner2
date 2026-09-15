@@ -252,11 +252,7 @@ export default function OrdersScreen() {
         (code === 'not_started' ||
           code === 'in_progress' ||
           code === 'under_review' ||
-          code === 'rejected' ||
-          code === 'license_expired' ||
-          code === 'insurance_expired' ||
-          code === 'license_not_approved' ||
-          code === 'insurance_not_approved');
+          code === 'rejected');
 
       if (isAccreditationError) {
         showToast(errorMsg, { type: 'error' });
