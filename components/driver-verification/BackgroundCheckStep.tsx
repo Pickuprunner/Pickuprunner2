@@ -151,7 +151,7 @@ export function BackgroundCheckStep({
             </>
           ) : (
             <>
-              <Text style={styles.nextBtnText}>Continue to Vehicle Insurance</Text>
+              <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.nextBtnText}>Next Step</Text>
               <ArrowRight size={18} color={colors.onPrimaryContainer} />
             </>
           )}

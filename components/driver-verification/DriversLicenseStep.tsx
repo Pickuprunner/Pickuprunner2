@@ -279,7 +279,9 @@ export function DriversLicenseStep({
       <View style={styles.actionsRow}>
         <Pressable onPress={onBack} style={styles.backBtn} disabled={submitting}>
           <ArrowLeft size={18} color={colors.onSurface} />
-          <Text style={styles.backBtnText}>Back</Text>
+          <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.backBtnText}>
+            Back
+          </Text>
         </Pressable>
 
         <Pressable
@@ -290,16 +292,22 @@ export function DriversLicenseStep({
           {submitting ? (
             <>
               <ActivityIndicator size="small" color="#FFFFFF" />
-              <Text style={styles.nextBtnText}>Submitting...</Text>
+              <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.nextBtnText}>
+                Submitting...
+              </Text>
             </>
           ) : canDirectSubmit ? (
             <>
-              <Text style={styles.nextBtnText}>Save & Resubmit</Text>
+              <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.nextBtnText}>
+                Save & Resubmit
+              </Text>
               <CheckCircle size={18} color={colors.onPrimaryContainer} />
             </>
           ) : (
             <>
-              <Text style={styles.nextBtnText}>Continue to Background Check</Text>
+              <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.nextBtnText}>
+                Next Step
+              </Text>
               <ArrowRight size={18} color={colors.onPrimaryContainer} />
             </>
           )}
@@ -460,7 +468,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     marginTop: spacing.md,
   },
   backBtn: {
@@ -483,6 +491,7 @@ const styles = StyleSheet.create({
   nextBtn: {
     flex: 1,
     height: 52,
+    paddingHorizontal: 16,
     backgroundColor: colors.primaryContainer,
     borderRadius: borderRadius.full,
     flexDirection: 'row',
@@ -492,7 +501,7 @@ const styles = StyleSheet.create({
   },
   nextBtnText: {
     color: colors.onPrimaryContainer,
-    fontSize: 14.5,
+    fontSize: 15,
     fontWeight: '700',
   },
 });
