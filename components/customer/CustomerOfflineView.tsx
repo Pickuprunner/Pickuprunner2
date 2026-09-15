@@ -14,7 +14,6 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, shadows } from '@/constants/design';
 import { useAuthStore } from '@/store/useAuthStore';
-import { DARK_MAP_STYLE } from '@/components/map/mapTypes';
 
 interface CustomerOfflineViewProps {
   onRetry?: () => void;
@@ -135,8 +134,6 @@ export function CustomerOfflineView({
             showsCompass={false}
             showsMyLocationButton={false}
             toolbarEnabled={false}
-            customMapStyle={DARK_MAP_STYLE}
-            userInterfaceStyle="dark"
           />
         ) : (
           <View style={StyleSheet.absoluteFill}>

@@ -15,7 +15,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, shadows } from '@/constants/design';
 import { Order } from '@/lib/orders';
 import { useAuthStore } from '@/store/useAuthStore';
-import { DARK_MAP_STYLE } from '@/components/map/mapTypes';
 
 interface DriverOfflineViewProps {
   onGoOnline?: () => void;
@@ -141,8 +140,6 @@ export function DriverOfflineView({
             showsCompass={false}
             showsMyLocationButton={false}
             toolbarEnabled={false}
-            customMapStyle={DARK_MAP_STYLE}
-            userInterfaceStyle="dark"
           />
         ) : (
          

@@ -8,3 +8,6 @@ export * from './mapApproachUtils';
 export * from './DestinationPin';
 export * from './hooks/useMapState';
 export * from './hooks/useMapOverlays';
+export * from './hooks/useMapCamera';
+export * from './hooks/useMapGeocoding';
+export * from './MapCalloutTooltip';

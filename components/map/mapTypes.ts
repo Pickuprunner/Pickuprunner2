@@ -2,6 +2,7 @@ import { Platform, Linking } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Order } from '@/lib/orders';
 import { colors } from '@/constants/design';
+import { useLocationStore } from '@/store/useLocationStore';
 
 export const GOLD = colors.secondaryContainer; // #F4C300
 export const GOLD_LIGHT = colors.secondary; // #FFE399
@@ -9,76 +10,7 @@ export const GREEN = colors.tertiary; // #00E297
 export const CYAN = colors.primary; // #B3C5FF
 export const COBALT = colors.primaryContainer; // #0066FF
 export const ROUTE_ACTIVE = colors.primaryContainer; // #0066FF (Electric Blue)
-export const ROUTE_PENDING = '#D97706'; // Warm Amber, comfortable on dark map without eye strain
-export const BG = colors.background; // #0F131C
-export const CARD_BG = colors.glassLevel2Bg; // rgba(255, 255, 255, 0.04)
-export const CARD_BORDER = colors.glassLevel2Border; // rgba(255, 255, 255, 0.08)
-
-export const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#0F131C' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0F131C' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8C90A1' }] },
-  {
-    featureType: 'administrative.locality',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#DFE2EF' }],
-  },
-  {
-    featureType: 'poi',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#8C90A1' }],
-  },
-  {
-    featureType: 'poi.park',
-    elementType: 'geometry',
-    stylers: [{ color: '#131A26' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'geometry',
-    stylers: [{ color: '#1A202C' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#10141D' }],
-  },
-  {
-    featureType: 'road',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#A0AEC0' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'geometry',
-    stylers: [{ color: '#242D3D' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'geometry.stroke',
-    stylers: [{ color: '#171E2B' }],
-  },
-  {
-    featureType: 'road.highway',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#DFE2EF' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'geometry',
-    stylers: [{ color: '#161C27' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'geometry',
-    stylers: [{ color: '#080B12' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#4A5568' }],
-  },
-];
+export const ROUTE_PENDING = '#D97706'; // Warm Amber
 
 export function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
   if (Platform.OS !== 'web') {
@@ -91,8 +23,6 @@ export function haptic(style: 'light' | 'medium' | 'heavy' = 'light') {
     Haptics.impactAsync(feedback).catch(() => { });
   }
 }
-
-import { useLocationStore } from '@/store/useLocationStore';
 
 export const CENTER = { lat: 31.9572, lng: -110.9553 };
 

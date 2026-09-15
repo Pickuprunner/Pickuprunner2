@@ -162,11 +162,13 @@ export function useMapOverlays({
           isValidCoord(c.latitude, c.longitude)
         );
 
-        const nodeToNode = [
-          { latitude: routePickup.lat, longitude: routePickup.lng },
-          ...middlePts,
-          { latitude: routeDelivery.lat, longitude: routeDelivery.lng },
-        ].filter((c, idx, arr) => {
+       
+        const isMultiNodeRoute = middlePts.length > 2;
+        const roadPoints = isMultiNodeRoute
+          ? [{ latitude: routePickup.lat, longitude: routePickup.lng }, ...middlePts]
+          : [{ latitude: routePickup.lat, longitude: routePickup.lng }, ...middlePts, { latitude: routeDelivery.lat, longitude: routeDelivery.lng }];
+
+        const nodeToNode = roadPoints.filter((c, idx, arr) => {
           if (idx === 0) return true;
           return (
             Math.abs(c.latitude - arr[idx - 1].latitude) > 0.00001 ||
@@ -200,7 +202,6 @@ export function useMapOverlays({
     return routeState.orderId === targetRouteOrder?.id ? routeState.coords : [];
   }, [routeState, targetRouteOrder?.id]);
 
-  
   const curbPoint = routeCoordinates.length >= 2 ? routeCoordinates[routeCoordinates.length - 1] : null;
   const approachCoordinates = useMemo(() => {
     if (
@@ -211,11 +212,17 @@ export function useMapOverlays({
     ) {
       return [];
     }
-    const arc = getApproachArcCoordinates(curbPoint, {
-      latitude: routeDelivery.lat,
-      longitude: routeDelivery.lng,
-    });
-    return arc.filter((pt) => isValidCoord(pt.latitude, pt.longitude));
+
+    const dLat = Math.abs(curbPoint.latitude - routeDelivery.lat);
+    const dLng = Math.abs(curbPoint.longitude - routeDelivery.lng);
+    if (dLat < 0.00005 && dLng < 0.00005) {
+      return [];
+    }
+
+    return [
+      curbPoint,
+      { latitude: routeDelivery.lat, longitude: routeDelivery.lng },
+    ];
   }, [curbPoint, routeDelivery]);
 
 
