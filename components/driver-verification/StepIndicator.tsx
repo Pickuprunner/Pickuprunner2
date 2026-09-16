@@ -1,22 +1,33 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { Check } from '@blinkdotnew/mobile-ui';
+import {
+  Car,
+  FileText,
+  ShieldCheck,
+  Umbrella,
+  Check,
+} from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
-import { colors, borderRadius, spacing } from '@/constants/design';
+
+export interface StepItem {
+  title: string;
+  subtitle?: string;
+  icon?: React.ComponentType<any>;
+}
 
 interface StepIndicatorProps {
   currentStep: number;
   totalSteps?: number;
-  steps?: { title: string; subtitle?: string }[];
+  steps?: StepItem[];
   onStepPress?: (stepNumber: number) => void;
   isInteractive?: boolean;
 }
 
-const DEFAULT_STEPS = [
-  { title: 'Vehicle', subtitle: 'Make & Address' },
-  { title: 'License', subtitle: 'State & Photo' },
-  { title: 'Check', subtitle: 'FCRA Consent' },
-  { title: 'Insurance', subtitle: 'Policy & VIN' },
+const DEFAULT_STEPS: StepItem[] = [
+  { title: 'Vehicle', subtitle: 'Make & Address', icon: Car },
+  { title: 'License', subtitle: 'State & Photo', icon: FileText },
+  { title: 'Check', subtitle: 'FCRA Consent', icon: ShieldCheck },
+  { title: 'Insurance', subtitle: 'Policy & VIN', icon: Umbrella },
 ];
 
 export function StepIndicator({
@@ -35,6 +46,7 @@ export function StepIndicator({
           const stepNum = idx + 1;
           const isDone = currentStep > stepNum;
           const isActive = currentStep === stepNum;
+          const StepIcon = step.icon || DEFAULT_STEPS[idx]?.icon || Car;
 
           return (
             <React.Fragment key={idx}>
@@ -54,31 +66,39 @@ export function StepIndicator({
                 <View
                   style={[
                     styles.circle,
-                    isDone && styles.circleDone,
                     isActive && styles.circleActive,
+                    isDone && styles.circleDone,
                   ]}
                 >
                   {isDone ? (
-                    <Check size={14} color="#0F131C" />
+                    <Check size={18} color="#FFFFFF" strokeWidth={2.5} />
                   ) : (
-                    <Text
-                      style={[
-                        styles.stepNum,
-                        isActive && styles.stepNumActive,
-                      ]}
-                    >
-                      {stepNum}
-                    </Text>
+                    <StepIcon
+                      size={19}
+                      color={isActive ? '#FFFFFF' : '#8C90A1'}
+                      strokeWidth={isActive ? 2.2 : 1.8}
+                    />
                   )}
                 </View>
-                <Text
-                  style={[
-                    styles.stepLabel,
-                    (isActive || isDone) && styles.stepLabelActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {step.title}
+                <Text style={styles.stepLabel} numberOfLines={1}>
+                  <Text
+                    style={[
+                      styles.stepNumPrefix,
+                      isActive && styles.stepNumPrefixActive,
+                      isDone && styles.stepNumPrefixDone,
+                    ]}
+                  >
+                    {`${stepNum}. `}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.stepTitle,
+                      isActive && styles.stepTitleActive,
+                      isDone && styles.stepTitleDone,
+                    ]}
+                  >
+                    {step.title}
+                  </Text>
                 </Text>
               </TouchableOpacity>
 
@@ -86,7 +106,7 @@ export function StepIndicator({
                 <View
                   style={[
                     styles.line,
-                    currentStep > stepNum && styles.lineDone,
+                    currentStep > idx && styles.lineActive,
                   ]}
                 />
               )}
@@ -100,66 +120,99 @@ export function StepIndicator({
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.gutter,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.md,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.035)',
+    borderRadius: 20,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   stepsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
   stepItem: {
     alignItems: 'center',
-    gap: 4,
+    minWidth: 54,
   },
   circle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#161B26',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   circleActive: {
-    backgroundColor: colors.primaryContainer,
-    borderColor: colors.primaryContainer,
+    backgroundColor: '#0066FF',
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+    borderWidth: 2,
+    ...(Platform.OS === 'web'
+      ? ({
+          boxShadow: '0 0 14px rgba(0, 102, 255, 0.45)',
+        } as any)
+      : {}),
   },
   circleDone: {
     backgroundColor: '#22C55E',
     borderColor: '#22C55E',
-  },
-  stepNum: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.onSurfaceVariant,
-  },
-  stepNumActive: {
-    color: colors.onPrimaryContainer,
+    borderWidth: 1.5,
+    ...(Platform.OS === 'web'
+      ? ({
+          boxShadow: '0 0 12px rgba(34, 197, 94, 0.35)',
+        } as any)
+      : {}),
   },
   stepLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.outline,
+    marginTop: 8,
+    textAlign: 'center',
   },
-  stepLabelActive: {
-    color: colors.onSurface,
+  stepNumPrefix: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#8C90A1',
+  },
+  stepNumPrefixActive: {
+    color: '#0066FF',
+    fontWeight: '700',
+  },
+  stepNumPrefixDone: {
+    color: '#22C55E',
+    fontWeight: '600',
+  },
+  stepPrefixActive: {
+    color: '#0066FF',
+    fontWeight: '700',
+  },
+  stepPrefixDone: {
+    color: '#22C55E',
+    fontWeight: '600',
+  },
+  stepTitle: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#8C90A1',
+  },
+  stepTitleActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  stepTitleDone: {
+    color: '#DFE2EF',
     fontWeight: '600',
   },
   line: {
     flex: 1,
     height: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginHorizontal: 4,
-    marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    marginHorizontal: 3,
+    marginTop: 20,
   },
-  lineDone: {
-    backgroundColor: '#22C55E',
+  lineActive: {
+    backgroundColor: '#0066FF',
   },
 });

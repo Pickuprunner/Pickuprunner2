@@ -48,15 +48,19 @@ import {
 export default function DriverVerificationScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ edit?: string; step?: string }>();
-  const { user, isAuthenticated, token, isLoading } = useAuth();
+  const { user, isAuthenticated, token, isLoading, clearSession } = useAuth();
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !user || !token)) {
+    if (!isLoading && (!isAuthenticated || !user || !token || user?.status === 'suspended')) {
+      if (user?.status === 'suspended') {
+        showToast('Your account has been suspended. Please contact support.', 'error');
+        clearSession();
+      }
       if (router.canDismiss()) router.dismissAll();
       router.replace('/(landing)/role-select');
     }
-  }, [isLoading, isAuthenticated, user, token]);
+  }, [isLoading, isAuthenticated, user, token, user?.status, clearSession, showToast]);
 
   const { data: accreditationData, isLoading: accreditationLoading, refetch: refetchAccreditation } = useDriverAccreditation();
   const saveStepMutation = useSaveAccreditationStep();
@@ -941,9 +945,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.gutter,
     paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
-    backgroundColor: 'rgba(15, 19, 28, 0.98)',
+    backgroundColor: '#0F131C',
   },
   headerBtn: {
     width: 38,
@@ -959,19 +961,19 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    color: colors.onSurface,
+    color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   headerSubtitle: {
-    fontSize: 12,
-    color: colors.onSurfaceVariant,
-    marginTop: 1,
+    fontSize: 12.5,
+    color: '#8C90A1',
+    marginTop: 2,
   },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: spacing.gutter,
-    paddingTop: spacing.md,
+    paddingTop: spacing.xs,
   },
 });

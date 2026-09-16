@@ -119,7 +119,6 @@ export default function RoleSelectScreen() {
             <ChevronRight size={20} color={colors.outline} />
           </Pressable>
 
-          <Text style={styles.switchRolesHint}>Switch roles anytime from Profile</Text>
         </View>
         <View style={styles.footerSection}>
           <View style={styles.linksRow}>

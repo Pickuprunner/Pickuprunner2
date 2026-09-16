@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMyVerification } from '@/lib/verification';
 import { useDriverAccreditation } from '@/lib/accreditation';
 import { isAccreditationFullyApproved } from '@/apis/accreditation';
+import { useToast } from '@/components/core';
 const ACTIVE = '#FFE399';
 const INACTIVE = '#C2C6D8';
 const TAB_BG = '#0F131C';
@@ -43,7 +44,8 @@ function ChatTabIcon({ color, size }: { color: string; size: number }) {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const { user, isAuthenticated, token, isLoading } = useAuth();
+  const { showToast } = useToast();
+  const { user, isAuthenticated, token, isLoading, clearSession } = useAuth();
   const { data: verification, isLoading: isVerifLoading } = useMyVerification(user?.id);
   const { data: accreditation, isLoading: isAccredLoading } = useDriverAccreditation();
 
@@ -55,7 +57,11 @@ export default function TabLayout() {
     accreditation?.profile?.accreditationStatus === 'approved' ||
     verification?.status === 'pending';
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !user || !token)) {
+    if (!isLoading && (!isAuthenticated || !user || !token || user?.status === 'suspended')) {
+      if (user?.status === 'suspended') {
+        showToast('Your account has been suspended. Please contact support.', 'error');
+        clearSession();
+      }
       if (router.canDismiss()) router.dismissAll();
       router.replace('/(landing)/role-select');
       return;

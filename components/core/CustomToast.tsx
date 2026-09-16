@@ -43,6 +43,14 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
+let globalToastHandler: ((msg: string, typeOrOptions?: ToastType | ToastOptions) => void) | null = null;
+
+export function showGlobalToast(msg: string, typeOrOptions?: ToastType | ToastOptions) {
+  if (globalToastHandler) {
+    globalToastHandler(msg, typeOrOptions);
+  }
+}
+
 function triggerHaptic(type: ToastType) {
   if (Platform.OS === 'web') return;
   switch (type) {
@@ -162,6 +170,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     },
     [hideToast]
   );
+
+  useEffect(() => {
+    globalToastHandler = showToast;
+    return () => {
+      globalToastHandler = null;
+    };
+  }, [showToast]);
 
   useEffect(() => {
     if (visible) {

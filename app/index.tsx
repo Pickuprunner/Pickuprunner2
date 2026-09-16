@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '@/store/useAuthStore';
-import { AppSplashScreen } from '@/components/core';
+import { AppSplashScreen, showGlobalToast } from '@/components/core';
 
 export default function Index() {
   const { isHydrated, isAuthenticated, user } = useAuthStore();
@@ -21,6 +21,11 @@ export default function Index() {
   }
 
   if (isAuthenticated && user) {
+    if (user.status === 'suspended') {
+      showGlobalToast('Your account has been suspended. Please contact support.', 'error');
+      useAuthStore.getState().clearSession();
+      return <Redirect href="/(landing)/role-select" />;
+    }
     return <Redirect href={user.role === 'customer' ? '/(customer)/my-orders' : '/(tabs)'} />;
   }
 

@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { useAuthStore, User } from '../store/useAuthStore';
+import { showGlobalToast } from '@/components/core';
 
 const rawApiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -189,6 +190,16 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
     const formattedErr = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(message);
     console.warn(`\n❌ ${tag} -> ${response.status} FAILED:\n${formattedErr}\n`);
+
+    if (
+      response.status === 403 &&
+      typeof message === 'string' &&
+      message.toLowerCase().includes('suspended')
+    ) {
+      showGlobalToast('Your account has been suspended. Please contact support.', 'error');
+      useAuthStore.getState().clearSession();
+    }
+
     throw new ApiError(response.status, message, data);
   }
 

@@ -69,7 +69,7 @@ export function VehicleAddressStep({
       {/* SECTION 1: VEHICLE INFORMATION */}
       <View style={styles.sectionHeader}>
         <View style={styles.sectionIconBg}>
-          <Car size={18} color={colors.primary} />
+          <Car size={18} color="#0066FF" strokeWidth={2.2} />
         </View>
         <View>
           <Text style={styles.sectionTitle}>VEHICLE INFORMATION</Text>
@@ -86,6 +86,8 @@ export function VehicleAddressStep({
               onChangeText={(val) => onChange({ vehicleMake: val })}
               placeholder="e.g. Toyota"
               autoCapitalize="words"
+              focusBorderColor="#0066FF"
+              focusGlowColor="rgba(0, 102, 255, 0.35)"
             />
           </View>
           <View style={styles.flex1}>
@@ -95,12 +97,14 @@ export function VehicleAddressStep({
               onChangeText={(val) => onChange({ vehicleModel: val })}
               placeholder="e.g. Camry"
               autoCapitalize="words"
+              focusBorderColor="#0066FF"
+              focusGlowColor="rgba(0, 102, 255, 0.35)"
             />
           </View>
         </View>
 
         <View style={styles.row3}>
-          <View style={{ flex: 1.2 }}>
+          <View style={{ flex: 1.1 }}>
             <CustomInput
               label="YEAR"
               value={data.vehicleYear}
@@ -108,9 +112,11 @@ export function VehicleAddressStep({
               placeholder="2023"
               keyboardType="number-pad"
               maxLength={4}
+              focusBorderColor="#0066FF"
+              focusGlowColor="rgba(0, 102, 255, 0.35)"
             />
           </View>
-          <View style={{ flex: 1.6 }}>
+          <View style={{ flex: 1.5 }}>
             <CustomInput
               label="COLOR"
               value={data.vehicleColor}
@@ -118,6 +124,8 @@ export function VehicleAddressStep({
               placeholder="e.g. Black"
               autoCapitalize="words"
               maxLength={30}
+              focusBorderColor="#0066FF"
+              focusGlowColor="rgba(0, 102, 255, 0.35)"
             />
           </View>
           <View style={{ flex: 1.8 }}>
@@ -128,6 +136,8 @@ export function VehicleAddressStep({
               placeholder="8ABC123"
               autoCapitalize="characters"
               maxLength={16}
+              focusBorderColor="#0066FF"
+              focusGlowColor="rgba(0, 102, 255, 0.35)"
             />
           </View>
         </View>
@@ -243,27 +253,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: spacing.xs,
+    marginBottom: 14,
   },
   sectionIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0, 102, 255, 0.12)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0, 102, 255, 0.14)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(0, 102, 255, 0.25)',
+    borderColor: 'rgba(0, 102, 255, 0.28)',
   },
   sectionTitle: {
     fontSize: 13.5,
     fontWeight: '700',
-    color: colors.onSurface,
+    color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   sectionSubtitle: {
     fontSize: 12,
-    color: colors.onSurfaceVariant,
+    color: '#8C90A1',
+    marginTop: 2,
   },
   formGrid: {
     gap: 12,

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/components/core';
 const ACTIVE = '#FFE399';
 const INACTIVE = '#C2C6D8';
 const TAB_BG = '#0F131C';
@@ -19,12 +20,17 @@ function ChatTabIcon({ color, size }: { color: string; size: number }) {
 
 export default function CustomerTabLayout() {
   const insets = useSafeAreaInsets();
-  const { user, isAuthenticated, token, isLoading } = useAuth();
+  const { showToast } = useToast();
+  const { user, isAuthenticated, token, isLoading, clearSession } = useAuth();
   const androidBottomPad = Platform.OS === 'web' ? 10 : Math.max(insets.bottom, 12);
   const hasHomeBar = insets.bottom > 0;
 
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !user || !token)) {
+    if (!isLoading && (!isAuthenticated || !user || !token || user?.status === 'suspended')) {
+      if (user?.status === 'suspended') {
+        showToast('Your account has been suspended. Please contact support.', 'error');
+        clearSession();
+      }
       if (router.canDismiss()) router.dismissAll();
       router.replace('/(landing)/role-select');
       return;
@@ -34,7 +40,7 @@ export default function CustomerTabLayout() {
       if (router.canDismiss()) router.dismissAll();
       router.replace('/(tabs)');
     }
-  }, [isLoading, isAuthenticated, user, token, user?.role]);
+  }, [isLoading, isAuthenticated, user, token, user?.role, user?.status, clearSession, showToast]);
 
   return (
     <Tabs

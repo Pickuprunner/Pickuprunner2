@@ -28,6 +28,7 @@ export {
 export {
   ToastProvider,
   useToast,
+  showGlobalToast,
   type ToastType,
   type ToastOptions,
 } from './CustomToast';

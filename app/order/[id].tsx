@@ -60,8 +60,19 @@ export default function OrderDetailScreen() {
   const fetchId = Array.isArray(id) ? id[0] : id;
   const updateStatus = useUpdateOrderStatus();
   const claimOrder = useClaimOrder();
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, clearSession } = useAuth();
   const driverId = useDriverId();
+
+  useEffect(() => {
+    if (!authLoading && (!isAuthenticated || !user || user?.status === 'suspended')) {
+      if (user?.status === 'suspended') {
+        showToast('Your account has been suspended. Please contact support.', 'error');
+        clearSession();
+      }
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(landing)/role-select');
+    }
+  }, [authLoading, isAuthenticated, user, user?.status, clearSession, showToast]);
   const { data: allOrders = [] } = useOrders();
   const { queueCount, atCapacity } = useDriverQueue(allOrders, driverId);
   const { data: accreditation } = useDriverAccreditation();

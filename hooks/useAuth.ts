@@ -3,6 +3,7 @@ import { useAuthStore, User } from '@/store/useAuthStore';
 import { useDriverStore } from '@/store/useDriverStore';
 import { authApi, usersApi, driverAvailabilityApi, UpdateProfilePayload } from '@/apis';
 import { registerAndSyncDeviceToken, unregisterDeviceToken } from '@/lib/notifications';
+import { showGlobalToast } from '@/components/core';
 
 export interface AuthUser extends User {}
 
@@ -20,6 +21,7 @@ export interface AuthState {
     phone?: string;
   }) => Promise<AuthUser>;
   logout: () => Promise<void>;
+  clearSession: () => void;
   fetchProfile: () => Promise<AuthUser | null>;
   updateProfile: (payload: UpdateProfilePayload) => Promise<AuthUser>;
   uploadPhoto: (file: any) => Promise<{ photoUrl: string; user: AuthUser }>;
@@ -56,6 +58,10 @@ export function useAuth(): AuthState {
       });
 
       const session = res?.data || res;
+      if (session.user?.status === 'suspended') {
+        clearSession();
+        throw new Error('Account is suspended');
+      }
       const authToken = (session as any).token || (session as any).accessToken || '';
       setSession(session.user, authToken, session.refreshToken);
 
@@ -69,7 +75,7 @@ export function useAuth(): AuthState {
 
       return session.user;
     },
-    [setSession]
+    [setSession, clearSession]
   );
 
   const register = useCallback(
@@ -128,12 +134,17 @@ export function useAuth(): AuthState {
     if (!token) return null;
     try {
       const profile = await usersApi.getMe();
+      if (profile?.status === 'suspended') {
+        showGlobalToast('Your account has been suspended. Please contact support.', 'error');
+        clearSession();
+        return null;
+      }
       updateUser(profile);
       return profile;
     } catch {
       return null;
     }
-  }, [token, updateUser]);
+  }, [token, updateUser, clearSession]);
 
   const updateProfile = useCallback(
     async (payload: UpdateProfilePayload): Promise<AuthUser> => {
@@ -178,6 +189,7 @@ export function useAuth(): AuthState {
     login,
     register,
     logout,
+    clearSession,
     fetchProfile,
     updateProfile,
     uploadPhoto,

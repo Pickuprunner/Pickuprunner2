@@ -86,7 +86,7 @@ export function BackgroundCheckStep({
         <Text style={styles.cardBodyText}>
           Pickup Runner will obtain a consumer report and/or investigative consumer report
           for background screening purposes, including motor vehicle records (MVR) and criminal history.
-          Your SSN and personal data are encrypted and transmitted securely via 256-bit SSL.
+          Your personal data and SSN details are transmitted securely via 256-bit SSL. Full SSN is never stored.
         </Text>
       </View>
 
