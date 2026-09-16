@@ -564,13 +564,18 @@ export default function TrackOrderScreen() {
   const calculatedTotal = DELIVERY_FEE + mileageCents + tipAmount;
   const totalCents = Number(order?.amountCents ?? order?.amount_cents ?? calculatedTotal);
 
+  const isAcceptedOrBeyond = currentStatus !== 'pending';
+
+  const isDevBypassed =
+    order?.payment_status === 'dev_bypassed' ||
+    (order as any)?.paymentStatus === 'dev_bypassed';
+
   const isPaid =
     order?.payment_status === 'paid' ||
     order?.payment_status === 'test_paid' ||
-    order?.payment_status === 'dev_bypassed' ||
+    (isDevBypassed && isAcceptedOrBeyond) ||
     (order as any)?.paymentStatus === 'paid' ||
-    (order as any)?.paymentStatus === 'test_paid' ||
-    (order as any)?.paymentStatus === 'dev_bypassed';
+    (order as any)?.paymentStatus === 'test_paid';
 
   const isChargeable =
     currentStatus !== 'pending' &&
@@ -813,17 +818,23 @@ export default function TrackOrderScreen() {
             <View style={[styles.paymentBanner, { borderColor: 'rgba(0, 226, 151, 0.35)', backgroundColor: 'rgba(0, 226, 151, 0.08)' }]}>
               <View style={styles.paymentBannerLeft}>
                 <View style={[styles.paymentIconCircle, { backgroundColor: 'rgba(0, 226, 151, 0.2)' }]}>
-                  <MaterialIcons name="check-circle" size={20} color="#00E297" />
+                  <MaterialIcons name={isDevBypassed ? "developer-mode" : "check-circle"} size={20} color="#00E297" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.paymentBannerTitle, { color: '#00E297' }]}>Payment Confirmed</Text>
+                  <Text style={[styles.paymentBannerTitle, { color: '#00E297' }]}>
+                    {isDevBypassed ? 'Dev-Pass Active' : 'Payment Confirmed'}
+                  </Text>
                   <Text style={styles.paymentBannerSub}>
-                    Paid via Stripe · ${(totalCents / 100).toFixed(2)}
+                    {isDevBypassed
+                      ? `Bypassed via Dev-Pass · $${(totalCents / 100).toFixed(2)}`
+                      : `Paid via Stripe · $${(totalCents / 100).toFixed(2)}`}
                   </Text>
                 </View>
               </View>
               <View style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: 'rgba(0, 226, 151, 0.15)', borderWidth: 1, borderColor: '#00E297' }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#00E297', letterSpacing: 0.5 }}> PAID</Text>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#00E297', letterSpacing: 0.5 }}>
+                  {isDevBypassed ? 'DEV-PASS' : 'PAID'}
+                </Text>
               </View>
             </View>
           </Animated.View>

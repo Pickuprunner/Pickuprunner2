@@ -17,7 +17,6 @@ import {
   ShieldCheck,
   FileText,
   Shield,
-  LogOut,
   RefreshCw,
   ArrowRight,
   X,
@@ -44,7 +43,7 @@ export function DriverProfileStatusScreen({
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { select } = useResponsive();
-  const { user, logout, fetchProfile } = useAuth();
+  const { user, fetchProfile } = useAuth();
   const { data: accreditation, refetch: refetchAccred, isFetching: isFetchingAccred } = useDriverAccreditation();
   const { data: verification, refetch: refetchVerif, isFetching: isFetchingVerif } = useMyVerification(user?.id);
   const { showToast } = useToast();
@@ -662,22 +661,6 @@ export function DriverProfileStatusScreen({
               )}
             </TouchableOpacity>
           )}
-
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={async () => {
-              if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-              }
-              await logout();
-              if (router.canDismiss()) router.dismissAll();
-              router.replace('/(landing)/role-select');
-            }}
-            style={styles.statusSignOutBtn}
-          >
-            <LogOut size={15} color="#94A3B8" />
-            <Text style={styles.statusSignOutBtnText}>Sign Out of Account</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -685,19 +668,6 @@ export function DriverProfileStatusScreen({
 }
 
 const styles = StyleSheet.create({
-  statusSignOutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    marginTop: 4,
-  },
-  statusSignOutBtnText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    fontWeight: '600',
-  },
   root: {
     flex: 1,
     backgroundColor: '#0F131C',

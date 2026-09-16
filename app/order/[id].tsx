@@ -183,13 +183,15 @@ export default function OrderDetailScreen() {
   const earnings = currentOrder ? calcDriverEarnings(miles, Number(currentOrder.tipAmount ?? 0)) : null;
   const shortId = currentOrder?.id?.slice(-6).toUpperCase() ?? '------';
   const hasPhoto = !!(photoUrl || photoUri || currentOrder?.deliveryPhotoUrl);
+  const isDevBypassed =
+    currentOrder?.payment_status === 'dev_bypassed' ||
+    (currentOrder as any)?.paymentStatus === 'dev_bypassed';
   const isPaid =
     currentOrder?.payment_status === 'paid' ||
     currentOrder?.payment_status === 'test_paid' ||
-    currentOrder?.payment_status === 'dev_bypassed' ||
+    isDevBypassed ||
     (currentOrder as any)?.paymentStatus === 'paid' ||
-    (currentOrder as any)?.paymentStatus === 'test_paid' ||
-    (currentOrder as any)?.paymentStatus === 'dev_bypassed';
+    (currentOrder as any)?.paymentStatus === 'test_paid';
 
   const getStatusBadge = () => {
     switch (status) {
@@ -456,7 +458,7 @@ export default function OrderDetailScreen() {
                   <Text style={styles.earningsLabel}>YOUR EARNINGS</Text>
                   {isPaid ? (
                     <View style={styles.paidOnlineTag}>
-                      <Text style={styles.paidOnlineTagText}>PAID ONLINE</Text>
+                      <Text style={styles.paidOnlineTagText}>{isDevBypassed ? 'DEV-PASS' : 'PAID ONLINE'}</Text>
                     </View>
                   ) : (
                     <View style={styles.payPickupTag}>
@@ -496,13 +498,15 @@ export default function OrderDetailScreen() {
                 alignItems: 'center',
                 gap: 10,
               }}>
-                <MaterialIcons name="verified-user" size={20} color="#00E297" />
+                <MaterialIcons name={isDevBypassed ? "developer-mode" : "verified-user"} size={20} color="#00E297" />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#00E297', marginBottom: 2 }}>
-                    Customer Paid Online
+                    {isDevBypassed ? 'Dev-Pass Active' : 'Customer Paid Online'}
                   </Text>
                   <Text style={{ fontSize: 11, color: colors.onSurfaceVariant, lineHeight: 15 }}>
-                    Your earnings ({earnings ? `$${earnings.totalDisplay}` : '$0.00'}) are secured and will transfer directly to your Stripe account upon delivery completion.
+                    {isDevBypassed
+                      ? `Dev-Pass mode active (${earnings ? `$${earnings.totalDisplay}` : '$0.00'}). Simulated payment bypass for developer testing.`
+                      : `Your earnings (${earnings ? `$${earnings.totalDisplay}` : '$0.00'}) are secured and will transfer directly to your Stripe account upon delivery completion.`}
                   </Text>
                 </View>
               </View>
@@ -557,8 +561,12 @@ export default function OrderDetailScreen() {
 
             {status === 'picked_up' && (
               <>
-                <View style={styles.sectionHead}>
+                <View style={styles.sectionHeadRow}>
                   <Text style={styles.sectionHeadText}>PROOF OF DELIVERY</Text>
+                  <View style={styles.requiredBadge}>
+                    <MaterialIcons name="photo-camera" size={13} color={colors.warning} />
+                    <Text style={styles.requiredBadgeText}>Required</Text>
+                  </View>
                 </View>
                 <DeliveryPhotoCard
                   photoUri={photoUri}
@@ -757,6 +765,14 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 8,
   },
+  sectionHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginTop: 18,
+    marginBottom: 8,
+  },
   sectionHeadText: {
     color: 'rgba(194, 198, 216, 0.5)',
     fontSize: 11,
@@ -764,5 +780,20 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
-
+  requiredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: 'rgba(244, 195, 0, 0.12)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(244, 195, 0, 0.35)',
+  },
+  requiredBadgeText: {
+    color: colors.warning,
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });
