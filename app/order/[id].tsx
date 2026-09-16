@@ -186,8 +186,10 @@ export default function OrderDetailScreen() {
   const isPaid =
     currentOrder?.payment_status === 'paid' ||
     currentOrder?.payment_status === 'test_paid' ||
+    currentOrder?.payment_status === 'dev_bypassed' ||
     (currentOrder as any)?.paymentStatus === 'paid' ||
-    (currentOrder as any)?.paymentStatus === 'test_paid';
+    (currentOrder as any)?.paymentStatus === 'test_paid' ||
+    (currentOrder as any)?.paymentStatus === 'dev_bypassed';
 
   const getStatusBadge = () => {
     switch (status) {
@@ -276,7 +278,7 @@ export default function OrderDetailScreen() {
   }
 
   async function doAccept() {
-    if (!isStripeReady) {
+    if (user?.role !== 'dev' && !isStripeReady) {
       setShowStripeModal(true);
       return;
     }
@@ -289,7 +291,7 @@ export default function OrderDetailScreen() {
       return;
     }
 
-    if (!isEligible) {
+    if (user?.role !== 'dev' && !isEligible) {
       const reason = accreditation?.eligibility?.reason || 'Accreditation required before accepting orders.';
       Alert.alert('Accreditation Required', reason, [
         {
@@ -336,7 +338,7 @@ export default function OrderDetailScreen() {
             code === 'under_review' ||
             code === 'rejected');
 
-        if (isAccreditationError) {
+        if (user?.role !== 'dev' && isAccreditationError) {
           Alert.alert('Accreditation Required', errorMsg, [
             {
               text: 'Complete Accreditation',

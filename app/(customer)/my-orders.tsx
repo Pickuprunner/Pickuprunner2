@@ -172,8 +172,10 @@ export default function MyOrdersScreen() {
               const isAlreadyPaid =
                 existing?.paymentStatus === 'paid' ||
                 existing?.paymentStatus === 'test_paid' ||
+                existing?.paymentStatus === 'dev_bypassed' ||
                 existing?.payment_status === 'paid' ||
-                existing?.payment_status === 'test_paid';
+                existing?.payment_status === 'test_paid' ||
+                existing?.payment_status === 'dev_bypassed';
               const resolvedPaymentStatus = isAlreadyPaid
                 ? (existing?.paymentStatus || 'paid')
                 : (fresh.paymentStatus || (fresh as any).payment_status || existing?.paymentStatus || 'unpaid');

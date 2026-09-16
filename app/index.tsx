@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
 import { Redirect } from 'expo-router';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useRole } from '@/hooks/useRole';
 import { AppSplashScreen, showGlobalToast } from '@/components/core';
 
 export default function Index() {
   const { isHydrated, isAuthenticated, user } = useAuthStore();
+  const { role: savedRole, isLoading: isRoleLoading } = useRole();
 
   useEffect(() => {
     if (isHydrated) {
@@ -12,11 +14,12 @@ export default function Index() {
         isAuthenticated,
         role: user?.role,
         email: user?.email,
+        savedRole,
       });
     }
-  }, [isHydrated, isAuthenticated, user]);
+  }, [isHydrated, isAuthenticated, user, savedRole]);
 
-  if (!isHydrated) {
+  if (!isHydrated || isRoleLoading) {
     return <AppSplashScreen />;
   }
 
@@ -26,6 +29,17 @@ export default function Index() {
       useAuthStore.getState().clearSession();
       return <Redirect href="/(landing)/role-select" />;
     }
+
+    if (user.role === 'dev') {
+      if (savedRole === 'customer') {
+        return <Redirect href="/(customer)/my-orders" />;
+      }
+      if (savedRole === 'driver') {
+        return <Redirect href="/(tabs)" />;
+      }
+      return <Redirect href="/(landing)/role-select" />;
+    }
+
     return <Redirect href={user.role === 'customer' ? '/(customer)/my-orders' : '/(tabs)'} />;
   }
 

@@ -26,6 +26,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/hooks/useAuth';
+import { saveRole } from '@/hooks/useRole';
 import { useResponsive } from '@/hooks/useResponsive';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
 import { AuthHero, TermsAgreement, PasswordInput } from '@/components/auth';
@@ -61,7 +62,7 @@ export default function CustomerAuthScreen() {
 
   useEffect(() => {
     if (!loading && !isLoading && isAuthenticated && user) {
-      if (user.role === 'customer') {
+      if (user.role === 'customer' || user.role === 'dev') {
         router.replace('/(customer)/my-orders');
       } else {
         router.replace('/(tabs)');
@@ -145,7 +146,7 @@ export default function CustomerAuthScreen() {
         }
       } else {
         const loggedUser = await login(emailTrimmed, password);
-        if (loggedUser.role !== 'customer' && loggedUser.role !== 'admin') {
+        if (loggedUser.role !== 'customer' && loggedUser.role !== 'admin' && loggedUser.role !== 'dev') {
           await logout();
           showToast('This account is registered as a driver. Please use Driver login.', 'error');
           return;
@@ -153,6 +154,7 @@ export default function CustomerAuthScreen() {
         if (loggedUser?.displayName) {
           await AsyncStorage.setItem(NAME_KEY, loggedUser.displayName).catch(() => {});
         }
+        await saveRole('customer').catch(() => {});
       }
 
       const sid = await AsyncStorage.getItem(SESSION_KEY);

@@ -567,8 +567,10 @@ export default function TrackOrderScreen() {
   const isPaid =
     order?.payment_status === 'paid' ||
     order?.payment_status === 'test_paid' ||
+    order?.payment_status === 'dev_bypassed' ||
     (order as any)?.paymentStatus === 'paid' ||
-    (order as any)?.paymentStatus === 'test_paid';
+    (order as any)?.paymentStatus === 'test_paid' ||
+    (order as any)?.paymentStatus === 'dev_bypassed';
 
   const isChargeable =
     currentStatus !== 'pending' &&

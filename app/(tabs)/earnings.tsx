@@ -146,7 +146,7 @@ export default function EarningsScreen() {
   const paidOrders = useMemo(
     () =>
       orders
-        .filter((o) => o.paymentStatus === 'paid')
+        .filter((o) => o.paymentStatus === 'paid' || o.paymentStatus === 'test_paid' || o.paymentStatus === 'dev_bypassed')
         .sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a)),
     [orders]
   );

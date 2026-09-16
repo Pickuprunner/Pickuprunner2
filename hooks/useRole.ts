@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type AppRole = 'customer' | 'driver';
+export type AppRole = 'customer' | 'driver' | 'dev';
 
 const ROLE_KEY = 'app_role';
 

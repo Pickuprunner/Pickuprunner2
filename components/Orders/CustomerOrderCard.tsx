@@ -149,7 +149,14 @@ export function CustomerOrderCard({
 
   const [paying, setPaying] = useState(false);
 
+  const isDevBypassed =
+    order.payment_status === 'dev_bypassed' ||
+    order.paymentStatus === 'dev_bypassed' ||
+    (storeOrder as any)?.paymentStatus === 'dev_bypassed' ||
+    (storeOrder as any)?.payment_status === 'dev_bypassed';
+
   const isPaid =
+    isDevBypassed ||
     order.payment_status === 'paid' ||
     order.payment_status === 'test_paid' ||
     order.paymentStatus === 'paid' ||
@@ -396,7 +403,7 @@ export function CustomerOrderCard({
           <View style={styles.paidBadge}>
             <MaterialIcons name="check-circle" size={15} color="#00e297" />
             <Text style={styles.paidBadgeText} numberOfLines={1}>
-              PAID
+              {isDevBypassed ? 'Dev-Pass' : 'PAID'}
             </Text>
           </View>
         )}

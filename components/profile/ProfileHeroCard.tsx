@@ -12,6 +12,7 @@ import { Avatar, Camera, Edit3, Check, X } from '@blinkdotnew/mobile-ui';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const CARD_BG = 'rgba(255, 255, 255, 0.04)';
 const CARD_BORDER = 'rgba(255, 255, 255, 0.08)';
@@ -50,6 +51,7 @@ export interface ProfileHeroCardProps {
   onSaveDisplayName?: (name: string) => Promise<void> | void;
   metrics: MetricItemData[];
   initialsFallback?: string;
+  isDev?: boolean;
 }
 
 function getInitials(name: string, fallback: string) {
@@ -68,8 +70,11 @@ export function ProfileHeroCard({
   onSaveDisplayName,
   metrics,
   initialsFallback = 'PR',
+  isDev,
 }: ProfileHeroCardProps) {
   const { select } = useResponsive();
+  const authUserRole = useAuthStore((s) => s.user?.role);
+  const isDevUser = isDev ?? (authUserRole === 'dev');
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(displayName);
   const [isSaving, setIsSaving] = useState(false);
@@ -127,6 +132,13 @@ export function ProfileHeroCard({
 
   return (
     <View style={[styles.heroCard, { padding: select(18, 14, 10) }]}>
+      {isDevUser && (
+        <View style={[styles.devBadge, { top: select(14, 12, 10), right: select(14, 12, 10) }]}>
+          <View style={styles.devBadgeDot} />
+          <Text style={styles.devBadgeText}>Dev-Pass</Text>
+        </View>
+      )}
+
       <View style={[styles.heroTopRow, { gap: select(16, 12, 8) }]}>
         <View style={styles.avatarWrap}>
           <Pressable
@@ -181,7 +193,7 @@ export function ProfileHeroCard({
           )}
         </View>
 
-        <View style={styles.infoCol}>
+        <View style={[styles.infoCol, isDevUser && { paddingRight: select(80, 72, 65) }]}>
           {editing ? (
             <View style={styles.editingWrap}>
               <TextInput
@@ -327,6 +339,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 24,
     padding: 18,
+    position: 'relative',
+  },
+  devBadge: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.28)',
+    zIndex: 10,
+  },
+  devBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#00e297',
+  },
+  devBadgeText: {
+    color: '#00e297',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   heroTopRow: {
     flexDirection: 'row',

@@ -45,6 +45,7 @@ export function StripeSetupBanner({ style, compact = false }: StripeSetupBannerP
   const connectOnboard = useConnectOnboard();
   const [loading, setLoading] = useState(false);
 
+  if (user?.role === 'dev') return null;
   if (!driverId || (isStatusLoading && !connectStatus)) return null;
 
   const isConnected = Boolean(connectStatus?.connected && connectStatus?.payoutsEnabled);

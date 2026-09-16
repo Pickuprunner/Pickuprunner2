@@ -25,6 +25,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/useAuth';
+import { saveRole } from '@/hooks/useRole';
 import { useResponsive } from '@/hooks/useResponsive';
 import { saveDisplayName } from '@/lib/chat';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
@@ -140,11 +141,12 @@ export default function SignInScreen() {
         await saveDisplayName(nameTrimmed).catch(() => { });
       } else {
         const loggedUser = await login(emailTrimmed, password);
-        if (loggedUser.role !== 'driver' && loggedUser.role !== 'admin') {
+        if (loggedUser.role !== 'driver' && loggedUser.role !== 'admin' && loggedUser.role !== 'dev') {
           await logout();
           showToast('This account is registered as a customer. Please use Customer login.', 'error');
           return;
         }
+        await saveRole('driver').catch(() => {});
       }
 
       if (Platform.OS !== 'web') {
