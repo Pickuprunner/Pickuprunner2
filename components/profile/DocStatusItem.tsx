@@ -8,7 +8,7 @@ const GOLD_ACCENT = '#E5A93C';
 const RED = '#EF4444';
 const TEXT_MUTED = '#94A3B8';
 
-export type DocStatus = 'approved' | 'rejected' | 'pending' | 'in_review' | 'expired' | 'expiring_soon' | undefined;
+export type DocStatus = 'approved' | 'rejected' | 'pending' | 'in_review' | 'expired' | 'expiring_soon' | 'dev_bypassed' | undefined;
 
 export interface StatusCfg {
   label: string;
@@ -20,6 +20,14 @@ export interface StatusCfg {
 
 export function getStatusCfg(s: DocStatus, customLabel?: string): StatusCfg {
   switch (s) {
+    case 'dev_bypassed':
+      return {
+        label: customLabel || 'Dev Pass',
+        color: GREEN,
+        bg: 'rgba(34, 197, 94, 0.12)',
+        border: 'rgba(34, 197, 94, 0.35)',
+        icon: <CheckCircle size={15} color={GREEN} />,
+      };
     case 'expired':
       return {
         label: customLabel || 'Expired',
