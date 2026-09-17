@@ -151,13 +151,6 @@ export function NewOrderWizardForm({
         });
         return;
       }
-      if (milesNum > APP_CONFIG.MAX_DELIVERY_RADIUS_MILES) {
-        showToast('Out of Delivery Range', {
-          description: `Delivery address must be within ${APP_CONFIG.MAX_DELIVERY_RADIUS_MILES} miles of pickup location (current: ${milesNum.toFixed(1)} mi).`,
-          type: 'error',
-        });
-        return;
-      }
     }
     haptic();
     setCurrentStep(Math.min(currentStep + 1, 2));
