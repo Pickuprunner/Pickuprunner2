@@ -158,7 +158,9 @@ export function NativeMap({
     if (hub) {
       const hubKey = `hub-${hub.lat.toFixed(4)}-${hub.lng.toFixed(4)}`;
       const offset = pinCollisionOffsets.get(hubKey);
-      const coord = offset || { latitude: hub.lat, longitude: hub.lng };
+      const coord = offset
+        ? { latitude: offset.latitude, longitude: offset.longitude }
+        : { latitude: hub.lat, longitude: hub.lng };
       return {
         id: selectedId,
         coord,
@@ -172,7 +174,9 @@ export function NativeMap({
       const dCoords = getDeliveryCoords(deliveryOrder);
       if (!dCoords) return null;
       const offset = pinCollisionOffsets.get(`delivery-${deliveryOrder.id}`);
-      const coord = offset || { latitude: dCoords.lat, longitude: dCoords.lng };
+      const coord = offset
+        ? { latitude: offset.latitude, longitude: offset.longitude }
+        : { latitude: dCoords.lat, longitude: dCoords.lng };
       const activeIndex = active.findIndex((a) => a.id === deliveryOrder.id);
       const isActive = activeIndex >= 0;
       const stopNumber = isActive ? activeIndex + 1 : null;
@@ -284,7 +288,13 @@ export function NativeMap({
           const isSelected = Boolean(selectedId && hub.orderIds.includes(selectedId));
           const hubKey = `hub-${hub.lat.toFixed(4)}-${hub.lng.toFixed(4)}`;
           const offset = pinCollisionOffsets.get(hubKey);
-          const coord = offset || { latitude: hub.lat, longitude: hub.lng };
+          const coord = offset
+            ? { latitude: offset.latitude, longitude: offset.longitude }
+            : { latitude: hub.lat, longitude: hub.lng };
+
+          if (coord.latitude == null || coord.longitude == null || isNaN(coord.latitude) || isNaN(coord.longitude)) {
+            return null;
+          }
           return (
             <Marker
               ref={(ref: any) => {
@@ -337,7 +347,13 @@ export function NativeMap({
           const isActive = activeIndex >= 0;
           const stopNumber = isActive ? activeIndex + 1 : null;
           const offset = pinCollisionOffsets.get(`delivery-${order.id}`);
-          const coord = offset || { latitude: dCoords.lat, longitude: dCoords.lng };
+          const coord = offset
+            ? { latitude: offset.latitude, longitude: offset.longitude }
+            : { latitude: dCoords.lat, longitude: dCoords.lng };
+
+          if (coord.latitude == null || coord.longitude == null || isNaN(coord.latitude) || isNaN(coord.longitude)) {
+            return null;
+          }
           const markerZIndex = isSelected ? 200 : (isActive ? 100 - activeIndex : 10);
 
           return (

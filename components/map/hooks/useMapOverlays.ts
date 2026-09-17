@@ -13,6 +13,16 @@ export interface PickupHub {
   orderIds: string[];
 }
 
+export interface PinOffsetCoord {
+  lat: number;
+  lng: number;
+  latitude: number;
+  longitude: number;
+}
+
+
+const routeCache = new Map<string, { latitude: number; longitude: number }[]>();
+
 export interface UseMapOverlaysParams {
   orders: Order[];
   currentTab?: 'active' | 'pending';
@@ -120,7 +130,7 @@ export function useMapOverlays({
       if (d && isValidCoord(d.lat, d.lng)) coordsList.push({ id: `delivery-${o.id}`, lat: d.lat, lng: d.lng });
     });
 
-    const offsetMap = new Map<string, { lat: number; lng: number }>();
+    const offsetMap = new Map<string, PinOffsetCoord>();
     coordsList.forEach((item) => {
       const collisions = coordsList.filter(
         (other) =>
@@ -131,9 +141,13 @@ export function useMapOverlays({
         const idx = collisions.findIndex((c) => c.id === item.id);
         const angle = (2 * Math.PI * idx) / collisions.length;
         const offsetDist = 0.00018; // ~18-20m
+        const finalLat = item.lat + offsetDist * Math.cos(angle);
+        const finalLng = item.lng + offsetDist * Math.sin(angle);
         offsetMap.set(item.id, {
-          lat: item.lat + offsetDist * Math.cos(angle),
-          lng: item.lng + offsetDist * Math.sin(angle),
+          lat: finalLat,
+          lng: finalLng,
+          latitude: finalLat,
+          longitude: finalLng,
         });
       }
     });
@@ -152,6 +166,16 @@ export function useMapOverlays({
 
     if (!currentOrderId || !routePickup || !routeDelivery) {
       setRouteState({ orderId: null, coords: [] });
+      return;
+    }
+
+    const cacheKey = `${routePickup.lat.toFixed(5)},${routePickup.lng.toFixed(5)}->${routeDelivery.lat.toFixed(5)},${routeDelivery.lng.toFixed(5)}`;
+    const cached = routeCache.get(cacheKey);
+    if (cached && cached.length >= 2) {
+      setRouteState({
+        orderId: currentOrderId,
+        coords: cached,
+      });
       return;
     }
 
@@ -176,9 +200,14 @@ export function useMapOverlays({
           );
         });
 
+        const finalCoords = nodeToNode.length >= 2 ? nodeToNode : [];
+        if (finalCoords.length >= 2) {
+          routeCache.set(cacheKey, finalCoords);
+        }
+
         setRouteState({
           orderId: currentOrderId,
-          coords: nodeToNode.length >= 2 ? nodeToNode : [],
+          coords: finalCoords,
         });
       })
       .catch(() => {
