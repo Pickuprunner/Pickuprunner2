@@ -191,6 +191,7 @@ export function useOrderChat({ orderId, orderStatus, displayName, role }: UseOrd
       if (intervalId) clearInterval(intervalId);
       if (orderId) {
         useChatStore.getState().setActiveThreadOrderId(null);
+        chatApi.getChats({ limit: 1 }).catch(() => {});
       }
     };
   }, [orderId, orderStatus, fetchAndSyncMessages]);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ScrollView,
   Platform,
@@ -25,6 +25,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getSavedDisplayName, saveDisplayName } from '@/lib/chat';
+import { registerAndSyncDeviceToken, unregisterDeviceToken } from '@/lib/notifications';
 import { useAuth } from '@/hooks/useAuth';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useDriverAccreditation } from '@/lib/accreditation';
@@ -92,6 +93,30 @@ export default function ProfileScreen() {
 
   const [displayName, setDisplayName] = useState('');
   const [pushEnabled, setPushEnabled] = useState(true);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@driver_push_notifications_enabled')
+      .then((val) => {
+        if (val !== null) setPushEnabled(val === 'true');
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleTogglePush = useCallback(
+    async (val: boolean) => {
+      haptic('light');
+      setPushEnabled(val);
+      await AsyncStorage.setItem('@driver_push_notifications_enabled', String(val)).catch(() => {});
+      if (val && user?.id) {
+        await registerAndSyncDeviceToken(user.id);
+        showToast('Push notifications enabled', 'success');
+      } else if (!val && user?.id) {
+        await unregisterDeviceToken(user.id);
+        showToast('Push notifications disabled', 'info');
+      }
+    },
+    [user?.id, showToast]
+  );
 
   const isOnline = useDriverStore((s) => s.isOnline);
   const toggleOnline = useDriverStore((s) => s.toggleOnline);
@@ -640,10 +665,7 @@ export default function ProfileScreen() {
             rightControl={
               <Switch
                 value={pushEnabled}
-                onValueChange={(val) => {
-                  haptic('light');
-                  setPushEnabled(val);
-                }}
+                onValueChange={handleTogglePush}
                 trackColor={{ false: '#262A38', true: BLUE }}
                 thumbColor="#FFFFFF"
               />

@@ -202,7 +202,10 @@ export function useMapCamera({
       }
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
-        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        let pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null);
+        if (!pos) {
+          pos = await Location.getLastKnownPositionAsync().catch(() => null);
+        }
         if (pos?.coords) {
           useLocationStore.getState().setCurrentLocation({
             lat: pos.coords.latitude,

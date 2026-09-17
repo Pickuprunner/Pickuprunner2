@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, Rea
 import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useDriverStore } from '@/store/useDriverStore';
 import { notificationApi, NotificationItem } from '@/apis/device';
 import {
   setupNotificationHandler,
@@ -99,14 +100,35 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     console.log('[NotificationContext] Notification tapped:', response);
     const orderId = getOrderIdFromNotification(response);
     const screen = getScreenFromNotification(response);
-    const role = useAuthStore.getState().user?.role || 'customer';
+    const content =
+      response?.notification?.request?.content ||
+      response?.data ||
+      response?.notification;
+    const data = content?.data || response?.data || {};
+    const notificationType = data?.type || '';
+    const senderRole = data?.senderRole || '';
+    const userRole = useAuthStore.getState().user?.role || 'customer';
+
+  
+    let isDriverView = userRole === 'driver';
+    if (notificationType === 'new_order' || screen === 'order_details') {
+      isDriverView = true;
+    } else if (notificationType === 'order_status' || screen === 'track') {
+      isDriverView = false;
+    } else if (senderRole === 'customer') {
+      isDriverView = true;
+    } else if (senderRole === 'driver') {
+      isDriverView = false;
+    } else if (userRole === 'dev') {
+      isDriverView = useDriverStore.getState().isOnline;
+    }
 
     if (
       screen === 'chat' ||
-      response?.notification?.request?.content?.data?.type === 'chat_message' ||
-      response?.data?.type === 'chat_message'
+      notificationType === 'chat_message' ||
+      data?.type === 'chat_message'
     ) {
-      if (role === 'driver') {
+      if (isDriverView) {
         router.push(orderId ? `/(tabs)/chat?orderId=${orderId}` : '/(tabs)/chat');
       } else {
         router.push(orderId ? `/(customer)/chat?orderId=${orderId}` : '/(customer)/chat');
@@ -115,7 +137,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
 
     if (orderId) {
-      if (role === 'driver') {
+      if (isDriverView) {
         router.push(`/order/${orderId}`);
       } else {
         router.push(`/(customer)/track/${orderId}`);

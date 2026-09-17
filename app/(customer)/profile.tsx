@@ -7,9 +7,10 @@ import {
   View,
   Text,
   StatusBar,
+  Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ShoppingBag } from '@blinkdotnew/mobile-ui';
+import { ShoppingBag, Bell } from '@blinkdotnew/mobile-ui';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -21,6 +22,7 @@ import { useOrdersRealtime } from '@/lib/realtime';
 import { ordersApi } from '@/apis/orders';
 import { blink } from '@/lib/blink';
 import { APP_CONFIG } from '@/lib/config';
+import { registerAndSyncDeviceToken, unregisterDeviceToken } from '@/lib/notifications';
 import { CustomHeader, useToast } from '@/components/core';
 
 import {
@@ -73,7 +75,32 @@ export default function CustomerProfileScreen() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(true);
   const webFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('@customer_push_notifications_enabled')
+      .then((val) => {
+        if (val !== null) setPushEnabled(val === 'true');
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleTogglePush = useCallback(
+    async (val: boolean) => {
+      haptic('light');
+      setPushEnabled(val);
+      await AsyncStorage.setItem('@customer_push_notifications_enabled', String(val)).catch(() => {});
+      if (val && user?.id) {
+        await registerAndSyncDeviceToken(user.id);
+        showToast('Push notifications enabled', 'success');
+      } else if (!val && user?.id) {
+        await unregisterDeviceToken(user.id);
+        showToast('Push notifications disabled', 'info');
+      }
+    },
+    [user?.id, showToast]
+  );
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || !user)) {
@@ -381,6 +408,24 @@ export default function CustomerProfileScreen() {
             title="Order New Delivery"
             subtitle="Request item pickup from any local store"
             onPress={() => router.push('/(customer)')}
+          />
+        </ProfileSection>
+
+        <ProfileSection title="PREFERENCES">
+          <ProfileActionRow
+            icon={<Bell size={18} color="#FFFFFF" />}
+            iconBg="rgba(255, 255, 255, 0.06)"
+            title="Push Notifications"
+            subtitle="Get instant alerts for delivery updates & chat"
+            showChevron={false}
+            rightControl={
+              <Switch
+                value={pushEnabled}
+                onValueChange={handleTogglePush}
+                trackColor={{ false: '#262A38', true: BLUE }}
+                thumbColor="#FFFFFF"
+              />
+            }
           />
         </ProfileSection>
 
