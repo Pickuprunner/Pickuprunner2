@@ -20,7 +20,7 @@ export default function RoleSelectScreen() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [selecting, setSelecting] = useState<AppRole | null>(null);
 
-  if (!isLoading && isAuthenticated && user) {
+  if (!isLoading && isAuthenticated && user && user.role !== 'dev') {
     return <Redirect href={user.role === 'customer' ? '/(customer)/my-orders' : '/(tabs)'} />;
   }
 
@@ -33,9 +33,9 @@ export default function RoleSelectScreen() {
     await saveRole(role);
     setSelecting(null);
     if (role === 'customer') {
-      router.push('/(auth)/customer-auth');
+      router.push(isAuthenticated && user?.role === 'dev' ? '/(customer)/my-orders' : '/(auth)/customer-auth');
     } else {
-      router.push('/(auth)/sign-in');
+      router.push(isAuthenticated && user?.role === 'dev' ? '/(tabs)' : '/(auth)/sign-in');
     }
   };
 

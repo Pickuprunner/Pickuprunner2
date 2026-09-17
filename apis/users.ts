@@ -105,7 +105,7 @@ export const usersApi = {
     return res.data.user;
   },
 
-  updateRole: async (id: string, role: 'customer' | 'driver' | 'admin'): Promise<User> => {
+  updateRole: async (id: string, role: 'customer' | 'driver' | 'admin' | 'dev'): Promise<User> => {
     const res = await apiClient.patch<UserResponse>(`/users/${id}/role`, { role });
     return res.data.user;
   },

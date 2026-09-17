@@ -16,7 +16,7 @@ export interface AuthState {
   register: (payload: {
     email: string;
     password: string;
-    role: 'customer' | 'driver' | 'admin';
+    role: 'customer' | 'driver' | 'admin' | 'dev';
     displayName?: string;
     phone?: string;
   }) => Promise<AuthUser>;
@@ -68,7 +68,7 @@ export function useAuth(): AuthState {
       // Trigger permission check & device token backend sync
       registerAndSyncDeviceToken(session.user?.id);
 
-      if (session.user?.role === 'driver') {
+      if (session.user?.role === 'driver' || session.user?.role === 'dev') {
         useDriverStore.setState({ isOnline: true });
         driverAvailabilityApi.setAvailability(true).catch(() => {});
       }
@@ -82,7 +82,7 @@ export function useAuth(): AuthState {
     async (payload: {
       email: string;
       password: string;
-      role: 'customer' | 'driver' | 'admin';
+      role: 'customer' | 'driver' | 'admin' | 'dev';
       displayName?: string;
       phone?: string;
     }): Promise<AuthUser> => {
@@ -98,7 +98,7 @@ export function useAuth(): AuthState {
       // Trigger permission check & device token backend sync
       registerAndSyncDeviceToken(session.user?.id);
 
-      if (session.user?.role === 'driver') {
+      if (session.user?.role === 'driver' || session.user?.role === 'dev') {
         useDriverStore.setState({ isOnline: true });
         driverAvailabilityApi.setAvailability(true).catch(() => {});
       }
@@ -117,7 +117,7 @@ export function useAuth(): AuthState {
         await unregisterDeviceToken(currentUser.id).catch(() => {});
       }
 
-      if (currentUser?.role === 'driver') {
+      if (currentUser?.role === 'driver' || currentUser?.role === 'dev') {
         useDriverStore.setState({ isOnline: false });
         await driverAvailabilityApi.setAvailability(false).catch(() => {});
       }

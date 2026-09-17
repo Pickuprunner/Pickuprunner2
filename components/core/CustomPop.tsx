@@ -51,16 +51,24 @@ export function CustomPop({
 
   const displayMessage = warning?.message || message || '';
 
+  const isExpired =
+    type === 'error' ||
+    warning?.daysLeft === 0 ||
+    warning?.message?.toLowerCase().includes('expired') ||
+    message?.toLowerCase().includes('expired');
+
+  const effectiveType = isExpired ? 'error' : type;
+
   const getThemedColors = () => {
-    switch (type) {
+    switch (effectiveType) {
       case 'error':
         return {
-          accent: colors.error,
-          btnBg: colors.errorContainer,
-          btnText: '#FFFFFF',
-          bg: 'rgba(147, 0, 10, 0.16)',
-          border: 'rgba(255, 180, 171, 0.32)',
-          iconBg: 'rgba(255, 180, 171, 0.12)',
+          accent: '#FFC2BA',
+          btnBg: '#FFA89E',
+          btnText: '#0F131C',
+          bg: 'rgba(255, 84, 73, 0.13)',
+          border: 'rgba(255, 84, 73, 0.42)',
+          iconBg: 'rgba(255, 84, 73, 0.20)',
         };
       case 'success':
         return {

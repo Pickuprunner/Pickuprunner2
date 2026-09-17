@@ -215,7 +215,7 @@ export const useOrderStore = create<OrderStoreState>()(
             orderScope: incoming.orderScope || incoming.order_scope || existing?.orderScope || ORDER_SCOPE,
             tipAmount: incoming.tipAmount ?? incoming.tip_amount ?? existing?.tipAmount ?? 1000,
             paymentStatus:
-              existing?.paymentStatus === 'paid' || existing?.paymentStatus === 'test_paid'
+              existing?.paymentStatus === 'paid' || existing?.paymentStatus === 'test_paid' || existing?.paymentStatus === 'dev_bypassed'
                 ? existing.paymentStatus
                 : incoming.paymentStatus || incoming.payment_status || existing?.paymentStatus || 'unpaid',
             checkoutUrl: incoming.checkoutUrl || incoming.checkout_url || existing?.checkoutUrl,

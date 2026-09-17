@@ -17,7 +17,6 @@ import {
   ShieldCheck,
   FileText,
   Shield,
-  LogOut,
   RefreshCw,
   ArrowRight,
   X,
@@ -44,11 +43,25 @@ export function DriverProfileStatusScreen({
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { select } = useResponsive();
-  const { user, logout } = useAuth();
+  const { user, fetchProfile } = useAuth();
   const { data: accreditation, refetch: refetchAccred, isFetching: isFetchingAccred } = useDriverAccreditation();
   const { data: verification, refetch: refetchVerif, isFetching: isFetchingVerif } = useMyVerification(user?.id);
   const { showToast } = useToast();
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (user?.role === 'dev') {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(tabs)');
+      return;
+    }
+    fetchProfile().then((fresh) => {
+      if (fresh?.role === 'dev') {
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/(tabs)');
+      }
+    });
+  }, [user?.role, fetchProfile]);
 
   const profile = accreditation?.profile;
   const expiry = accreditation?.expiry;
@@ -141,7 +154,18 @@ export function DriverProfileStatusScreen({
     setRefreshing(true);
     try {
       const minDelay = new Promise((resolve) => setTimeout(resolve, 550));
-      const [accredRes] = await Promise.all([refetchAccred(), refetchVerif(), minDelay]);
+      const [accredRes, _verifRes, freshUser] = await Promise.all([
+        refetchAccred(),
+        refetchVerif(),
+        fetchProfile(),
+        minDelay,
+      ]);
+      if (freshUser?.role === 'dev' || user?.role === 'dev') {
+        showToast('Dev role active. Bypassing verification lock.', 'success');
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/(tabs)');
+        return;
+      }
       const isNowFullyApproved = isAccreditationFullyApproved(accredRes.data);
       if (isNowFullyApproved) {
         showToast('Verification Approved! Welcome to PickupRunner.', 'success');

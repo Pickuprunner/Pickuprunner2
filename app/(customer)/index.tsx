@@ -197,15 +197,6 @@ export default function CustomerNewOrderScreen() {
       return;
     }
 
-    const milesNum = parseFloat(form.miles);
-    if (milesNum > APP_CONFIG.MAX_DELIVERY_RADIUS_MILES) {
-      showToast('Out of Delivery Range', {
-        description: `Delivery address must be within ${APP_CONFIG.MAX_DELIVERY_RADIUS_MILES} miles of pickup location.`,
-        type: 'error',
-      });
-      return;
-    }
-
     setLoading(true);
 
     try {

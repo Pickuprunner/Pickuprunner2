@@ -87,7 +87,7 @@ export async function openCheckoutUrl(url: string, orderId?: string): Promise<bo
     try {
       const res = await apiClient.get<any>(`/orders/${orderId}`);
       const order = res?.data || res;
-      if (order?.paymentStatus === 'paid' || order?.payment_status === 'paid') {
+      if (order?.paymentStatus === 'paid' || order?.payment_status === 'paid' || order?.paymentStatus === 'dev_bypassed' || order?.payment_status === 'dev_bypassed') {
         return true;
       }
     } catch {}

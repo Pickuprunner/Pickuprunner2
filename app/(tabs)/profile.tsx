@@ -268,15 +268,17 @@ export default function ProfileScreen() {
     accredProfile?.accreditationStatus === 'under_review' ||
     accredProfile?.accreditationStatus === 'approved';
 
+  const isDevUser = user?.role === 'dev';
+
   const hasLicenseData = Boolean(accredProfile?.licenseNumber || accredProfile?.documents?.licenseFront);
   const hasInsuranceData = Boolean(accredProfile?.insurancePolicyNumber || accredProfile?.documents?.insuranceCard);
   const hasConsentData = Boolean(accredProfile?.backgroundConsentAt);
 
   const expiry = accreditation?.expiry;
-  const isLicenseExpired = Boolean(expiry?.license?.expired);
-  const isLicenseExpiringSoon = Boolean(expiry?.license?.expiringSoon);
-  const isInsuranceExpired = Boolean(expiry?.insurance?.expired);
-  const isInsuranceExpiringSoon = Boolean(expiry?.insurance?.expiringSoon);
+  const isLicenseExpired = !isDevUser && Boolean(expiry?.license?.expired);
+  const isLicenseExpiringSoon = !isDevUser && Boolean(expiry?.license?.expiringSoon);
+  const isInsuranceExpired = !isDevUser && Boolean(expiry?.insurance?.expired);
+  const isInsuranceExpiringSoon = !isDevUser && Boolean(expiry?.insurance?.expiringSoon);
 
   const licenseStatus: DocStatus =
     isLicenseExpired
@@ -443,7 +445,11 @@ export default function ProfileScreen() {
             <View
               style={[
                 styles.overallBadge,
-                isAccredApproved ? styles.overallBadgeSuccess : isLicenseExpired || isInsuranceExpired ? styles.overallBadgeError : styles.overallBadgeWarning,
+                isDevUser || isAccredApproved
+                  ? styles.overallBadgeSuccess
+                  : isLicenseExpired || isInsuranceExpired
+                    ? styles.overallBadgeError
+                    : styles.overallBadgeWarning,
               ]}
             >
               <Text
@@ -451,16 +457,22 @@ export default function ProfileScreen() {
                 style={[
                   styles.overallBadgeText,
                   { fontSize: select(10, 9, 8.5) },
-                  isAccredApproved ? { color: GREEN } : isLicenseExpired || isInsuranceExpired ? { color: RED } : { color: GOLD_ACCENT },
+                  isDevUser || isAccredApproved
+                    ? { color: GREEN }
+                    : isLicenseExpired || isInsuranceExpired
+                      ? { color: RED }
+                      : { color: GOLD_ACCENT },
                 ]}
               >
-                {isAccredApproved
-                  ? 'FULLY CLEARED'
-                  : isLicenseExpired || isInsuranceExpired
-                    ? 'ACTION REQUIRED'
-                    : isAccredUnderReview
-                      ? 'UNDER REVIEW'
-                      : 'IN PROGRESS'}
+                {isDevUser
+                  ? 'DEV PASS'
+                  : isAccredApproved
+                    ? 'FULLY CLEARED'
+                    : isLicenseExpired || isInsuranceExpired
+                      ? 'ACTION REQUIRED'
+                      : isAccredUnderReview
+                        ? 'UNDER REVIEW'
+                        : 'IN PROGRESS'}
               </Text>
             </View>
           }
@@ -478,13 +490,15 @@ export default function ProfileScreen() {
                       : `Expires in ${expiry?.license?.daysLeft} days • Tap to renew`
                   : licenseStatus === 'approved'
                     ? 'Valid license on file'
-                    : licenseStatus === 'rejected'
-                      ? 'Resubmission required'
-                      : licenseStatus === 'pending'
-                        ? 'Under review'
-                        : 'Upload driver license'
+                    : isDevUser
+                      ? 'Verification bypassed for dev testing'
+                      : licenseStatus === 'rejected'
+                        ? 'Resubmission required'
+                        : licenseStatus === 'pending'
+                          ? 'Under review'
+                          : 'Upload driver license'
             }
-            status={licenseStatus}
+            status={licenseStatus === 'approved' ? 'approved' : isDevUser ? 'dev_bypassed' : licenseStatus}
             customLabel={
               isLicenseExpired
                 ? 'Expired'
@@ -492,7 +506,9 @@ export default function ProfileScreen() {
                   ? (expiry?.license?.daysLeft ?? 0) <= 0
                     ? 'Today'
                     : `Exp. in ${expiry?.license?.daysLeft}d`
-                  : undefined
+                  : isDevUser && licenseStatus !== 'approved'
+                    ? 'Dev Pass'
+                    : undefined
             }
             onPress={() => {
               router.push({
@@ -517,13 +533,15 @@ export default function ProfileScreen() {
                       : `Expires in ${expiry?.insurance?.daysLeft} days • Tap to renew`
                   : insuranceStatus === 'approved'
                     ? 'Current policy verified'
-                    : insuranceStatus === 'rejected'
-                      ? 'Resubmission required'
-                      : insuranceStatus === 'pending'
-                        ? 'Under review'
-                        : 'Upload insurance policy'
+                    : isDevUser
+                      ? 'Insurance bypassed for dev testing'
+                      : insuranceStatus === 'rejected'
+                        ? 'Resubmission required'
+                        : insuranceStatus === 'pending'
+                          ? 'Under review'
+                          : 'Upload insurance policy'
             }
-            status={insuranceStatus}
+            status={insuranceStatus === 'approved' ? 'approved' : isDevUser ? 'dev_bypassed' : insuranceStatus}
             customLabel={
               isInsuranceExpired
                 ? 'Expired'
@@ -531,7 +549,9 @@ export default function ProfileScreen() {
                   ? (expiry?.insurance?.daysLeft ?? 0) <= 0
                     ? 'Today'
                     : `Exp. in ${expiry?.insurance?.daysLeft}d`
-                  : undefined
+                  : isDevUser && insuranceStatus !== 'approved'
+                    ? 'Dev Pass'
+                    : undefined
             }
             onPress={() => {
               router.push({
@@ -548,13 +568,16 @@ export default function ProfileScreen() {
             subtitle={
               bgStatus === 'approved'
                 ? 'MVR & criminal check cleared'
-                : bgStatus === 'rejected'
-                  ? 'Check failed — tap details'
-                  : bgStatus === 'in_review' || bgStatus === 'pending'
-                    ? 'Screening in progress'
-                    : 'FCRA authorization needed'
+                : isDevUser
+                  ? 'Background check bypassed for dev testing'
+                  : bgStatus === 'rejected'
+                    ? 'Check failed — tap details'
+                    : bgStatus === 'in_review' || bgStatus === 'pending'
+                      ? 'Screening in progress'
+                      : 'FCRA authorization needed'
             }
-            status={bgStatus}
+            status={bgStatus === 'approved' ? 'approved' : isDevUser ? 'dev_bypassed' : bgStatus}
+            customLabel={isDevUser && bgStatus !== 'approved' ? 'Dev Pass' : undefined}
             onPress={() => {
               router.push({
                 pathname: '/(auth)/driver-verification',

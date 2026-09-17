@@ -15,11 +15,11 @@ export function useDriverAvailability() {
   const query = useQuery({
     queryKey: DRIVER_AVAILABILITY_QUERY_KEY,
     queryFn: async () => {
-      if (!token || user?.role !== 'driver') return false;
+      if (!token || (user?.role !== 'driver' && user?.role !== 'dev')) return false;
       const isAvailable = await driverAvailabilityApi.getAvailability();
       return isAvailable;
     },
-    enabled: Boolean(token && user?.role === 'driver'),
+    enabled: Boolean(token && (user?.role === 'driver' || user?.role === 'dev')),
     staleTime: 1000 * 15,
   });
 
@@ -69,7 +69,7 @@ export function useDriverLocationHeartbeat(driverCoords?: { lat?: number; lng?: 
   const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
-    if (!token || user?.role !== 'driver' || !isOnline) return;
+    if (!token || (user?.role !== 'driver' && user?.role !== 'dev') || !isOnline) return;
 
     let isMounted = true;
 

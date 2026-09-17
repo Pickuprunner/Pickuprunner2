@@ -204,7 +204,7 @@ export default function OrdersScreen() {
   };
 
   const handleAcceptOrder = async (orderItem: any) => {
-    if (!isStripeReady) {
+    if (user?.role !== 'dev' && !isStripeReady) {
       setShowStripeModal(true);
       return;
     }
@@ -216,7 +216,7 @@ export default function OrdersScreen() {
       return;
     }
 
-    if (accreditation?.eligibility && !accreditation.eligibility.eligible) {
+    if (user?.role !== 'dev' && accreditation?.eligibility && !accreditation.eligibility.eligible) {
       showToast(accreditation.eligibility.reason || 'Accreditation action required before accepting orders.', {
         type: 'error',
       });
@@ -254,7 +254,7 @@ export default function OrdersScreen() {
           code === 'under_review' ||
           code === 'rejected');
 
-      if (isAccreditationError) {
+      if (user?.role !== 'dev' && isAccreditationError) {
         showToast(errorMsg, { type: 'error' });
         router.push('/(auth)/driver-verification');
       } else {
@@ -491,7 +491,7 @@ export default function OrdersScreen() {
       return !dismissedWarningKeys[key] && !sessionDismissedPops.has(key);
     });
 
-    if (!visibleWarnings.length) return null;
+    if (user?.role === 'dev' || !visibleWarnings.length) return null;
 
     return (
       <View style={styles.expiringBannerContainer}>
@@ -524,11 +524,11 @@ export default function OrdersScreen() {
       <View>
         <View style={{ height: headerHeight + 4 }} />
         <ExpiringDocumentsBanner />
-        <StripeSetupBanner />
+        {user?.role !== 'dev' && <StripeSetupBanner />}
         {isLoading && <SkeletonList count={3} />}
       </View>
     ),
-    [headerHeight, isLoading, expiringWarnings, dismissedWarningKeys]
+    [headerHeight, isLoading, expiringWarnings, dismissedWarningKeys, user?.role]
   );
 
   const isOnline = useDriverStore((s) => s.isOnline);

@@ -149,7 +149,16 @@ export function CustomerOrderCard({
 
   const [paying, setPaying] = useState(false);
 
+  const isAcceptedOrBeyond = currentStatus !== 'pending';
+
+  const isDevBypassed =
+    order.payment_status === 'dev_bypassed' ||
+    order.paymentStatus === 'dev_bypassed' ||
+    (storeOrder as any)?.paymentStatus === 'dev_bypassed' ||
+    (storeOrder as any)?.payment_status === 'dev_bypassed';
+
   const isPaid =
+    (isDevBypassed && isAcceptedOrBeyond) ||
     order.payment_status === 'paid' ||
     order.payment_status === 'test_paid' ||
     order.paymentStatus === 'paid' ||
@@ -162,7 +171,7 @@ export function CustomerOrderCard({
     currentStatus !== 'pending' &&
     currentStatus !== 'assigned' &&
     currentStatus !== 'cancelled';
-  const needsPayment = isChargeable && !isPaid;
+  const needsPayment = isChargeable && !isPaid && !isDevBypassed;
 
   const handlePayNow = async () => {
     if (paying) return;
@@ -396,7 +405,7 @@ export function CustomerOrderCard({
           <View style={styles.paidBadge}>
             <MaterialIcons name="check-circle" size={15} color="#00e297" />
             <Text style={styles.paidBadgeText} numberOfLines={1}>
-              PAID
+              {isDevBypassed ? 'Dev-Pass' : 'PAID'}
             </Text>
           </View>
         )}
