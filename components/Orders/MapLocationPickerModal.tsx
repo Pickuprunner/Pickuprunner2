@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Keyboard,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useResponsive } from '@/hooks/useResponsive';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
@@ -47,6 +49,16 @@ export function MapLocationPickerModal({
   initialAddress = '',
   title = 'Pin Location on Map',
 }: MapLocationPickerModalProps) {
+  const insets = useSafeAreaInsets();
+  const { isCompact, isNarrow } = useResponsive();
+
+  const bottomSafePadding = Math.max(
+    insets.bottom,
+    Platform.OS === 'ios' ? (isNarrow ? 20 : 24) : (isNarrow ? 12 : 16)
+  ) + (isNarrow ? 10 : 14);
+
+  const sheetHeight = isNarrow ? '92%' : isCompact ? '88%' : '86%';
+
   const mapRef = useRef<any>(null);
   const initialCoords = useLocationStore.getState().currentLocation || DEFAULT_MAP_COORDS;
   const coordsRef = useRef<{ lat: number; lon: number }>(initialCoords);
@@ -290,7 +302,7 @@ export function MapLocationPickerModal({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.sheetContainer}>
+        <View style={[styles.sheetContainer, { height: sheetHeight }]}>
           <View style={styles.header}>
             <View style={styles.notch} />
             <View style={styles.headerRow}>
@@ -471,18 +483,28 @@ export function MapLocationPickerModal({
             </View>
           </View>
 
-          <View style={styles.bottomCard}>
-            <View style={styles.addressBox}>
-              <MaterialIcons name="place" size={20} color={GREEN} style={{ marginTop: 2 }} />
+          <View
+            style={[
+              styles.bottomCard,
+              {
+                paddingBottom: bottomSafePadding,
+                paddingHorizontal: isNarrow ? 12 : 16,
+                paddingTop: isNarrow ? 10 : 14,
+                gap: isNarrow ? 8 : 12,
+              },
+            ]}
+          >
+            <View style={[styles.addressBox, isNarrow && { padding: 9, gap: 8 }]}>
+              <MaterialIcons name="place" size={isNarrow ? 18 : 20} color={GREEN} style={{ marginTop: 2 }} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.addressLabel}>PINPOINTED LOCATION</Text>
+                <Text style={[styles.addressLabel, isNarrow && { fontSize: 9 }]}>PINPOINTED LOCATION</Text>
                 {loadingAddress ? (
                   <View style={styles.loadingRow}>
                     <ActivityIndicator size="small" color={GOLD} />
                     <Text style={styles.loadingText}>Resolving address…</Text>
                   </View>
                 ) : (
-                  <Text style={styles.addressText} numberOfLines={2}>
+                  <Text style={[styles.addressText, isNarrow && { fontSize: 12.5, lineHeight: 16 }]} numberOfLines={2}>
                     {selectedAddress || 'Move pin to choose address'}
                   </Text>
                 )}
@@ -502,10 +524,10 @@ export function MapLocationPickerModal({
                 colors={['#1E75FF', colors.primaryContainer]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.confirmGradient}
+                style={[styles.confirmGradient, isNarrow && { paddingVertical: 11 }]}
               >
-                <MaterialIcons name="check" size={18} color="#FFFFFF" />
-                <Text style={styles.confirmBtnText}>Confirm Pinpoint Address</Text>
+                <MaterialIcons name="check" size={isNarrow ? 16 : 18} color="#FFFFFF" />
+                <Text style={[styles.confirmBtnText, isNarrow && { fontSize: 13 }]}>Confirm Pinpoint Address</Text>
               </LinearGradient>
             </Pressable>
           </View>
@@ -522,7 +544,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheetContainer: {
-    height: '84%',
+    height: '86%',
     backgroundColor: '#0F131C',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -721,8 +743,8 @@ const styles = StyleSheet.create({
   },
   bottomCard: {
     backgroundColor: '#121622',
-    padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
     gap: 12,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',

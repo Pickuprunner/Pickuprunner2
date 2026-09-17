@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type CustomerOrderStatusFilter =
   | 'all'
@@ -53,6 +54,9 @@ export function CustomerOrderFilterModal({
   onApply,
   counts,
 }: CustomerOrderFilterModalProps) {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 16) + 14;
+
   const [selectedStatus, setSelectedStatus] = useState<CustomerOrderStatusFilter>(
     filters.status
   );
@@ -188,7 +192,10 @@ export function CustomerOrderFilterModal({
             <Animated.View
               style={[
                 styles.sheetContainer,
-                { transform: [{ translateY: slideAnim }] },
+                {
+                  paddingBottom: bottomPadding,
+                  transform: [{ translateY: slideAnim }],
+                },
               ]}
             >
               <View style={styles.dragHandle} />
@@ -405,7 +412,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     borderColor: 'rgba(255, 227, 153, 0.35)',
     maxHeight: '85%',
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     shadowColor: '#FFE399',
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.18,
@@ -530,7 +536,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 20,
-    paddingTop: 14,
+    paddingTop: 16,
+    paddingBottom: 4,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.07)',
   },
