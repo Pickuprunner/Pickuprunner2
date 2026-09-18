@@ -15,6 +15,8 @@ import type { Order } from '@/lib/orders';
 import { calcDriverEarnings } from '@/lib/config';
 import { setSelectedOrder } from '@/lib/selectedOrder';
 import * as Haptics from 'expo-haptics';
+import { MaterialIcons } from '@expo/vector-icons';
+import { openMapsNavigation } from '@/lib/maps';
 
 const BLUE = '#0066FF';
 const YELLOW = '#F5C400';
@@ -31,14 +33,13 @@ function haptic(type: 'light' | 'medium' | 'success' = 'medium') {
   else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
 }
 
-import { openMapsNavigation } from '@/lib/maps';
 
 function AddressBlock({ title, address, accent, lat, lng }: {
-  title: string; address: string; accent: string; lat?: number; lng?: number;
+  title?: string; address?: string; accent: string; lat?: number; lng?: number;
 }) {
   return (
     <View style={[styles.addrBlock, { borderLeftColor: accent }]}>
-      <Text style={[styles.addrTitle, { color: accent }]}>{title}</Text>
+      {!!title && <Text style={[styles.addrTitle, { color: accent }]}>{title}</Text>}
       <Text style={styles.addrValue}>{address || '(no address on file)'}</Text>
       {!!address && (
         <Pressable
@@ -53,8 +54,8 @@ function AddressBlock({ title, address, accent, lat, lng }: {
 }
 
 // ── Big CTA button ────────────────────────────────────────────────────────────
-function BigButton({ label, bg, fg = '#000', icon, loading, onPress }: {
-  label: string; bg: string; fg?: string; icon?: string; loading?: boolean; onPress: () => void;
+function BigButton({ label, bg, fg = '#000', iconName, loading, onPress }: {
+  label: string; bg: string; fg?: string; iconName?: keyof typeof MaterialIcons.glyphMap; loading?: boolean; onPress: () => void;
 }) {
   return (
     <Pressable
@@ -64,7 +65,7 @@ function BigButton({ label, bg, fg = '#000', icon, loading, onPress }: {
     >
       {loading
         ? <Spinner size="small" color={fg} />
-        : !!icon && <Text style={{ fontSize: 18, color: fg }}>{icon}</Text>}
+        : !!iconName && <MaterialIcons name={iconName} size={20} color={fg} />}
       <Text style={[styles.bigBtnText, { color: fg }]}>{loading ? 'Please wait…' : label}</Text>
     </Pressable>
   );
@@ -76,7 +77,7 @@ function NavButton({ label, accent, onPress }: { label: string; accent: string; 
       style={[styles.navBtn, { borderColor: accent + '55', backgroundColor: accent + '14' }]}
       onPress={onPress}
     >
-      <Text style={{ fontSize: 16 }}>🗺️</Text>
+      <MaterialIcons name="map" size={18} color={accent} />
       <Text style={[styles.navBtnText, { color: accent }]}>{label}</Text>
     </Pressable>
   );
@@ -89,7 +90,11 @@ function StepBadge({ step, label, active, done }: { step: number; label: string;
   return (
     <View style={styles.stepBadge}>
       <View style={[styles.stepCircle, { backgroundColor: bg }]}>
-        <Text style={[styles.stepNum, { color: col }]}>{done ? '✓' : step}</Text>
+        {done ? (
+          <MaterialIcons name="check" size={14} color={col} />
+        ) : (
+          <Text style={[styles.stepNum, { color: col }]}>{step}</Text>
+        )}
       </View>
       <Text style={[styles.stepLabel, { color: tcol }]}>{label}</Text>
     </View>
@@ -168,7 +173,7 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
 
         <View style={styles.header}>
           <Pressable onPress={onClose} style={styles.closeBtn}>
-            <Text style={styles.closeBtnText}>✕</Text>
+            <MaterialIcons name="close" size={20} color="#FFFFFF" />
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerName} numberOfLines={1}>{order.customerName}</Text>
@@ -207,18 +212,25 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
             </View>
           </View>
 
-          <Text style={styles.sectionHead}>PICK UP FROM</Text>
+          {order.items ? (
+            <>
+              <Text style={styles.sectionHead}>ITEMS TO DELIVER</Text>
+              <View style={styles.itemsCard}>
+                <Text style={styles.itemsText}>{order.items}</Text>
+              </View>
+            </>
+          ) : null}
+
+          <Text style={styles.sectionHead}>Pick up from</Text>
           <AddressBlock
-            title="Pickup Location"
             address={order.pickupAddress}
             accent={YELLOW}
             lat={order.pickupLat ?? (order as any).pickup_lat}
             lng={order.pickupLng ?? (order as any).pickup_lng}
           />
 
-          <Text style={styles.sectionHead}>DELIVER TO</Text>
+          <Text style={styles.sectionHead}>Deliver to</Text>
           <AddressBlock
-            title="Delivery Address"
             address={order.deliveryAddress}
             accent="#60A5FA"
             lat={(order as any).deliveryLat ?? (order as any).delivery_lat}
@@ -229,14 +241,14 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
             <View style={styles.customerCard}>
               {!!order.customerPhone && (
                 <Pressable style={styles.customerRow} onPress={() => Linking.openURL(`tel:${order.customerPhone}`)}>
-                  <Text style={styles.customerIcon}>📞</Text>
+                  <MaterialIcons name="phone" size={16} color="rgba(255,255,255,0.7)" />
                   <Text style={styles.customerPhone}>{order.customerPhone}</Text>
                   <Text style={styles.customerCta}>tap to call</Text>
                 </Pressable>
               )}
               {!!order.customerEmail && (
                 <View style={[styles.customerRow, { borderBottomWidth: 0 }]}>
-                  <Text style={styles.customerIcon}>✉️</Text>
+                  <MaterialIcons name="email" size={16} color="rgba(255,255,255,0.7)" />
                   <Text style={styles.customerPhone}>{order.customerEmail}</Text>
                 </View>
               )}
@@ -250,7 +262,7 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
               <Text style={styles.instruction}>
                 Review the pickup and delivery addresses, then accept to start this delivery.
               </Text>
-              <BigButton label="Accept This Order" bg={YELLOW} icon="✓" loading={accepting} onPress={doAccept} />
+              <BigButton label="Accept This Order" bg={YELLOW} iconName="check" loading={accepting} onPress={doAccept} />
             </>
           )}
 
@@ -270,7 +282,7 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
                 }}
               />
               <View style={{ height: 12 }} />
-              <BigButton label="Order Picked Up" bg={ORANGE} icon="🛍️" loading={pickingUp} onPress={doPickUp} />
+              <BigButton label="Order Picked Up" bg={ORANGE} iconName="shopping-bag" loading={pickingUp} onPress={doPickUp} />
             </>
           )}
 
@@ -290,13 +302,13 @@ export default function OrderDetailModal({ order, onClose, onStatusChange }: Pro
                 }}
               />
               <View style={{ height: 12 }} />
-              <BigButton label="Complete with Photo" bg={GREEN} icon="📸" loading={delivering} onPress={doDeliver} />
+              <BigButton label="Complete with Photo" bg={GREEN} iconName="photo-camera" loading={delivering} onPress={doDeliver} />
             </>
           )}
 
           {status === 'delivered' && (
             <View style={styles.deliveredBanner}>
-              <Text style={{ fontSize: 32 }}>✓</Text>
+              <MaterialIcons name="check-circle" size={32} color={GREEN} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.deliveredTitle}>Order Delivered!</Text>
                 <Text style={styles.deliveredSub}>
@@ -365,6 +377,16 @@ const styles = StyleSheet.create({
   earningsTotal: { color: '#F5C400', fontSize: 28, fontWeight: '900' },
   earningsRight: { flex: 1 },
   earningsLine: { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 19 },
+
+  // Items
+  itemsCard: {
+    backgroundColor: CARD,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  itemsText: { color: 'white', fontSize: 14, lineHeight: 20 },
 
   // Address
   sectionHead: {

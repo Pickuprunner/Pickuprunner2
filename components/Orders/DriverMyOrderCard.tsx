@@ -15,6 +15,7 @@ import { calcDriverEarnings } from '@/lib/config';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { CustomCard, useToast } from '@/components/core';
+import { useResponsive } from '@/hooks/useResponsive';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -50,6 +51,7 @@ export function DriverMyOrderCard({
   onDeliver,
   style,
 }: DriverMyOrderCardProps) {
+  const { select } = useResponsive();
   const { showToast } = useToast();
   const updateStatus = useUpdateOrderStatus();
   const status = order.status || 'assigned';
@@ -91,6 +93,21 @@ export function DriverMyOrderCard({
       await onPickup();
       return;
     }
+
+    const reqId = !!(
+      order.requiresIdVerification ||
+      (order as any).requires_id_verification ||
+      (order as any).hasAlcohol
+    );
+    const isVerified = !!(order.ageVerified || (order as any).age_verified);
+
+    if (reqId && !isVerified) {
+      showToast('Customer ID verification required for pickup', {
+        type: 'warning',
+      });
+      router.push(`/order/${order.id}` as any);
+      return;
+    }
     updateStatus.mutate(
       {
         id: order.id,
@@ -119,8 +136,18 @@ export function DriverMyOrderCard({
       await onDeliver();
       return;
     }
-    router.push(`/order/${order.id}`);
+    router.push(`/order/${order.id}` as any);
   };
+
+  const requiresId = !!(
+    order.requiresIdVerification ||
+    (order as any).requires_id_verification ||
+    (order as any).hasAlcohol
+  );
+  const isMedication =
+    order.idVerificationType === 'medication' ||
+    (order as any).id_verification_type === 'medication';
+  const isIdVerified = !!(order.ageVerified || (order as any).age_verified);
 
   const headerNode = (
     <View style={styles.header}>
@@ -129,10 +156,12 @@ export function DriverMyOrderCard({
           <Text style={styles.avatarText}>{initial}</Text>
         </View>
         <View style={styles.userTextCol}>
-          <Text style={styles.userName} numberOfLines={1}>
+          <Text style={styles.userName} numberOfLines={1} ellipsizeMode="tail">
             {order.customerName || 'Customer'}
           </Text>
-          <Text style={styles.orderId}>#{shortId}</Text>
+          <Text style={styles.orderId} numberOfLines={1} ellipsizeMode="tail">
+            #{shortId} · {order.pickupAddress ? order.pickupAddress.split(',')[0] : 'Order'}
+          </Text>
         </View>
       </View>
 
@@ -147,6 +176,43 @@ export function DriverMyOrderCard({
             {badge.label}
           </Text>
         </View>
+
+        {(requiresId || isIdVerified) && (
+          <View style={styles.badgesRow}>
+            {requiresId && (
+              <View
+                style={[
+                  styles.statusBadge,
+                  styles.badgeWithIcon,
+                  isMedication ? styles.rxBadge : styles.alcoholBadge,
+                ]}
+              >
+                <MaterialIcons
+                  name={isMedication ? 'medical-services' : 'local-bar'}
+                  size={11}
+                  color={isMedication ? '#B388FF' : '#FF7B7B'}
+                />
+                <Text
+                  style={[
+                    styles.statusText,
+                    isMedication ? styles.rxBadgeText : styles.alcoholBadgeText,
+                  ]}
+                >
+                  {isMedication ? 'RX ID' : '21+ ID'}
+                </Text>
+              </View>
+            )}
+
+            {isIdVerified && (
+              <View style={[styles.statusBadge, styles.badgeWithIcon, styles.verifiedBadge]}>
+                <MaterialIcons name="verified" size={11} color="#00E297" />
+                <Text style={[styles.statusText, styles.verifiedBadgeText]}>
+                  ID VERIFIED
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -228,7 +294,8 @@ export function DriverMyOrderCard({
 
       {actionError && (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>⚠️ {actionError}</Text>
+          <MaterialIcons name="warning" size={14} color="#FF5C5C" />
+          <Text style={styles.errorText}>{actionError}</Text>
         </View>
       )}
     </View>
@@ -240,7 +307,11 @@ export function DriverMyOrderCard({
       header={headerNode}
       footer={footerNode}
       onPress={onPress}
-      style={[styles.cardContainer, style]}
+      style={[
+        styles.cardContainer,
+        { marginHorizontal: select(16, 12, 8) },
+        style,
+      ]}
     >
       <View style={styles.routesContainer}>
         <View style={styles.connectingLine} />
@@ -251,7 +322,7 @@ export function DriverMyOrderCard({
             <MaterialIcons name="store" size={12} color="#FFE399" />
           </View>
           <View style={styles.routeTextContainer}>
-            <Text style={[styles.routeLabel, { color: '#FFE399' }]}>PICKUP</Text>
+            <Text style={[styles.routeLabel, { color: '#FFE399' }]}>Pick up from</Text>
             <Text style={styles.routeAddress} numberOfLines={2}>
               {order.pickupAddress || 'Pickup address'}
             </Text>
@@ -264,7 +335,7 @@ export function DriverMyOrderCard({
             <MaterialIcons name="location-on" size={12} color="#00E297" />
           </View>
           <View style={styles.routeTextContainer}>
-            <Text style={[styles.routeLabel, { color: '#00E297' }]}>DROPOFF</Text>
+            <Text style={[styles.routeLabel, { color: '#00E297' }]}>Deliver to</Text>
             <Text style={styles.routeAddress} numberOfLines={2}>
               {order.deliveryAddress || 'Delivery address'}
             </Text>
@@ -276,10 +347,23 @@ export function DriverMyOrderCard({
         <View style={styles.itemsPill}>
           <MaterialIcons name="inventory-2" size={15} color="#B3C5FF" />
           <View style={styles.itemsTextCol}>
-            <Text style={styles.itemsPillText} numberOfLines={2}>
-              <Text style={styles.itemsHighlightTag}>ITEMS: </Text>
-              {order.items}
-            </Text>
+            {(() => {
+              const bracketMatch = order.items.match(/^(\[[^\]]+\])\s*(.*)$/);
+              if (bracketMatch) {
+                return (
+                  <Text style={styles.itemsPillText} numberOfLines={2}>
+                    <Text style={styles.itemsHighlightTag}>{bracketMatch[1]} </Text>
+                    {bracketMatch[2]}
+                  </Text>
+                );
+              }
+              return (
+                <Text style={styles.itemsPillText} numberOfLines={2}>
+                  <Text style={styles.itemsHighlightTag}>ITEMS: </Text>
+                  {order.items}
+                </Text>
+              );
+            })()}
           </View>
         </View>
       ) : null}
@@ -289,22 +373,26 @@ export function DriverMyOrderCard({
 
 const styles = StyleSheet.create({
   cardContainer: {
-    marginHorizontal: 20,
+    marginHorizontal: 12,
     marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: 8,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0,
   },
   userTextCol: {
     flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
   },
   avatar: {
     width: 36,
@@ -331,25 +419,61 @@ const styles = StyleSheet.create({
     color: 'rgba(194, 198, 216, 0.7)',
     fontSize: 11,
     fontWeight: '500',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
     marginTop: 1,
   },
   badgesWrapper: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    gap: 4,
+    flexShrink: 0,
+    maxWidth: '52%',
+  },
+  badgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   statusBadge: {
     borderRadius: 9999,
-    paddingHorizontal: 9,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1,
   },
   statusText: {
     fontSize: 9.5,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  badgeWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  alcoholBadge: {
+    backgroundColor: 'rgba(255, 92, 92, 0.12)',
+    borderColor: 'rgba(255, 92, 92, 0.35)',
+  },
+  alcoholBadgeText: {
+    color: '#FF7B7B',
+    fontWeight: '700',
+  },
+  rxBadge: {
+    backgroundColor: 'rgba(179, 136, 255, 0.12)',
+    borderColor: 'rgba(179, 136, 255, 0.35)',
+  },
+  rxBadgeText: {
+    color: '#B388FF',
+    fontWeight: '700',
+  },
+  verifiedBadge: {
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderColor: 'rgba(0, 226, 151, 0.35)',
+  },
+  verifiedBadgeText: {
+    color: '#00E297',
+    fontWeight: '700',
   },
   routesContainer: {
     flexDirection: 'column',
@@ -528,6 +652,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     padding: 6,
     borderRadius: 6,
     backgroundColor: 'rgba(255, 92, 92, 0.1)',

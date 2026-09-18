@@ -157,6 +157,12 @@ export function useCreateOrder() {
       storeId?: string;
       orderScope?: string;
       customerSessionId?: string;
+      requires_id_verification?: boolean;
+      requiresIdVerification?: boolean;
+      id_verification_type?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+      idVerificationType?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+      minimum_age?: number;
+      minimumAge?: number;
     }): Promise<Order> => {
       const rawTip = Number(orderData.tipAmount ?? 500);
       const tipCents = rawTip > 0 && rawTip < 100 ? Math.round(rawTip * 100) : Math.round(rawTip);
@@ -185,6 +191,12 @@ export function useCreateOrder() {
         storeId: orderData.storeId || APP_CONFIG.STORE_ID,
         orderScope: orderData.orderScope,
         customerSessionId: orderData.customerSessionId,
+        requires_id_verification: orderData.requires_id_verification ?? orderData.requiresIdVerification,
+        requiresIdVerification: orderData.requiresIdVerification ?? orderData.requires_id_verification,
+        id_verification_type: orderData.id_verification_type ?? orderData.idVerificationType,
+        idVerificationType: orderData.idVerificationType ?? orderData.id_verification_type,
+        minimum_age: orderData.minimum_age ?? orderData.minimumAge,
+        minimumAge: orderData.minimumAge ?? orderData.minimum_age,
       };
 
       let createdOrder: Order;
@@ -288,12 +300,26 @@ export function useUpdateOrderStatus() {
       customerName,
       customerPhone,
       customerEmail,
+      intoxication_checked,
+      intoxicationChecked,
+      requires_id_verification,
+      requiresIdVerification,
+      id_verification_type,
+      idVerificationType,
+      minimum_age,
+      minimumAge,
+      age_verified,
+      age_verified_at,
+      delivery_photo_url,
     }: {
       id: string;
       status?: OrderStatus;
       ageVerified?: number | boolean;
+      age_verified?: number | boolean;
       ageVerifiedAt?: string;
+      age_verified_at?: string;
       deliveryPhotoUrl?: string;
+      delivery_photo_url?: string;
       driverUserId?: string;
       driverName?: string;
       tipAmount?: number;
@@ -304,12 +330,23 @@ export function useUpdateOrderStatus() {
       customerName?: string;
       customerPhone?: string;
       customerEmail?: string;
+      intoxication_checked?: boolean;
+      intoxicationChecked?: boolean;
+      requires_id_verification?: boolean;
+      requiresIdVerification?: boolean;
+      id_verification_type?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+      idVerificationType?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+      minimum_age?: number;
+      minimumAge?: number;
     }): Promise<Order> => {
       const payload: UpdateOrderPayload = {
         ...(status ? { status } : {}),
         ...(ageVerified !== undefined ? { ageVerified } : {}),
+        ...(age_verified !== undefined ? { age_verified } : {}),
         ...(ageVerifiedAt ? { ageVerifiedAt } : {}),
+        ...(age_verified_at ? { age_verified_at } : {}),
         ...(deliveryPhotoUrl ? { deliveryPhotoUrl } : {}),
+        ...(delivery_photo_url ? { delivery_photo_url } : {}),
         ...(driverUserId ? { driverUserId } : {}),
         ...(driverName ? { driverName } : {}),
         ...(tipAmount !== undefined ? { tipAmount: Math.round(tipAmount) } : {}),
@@ -320,6 +357,14 @@ export function useUpdateOrderStatus() {
         ...(customerName ? { customerName } : {}),
         ...(customerPhone ? { customerPhone } : {}),
         ...(customerEmail ? { customerEmail } : {}),
+        ...(intoxication_checked !== undefined ? { intoxication_checked } : {}),
+        ...(intoxicationChecked !== undefined ? { intoxicationChecked } : {}),
+        ...(requires_id_verification !== undefined ? { requires_id_verification } : {}),
+        ...(requiresIdVerification !== undefined ? { requiresIdVerification } : {}),
+        ...(id_verification_type ? { id_verification_type } : {}),
+        ...(idVerificationType ? { idVerificationType } : {}),
+        ...(minimum_age !== undefined ? { minimum_age } : {}),
+        ...(minimumAge !== undefined ? { minimumAge } : {}),
       };
 
       try {

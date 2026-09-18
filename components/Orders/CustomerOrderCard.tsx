@@ -20,6 +20,7 @@ import { APP_CONFIG } from '@/lib/config';
 import { createCheckoutForOrder, openCheckoutUrl } from '@/apis/checkout';
 import { ordersApi } from '@/apis/orders';
 import { useOrderStore } from '@/store/useOrderStore';
+import { useResponsive } from '@/hooks/useResponsive';
 
 function haptic() {
   if (Platform.OS !== 'web') {
@@ -97,6 +98,15 @@ export interface CustomerOrderData {
   delivery_photo_url?: string;
   customerSessionId?: string;
   customer_session_id?: string;
+  requires_id_verification?: boolean;
+  requiresIdVerification?: boolean;
+  hasAlcohol?: boolean;
+  id_verification_type?: 'alcohol' | 'medication' | 'id';
+  idVerificationType?: 'alcohol' | 'medication' | 'id';
+  minimum_age?: number;
+  minimumAge?: number;
+  age_verified?: boolean;
+  ageVerified?: boolean;
 }
 
 export interface CustomerOrderCardProps {
@@ -114,6 +124,7 @@ export function CustomerOrderCard({
   onCancel,
   style,
 }: CustomerOrderCardProps) {
+  const { isCompact, isNarrow, select } = useResponsive();
   const [expanded, setExpanded] = useState(false);
   const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
 
@@ -276,6 +287,16 @@ export function CustomerOrderCard({
 
   const badge = getStatusBadge();
 
+  const requiresId = !!(
+    order.requiresIdVerification ||
+    order.requires_id_verification ||
+    order.hasAlcohol
+  );
+  const isMedication =
+    order.idVerificationType === 'medication' ||
+    order.id_verification_type === 'medication';
+  const isIdVerified = !!(order.ageVerified || order.age_verified);
+
   const headerNode = (
     <View style={styles.header}>
       <View style={styles.userInfo}>
@@ -283,10 +304,12 @@ export function CustomerOrderCard({
           <Text style={styles.avatarText}>{initial}</Text>
         </View>
         <View style={styles.userTextCol}>
-          <Text style={styles.userName} numberOfLines={1}>
+          <Text style={styles.userName} numberOfLines={1} ellipsizeMode="tail">
             {customerName}
           </Text>
-          <Text style={styles.orderId}>#{shortId} · {formatRelativeTime(createdAt)}</Text>
+          <Text style={styles.orderId} numberOfLines={1} ellipsizeMode="tail">
+            #{shortId} · {formatRelativeTime(createdAt)}
+          </Text>
         </View>
       </View>
 
@@ -299,6 +322,43 @@ export function CustomerOrderCard({
         >
           <Text style={[styles.statusText, { color: badge.color }]}>{badge.label}</Text>
         </View>
+
+        {(requiresId || isIdVerified) && (
+          <View style={styles.badgesRow}>
+            {requiresId && (
+              <View
+                style={[
+                  styles.statusBadge,
+                  styles.badgeWithIcon,
+                  isMedication ? styles.rxBadge : styles.alcoholBadge,
+                ]}
+              >
+                <MaterialIcons
+                  name={isMedication ? 'medical-services' : 'local-bar'}
+                  size={11}
+                  color={isMedication ? '#B388FF' : '#FF7B7B'}
+                />
+                <Text
+                  style={[
+                    styles.statusText,
+                    isMedication ? styles.rxBadgeText : styles.alcoholBadgeText,
+                  ]}
+                >
+                  {isMedication ? 'RX ID' : '21+ ID'}
+                </Text>
+              </View>
+            )}
+
+            {isIdVerified && (
+              <View style={[styles.statusBadge, styles.badgeWithIcon, styles.verifiedBadge]}>
+                <MaterialIcons name="verified" size={11} color="#00E297" />
+                <Text style={[styles.statusText, styles.verifiedBadgeText]}>
+                  ID VERIFIED
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -529,15 +589,20 @@ export function CustomerOrderCard({
       variant="glass"
       header={headerNode}
       footer={footerNode}
-      onPress={handleCardPress}
-      style={[styles.cardContainer, style]}
+      onPress={onPress || handleCardPress}
+      style={[
+        styles.cardContainer,
+        { marginHorizontal: select(16, 12, 8) },
+        style,
+      ]}
     >
       <View style={styles.routesContainer}>
         <View style={styles.connectingLine} />
 
+        {/* Pickup */}
         <View style={styles.routeItem}>
-          <View style={[styles.routeIcon, { borderColor: '#b3c5ff' }]}>
-            <MaterialIcons name="inventory-2" size={12} color="#b3c5ff" />
+          <View style={[styles.routeIcon, { borderColor: '#FFE399' }]}>
+            <MaterialIcons name="store" size={12} color="#FFE399" />
           </View>
           <View style={styles.routeTextContainer}>
             <Text style={[styles.routeLabel, { color: '#b3c5ff' }]}>Pick up from</Text>
@@ -547,9 +612,10 @@ export function CustomerOrderCard({
           </View>
         </View>
 
+        {/* Delivery */}
         <View style={styles.routeItem}>
-          <View style={[styles.routeIcon, { borderColor: '#00e297' }]}>
-            <MaterialIcons name="location-on" size={12} color="#00e297" />
+          <View style={[styles.routeIcon, { borderColor: '#00E297' }]}>
+            <MaterialIcons name="location-on" size={12} color="#00E297" />
           </View>
           <View style={styles.routeTextContainer}>
             <Text style={[styles.routeLabel, { color: '#00e297' }]}>Deliver to</Text>
@@ -562,7 +628,7 @@ export function CustomerOrderCard({
 
       {order.items ? (
         <View style={styles.itemsPill}>
-          <Ionicons name="information-circle-outline" size={16} color="#B3C5FF" />
+          <MaterialIcons name="inventory-2" size={15} color="#B3C5FF" />
           <View style={styles.itemsTextCol}>
             {(() => {
               const bracketMatch = order.items.match(/^(\[[^\]]+\])\s*(.*)$/);
@@ -601,27 +667,31 @@ export function CustomerOrderCard({
 
 const styles = StyleSheet.create({
   cardContainer: {
-    marginHorizontal: 20,
+    marginHorizontal: 12,
     marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 8,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     flex: 1,
+    minWidth: 0,
   },
   userTextCol: {
     flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#0F131C',
     borderWidth: 1.5,
     borderColor: '#FFE399',
@@ -635,33 +705,69 @@ const styles = StyleSheet.create({
   },
   userName: {
     color: '#dfe2ef',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   orderId: {
     color: 'rgba(194, 198, 216, 0.7)',
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '500',
-    letterSpacing: 0.5,
-    marginTop: 2,
+    letterSpacing: 0.3,
+    marginTop: 1,
   },
   badgesWrapper: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    gap: 4,
+    flexShrink: 0,
+    maxWidth: '52%',
+  },
+  badgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   statusBadge: {
     borderRadius: 9999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderWidth: 1,
   },
   statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  badgeWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  alcoholBadge: {
+    backgroundColor: 'rgba(255, 92, 92, 0.12)',
+    borderColor: 'rgba(255, 92, 92, 0.35)',
+  },
+  alcoholBadgeText: {
+    color: '#FF7B7B',
+    fontWeight: '700',
+  },
+  rxBadge: {
+    backgroundColor: 'rgba(179, 136, 255, 0.12)',
+    borderColor: 'rgba(179, 136, 255, 0.35)',
+  },
+  rxBadgeText: {
+    color: '#B388FF',
+    fontWeight: '700',
+  },
+  verifiedBadge: {
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderColor: 'rgba(0, 226, 151, 0.35)',
+  },
+  verifiedBadgeText: {
+    color: '#00E297',
+    fontWeight: '700',
   },
   routesContainer: {
     flexDirection: 'column',

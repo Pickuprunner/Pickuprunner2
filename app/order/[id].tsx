@@ -28,6 +28,7 @@ import { colors } from '@/constants/design';
 import { useOrderStore } from '@/store/useOrderStore';
 import { ordersApi } from '@/apis/orders';
 import { deliveryApi } from '@/apis/delivery';
+import AgeVerificationModal from '@/components/AgeVerificationModal';
 
 import { useDriverAccreditation } from '@/lib/accreditation';
 import {
@@ -81,6 +82,8 @@ export default function OrderDetailScreen() {
   const { data: connectStatus, refetch: refetchConnect } = useConnectStatus(driverId);
   const connectOnboard = useConnectOnboard();
   const [showStripeModal, setShowStripeModal] = useState(false);
+  const [showAgeModal, setShowAgeModal] = useState(false);
+  const [showSobrietyModal, setShowSobrietyModal] = useState(false);
   const [onboardingLoading, setOnboardingLoading] = useState(false);
   const isStripeReady = Boolean(connectStatus?.connected && connectStatus?.payoutsEnabled) || Boolean(user?.stripeAccountId);
 
@@ -192,6 +195,21 @@ export default function OrderDetailScreen() {
     isDevBypassed ||
     (currentOrder as any)?.paymentStatus === 'paid' ||
     (currentOrder as any)?.paymentStatus === 'test_paid';
+
+  const requiresId = !!(
+    activeOrder?.requiresIdVerification ||
+    activeOrder?.requires_id_verification ||
+    activeOrder?.hasAlcohol
+  );
+  const isMedication =
+    activeOrder?.idVerificationType === 'medication' ||
+    activeOrder?.id_verification_type === 'medication';
+  const isIdVerified = !!(activeOrder?.ageVerified || activeOrder?.age_verified);
+  const isAlcohol = !!(
+    activeOrder?.hasAlcohol ||
+    activeOrder?.idVerificationType === 'alcohol' ||
+    activeOrder?.id_verification_type === 'alcohol'
+  );
 
   const getStatusBadge = () => {
     switch (status) {
@@ -355,7 +373,46 @@ export default function OrderDetailScreen() {
     }
   }
 
-  function doPickUp() {
+  const handleVerificationResult = async (passed: boolean, scanResult: any) => {
+    if (passed) {
+      setShowAgeModal(false);
+      haptic('success');
+      showToast('Customer ID Verified', {
+        description: `Verification confirmed${scanResult?.age ? ` (Age: ${scanResult.age})` : ''}`,
+        type: 'success',
+      });
+      if (activeOrder?.id) {
+        useOrderStore.getState().updateOrder(activeOrder.id, {
+          ageVerified: true,
+          age_verified: true,
+          status: 'picked_up',
+        });
+        try {
+          await updateStatus.mutateAsync({
+            id: activeOrder.id,
+            status: 'picked_up',
+          });
+          dispatch({ type: 'CONFIRM_PICKUP' });
+        } catch (err: any) {
+          showToast(err?.message || 'Failed to update pickup status', { type: 'error' });
+        }
+      }
+    } else {
+      Alert.alert(
+        'ID Verification Failed',
+        scanResult?.errorMessage || 'Customer is underage or ID is expired. Pickup cannot be completed.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  async function doPickUp() {
+    if (requiresId && !isIdVerified) {
+      haptic('medium');
+      setShowAgeModal(true);
+      return;
+    }
+
     haptic('medium');
     dispatch({ type: 'CONFIRM_PICKUP' });
     showToast('Order Picked Up', {
@@ -363,9 +420,13 @@ export default function OrderDetailScreen() {
       type: 'success',
     });
 
-    if (order) {
-      useOrderStore.getState().updateOrder(order.id, { status: 'picked_up' });
-      updateStatus.mutateAsync({ id: order.id, status: 'picked_up' }).catch(() => { });
+    if (activeOrder?.id) {
+      useOrderStore.getState().updateOrder(activeOrder.id, { status: 'picked_up' });
+      try {
+        await updateStatus.mutateAsync({ id: activeOrder.id, status: 'picked_up' });
+      } catch (err: any) {
+        showToast(err?.message || 'Failed to update pickup status on server', { type: 'error' });
+      }
     }
   }
 
@@ -377,30 +438,47 @@ export default function OrderDetailScreen() {
       );
       return;
     }
+
+    if (isAlcohol) {
+      setShowSobrietyModal(true);
+      return;
+    }
+
+    await finishDelivery(false);
+  }
+
+  async function finishDelivery(intoxicationChecked: boolean = false) {
     haptic('success');
     dispatch({ type: 'COMPLETE_DELIVERY' });
-    showToast('Delivered! 🎉', {
+    showToast('Delivered!', {
       description: `You earned ${earnings?.totalDisplay ?? '$8.55'}.`,
       type: 'success',
     });
 
-    if (order) {
-      const photo = (photoUrl ?? photoUri ?? order?.deliveryPhotoUrl) || undefined;
+    if (activeOrder?.id) {
+      const photo = (photoUrl ?? photoUri ?? activeOrder?.deliveryPhotoUrl) || undefined;
 
-      useOrderStore.getState().updateOrder(order.id, {
+      useOrderStore.getState().updateOrder(activeOrder.id, {
         status: 'delivered',
         deliveryPhotoUrl: photo,
         delivery_photo_url: photo,
+        intoxicationChecked,
+        intoxication_checked: intoxicationChecked,
       });
 
-      updateStatus.mutateAsync({
-        id: order.id,
-        status: 'delivered',
-        deliveryPhotoUrl: photo,
-      }).catch(() => { });
+      try {
+        await updateStatus.mutateAsync({
+          id: activeOrder.id,
+          status: 'delivered',
+          deliveryPhotoUrl: photo,
+          intoxication_checked: intoxicationChecked,
+        } as any);
+      } catch (err: any) {
+        showToast(err?.message || 'Failed to update delivery status on server', { type: 'error' });
+      }
 
       try {
-        const transferRes = await connectApi.transferEarnings(order.id);
+        const transferRes = await connectApi.transferEarnings(activeOrder.id);
         console.log('[doDeliver] connectApi.transferEarnings response:', transferRes);
       } catch (transferErr: any) {
         console.warn('[doDeliver] connectApi.transferEarnings failed:', transferErr?.message || transferErr);
@@ -430,15 +508,58 @@ export default function OrderDetailScreen() {
           <Text style={styles.headerSubtitle}>#{shortId}</Text>
         </View>
 
-        <View
-          style={[
-            styles.badge,
-            { backgroundColor: badge.bg, borderColor: badge.border },
-          ]}
-        >
-          <Text style={[styles.badgeText, { color: badge.color }]}>
-            {badge.label}
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {requiresId && (
+            <View
+              style={[
+                styles.badge,
+                { flexDirection: 'row', alignItems: 'center', gap: 4 },
+                isMedication
+                  ? { backgroundColor: 'rgba(179, 136, 255, 0.15)', borderColor: 'rgba(179, 136, 255, 0.4)' }
+                  : { backgroundColor: 'rgba(255, 92, 92, 0.15)', borderColor: 'rgba(255, 92, 92, 0.4)' },
+              ]}
+            >
+              <MaterialIcons
+                name={isMedication ? 'medical-services' : 'local-bar'}
+                size={12}
+                color={isMedication ? '#B388FF' : '#FF7B7B'}
+              />
+              <Text
+                style={[
+                  styles.badgeText,
+                  { color: isMedication ? '#B388FF' : '#FF7B7B' },
+                ]}
+              >
+                {isMedication ? 'RX ID' : '21+ ID'}
+              </Text>
+            </View>
+          )}
+
+          {isIdVerified && (
+            <View
+              style={[
+                styles.badge,
+                { flexDirection: 'row', alignItems: 'center', gap: 4 },
+                { backgroundColor: 'rgba(0, 226, 151, 0.15)', borderColor: 'rgba(0, 226, 151, 0.4)' },
+              ]}
+            >
+              <MaterialIcons name="verified" size={12} color="#00E297" />
+              <Text style={[styles.badgeText, { color: '#00E297' }]}>
+                VERIFIED
+              </Text>
+            </View>
+          )}
+
+          <View
+            style={[
+              styles.badge,
+              { backgroundColor: badge.bg, borderColor: badge.border },
+            ]}
+          >
+            <Text style={[styles.badgeText, { color: badge.color }]}>
+              {badge.label}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -530,6 +651,62 @@ export default function OrderDetailScreen() {
               </View>
             )}
 
+            {requiresId && !isIdVerified && (
+              <View style={{
+                marginHorizontal: 20,
+                marginTop: 10,
+                padding: 12,
+                borderRadius: 12,
+                backgroundColor: 'rgba(255, 92, 92, 0.08)',
+                borderColor: 'rgba(255, 92, 92, 0.3)',
+                borderWidth: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              }}>
+                <MaterialIcons name="verified-user" size={20} color="#FF7B7B" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF7B7B', marginBottom: 2 }}>
+                    {isMedication ? 'Prescription ID Verification Required' : 'Customer 21+ ID Verification Required'}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.onSurfaceVariant, lineHeight: 15 }}>
+                    Verify customer government ID before picking up order.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowAgeModal(true)}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    backgroundColor: '#0066FF',
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>Verify ID</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {requiresId && isIdVerified && (
+              <View style={{
+                marginHorizontal: 20,
+                marginTop: 10,
+                padding: 10,
+                borderRadius: 12,
+                backgroundColor: 'rgba(0, 226, 151, 0.08)',
+                borderColor: 'rgba(0, 226, 151, 0.3)',
+                borderWidth: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              }}>
+                <MaterialIcons name="check-circle" size={18} color="#00E297" />
+                <Text style={{ fontSize: 11, color: '#00E297', flex: 1, fontWeight: '600' }}>
+                  Customer ID Verified · Ready for Pickup
+                </Text>
+              </View>
+            )}
+
             <View style={styles.sectionHead}>
               <Text style={styles.sectionHeadText}>ROUTE & STOPS</Text>
             </View>
@@ -602,6 +779,30 @@ export default function OrderDetailScreen() {
           />
         </>
       )}
+
+      <AgeVerificationModal
+        visible={showAgeModal}
+        orderId={activeOrder?.id || order?.id}
+        minAge={activeOrder?.minimumAge || (activeOrder as any)?.minimum_age || 21}
+        verificationType={activeOrder?.idVerificationType || (activeOrder as any)?.id_verification_type || 'alcohol'}
+        onClose={() => setShowAgeModal(false)}
+        onResult={handleVerificationResult}
+      />
+
+      <CustomConfirmModal
+        visible={showSobrietyModal}
+        onClose={() => setShowSobrietyModal(false)}
+        onConfirm={() => {
+          setShowSobrietyModal(false);
+          finishDelivery(true);
+        }}
+        variant="warning"
+        title="Confirm Recipient Sobriety"
+        message="State law requires confirming that the recipient of an alcohol delivery does not show signs of intoxication before handing over alcohol. Confirm recipient appears sober and alert."
+        confirmText="Confirm & Complete Delivery"
+        cancelText="Cancel"
+        iconName="verified-user"
+      />
 
       <CustomConfirmModal
         visible={showStripeModal}

@@ -19,7 +19,7 @@ export function TrackRouteCard({ pickupAddress, deliveryAddress }: TrackRouteCar
           <MaterialIcons name="storefront" size={14} color={colors.primary} />
         </View>
         <View style={styles.detailTextCol}>
-          <Text style={[styles.detailLabel, { color: colors.primary }]}>PICK UP FROM</Text>
+          <Text style={[styles.detailLabel, { color: colors.primary }]}>Pick up from</Text>
           <Text style={styles.detailValue}>{pickupAddress}</Text>
         </View>
       </View>
@@ -32,7 +32,7 @@ export function TrackRouteCard({ pickupAddress, deliveryAddress }: TrackRouteCar
           <MaterialIcons name="location-on" size={14} color={colors.tertiary} />
         </View>
         <View style={styles.detailTextCol}>
-          <Text style={[styles.detailLabel, { color: colors.tertiary }]}>DELIVER TO</Text>
+          <Text style={[styles.detailLabel, { color: colors.tertiary }]}>Deliver to</Text>
           <Text style={styles.detailValue}>{deliveryAddress}</Text>
         </View>
       </View>

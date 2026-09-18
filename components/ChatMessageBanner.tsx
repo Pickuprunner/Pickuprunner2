@@ -112,7 +112,7 @@ export default function ChatMessageBanner({ message, onDismiss }: Props) {
 
           <YStack flex={1} gap="$0.5">
             <SizableText size="$3" fontWeight="800" color="#DBEAFE">
-              👤 {message.senderName}
+              {message.senderName}
             </SizableText>
             <SizableText size="$2" color="#93C5FD" numberOfLines={2}>
               {preview}

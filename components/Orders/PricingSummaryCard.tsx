@@ -132,7 +132,7 @@ export function PricingSummaryCard({
             <View style={styles.summaryRow}>
               <View style={styles.dotGreen} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.rowLabel}>PICKUP FROM</Text>
+                <Text style={styles.rowLabel}>Pick up from</Text>
                 <Text style={styles.rowValue}>{cleanPickup}</Text>
               </View>
             </View>
@@ -144,7 +144,7 @@ export function PricingSummaryCard({
             <View style={styles.summaryRow}>
               <View style={styles.dotBlue} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.rowLabel}>DELIVER TO</Text>
+                <Text style={styles.rowLabel}>Deliver to</Text>
                 <Text style={styles.rowValue}>{cleanDelivery}</Text>
               </View>
             </View>

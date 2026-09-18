@@ -35,19 +35,42 @@ export interface CreateOrderPayload {
   storeId?: string;
   orderScope?: string;
   customerSessionId?: string;
+  requires_id_verification?: boolean;
+  id_verification_type?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+  minimum_age?: number;
+  requiresIdVerification?: boolean;
+  idVerificationType?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+  minimumAge?: number;
 }
 
 export interface UpdateOrderPayload {
   status?: OrderStatus;
   driverUserId?: string;
+  driver_user_id?: string;
   driverName?: string;
+  driver_name?: string;
   deliveryPhotoUrl?: string;
+  delivery_photo_url?: string;
   ageVerified?: boolean | number;
+  age_verified?: boolean | number;
   ageVerifiedAt?: string | Date;
+  age_verified_at?: string | Date;
+  intoxication_checked?: boolean;
+  intoxicationChecked?: boolean;
+  requires_id_verification?: boolean;
+  requiresIdVerification?: boolean;
+  id_verification_type?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+  idVerificationType?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+  minimum_age?: number;
+  minimumAge?: number;
   tipAmount?: number;
+  tip_amount?: number;
   distanceMiles?: number;
+  distance_miles?: number;
   pickupAddress?: string;
+  pickup_address?: string;
   deliveryAddress?: string;
+  delivery_address?: string;
   pickupLat?: number;
   pickupLng?: number;
   deliveryLat?: number;
@@ -60,8 +83,11 @@ export interface UpdateOrderPayload {
   deliveryPrecision?: string;
   items?: string;
   customerName?: string;
+  customer_name?: string;
   customerPhone?: string;
+  customer_phone?: string;
   customerEmail?: string;
+  customer_email?: string;
 }
 
 export interface ClaimOrderPayload {
@@ -145,6 +171,14 @@ export interface OrderItem {
   updated_at?: string;
   amountCents?: number;
   amount_cents?: number;
+  requiresIdVerification?: boolean;
+  requires_id_verification?: boolean;
+  idVerificationType?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+  id_verification_type?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+  minimumAge?: number;
+  minimum_age?: number;
+  intoxicationChecked?: boolean;
+  intoxication_checked?: boolean;
 }
 
 export type OrderResponse = OrderItem | { success?: boolean; data: OrderItem };
@@ -189,6 +223,14 @@ function unwrapOrder(res: any): OrderItem {
     deliveryLocationSource: raw.deliveryLocationSource || raw.delivery_location_source,
     pickupPrecision: raw.pickupPrecision || raw.pickup_precision,
     deliveryPrecision: raw.deliveryPrecision || raw.delivery_precision,
+    requiresIdVerification: Boolean(raw.requiresIdVerification ?? raw.requires_id_verification),
+    requires_id_verification: Boolean(raw.requiresIdVerification ?? raw.requires_id_verification),
+    idVerificationType: raw.idVerificationType || raw.id_verification_type,
+    id_verification_type: raw.idVerificationType || raw.id_verification_type,
+    minimumAge: raw.minimumAge ?? raw.minimum_age,
+    minimum_age: raw.minimumAge ?? raw.minimum_age,
+    ageVerified: Boolean(raw.ageVerified ?? raw.age_verified),
+    intoxicationChecked: Boolean(raw.intoxicationChecked ?? raw.intoxication_checked),
   };
 }
 

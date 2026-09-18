@@ -50,7 +50,8 @@ export function DeliveryPhotoCard({
             )}
             {!uploadingPhoto && photoUrl && (
               <View style={styles.photoUploadedBadge}>
-                <Text style={styles.photoUploadedText}>✓ Verified Upload</Text>
+                <MaterialIcons name="check-circle" size={12} color="#FFFFFF" />
+                <Text style={styles.photoUploadedText}>Verified Upload</Text>
               </View>
             )}
           </View>
@@ -143,6 +144,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 10,
     right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: colors.primaryContainer,
     borderRadius: 12,
     paddingHorizontal: 10,

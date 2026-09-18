@@ -76,4 +76,69 @@ export const deliveryApi = {
       return null;
     }
   },
+
+  verifyId: async (
+    orderId: string,
+    file: { uri: string; name?: string; type?: string }
+  ): Promise<VerifyIdResponse> => {
+    const baseUrl = getApiBaseUrl();
+    const token = useAuthStore.getState().token;
+
+    const formData = new FormData();
+    const fileName = file.name || `id_${orderId}_${Date.now()}.jpg`;
+    const fileType = file.type || 'image/jpeg';
+
+    formData.append('customer_id_photo', {
+      uri: file.uri,
+      name: fileName,
+      type: fileType,
+    } as any);
+    formData.append('orderId', orderId);
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${baseUrl}/delivery/verify-id`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      const err: any = new Error(
+        data?.rejectionReason || data?.error || data?.message || 'ID Verification Failed'
+      );
+      err.status = response.status;
+      err.data = data;
+      throw err;
+    }
+
+    return data as VerifyIdResponse;
+  },
 };
+
+export interface VerifyIdResponse {
+  orderId: string;
+  customerVerified: boolean;
+  verdict: 'PASSED' | 'REJECTED' | 'FAILED';
+  rejectionReason?: string;
+  customerName?: string;
+  customerAge?: number;
+  isOverMinAge?: boolean;
+  isExpired?: boolean;
+  idType?: string;
+  details?: {
+    customerAge?: number;
+    isOverMinAge?: boolean;
+    isExpired?: boolean;
+    idType?: string;
+    tamperSignsDetected?: boolean;
+    fraudNotes?: string;
+  };
+  error?: string;
+  message?: string;
+}
+

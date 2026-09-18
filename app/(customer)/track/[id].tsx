@@ -76,6 +76,17 @@ interface TrackedOrder {
   paymentStatus?: string;
   amount_cents?: number;
   amountCents?: number;
+  requires_id_verification?: boolean;
+  requiresIdVerification?: boolean;
+  hasAlcohol?: boolean;
+  id_verification_type?: 'alcohol' | 'medication' | 'id';
+  idVerificationType?: 'alcohol' | 'medication' | 'id';
+  minimum_age?: number;
+  minimumAge?: number;
+  age_verified?: boolean;
+  ageVerified?: boolean;
+  intoxication_checked?: boolean;
+  intoxicationChecked?: boolean;
 }
 
 export default function TrackOrderScreen() {
@@ -435,6 +446,7 @@ export default function TrackOrderScreen() {
         await ordersApi.update(id, {
           status: 'delivered',
           deliveryPhotoUrl: samplePhoto,
+          intoxication_checked: true,
         });
       } catch (err) {
         console.warn('[TrackOrder] ordersApi.update deliver failed:', err);
@@ -676,7 +688,7 @@ export default function TrackOrderScreen() {
     if (isDelivered) {
       return {
         icon: 'check-circle',
-        title: 'Delivered ✓',
+        title: 'Delivered',
         desc: 'Your package has been successfully delivered.',
         color: colors.tertiary,
         bg: colors.greenAlpha10,
@@ -839,6 +851,80 @@ export default function TrackOrderScreen() {
             </View>
           </Animated.View>
         )}
+
+        {/* ID Verification Status Banner */}
+        {(() => {
+          const requiresId = !!(
+            order?.requiresIdVerification ||
+            order?.requires_id_verification ||
+            order?.hasAlcohol ||
+            storeOrder?.requiresIdVerification ||
+            storeOrder?.hasAlcohol
+          );
+          const isMed =
+            order?.idVerificationType === 'medication' ||
+            order?.id_verification_type === 'medication' ||
+            storeOrder?.idVerificationType === 'medication';
+          const isIdVerified = !!(
+            order?.ageVerified ||
+            order?.age_verified ||
+            storeOrder?.ageVerified
+          );
+
+          if (!requiresId) return null;
+
+          if (!isIdVerified) {
+            return (
+              <Animated.View entering={FadeInDown.delay(50).springify()}>
+                <View style={{
+                  padding: 14,
+                  borderRadius: 18,
+                  backgroundColor: 'rgba(255, 92, 92, 0.08)',
+                  borderWidth: 1.5,
+                  borderColor: 'rgba(255, 92, 92, 0.3)',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                }}>
+                  <MaterialIcons name="verified-user" size={22} color="#FF7B7B" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#FF7B7B', marginBottom: 2 }}>
+                      {isMed ? 'Prescription ID Verification Required' : '21+ Government ID Required'}
+                    </Text>
+                    <Text style={{ fontSize: 11.5, color: colors.onSurfaceVariant, lineHeight: 16 }}>
+                      Government ID verification is required before pickup. Zero disk retention.
+                    </Text>
+                  </View>
+                </View>
+              </Animated.View>
+            );
+          }
+
+          return (
+            <Animated.View entering={FadeInDown.delay(50).springify()}>
+              <View style={{
+                padding: 14,
+                borderRadius: 18,
+                backgroundColor: 'rgba(0, 226, 151, 0.08)',
+                borderWidth: 1.5,
+                borderColor: 'rgba(0, 226, 151, 0.3)',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+              }}>
+                <MaterialIcons name="check-circle" size={20} color="#00E297" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#00E297' }}>
+                    Customer ID Verified
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.onSurfaceVariant, marginTop: 1 }}>
+                    Customer ID Verified · Ready for Pickup
+                  </Text>
+                </View>
+              </View>
+            </Animated.View>
+          );
+        })()}
 
         {/* Order Status Timeline */}
         <Animated.View entering={FadeInDown.delay(70).springify()}>

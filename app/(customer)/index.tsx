@@ -245,6 +245,9 @@ export default function CustomerNewOrderScreen() {
           cityId: APP_CONFIG.CITY_ID,
           storeId: APP_CONFIG.STORE_ID,
           orderScope: ORDER_SCOPE,
+          requires_id_verification: form.hasAlcohol,
+          id_verification_type: form.hasAlcohol ? 'alcohol' : undefined,
+          minimum_age: form.hasAlcohol ? 21 : undefined,
         });
       } catch (apiErr: any) {
         console.warn('[customer-new-order] ordersApi.create failed, fallback local:', apiErr);
@@ -271,6 +274,14 @@ export default function CustomerNewOrderScreen() {
         storeId: APP_CONFIG.STORE_ID,
         orderScope: ORDER_SCOPE,
         createdAt: new Date().toISOString(),
+        hasAlcohol: form.hasAlcohol ? 1 : 0,
+        requiresIdVerification: form.hasAlcohol,
+        requires_id_verification: form.hasAlcohol,
+        idVerificationType: form.hasAlcohol ? 'alcohol' : undefined,
+        id_verification_type: form.hasAlcohol ? 'alcohol' : undefined,
+        minimumAge: form.hasAlcohol ? 21 : undefined,
+        minimum_age: form.hasAlcohol ? 21 : undefined,
+        ageVerified: false,
       };
 
       const orderId = finalOrder.id;

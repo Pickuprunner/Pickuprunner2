@@ -59,8 +59,19 @@ export interface Order {
   customerSessionId?: string;
   customer_session_id?: string;
   hasAlcohol?: number;
+  has_alcohol?: number | boolean;
   ageVerified?: number | boolean;
+  age_verified?: number | boolean;
   ageVerifiedAt?: string;
+  age_verified_at?: string;
+  requiresIdVerification?: boolean;
+  requires_id_verification?: boolean;
+  idVerificationType?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+  id_verification_type?: 'alcohol' | 'medication' | 'prescription_medication' | string;
+  minimumAge?: number;
+  minimum_age?: number;
+  intoxicationChecked?: boolean;
+  intoxication_checked?: boolean;
   deliveryPhotoUrl?: string;
   deliveredAt?: string;
   driverUserId?: string;
@@ -226,6 +237,14 @@ export const useOrderStore = create<OrderStoreState>()(
             hasAlcohol: incoming.hasAlcohol ?? existing?.hasAlcohol ?? 0,
             ageVerified: incoming.ageVerified ?? incoming.age_verified ?? existing?.ageVerified,
             ageVerifiedAt: incoming.ageVerifiedAt ?? incoming.age_verified_at ?? existing?.ageVerifiedAt,
+            requiresIdVerification: Boolean(incoming.requiresIdVerification ?? incoming.requires_id_verification ?? existing?.requiresIdVerification),
+            requires_id_verification: Boolean(incoming.requiresIdVerification ?? incoming.requires_id_verification ?? existing?.requires_id_verification),
+            idVerificationType: incoming.idVerificationType || incoming.id_verification_type || existing?.idVerificationType,
+            id_verification_type: incoming.idVerificationType || incoming.id_verification_type || existing?.id_verification_type,
+            minimumAge: incoming.minimumAge ?? incoming.minimum_age ?? existing?.minimumAge,
+            minimum_age: incoming.minimumAge ?? incoming.minimum_age ?? existing?.minimum_age,
+            intoxicationChecked: Boolean(incoming.intoxicationChecked ?? incoming.intoxication_checked ?? existing?.intoxicationChecked),
+            intoxication_checked: Boolean(incoming.intoxicationChecked ?? incoming.intoxication_checked ?? existing?.intoxication_checked),
             deliveryPhotoUrl:
               incoming.deliveryPhotoUrl && (incoming.deliveryPhotoUrl.startsWith('http') || incoming.deliveryPhotoUrl.startsWith('file://'))
                 ? incoming.deliveryPhotoUrl
