@@ -10,6 +10,7 @@ import {
   Text,
   ScrollView,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResponsive } from '@/hooks/useResponsive';
 import * as ImagePicker from 'expo-image-picker';
@@ -295,15 +296,30 @@ export default function AgeVerificationModal({
 
           {(phase === 'uploading' || phase === 'scanning') && (
             <View style={styles.loadingContainer}>
-              <View style={styles.loadingCard}>
-                <ActivityIndicator size="large" color={colors.primaryContainer} />
-                <View style={styles.loadingTextCol}>
-                  <Text style={styles.loadingTitle}>Verifying Customer ID…</Text>
-                  <Text style={styles.loadingSubtitle}>
-                    Checking document validity & date of birth
-                  </Text>
-                </View>
+              <View style={styles.scanFrame}>
+                {!!previewUri && (
+                  <Image
+                    source={{ uri: previewUri }}
+                    style={styles.scanPhoto}
+                    contentFit="contain"
+                    transition={200}
+                  />
+                )}
+                {/* Corner brackets */}
+                <View style={[styles.scanCorner, styles.scanCornerTL]} />
+                <View style={[styles.scanCorner, styles.scanCornerTR]} />
+                <View style={[styles.scanCorner, styles.scanCornerBL]} />
+                <View style={[styles.scanCorner, styles.scanCornerBR]} />
               </View>
+
+              {/* Status below */}
+              <View style={styles.scanStatusRow}>
+                <ActivityIndicator size="small" color={colors.primaryContainer} />
+                <Text style={styles.loadingTitle}>Verifying Customer ID…</Text>
+              </View>
+              <Text style={styles.loadingSubtitle}>
+                Checking document validity & date of birth
+              </Text>
             </View>
           )}
 
@@ -608,6 +624,59 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+  scanFrame: {
+    width: '100%',
+    aspectRatio: 1.6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  scanPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  scanCorner: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    borderColor: colors.primaryContainer,
+  },
+  scanCornerTL: {
+    top: 10,
+    left: 10,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderTopLeftRadius: 6,
+  },
+  scanCornerTR: {
+    top: 10,
+    right: 10,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderTopRightRadius: 6,
+  },
+  scanCornerBL: {
+    bottom: 10,
+    left: 10,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderBottomLeftRadius: 6,
+  },
+  scanCornerBR: {
+    bottom: 10,
+    right: 10,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: 6,
+  },
+  scanStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   loadingCard: {
     alignItems: 'center',
