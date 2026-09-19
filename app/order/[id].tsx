@@ -798,8 +798,8 @@ export default function OrderDetailScreen() {
         }}
         variant="warning"
         title="Confirm Recipient Sobriety"
-        message="State law requires confirming that the recipient of an alcohol delivery does not show signs of intoxication before handing over alcohol. Confirm recipient appears sober and alert."
-        confirmText="Confirm & Complete Delivery"
+        message="By law, you must verify the recipient is not visibly intoxicated before delivering alcohol."
+        confirmText="Confirm & Deliver"
         cancelText="Cancel"
         iconName="verified-user"
       />
