@@ -124,7 +124,7 @@ export function CustomerOrderCard({
   onCancel,
   style,
 }: CustomerOrderCardProps) {
-  const { isCompact, isNarrow, select } = useResponsive();
+  const { select } = useResponsive();
   const [expanded, setExpanded] = useState(false);
   const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
 
@@ -151,7 +151,6 @@ export function CustomerOrderCard({
   const hasMileageSurcharge = mileageCents > 0;
 
   const isPending = currentStatus === 'pending';
-  const isAccepted = currentStatus === 'accepted' || currentStatus === 'assigned';
   const isPickedUp = currentStatus === 'picked_up' || currentStatus === 'en_route' || currentStatus === 'shopping';
   const isDelivered = currentStatus === 'delivered';
   const driverName = order.driverName || order.driver_name;
@@ -212,7 +211,7 @@ export function CustomerOrderCard({
               payment_status: paidSuccess ? 'paid' : ((latest as any).payment_status || 'unpaid'),
             });
           }
-        } catch {}
+        } catch { }
         setTimeout(async () => {
           try {
             const latest = await ordersApi.getById(order.id);
@@ -223,7 +222,7 @@ export function CustomerOrderCard({
                 payment_status: paidSuccess ? 'paid' : ((latest as any).payment_status || 'unpaid'),
               });
             }
-          } catch {}
+          } catch { }
         }, 700);
       } else {
         Alert.alert('Payment', res?.error || 'Could not create checkout session. Please try again.');
@@ -240,46 +239,52 @@ export function CustomerOrderCard({
       case 'assigned':
       case 'accepted':
         return {
-          label: 'DRIVER ON THE WAY',
-          color: '#0066FF',
-          bg: 'rgba(0, 102, 255, 0.15)',
-          border: 'rgba(0, 102, 255, 0.35)',
+          label: 'DRIVER ON WAY',
+          icon: 'directions-car' as const,
+          color: '#3B82F6',
+          bg: 'rgba(59, 130, 246, 0.14)',
+          border: 'rgba(59, 130, 246, 0.35)',
         };
       case 'shopping':
         return {
           label: 'SHOPPING',
+          icon: 'shopping-bag' as const,
           color: '#FFE399',
-          bg: 'rgba(255, 227, 153, 0.15)',
+          bg: 'rgba(255, 227, 153, 0.14)',
           border: 'rgba(255, 227, 153, 0.35)',
         };
       case 'picked_up':
       case 'en_route':
         return {
           label: 'OUT FOR DELIVERY',
+          icon: 'near-me' as const,
           color: '#F4C300',
-          bg: 'rgba(244, 195, 0, 0.15)',
+          bg: 'rgba(244, 195, 0, 0.14)',
           border: 'rgba(244, 195, 0, 0.35)',
         };
       case 'delivered':
         return {
           label: 'DELIVERED',
+          icon: 'check-circle' as const,
           color: '#00E297',
-          bg: 'rgba(0, 226, 151, 0.12)',
+          bg: 'rgba(0, 226, 151, 0.14)',
           border: 'rgba(0, 226, 151, 0.35)',
         };
       case 'cancelled':
         return {
           label: 'CANCELLED',
+          icon: 'cancel' as const,
           color: '#FF6B6B',
-          bg: 'rgba(255, 107, 107, 0.15)',
+          bg: 'rgba(255, 107, 107, 0.14)',
           border: 'rgba(255, 107, 107, 0.35)',
         };
       case 'pending':
       default:
         return {
           label: 'PENDING',
+          icon: 'schedule' as const,
           color: '#F4C300',
-          bg: 'rgba(244, 195, 0, 0.1)',
+          bg: 'rgba(244, 195, 0, 0.12)',
           border: 'rgba(244, 195, 0, 0.3)',
         };
     }
@@ -297,6 +302,75 @@ export function CustomerOrderCard({
     order.id_verification_type === 'medication';
   const isIdVerified = !!(order.ageVerified || order.age_verified);
 
+  const parsedItems = (() => {
+    let text = order.items || '';
+    const idBadges: { label: string; icon?: any; color: string; bg: string; border: string }[] = [];
+    let deliveryTag: { label: string; icon?: any; color: string; bg: string; border: string } | null = null;
+
+    // 1. Delivery Mode Tag (e.g. Leave at Door / Meet at Door)
+    if (text.includes('[LEAVE AT DOOR]')) {
+      deliveryTag = {
+        label: 'Leave at Door',
+        icon: 'meeting-room',
+        color: '#FFE399',
+        bg: 'rgba(255, 227, 153, 0.12)',
+        border: 'rgba(255, 227, 153, 0.28)',
+      };
+      text = text.replace(/\[LEAVE AT DOOR\]\s*/g, '');
+    } else if (text.includes('[MEET AT DOOR]')) {
+      deliveryTag = {
+        label: 'Meet at Door',
+        icon: 'people',
+        color: '#00E297',
+        bg: 'rgba(0, 226, 151, 0.12)',
+        border: 'rgba(0, 226, 151, 0.28)',
+      };
+      text = text.replace(/\[MEET AT DOOR\]\s*/g, '');
+    }
+
+    // 2. ID Verification Requirement Tag (21+ ID or RX ID)
+    if (requiresId || text.includes('[21+ ALCOHOL ID REQUIRED]') || text.includes('[21+ALCOHOL ID REQUIRED]')) {
+      idBadges.push({
+        label: isMedication ? 'RX ID' : '21+ ID',
+        icon: isMedication ? 'medical-services' : 'wine-bar',
+        color: isMedication ? '#B388FF' : '#FF7B7B',
+        bg: isMedication ? 'rgba(179, 136, 255, 0.14)' : 'rgba(255, 107, 107, 0.14)',
+        border: isMedication ? 'rgba(179, 136, 255, 0.35)' : 'rgba(255, 107, 107, 0.35)',
+      });
+      text = text.replace(/\[21\+?\s*ALCOHOL ID REQUIRED\]\s*/gi, '');
+    }
+
+    // 3. ID Verified Status Tag
+    if (isIdVerified) {
+      idBadges.push({
+        label: 'ID Verified',
+        icon: 'verified',
+        color: '#00E297',
+        bg: 'rgba(0, 226, 151, 0.14)',
+        border: 'rgba(0, 226, 151, 0.35)',
+      });
+    }
+
+    // 4. Other bracket tags
+    const otherBracket = text.match(/^\[([^\]]+)\]\s*(.*)$/);
+    if (otherBracket) {
+      idBadges.push({
+        label: otherBracket[1],
+        color: '#B3C5FF',
+        bg: 'rgba(0, 102, 255, 0.12)',
+        border: 'rgba(0, 102, 255, 0.28)',
+      });
+      text = otherBracket[2] || '';
+    }
+
+    return {
+      cleanText: text.trim() || order.items || 'Standard Order',
+      idBadges,
+      deliveryTag,
+    };
+  })();
+
+  // Header: Clean top row containing Customer Profile and Main Order Status ONLY
   const headerNode = (
     <View style={styles.header}>
       <View style={styles.userInfo}>
@@ -313,55 +387,36 @@ export function CustomerOrderCard({
         </View>
       </View>
 
-      <View style={styles.badgesWrapper}>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: badge.bg, borderColor: badge.border },
-          ]}
-        >
-          <Text style={[styles.statusText, { color: badge.color }]}>{badge.label}</Text>
-        </View>
-
-        {(requiresId || isIdVerified) && (
-          <View style={styles.badgesRow}>
-            {requiresId && (
-              <View
-                style={[
-                  styles.statusBadge,
-                  styles.badgeWithIcon,
-                  isMedication ? styles.rxBadge : styles.alcoholBadge,
-                ]}
-              >
-                <MaterialIcons
-                  name={isMedication ? 'medical-services' : 'local-bar'}
-                  size={11}
-                  color={isMedication ? '#B388FF' : '#FF7B7B'}
-                />
-                <Text
-                  style={[
-                    styles.statusText,
-                    isMedication ? styles.rxBadgeText : styles.alcoholBadgeText,
-                  ]}
-                >
-                  {isMedication ? 'RX ID' : '21+ ID'}
-                </Text>
-              </View>
-            )}
-
-            {isIdVerified && (
-              <View style={[styles.statusBadge, styles.badgeWithIcon, styles.verifiedBadge]}>
-                <MaterialIcons name="verified" size={11} color="#00E297" />
-                <Text style={[styles.statusText, styles.verifiedBadgeText]}>
-                  ID VERIFIED
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
+      <View
+        style={[
+          styles.statusBadge,
+          { backgroundColor: badge.bg, borderColor: badge.border },
+        ]}
+      >
+        <MaterialIcons name={badge.icon} size={13} color={badge.color} />
+        <Text style={[styles.statusText, { color: badge.color }]}>{badge.label}</Text>
       </View>
     </View>
   );
+
+  const navigateToTrack = () => {
+    haptic();
+    router.push({
+      pathname: `/(customer)/track/${order.id}`,
+      params: {
+        deliveryAddress: order.deliveryAddress || order.delivery_address || '123 E Test Ave, Sahuarita, AZ 85629',
+        pickupAddress: order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        customerEmail: order.customerEmail || order.customer_email || '',
+        items: order.items || '',
+        status: currentStatus,
+        distanceMiles: (order.distanceMiles ?? order.distance_miles ?? '').toString(),
+        tipAmount: (order.tipAmount ?? order.tip_amount ?? '').toString(),
+        amountCents: (order.amountCents ?? order.amount_cents ?? '').toString(),
+      },
+    } as any);
+  };
 
   const footerNode = (
     <View style={styles.footer}>
@@ -372,7 +427,7 @@ export function CustomerOrderCard({
               {(driverName || 'D').trim().charAt(0).toUpperCase()}
             </Text>
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, gap: 2 }}>
             <Text style={styles.driverNameText}>{driverName}</Text>
             <Text style={styles.driverStatusText}>
               {isPickedUp ? 'Package picked up · Heading to you' : 'Driver assigned · Heading to store'}
@@ -381,34 +436,41 @@ export function CustomerOrderCard({
         </View>
       )}
 
-      <Pressable
-        onPress={() => {
-          haptic();
-          setExpanded((v) => !v);
-        }}
-        style={styles.priceRow}
-      >
+      {/* Price & Details Bar */}
+      <View style={styles.priceRow}>
         <View style={styles.priceContainer}>
           <Text style={styles.priceText}>{fmt(totalCents)}</Text>
-          {!isPaid && (
+          {isPaid ? (
+            <View style={styles.paidChip}>
+              <MaterialIcons name="check-circle" size={13} color="#00E297" />
+              <Text style={styles.paidChipText}>{isDevBypassed ? 'Dev-Pass' : 'Paid'}</Text>
+            </View>
+          ) : (
             <View style={styles.paymentTag}>
               <Text style={styles.paymentTagText}>Pay on Pickup</Text>
             </View>
           )}
         </View>
 
-        <View style={styles.detailsToggle}>
+        <Pressable
+          onPress={() => {
+            haptic();
+            setExpanded((v) => !v);
+          }}
+          style={styles.detailsToggle}
+        >
           <Text style={styles.detailsToggleText}>
             {expanded ? 'Hide Details' : 'View Details'}
           </Text>
           <MaterialIcons
             name={expanded ? 'expand-less' : 'expand-more'}
             size={18}
-            color="#8C90A1"
+            color="#A4A8BC"
           />
-        </View>
-      </Pressable>
+        </Pressable>
+      </View>
 
+      {/* Expandable Breakdown Drawer */}
       {expanded && (
         <View style={styles.breakdownDrawer}>
           <Text style={styles.breakdownHeader}>PRICE BREAKDOWN</Text>
@@ -440,6 +502,7 @@ export function CustomerOrderCard({
         </View>
       )}
 
+      {/* Action Buttons Section (Old single-row style restored) */}
       <View style={styles.actionsContainer}>
         {needsPayment && (
           <TouchableOpacity
@@ -452,7 +515,7 @@ export function CustomerOrderCard({
               <ActivityIndicator size="small" color="#0F131C" />
             ) : (
               <>
-                <MaterialIcons name="payment" size={15} color="#0F131C" />
+                <MaterialIcons name="payment" size={16} color="#0F131C" />
                 <Text style={styles.payButtonText} numberOfLines={1}>
                   Pay {fmt(totalCents)}
                 </Text>
@@ -461,67 +524,24 @@ export function CustomerOrderCard({
           </TouchableOpacity>
         )}
 
-        {isPaid && (
-          <View style={styles.paidBadge}>
-            <MaterialIcons name="check-circle" size={15} color="#00e297" />
-            <Text style={styles.paidBadgeText} numberOfLines={1}>
-              {isDevBypassed ? 'Dev-Pass' : 'PAID'}
-            </Text>
-          </View>
-        )}
-
         {!isDelivered ? (
           <TouchableOpacity
-            onPress={() => {
-              haptic();
-              router.push({
-                pathname: `/(customer)/track/${order.id}`,
-                params: {
-                  deliveryAddress: order.deliveryAddress || order.delivery_address || '123 E Test Ave, Sahuarita, AZ 85629',
-                  pickupAddress: order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS,
-                  customerName: customerName,
-                  customerPhone: customerPhone,
-                  customerEmail: order.customerEmail || order.customer_email || '',
-                  items: order.items || '',
-                  status: currentStatus,
-                  distanceMiles: (order.distanceMiles ?? order.distance_miles ?? '').toString(),
-                  tipAmount: (order.tipAmount ?? order.tip_amount ?? '').toString(),
-                  amountCents: (order.amountCents ?? order.amount_cents ?? '').toString(),
-                },
-              } as any);
-            }}
+            onPress={navigateToTrack}
             activeOpacity={0.85}
-            style={styles.actionButton}
+            style={styles.trackButton}
           >
-            <MaterialIcons name="near-me" size={15} color="#f8f7ff" />
-            <Text style={styles.actionButtonText} numberOfLines={1}>
+            <MaterialIcons name="near-me" size={16} color="#FFFFFF" />
+            <Text style={styles.trackButtonText} numberOfLines={1}>
               Track
             </Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            onPress={() => {
-              haptic();
-              router.push({
-                pathname: `/(customer)/track/${order.id}`,
-                params: {
-                  deliveryAddress: order.deliveryAddress || order.delivery_address || '123 E Test Ave, Sahuarita, AZ 85629',
-                  pickupAddress: order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS,
-                  customerName: customerName,
-                  customerPhone: customerPhone,
-                  customerEmail: order.customerEmail || order.customer_email || '',
-                  items: order.items || '',
-                  status: currentStatus,
-                  distanceMiles: (order.distanceMiles ?? order.distance_miles ?? '').toString(),
-                  tipAmount: (order.tipAmount ?? order.tip_amount ?? '').toString(),
-                  amountCents: (order.amountCents ?? order.amount_cents ?? '').toString(),
-                },
-              } as any);
-            }}
+            onPress={navigateToTrack}
             activeOpacity={0.85}
             style={styles.deliveredBadgeButton}
           >
-            <MaterialIcons name="check-circle" size={15} color="#00e297" />
+            <MaterialIcons name="check-circle" size={16} color="#00E297" />
             <Text style={styles.deliveredBadgeText} numberOfLines={1}>
               Delivered
             </Text>
@@ -561,94 +581,116 @@ export function CustomerOrderCard({
     </View>
   );
 
-  const handleCardPress = () => {
-    if (onPress) {
-      onPress();
-      return;
-    }
-    haptic();
-    router.push({
-      pathname: `/(customer)/track/${order.id}`,
-      params: {
-        deliveryAddress: order.deliveryAddress || order.delivery_address || '123 E Test Ave, Sahuarita, AZ 85629',
-        pickupAddress: order.pickupAddress || order.pickup_address || APP_CONFIG.STORE_ADDRESS,
-        customerName: customerName,
-        customerPhone: customerPhone,
-        customerEmail: order.customerEmail || order.customer_email || '',
-        items: order.items || '',
-        status: currentStatus,
-        distanceMiles: (order.distanceMiles ?? order.distance_miles ?? '').toString(),
-        tipAmount: (order.tipAmount ?? order.tip_amount ?? '').toString(),
-        amountCents: (order.amountCents ?? order.amount_cents ?? '').toString(),
-      },
-    } as any);
-  };
-
   return (
     <CustomCard
       variant="glass"
       header={headerNode}
       footer={footerNode}
-      onPress={onPress || handleCardPress}
+      onPress={onPress || navigateToTrack}
       style={[
         styles.cardContainer,
         { marginHorizontal: select(16, 12, 8) },
         style,
       ]}
     >
-      <View style={styles.routesContainer}>
-        <View style={styles.connectingLine} />
+      {/* 1. TOP: Order Items & Badges Card */}
+      <View style={styles.itemsCard}>
+        {/* Top Header Row: Title on Left, Leave at Door on Right */}
+        <View style={styles.itemsHeaderRow}>
+          <View style={styles.itemsTitleLeft}>
+            <View style={styles.itemsIconBox}>
+              <MaterialIcons name="inventory-2" size={13} color="#FFE399" />
+            </View>
+            <Text style={styles.itemsSectionTitle}>ORDER ITEMS</Text>
+          </View>
 
-        {/* Pickup */}
+          {/* Leave at Door / Delivery tag on top right */}
+          {parsedItems.deliveryTag && (
+            <View
+              style={[
+                styles.deliveryInstructionPill,
+                {
+                  backgroundColor: parsedItems.deliveryTag.bg,
+                  borderColor: parsedItems.deliveryTag.border,
+                },
+              ]}
+            >
+              <MaterialIcons
+                name={parsedItems.deliveryTag.icon}
+                size={11}
+                color={parsedItems.deliveryTag.color}
+              />
+              <Text
+                style={[
+                  styles.deliveryInstructionText,
+                  { color: parsedItems.deliveryTag.color },
+                ]}
+              >
+                {parsedItems.deliveryTag.label}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Content Row: Item Text on Left, 21+ ID & Verified Badges on Bottom Right */}
+        <View style={styles.itemsContentRow}>
+          <Text style={styles.itemsBodyText} numberOfLines={2}>
+            {parsedItems.cleanText}
+          </Text>
+
+          {/* ID Badges (21+ ID & ID Verified) on bottom right */}
+          {parsedItems.idBadges.length > 0 && (
+            <View style={styles.idBadgesRow}>
+              {parsedItems.idBadges.map((b, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.itemTagPill,
+                    { backgroundColor: b.bg, borderColor: b.border },
+                  ]}
+                >
+                  {b.icon && <MaterialIcons name={b.icon} size={11} color={b.color} />}
+                  <Text style={[styles.itemTagText, { color: b.color }]}>{b.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* 2. SECOND: Location & Route Timeline */}
+      <View style={styles.routesContainer}>
+        {/* Pickup Location */}
         <View style={styles.routeItem}>
-          <View style={[styles.routeIcon, { borderColor: '#FFE399' }]}>
-            <MaterialIcons name="store" size={12} color="#FFE399" />
+          <View style={styles.routeIconBoxPickup}>
+            <MaterialIcons name="store" size={15} color="#FFE399" />
           </View>
           <View style={styles.routeTextContainer}>
-            <Text style={[styles.routeLabel, { color: '#b3c5ff' }]}>Pick up from</Text>
+            <Text style={styles.routeLabelPickup}>PICK UP FROM</Text>
             <Text style={styles.routeAddress} numberOfLines={2}>
               {pickupAddress}
             </Text>
           </View>
         </View>
 
-        {/* Delivery */}
+        {/* Connecting Track Line */}
+        <View style={styles.routeLineContainer}>
+          <View style={styles.connectingLine} />
+        </View>
+
+        {/* Delivery Location */}
         <View style={styles.routeItem}>
-          <View style={[styles.routeIcon, { borderColor: '#00E297' }]}>
-            <MaterialIcons name="location-on" size={12} color="#00E297" />
+          <View style={styles.routeIconBoxDelivery}>
+            <MaterialIcons name="navigation" size={15} color="#00E297" />
           </View>
           <View style={styles.routeTextContainer}>
-            <Text style={[styles.routeLabel, { color: '#00e297' }]}>Deliver to</Text>
+            <Text style={styles.routeLabelDelivery}>DELIVER TO</Text>
             <Text style={styles.routeAddress} numberOfLines={2}>
               {deliveryAddress}
             </Text>
           </View>
         </View>
       </View>
-
-      {order.items ? (
-        <View style={styles.itemsPill}>
-          <MaterialIcons name="inventory-2" size={15} color="#B3C5FF" />
-          <View style={styles.itemsTextCol}>
-            {(() => {
-              const bracketMatch = order.items.match(/^(\[[^\]]+\])\s*(.*)$/);
-              if (bracketMatch) {
-                return (
-                  <Text style={styles.itemsPillText} numberOfLines={2} ellipsizeMode="tail">
-                    <Text style={styles.itemsHighlightTag}>{bracketMatch[1]}</Text>
-                    {bracketMatch[2] ? ` ${bracketMatch[2]}` : ''}
-                  </Text>
-                );
-              }
-              return (
-                <Text style={styles.itemsPillText} numberOfLines={2} ellipsizeMode="tail">
-                  {order.items}
-                </Text>
-              );
-            })()}
-          </View>
-        </View>
-      ) : null}
 
       <CustomConfirmModal
         visible={showPaymentSuccessModal}
@@ -669,187 +711,233 @@ const styles = StyleSheet.create({
   cardContainer: {
     marginHorizontal: 12,
     marginBottom: 16,
+    borderRadius: 24,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 8,
+    alignItems: 'center',
+    gap: 12,
+    paddingBottom: 2,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     flex: 1,
     minWidth: 0,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#101420',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 227, 153, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FFE399',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  avatarText: {
+    color: '#FFE399',
+    fontSize: 16,
+    fontWeight: '800',
   },
   userTextCol: {
     flex: 1,
     minWidth: 0,
     justifyContent: 'center',
-  },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#0F131C',
-    borderWidth: 1.5,
-    borderColor: '#FFE399',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: '#FFE399',
-    fontSize: 14,
-    fontWeight: '700',
+    gap: 2,
   },
   userName: {
-    color: '#dfe2ef',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-    lineHeight: 22,
+    letterSpacing: -0.2,
   },
   orderId: {
-    color: 'rgba(194, 198, 216, 0.7)',
-    fontSize: 11.5,
+    color: '#8C90A1',
+    fontSize: 12,
     fontWeight: '500',
-    letterSpacing: 0.3,
-    marginTop: 1,
-  },
-  badgesWrapper: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    justifyContent: 'flex-start',
-    gap: 4,
-    flexShrink: 0,
-    maxWidth: '52%',
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
   },
   statusBadge: {
     borderRadius: 9999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
     borderWidth: 1,
-  },
-  statusText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  badgeWithIcon: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 5,
+    flexShrink: 0,
   },
-  alcoholBadge: {
-    backgroundColor: 'rgba(255, 92, 92, 0.12)',
-    borderColor: 'rgba(255, 92, 92, 0.35)',
+  statusText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  alcoholBadgeText: {
-    color: '#FF7B7B',
+  itemsCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 8,
+    marginTop: 2,
+  },
+  itemsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  itemsTitleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  itemsIconBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 227, 153, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemsSectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFE399',
+    letterSpacing: 0.8,
+  },
+  idBadgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    flexShrink: 1,
+  },
+  itemTagPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  itemTagText: {
+    fontSize: 10,
     fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  rxBadge: {
-    backgroundColor: 'rgba(179, 136, 255, 0.12)',
-    borderColor: 'rgba(179, 136, 255, 0.35)',
+  itemsContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  rxBadgeText: {
-    color: '#B388FF',
+  itemsBodyText: {
+    flex: 1,
+    fontSize: 13.5,
+    lineHeight: 19,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  deliveryInstructionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    flexShrink: 0,
+    alignSelf: 'center',
+  },
+  deliveryInstructionText: {
+    fontSize: 10.5,
     fontWeight: '700',
-  },
-  verifiedBadge: {
-    backgroundColor: 'rgba(0, 226, 151, 0.12)',
-    borderColor: 'rgba(0, 226, 151, 0.35)',
-  },
-  verifiedBadgeText: {
-    color: '#00E297',
-    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   routesContainer: {
     flexDirection: 'column',
-    gap: 16,
-  },
-  connectingLine: {
-    position: 'absolute',
-    left: 10,
-    top: 24,
-    bottom: 24,
-    width: 1,
-    backgroundColor: 'rgba(66, 70, 86, 0.3)',
+    gap: 4,
+    marginTop: 10,
+    marginBottom: 2,
   },
   routeItem: {
     flexDirection: 'row',
     gap: 12,
     alignItems: 'flex-start',
-    zIndex: 1,
   },
-  routeIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#0f131c',
+  routeIconBoxPickup: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 227, 153, 0.12)',
     borderWidth: 1,
+    borderColor: 'rgba(255, 227, 153, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 1,
+  },
+  routeIconBoxDelivery: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  routeLineContainer: {
+    width: 28,
+    alignItems: 'center',
+    height: 18,
+    justifyContent: 'center',
+  },
+  connectingLine: {
+    width: 1.5,
+    height: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: 1,
   },
   routeTextContainer: {
-    flexDirection: 'column',
     flex: 1,
+    gap: 3,
   },
-  routeLabel: {
+  routeLabelPickup: {
     fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
+    fontWeight: '800',
+    color: '#FFE399',
+    letterSpacing: 0.8,
+  },
+  routeLabelDelivery: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#00E297',
+    letterSpacing: 0.8,
   },
   routeAddress: {
-    color: '#dfe2ef',
-    fontSize: 14,
-    lineHeight: 20,
+    color: '#E0E3EF',
+    fontSize: 13.5,
+    lineHeight: 19,
     fontWeight: '500',
-  },
-  itemsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(0, 102, 255, 0.08)',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 102, 255, 0.22)',
-    marginTop: 12,
-    overflow: 'hidden',
-  },
-  itemsTextCol: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  itemsPillText: {
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: '#DFE2EF',
-    fontWeight: '500',
-    flexShrink: 1,
-  },
-  itemsHighlightTag: {
-    color: '#B3C5FF',
-    fontWeight: '700',
-    letterSpacing: 0.2,
   },
   footer: {
     flexDirection: 'column',
     gap: 14,
-    paddingTop: 16,
+    paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
   },
   driverBanner: {
     flexDirection: 'row',
@@ -886,41 +974,61 @@ const styles = StyleSheet.create({
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   priceText: {
-    color: '#ffe399',
-    fontSize: 24,
+    color: '#FFE399',
+    fontSize: 22,
     fontWeight: '800',
-    lineHeight: 30,
+    letterSpacing: -0.3,
   },
   paymentTag: {
     backgroundColor: 'rgba(244, 195, 0, 0.12)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    borderRadius: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(244, 195, 0, 0.25)',
+    borderColor: 'rgba(244, 195, 0, 0.3)',
   },
   paymentTagText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#ffe399',
+    color: '#FFE399',
+  },
+  paidChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.3)',
+  },
+  paidChipText: {
+    color: '#00E297',
+    fontSize: 11,
+    fontWeight: '700',
   },
   detailsToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
   detailsToggleText: {
     fontSize: 12,
-    color: '#8C90A1',
+    color: '#C2C6D8',
     fontWeight: '600',
   },
   breakdownDrawer: {
-    backgroundColor: '#10131B',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: '#0E121B',
+    borderRadius: 14,
+    padding: 14,
     gap: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
@@ -949,7 +1057,7 @@ const styles = StyleSheet.create({
   breakdownDivider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    marginVertical: 2,
+    marginVertical: 4,
   },
   breakdownTotalLabel: {
     fontSize: 13.5,
@@ -959,24 +1067,24 @@ const styles = StyleSheet.create({
   breakdownTotalValue: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#ffe399',
+    color: '#FFE399',
   },
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     width: '100%',
   },
   payButton: {
-    flex: 1.2,
-    height: 38,
-    borderRadius: 10,
+    flex: 1.3,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: '#00E297',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 4,
+    gap: 6,
+    paddingHorizontal: 8,
     shadowColor: 'rgba(0, 226, 151, 0.35)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.8,
@@ -985,92 +1093,36 @@ const styles = StyleSheet.create({
   },
   payButtonText: {
     color: '#0F131C',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     letterSpacing: -0.2,
   },
-  actionButton: {
+  trackButton: {
     flex: 1,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#0066ff',
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#1E75FF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 4,
+    gap: 6,
+    paddingHorizontal: 8,
     shadowColor: 'rgba(0, 102, 255, 0.25)',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.8,
     shadowRadius: 6,
     elevation: 3,
   },
-  actionButtonText: {
-    color: '#f8f7ff',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  supportButton: {
-    flex: 1,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 4,
-  },
-  supportButtonText: {
-    color: '#dfe2ef',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  cancelButton: {
-    flex: 1,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: 'rgba(239, 68, 68, 0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.28)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 4,
-  },
-  cancelButtonText: {
-    color: '#FF6B6B',
-    fontSize: 12,
+  trackButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
   deliveredBadgeButton: {
-    flex: 1.25,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: 'rgba(0, 226, 151, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 226, 151, 0.3)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    paddingHorizontal: 8,
-  },
-  deliveredBadgeText: {
-    color: '#00e297',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  paidBadge: {
     flex: 1.2,
-    height: 38,
-    borderRadius: 10,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: 'rgba(0, 226, 151, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(0, 226, 151, 0.3)',
@@ -1080,9 +1132,46 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 8,
   },
-  paidBadgeText: {
-    color: '#00e297',
-    fontSize: 12,
+  deliveredBadgeText: {
+    color: '#00E297',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  supportButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  supportButtonText: {
+    color: '#DFE2EF',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  cancelButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(239, 68, 68, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.28)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  cancelButtonText: {
+    color: '#FF6B6B',
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: -0.2,
   },
