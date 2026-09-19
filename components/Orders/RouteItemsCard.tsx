@@ -16,6 +16,7 @@ import { CustomInput } from '@/components/core';
 import { AddressAutocompleteInput } from './AddressAutocompleteInput';
 import { APP_CONFIG, IS_STORE_BUILD } from '@/lib/config';
 import { colors, spacing, typography } from '@/constants/design';
+import { detectAlcoholInText } from '@/lib/validation';
 
 const GOLD = '#FFE399';
 const GREEN = '#00E297';
@@ -78,6 +79,23 @@ export function RouteItemsCard({
   const haptic = () => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+  };
+
+  const wasAlcoholAutoDetected = useRef(detectAlcoholInText(items));
+
+  const handleItemsChange = (val: string) => {
+    onItemsChange(val);
+    const isAlcoholDetected = detectAlcoholInText(val);
+
+    if (isAlcoholDetected && !hasAlcohol) {
+      wasAlcoholAutoDetected.current = true;
+      haptic();
+      onHasAlcoholChange?.(true);
+    } else if (!isAlcoholDetected && hasAlcohol && (wasAlcoholAutoDetected.current || !val.trim())) {
+      wasAlcoholAutoDetected.current = false;
+      haptic();
+      onHasAlcoholChange?.(false);
     }
   };
 
@@ -245,7 +263,7 @@ export function RouteItemsCard({
           label="ORDER ITEMS *"
           placeholder="e.g. 2 grocery bags, milk & bread, order #1042..."
           value={items}
-          onChangeText={onItemsChange}
+          onChangeText={handleItemsChange}
           multiline
           numberOfLines={3}
           autoCapitalize="sentences"
@@ -256,7 +274,9 @@ export function RouteItemsCard({
         <Pressable
           onPress={() => {
             haptic();
-            onHasAlcoholChange?.(!hasAlcohol);
+            const next = !hasAlcohol;
+            wasAlcoholAutoDetected.current = next && detectAlcoholInText(items);
+            onHasAlcoholChange?.(next);
           }}
           style={[
             styles.alcoholCard,
@@ -278,6 +298,7 @@ export function RouteItemsCard({
             value={hasAlcohol}
             onValueChange={(val) => {
               haptic();
+              wasAlcoholAutoDetected.current = val && detectAlcoholInText(items);
               onHasAlcoholChange?.(val);
             }}
             trackColor={{
