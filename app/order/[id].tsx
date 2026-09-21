@@ -211,26 +211,7 @@ export default function OrderDetailScreen() {
     activeOrder?.id_verification_type === 'alcohol'
   );
 
-  const getStatusBadge = () => {
-    switch (status) {
-      case 'delivered':
-        return { label: 'DELIVERED', color: colors.tertiary, bg: colors.greenAlpha15, border: colors.greenAlpha40 };
-      case 'picked_up':
-      case 'en_route':
-      case 'shopping':
-        return { label: 'IN TRANSIT', color: colors.tertiary, bg: colors.greenAlpha15, border: colors.greenAlpha40 };
-      case 'assigned':
-      case 'accepted':
-        return { label: 'ACCEPTED', color: colors.secondary, bg: colors.accentAlpha15, border: colors.accentAlpha35 };
-      case 'cancelled':
-        return { label: 'CANCELLED', color: colors.error, bg: 'rgba(255, 92, 92, 0.15)', border: 'rgba(255, 92, 92, 0.35)' };
-      case 'pending':
-      default:
-        return { label: 'UNASSIGNED', color: colors.accent, bg: colors.accentAlpha12, border: colors.accentAlpha30 };
-    }
-  };
 
-  const badge = getStatusBadge();
 
   async function pickPhoto(source: 'camera' | 'library') {
     try {
@@ -254,7 +235,7 @@ export default function OrderDetailScreen() {
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
       dispatch({ type: 'SET_PHOTO', uri: asset.uri });
-      await uploadPhoto(asset.uri);
+      await uploadPhoto(asset);
     } catch (err: any) {
       console.error('[pickPhoto] Error:', err?.message || err);
       Alert.alert(
@@ -264,13 +245,21 @@ export default function OrderDetailScreen() {
     }
   }
 
-  async function uploadPhoto(uri: string) {
+  async function uploadPhoto(assetInput: string | ImagePicker.ImagePickerAsset) {
     if (!currentOrder?.id) return;
     dispatch({ type: 'SET_UPLOADING', uploading: true });
     try {
-      const ext = uri.split('.').pop()?.split('?')[0]?.replace('jpg', 'jpeg') ?? 'jpeg';
-      const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg';
-      const filename = `delivery_${currentOrder.id}_${Date.now()}.${ext}`;
+      const uri = typeof assetInput === 'string' ? assetInput : assetInput.uri;
+      const rawExt = (typeof assetInput !== 'string' && assetInput.fileName
+        ? assetInput.fileName
+        : uri
+      )
+        .split('.')
+        .pop()
+        ?.split('?')[0] ?? 'jpg';
+      const cleanExt = (rawExt.length > 5 || rawExt.includes('/') || rawExt.includes(':')) ? 'jpg' : rawExt;
+      const mimeType = (typeof assetInput !== 'string' && assetInput.mimeType) || (cleanExt === 'png' ? 'image/png' : 'image/jpeg');
+      const filename = `delivery_${currentOrder.id}_${Date.now()}.${cleanExt}`;
       const storagePath = `delivery-photos/${filename}`;
 
       const res = await deliveryApi.uploadPhoto({
@@ -397,12 +386,6 @@ export default function OrderDetailScreen() {
           showToast(err?.message || 'Failed to update pickup status', { type: 'error' });
         }
       }
-    } else {
-      Alert.alert(
-        'ID Verification Failed',
-        scanResult?.errorMessage || 'Customer is underage or ID is expired. Pickup cannot be completed.',
-        [{ text: 'OK' }]
-      );
     }
   };
 
@@ -534,32 +517,6 @@ export default function OrderDetailScreen() {
               </Text>
             </View>
           )}
-
-          {isIdVerified && (
-            <View
-              style={[
-                styles.badge,
-                { flexDirection: 'row', alignItems: 'center', gap: 4 },
-                { backgroundColor: 'rgba(0, 226, 151, 0.15)', borderColor: 'rgba(0, 226, 151, 0.4)' },
-              ]}
-            >
-              <MaterialIcons name="verified" size={12} color="#00E297" />
-              <Text style={[styles.badgeText, { color: '#00E297' }]}>
-                VERIFIED
-              </Text>
-            </View>
-          )}
-
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: badge.bg, borderColor: badge.border },
-            ]}
-          >
-            <Text style={[styles.badgeText, { color: badge.color }]}>
-              {badge.label}
-            </Text>
-          </View>
         </View>
       </View>
 
@@ -702,7 +659,7 @@ export default function OrderDetailScreen() {
               }}>
                 <MaterialIcons name="check-circle" size={18} color="#00E297" />
                 <Text style={{ fontSize: 11, color: '#00E297', flex: 1, fontWeight: '600' }}>
-                  Customer ID Verified · Ready for Pickup
+                  Customer ID Verified
                 </Text>
               </View>
             )}

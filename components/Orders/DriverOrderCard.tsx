@@ -104,6 +104,70 @@ export function DriverOrderCard({
     (order as any).id_verification_type === 'medication';
   const isIdVerified = !!(order.ageVerified || (order as any).age_verified);
 
+  const parsedItems = (() => {
+    let text = order.items || '';
+    const idBadges: { label: string; icon?: any; color: string; bg: string; border: string }[] = [];
+    let deliveryTag: { label: string; icon?: any; color: string; bg: string; border: string } | null = null;
+
+    if (text.includes('[LEAVE AT DOOR]')) {
+      deliveryTag = {
+        label: 'Leave at Door',
+        icon: 'meeting-room',
+        color: '#FFE399',
+        bg: 'rgba(255, 227, 153, 0.12)',
+        border: 'rgba(255, 227, 153, 0.28)',
+      };
+      text = text.replace(/\[LEAVE AT DOOR\]\s*/g, '');
+    } else if (text.includes('[MEET AT DOOR]')) {
+      deliveryTag = {
+        label: 'Meet at Door',
+        icon: 'people',
+        color: '#00E297',
+        bg: 'rgba(0, 226, 151, 0.12)',
+        border: 'rgba(0, 226, 151, 0.28)',
+      };
+      text = text.replace(/\[MEET AT DOOR\]\s*/g, '');
+    }
+
+    if (requiresId || text.includes('[21+ ALCOHOL ID REQUIRED]') || text.includes('[21+ALCOHOL ID REQUIRED]')) {
+      idBadges.push({
+        label: isMedication ? 'RX ID' : '21+ ID',
+        icon: isMedication ? 'medical-services' : 'wine-bar',
+        color: isMedication ? '#B388FF' : '#FF7B7B',
+        bg: isMedication ? 'rgba(179, 136, 255, 0.14)' : 'rgba(255, 107, 107, 0.14)',
+        border: isMedication ? 'rgba(179, 136, 255, 0.35)' : 'rgba(255, 107, 107, 0.35)',
+      });
+      text = text.replace(/\[21\+?\s*ALCOHOL ID REQUIRED\]\s*/gi, '');
+    }
+
+    if (isIdVerified) {
+      idBadges.push({
+        label: 'ID Verified',
+        icon: 'verified',
+        color: '#00E297',
+        bg: 'rgba(0, 226, 151, 0.14)',
+        border: 'rgba(0, 226, 151, 0.35)',
+      });
+    }
+
+    const otherBracket = text.match(/^\[([^\]]+)\]\s*(.*)$/);
+    if (otherBracket) {
+      idBadges.push({
+        label: otherBracket[1],
+        color: '#B3C5FF',
+        bg: 'rgba(0, 102, 255, 0.12)',
+        border: 'rgba(0, 102, 255, 0.28)',
+      });
+      text = otherBracket[2] || '';
+    }
+
+    return {
+      cleanText: text.trim() || order.items || 'Standard Order',
+      idBadges,
+      deliveryTag,
+    };
+  })();
+
   const headerNode = (
     <View style={styles.header}>
       <View style={styles.userInfo}>
@@ -120,49 +184,10 @@ export function DriverOrderCard({
         </View>
       </View>
 
-      <View style={styles.badgesWrapper}>
-        <View style={[styles.statusBadge, styles.availableBadge]}>
-          <Text style={[styles.statusText, styles.availableBadgeText]}>
-            AVAILABLE
-          </Text>
-        </View>
-
-        {(requiresId || isIdVerified) && (
-          <View style={styles.badgesRow}>
-            {requiresId && (
-              <View
-                style={[
-                  styles.statusBadge,
-                  styles.badgeWithIcon,
-                  isMedication ? styles.rxBadge : styles.alcoholBadge,
-                ]}
-              >
-                <MaterialIcons
-                  name={isMedication ? 'medical-services' : 'local-bar'}
-                  size={11}
-                  color={isMedication ? '#B388FF' : '#FF7B7B'}
-                />
-                <Text
-                  style={[
-                    styles.statusText,
-                    isMedication ? styles.rxBadgeText : styles.alcoholBadgeText,
-                  ]}
-                >
-                  {isMedication ? 'RX ID' : '21+ ID'}
-                </Text>
-              </View>
-            )}
-
-            {isIdVerified && (
-              <View style={[styles.statusBadge, styles.badgeWithIcon, styles.verifiedBadge]}>
-                <MaterialIcons name="verified" size={11} color="#00E297" />
-                <Text style={[styles.statusText, styles.verifiedBadgeText]}>
-                  ID VERIFIED
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
+      <View style={[styles.statusBadge, styles.availableBadge]}>
+        <Text style={[styles.statusText, styles.availableBadgeText]}>
+          AVAILABLE
+        </Text>
       </View>
     </View>
   );
@@ -171,7 +196,7 @@ export function DriverOrderCard({
     <View style={styles.footer}>
       <View style={styles.footerTop}>
         <View style={styles.priceContainer}>
-          <Text style={styles.priceText}>{earnings.totalDisplay}</Text>
+          <Text style={styles.priceText}>${earnings.totalDisplay}</Text>
           <Text style={styles.tipText}>
             {earnings.tipCents > 0
               ? `${(earnings.tipCents / 100).toFixed(2)} tip included`
@@ -246,60 +271,97 @@ export function DriverOrderCard({
         style,
       ]}
     >
-      <View style={styles.routesContainer}>
-        <View style={styles.connectingLine} />
+      {order.items ? (
+        <View style={styles.itemsCard}>
+          <View style={styles.itemsHeaderRow}>
+            <View style={styles.itemsTitleLeft}>
+              <View style={styles.itemsIconBox}>
+                <MaterialIcons name="inventory-2" size={13} color="#FFE399" />
+              </View>
+              <Text style={styles.itemsSectionTitle}>ORDER ITEMS</Text>
+            </View>
 
-        {/* Pickup */}
+            {parsedItems.deliveryTag && (
+              <View
+                style={[
+                  styles.deliveryInstructionPill,
+                  {
+                    backgroundColor: parsedItems.deliveryTag.bg,
+                    borderColor: parsedItems.deliveryTag.border,
+                  },
+                ]}
+              >
+                <MaterialIcons
+                  name={parsedItems.deliveryTag.icon}
+                  size={11}
+                  color={parsedItems.deliveryTag.color}
+                />
+                <Text
+                  style={[
+                    styles.deliveryInstructionText,
+                    { color: parsedItems.deliveryTag.color },
+                  ]}
+                >
+                  {parsedItems.deliveryTag.label}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.itemsContentRow}>
+            <Text style={styles.itemsBodyText} numberOfLines={2}>
+              {parsedItems.cleanText}
+            </Text>
+
+            {parsedItems.idBadges.length > 0 && (
+              <View style={styles.idBadgesRow}>
+                {parsedItems.idBadges.map((b, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.itemTagPill,
+                      { backgroundColor: b.bg, borderColor: b.border },
+                    ]}
+                  >
+                    {b.icon && <MaterialIcons name={b.icon} size={11} color={b.color} />}
+                    <Text style={[styles.itemTagText, { color: b.color }]}>{b.label}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.routesContainer}>
         <View style={styles.routeItem}>
-          <View style={[styles.routeIcon, { borderColor: '#FFE399' }]}>
-            <MaterialIcons name="store" size={12} color="#FFE399" />
+          <View style={styles.routeIconBoxPickup}>
+            <MaterialIcons name="store" size={15} color="#FFE399" />
           </View>
           <View style={styles.routeTextContainer}>
-            <Text style={[styles.routeLabel, { color: '#FFE399' }]}>Pick up from</Text>
+            <Text style={styles.routeLabelPickup}>PICK UP FROM</Text>
             <Text style={styles.routeAddress} numberOfLines={2}>
               {order.pickupAddress || 'Pickup address'}
             </Text>
           </View>
         </View>
 
-        {/* Delivery */}
+        <View style={styles.routeLineContainer}>
+          <View style={styles.connectingLine} />
+        </View>
+
         <View style={styles.routeItem}>
-          <View style={[styles.routeIcon, { borderColor: '#00E297' }]}>
-            <MaterialIcons name="location-on" size={12} color="#00E297" />
+          <View style={styles.routeIconBoxDelivery}>
+            <MaterialIcons name="navigation" size={15} color="#00E297" />
           </View>
           <View style={styles.routeTextContainer}>
-            <Text style={[styles.routeLabel, { color: '#00E297' }]}>Deliver to</Text>
+            <Text style={styles.routeLabelDelivery}>DELIVER TO</Text>
             <Text style={styles.routeAddress} numberOfLines={2}>
               {order.deliveryAddress || 'Delivery address'}
             </Text>
           </View>
         </View>
       </View>
-
-      {order.items ? (
-        <View style={styles.itemsPill}>
-          <MaterialIcons name="inventory-2" size={15} color="#B3C5FF" />
-          <View style={styles.itemsTextCol}>
-            {(() => {
-              const bracketMatch = order.items.match(/^(\[[^\]]+\])\s*(.*)$/);
-              if (bracketMatch) {
-                return (
-                  <Text style={styles.itemsPillText} numberOfLines={2}>
-                    <Text style={styles.itemsHighlightTag}>{bracketMatch[1]} </Text>
-                    {bracketMatch[2]}
-                  </Text>
-                );
-              }
-              return (
-                <Text style={styles.itemsPillText} numberOfLines={2}>
-                  <Text style={styles.itemsHighlightTag}>ITEMS: </Text>
-                  {order.items}
-                </Text>
-              );
-            })()}
-          </View>
-        </View>
-      ) : null}
     </CustomCard>
   );
 }
@@ -415,81 +477,159 @@ const styles = StyleSheet.create({
   availableBadgeText: {
     color: '#F4C300',
   },
+  itemsCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 8,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  itemsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  itemsTitleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  itemsIconBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 227, 153, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemsSectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFE399',
+    letterSpacing: 0.8,
+  },
+  idBadgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    flexShrink: 1,
+  },
+  itemTagPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  itemTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  itemsContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  itemsBodyText: {
+    flex: 1,
+    fontSize: 13.5,
+    lineHeight: 19,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  deliveryInstructionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    flexShrink: 0,
+    alignSelf: 'center',
+  },
+  deliveryInstructionText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
   routesContainer: {
     flexDirection: 'column',
-    gap: 12,
-    marginTop: 4,
-  },
-  connectingLine: {
-    position: 'absolute',
-    left: 9,
-    top: 20,
-    bottom: 20,
-    width: 1,
-    backgroundColor: 'rgba(66, 70, 86, 0.3)',
+    gap: 4,
+    marginTop: 8,
+    marginBottom: 2,
   },
   routeItem: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     alignItems: 'flex-start',
-    zIndex: 1,
   },
-  routeIcon: {
-    width: 18,
-    height: 18,
+  routeIconBoxPickup: {
+    width: 28,
+    height: 28,
     borderRadius: 9,
-    backgroundColor: '#0f131c',
+    backgroundColor: 'rgba(255, 227, 153, 0.12)',
     borderWidth: 1,
+    borderColor: 'rgba(255, 227, 153, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 1,
+  },
+  routeIconBoxDelivery: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0, 226, 151, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 226, 151, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  routeLineContainer: {
+    width: 28,
+    alignItems: 'center',
+    height: 18,
+    justifyContent: 'center',
+  },
+  connectingLine: {
+    width: 1.5,
+    height: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: 1,
   },
   routeTextContainer: {
-    flexDirection: 'column',
     flex: 1,
+    gap: 3,
   },
-  routeLabel: {
-    fontSize: 9.5,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+  routeLabelPickup: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFE399',
     letterSpacing: 0.8,
-    marginBottom: 2,
+  },
+  routeLabelDelivery: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#00E297',
+    letterSpacing: 0.8,
   },
   routeAddress: {
-    color: '#dfe2ef',
-    fontSize: 13,
-    lineHeight: 18,
+    color: '#E0E3EF',
+    fontSize: 13.5,
+    lineHeight: 19,
     fontWeight: '500',
-  },
-  itemsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(0, 102, 255, 0.08)',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 102, 255, 0.22)',
-    marginTop: 10,
-    overflow: 'hidden',
-  },
-  itemsTextCol: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  itemsPillText: {
-    fontSize: 12,
-    lineHeight: 16,
-    color: '#DFE2EF',
-    fontWeight: '500',
-    flexShrink: 1,
-  },
-  itemsHighlightTag: {
-    color: '#B3C5FF',
-    fontWeight: '700',
-    letterSpacing: 0.2,
   },
   footer: {
     flexDirection: 'column',

@@ -23,14 +23,18 @@ export const deliveryApi = {
     const baseUrl = getApiBaseUrl();
     const token = useAuthStore.getState().token;
 
-    const formData = new FormData();
-    const fileName = payload.file.name || `delivery_${payload.orderId}_${Date.now()}.jpg`;
+    const rawFileName = payload.file.name || `delivery_${payload.orderId}_${Date.now()}.jpg`;
+    const cleanFileName =
+      rawFileName.includes('/') || rawFileName.includes(':')
+        ? `delivery_${payload.orderId}_${Date.now()}.jpg`
+        : rawFileName;
     const fileType = payload.file.type || 'image/jpeg';
-    const storagePath = payload.path || `delivery-photos/${payload.orderId}/${fileName}`;
+    const storagePath = payload.path || `delivery-photos/${payload.orderId}/${cleanFileName}`;
 
+    const formData = new FormData();
     formData.append('file', {
       uri: payload.file.uri,
-      name: fileName,
+      name: cleanFileName,
       type: fileType,
     } as any);
     formData.append('orderId', payload.orderId);
@@ -41,11 +45,19 @@ export const deliveryApi = {
       headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${baseUrl}/delivery-photo`, {
+    let response = await fetch(`${baseUrl}/delivery`, {
       method: 'POST',
       headers,
       body: formData,
     });
+
+    if (response.status === 404) {
+      response = await fetch(`${baseUrl}/delivery-photo`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+    }
 
     const data = await response.json();
     if (!response.ok) {
@@ -64,10 +76,17 @@ export const deliveryApi = {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const response = await fetch(`${baseUrl}/delivery-photo/${orderId}`, {
+      let response = await fetch(`${baseUrl}/delivery/${orderId}`, {
         method: 'GET',
         headers,
       });
+
+      if (response.status === 404) {
+        response = await fetch(`${baseUrl}/delivery-photo/${orderId}`, {
+          method: 'GET',
+          headers,
+        });
+      }
 
       if (!response.ok) return null;
       const data = await response.json();

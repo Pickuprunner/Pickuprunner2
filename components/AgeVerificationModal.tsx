@@ -21,7 +21,7 @@ import { scanDriversLicense, type IDScanResult } from '@/lib/ageVerification';
 import { colors } from '@/constants/design';
 import { deliveryApi } from '@/apis/delivery';
 
-type Phase = 'idle' | 'uploading' | 'scanning' | 'result' | 'error';
+type Phase = 'idle' | 'preview' | 'uploading' | 'scanning' | 'result' | 'error';
 
 interface Props {
   visible: boolean;
@@ -51,11 +51,13 @@ export default function AgeVerificationModal({
   const [phase, setPhase] = useState<Phase>('idle');
   const [result, setResult] = useState<IDScanResult | null>(null);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   const reset = () => {
     setPhase('idle');
     setResult(null);
     setPreviewUri(null);
+    setSelectedAsset(null);
   };
 
   const handleClose = () => {
@@ -92,8 +94,9 @@ export default function AgeVerificationModal({
       if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
 
       const asset = pickerResult.assets[0];
+      setSelectedAsset(asset);
       setPreviewUri(asset.uri);
-      await runScan(asset);
+      setPhase('preview');
     } catch (err: any) {
       setPhase('error');
       setResult({ success: false, errorMessage: err?.message ?? 'Failed to open camera.' });
@@ -181,6 +184,45 @@ export default function AgeVerificationModal({
   const passed = result?.success && result.isOver21 && !result.isExpired && !result.errorMessage;
   const isMedication = verificationType === 'medication';
 
+  const getRejectionDisplay = (reason?: string) => {
+    switch (reason?.toUpperCase()) {
+      case 'NAME_MISMATCH':
+        return {
+          title: 'NAME MISMATCH',
+          subtitle: 'Name on the ID does not match the customer name on this order.',
+        };
+      case 'TAMPERED':
+        return {
+          title: 'TAMPER DETECTED',
+          subtitle: 'ID appears digitally altered, paper printout, or photo of a screen.',
+        };
+      case 'EXPIRED':
+        return {
+          title: 'ID EXPIRED',
+          subtitle: 'This ID has expired. Ask for a valid, non-expired ID.',
+        };
+      case 'UNDERAGE':
+        return {
+          title: `UNDER ${minAge}`,
+          subtitle: `Customer does not meet the minimum age requirement of ${minAge}.`,
+        };
+      case 'UNREADABLE':
+        return {
+          title: 'ID UNREADABLE',
+          subtitle: 'Could not clearly read the ID details. Please scan again.',
+        };
+      default:
+        return {
+          title: reason || `UNDER ${minAge}`,
+          subtitle: reason || `Customer does not meet minimum age of ${minAge}. Cannot proceed.`,
+        };
+    }
+  };
+
+  const rejectionInfo = !passed
+    ? getRejectionDisplay(result?.isExpired ? 'EXPIRED' : result?.errorMessage)
+    : null;
+
   return (
     <Modal
       visible={visible}
@@ -205,8 +247,20 @@ export default function AgeVerificationModal({
 
           {/* Header */}
           <CustomHeader
-            title={isMedication ? 'Prescription ID Verification' : 'Customer ID Verification'}
-            subtitle={isMedication ? 'Rx Recipient Verification' : `${minAge}+ Age Requirement · Secure Verification`}
+            title={
+              phase === 'preview'
+                ? 'Review ID Photo'
+                : isMedication
+                  ? 'Prescription ID Verification'
+                  : 'Customer ID Verification'
+            }
+            subtitle={
+              phase === 'preview'
+                ? 'Check photo clarity before AI scan'
+                : isMedication
+                  ? 'Rx Recipient Verification'
+                  : `${minAge}+ Age Requirement · Secure Verification`
+            }
             titleSize="medium"
             variant="transparent"
             withSafeArea={false}
@@ -294,6 +348,56 @@ export default function AgeVerificationModal({
             </ScrollView>
           )}
 
+          {phase === 'preview' && (
+            <ScrollView
+              style={styles.previewScroll}
+              contentContainerStyle={styles.previewContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.scanFrame}>
+                {!!previewUri && (
+                  <Image
+                    source={{ uri: previewUri }}
+                    style={styles.scanPhoto}
+                    contentFit="contain"
+                    transition={200}
+                  />
+                )}
+                <View style={[styles.scanCorner, styles.scanCornerTL]} />
+                <View style={[styles.scanCorner, styles.scanCornerTR]} />
+                <View style={[styles.scanCorner, styles.scanCornerBL]} />
+                <View style={[styles.scanCorner, styles.scanCornerBR]} />
+              </View>
+
+              <View style={styles.previewGuidanceRow}>
+                <MaterialIcons name="info-outline" size={18} color={colors.secondary} />
+                <Text style={styles.previewGuidanceText}>
+                  Ensure customer name, photo, and birth date are clear and free of glare.
+                </Text>
+              </View>
+
+              <View style={styles.previewActions}>
+                <TouchableOpacity
+                  style={[styles.primaryButton, styles.scanButton]}
+                  onPress={() => selectedAsset && runScan(selectedAsset)}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="document-scanner" size={20} color="#000" />
+                  <Text style={styles.scanButtonText}>Scan & Verify with AI</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={reset}
+                  activeOpacity={0.75}
+                >
+                  <MaterialIcons name="refresh" size={18} color={colors.onSurface} />
+                  <Text style={styles.retryButtonText}>Retake / Choose Another</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+
           {(phase === 'uploading' || phase === 'scanning') && (
             <View style={styles.loadingContainer}>
               <View style={styles.scanFrame}>
@@ -354,14 +458,12 @@ export default function AgeVerificationModal({
                     { color: passed ? colors.tertiary : colors.error },
                   ]}
                 >
-                  {passed ? 'ID VERIFIED' : result.isExpired ? 'ID EXPIRED' : result.errorMessage || `UNDER ${minAge}`}
+                  {passed ? 'ID VERIFIED' : rejectionInfo?.title}
                 </Text>
                 <Text style={styles.verdictSubtitle}>
                   {passed
-                    ? `Customer is ${result.age ?? '21+'} years old — Verification PASSED`
-                    : result.isExpired
-                      ? 'This ID has expired. Ask for a valid, non-expired ID.'
-                      : result.errorMessage ?? `Customer is under minimum age of ${minAge}. Cannot proceed.`}
+                    ? `Customer is ${result.age ?? `${minAge}+`} years old — Verification PASSED`
+                    : rejectionInfo?.subtitle}
                 </Text>
               </View>
 
@@ -883,5 +985,44 @@ const styles = StyleSheet.create({
     color: colors.outline,
     fontSize: 14,
     fontWeight: '600',
+  },
+  previewScroll: {
+    flex: 1,
+  },
+  previewContent: {
+    gap: 16,
+    paddingBottom: 24,
+  },
+  previewGuidanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(255, 184, 0, 0.08)',
+    borderColor: 'rgba(255, 184, 0, 0.25)',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  previewGuidanceText: {
+    color: colors.onSurface,
+    fontSize: 12.5,
+    flex: 1,
+    lineHeight: 17,
+  },
+  previewActions: {
+    gap: 10,
+    marginTop: 4,
+  },
+  scanButton: {
+    backgroundColor: colors.primaryContainer,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  scanButtonText: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });
