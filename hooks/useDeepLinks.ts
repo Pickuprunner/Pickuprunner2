@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 export function parseResetPasswordUrl(url: string): { userId?: string; token?: string } | null {
   if (!url || !url.includes('reset-password')) return null;
 
-  // Path format: pickuprunner://auth/reset-password/:userId/:token or /reset-password/:userId/:token
+  
   const pathMatch = url.match(/(?:auth\/)?reset-password\/([^/?#]+)\/([^/?#]+)/);
   if (pathMatch) {
     return {
@@ -14,7 +14,7 @@ export function parseResetPasswordUrl(url: string): { userId?: string; token?: s
     };
   }
 
-  // Query parameter format: ?userId=...&token=...
+
   if (url.includes('userId=') && url.includes('token=')) {
     const userIdMatch = url.match(/[?&]userId=([^&#]+)/);
     const tokenMatch = url.match(/[?&]token=([^&#]+)/);

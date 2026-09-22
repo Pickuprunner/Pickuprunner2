@@ -65,7 +65,7 @@ export function useAuth(): AuthState {
       const authToken = (session as any).token || (session as any).accessToken || '';
       setSession(session.user, authToken, session.refreshToken);
 
-      // Trigger permission check & device token backend sync
+      
       registerAndSyncDeviceToken(session.user?.id);
 
       if (session.user?.role === 'driver' || session.user?.role === 'dev') {
@@ -95,7 +95,7 @@ export function useAuth(): AuthState {
       const authToken = (session as any).token || (session as any).accessToken || '';
       setSession(session.user, authToken, session.refreshToken);
 
-      // Trigger permission check & device token backend sync
+      
       registerAndSyncDeviceToken(session.user?.id);
 
       if (session.user?.role === 'driver' || session.user?.role === 'dev') {

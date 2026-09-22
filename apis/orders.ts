@@ -210,9 +210,7 @@ export interface AvailableOrdersResponse {
 }
 
 export const ordersApi = {
-  /**
-   * GET /orders/available - List open/unassigned orders for driver job board
-   */
+  
   getAvailable: async (params: AvailableOrdersParams = {}): Promise<OrderItem[]> => {
     const searchParams = new URLSearchParams();
     if (params.lat !== undefined && params.lng !== undefined) {
@@ -240,9 +238,7 @@ export const ordersApi = {
     return [];
   },
 
-  /**
-   * GET /orders/mine - List orders placed by current customer or assigned to current driver
-   */
+  
   getMine: async (): Promise<OrderItem[]> => {
     const res = await apiClient.get<any>('/orders/mine');
     const rawList = res?.data?.orders || res?.data || (Array.isArray(res) ? res : []);

@@ -126,7 +126,7 @@ export function getDriverAccreditationGateState(data?: AccreditationResponseData
   }
   const { steps, eligibility, expiry, profile } = data;
 
-  // 1. Pending review check
+  
   if (steps?.license === 'pending' || steps?.insurance === 'pending' || profile?.accreditationStatus === 'under_review') {
     return {
       type: 'under_review',
@@ -135,7 +135,7 @@ export function getDriverAccreditationGateState(data?: AccreditationResponseData
     };
   }
 
-  // 2. Eligibility check
+ 
   if (!eligibility?.eligible) {
     return {
       type: 'ineligible',
@@ -144,7 +144,7 @@ export function getDriverAccreditationGateState(data?: AccreditationResponseData
     };
   }
 
-  // 3. Eligible (with optional expired / expiringSoon warnings)
+  
   const expiringWarnings: Array<{ document: 'license' | 'insurance'; daysLeft: number | null; message: string }> = [];
 
   if (expiry?.license?.expired) {

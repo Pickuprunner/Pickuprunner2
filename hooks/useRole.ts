@@ -5,10 +5,7 @@ export type AppRole = 'customer' | 'driver' | 'dev';
 
 const ROLE_KEY = 'app_role';
 
-/**
- * Persists and returns the user's chosen role (customer | driver).
- * Returns null while loading (role not yet read from storage).
- */
+
 export function useRole() {
   const [role, setRoleState] = useState<AppRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +32,7 @@ export function useRole() {
   return { role, isLoading, setRole, clearRole };
 }
 
-/** Standalone helpers for use outside React (e.g. in lib files) */
+
 export async function getSavedRole(): Promise<AppRole | null> {
   try {
     const val = await AsyncStorage.getItem(ROLE_KEY);
