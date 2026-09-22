@@ -16,7 +16,7 @@ export interface AuthState {
   register: (payload: {
     email: string;
     password: string;
-    role: 'customer' | 'driver' | 'admin' | 'dev';
+    role: 'customer' | 'driver' | 'dev';
     displayName?: string;
     phone?: string;
   }) => Promise<AuthUser>;
@@ -82,7 +82,7 @@ export function useAuth(): AuthState {
     async (payload: {
       email: string;
       password: string;
-      role: 'customer' | 'driver' | 'admin' | 'dev';
+      role: 'customer' | 'driver' | 'dev';
       displayName?: string;
       phone?: string;
     }): Promise<AuthUser> => {

@@ -4,7 +4,7 @@ import { User } from '@/store/useAuthStore';
 export interface RegisterPayload {
   email: string;
   password: string;
-  role: 'customer' | 'driver' | 'admin' | 'dev';
+  role: 'customer' | 'driver' | 'dev';
   displayName?: string;
   phone?: string;
 }

@@ -141,7 +141,7 @@ export default function SignInScreen() {
         await saveDisplayName(nameTrimmed).catch(() => { });
       } else {
         const loggedUser = await login(emailTrimmed, password);
-        if (loggedUser.role !== 'driver' && loggedUser.role !== 'admin' && loggedUser.role !== 'dev') {
+        if (loggedUser.role !== 'driver' && loggedUser.role !== 'dev') {
           await logout();
           showToast('This account is registered as a customer. Please use Customer login.', 'error');
           return;

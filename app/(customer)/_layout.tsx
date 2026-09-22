@@ -1,4 +1,4 @@
-import { Tabs, router } from 'expo-router';
+import { Tabs, router, useSegments } from 'expo-router';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -20,27 +20,28 @@ function ChatTabIcon({ color, size }: { color: string; size: number }) {
 
 export default function CustomerTabLayout() {
   const insets = useSafeAreaInsets();
+  const segments = useSegments();
   const { showToast } = useToast();
   const { user, isAuthenticated, token, isLoading, clearSession } = useAuth();
   const androidBottomPad = Platform.OS === 'web' ? 10 : Math.max(insets.bottom, 12);
   const hasHomeBar = insets.bottom > 0;
 
   useEffect(() => {
+    if (segments[0] !== '(customer)') return;
+
     if (!isLoading && (!isAuthenticated || !user || !token || user?.status === 'suspended')) {
       if (user?.status === 'suspended') {
         showToast('Your account has been suspended. Please contact support.', 'error');
         clearSession();
       }
-      if (router.canDismiss()) router.dismissAll();
       router.replace('/(landing)/role-select');
       return;
     }
 
     if (user?.role === 'driver') {
-      if (router.canDismiss()) router.dismissAll();
       router.replace('/(tabs)');
     }
-  }, [isLoading, isAuthenticated, user, token, user?.role, user?.status, clearSession, showToast]);
+  }, [segments, isLoading, isAuthenticated, user, token, user?.role, user?.status, clearSession, showToast]);
 
   return (
     <Tabs

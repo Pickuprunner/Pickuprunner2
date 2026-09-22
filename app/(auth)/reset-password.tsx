@@ -15,8 +15,9 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { KeyRound, ChevronLeft, CheckCircle2 } from '@blinkdotnew/mobile-ui';
 import * as Haptics from 'expo-haptics';
+import { KeyRound, ChevronLeft, CheckCircle2 } from '@blinkdotnew/mobile-ui';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/hooks/useAuth';
 import { colors, gradients, spacing, borderRadius } from '@/constants/design';
 import { AuthHero, PasswordInput } from '@/components/auth';
@@ -29,7 +30,7 @@ export default function ResetPasswordScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ userId?: string; token?: string; role?: string }>();
   const { showToast } = useToast();
-  const { resetPassword } = useAuth();
+  const { resetPassword, clearSession } = useAuth();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -118,11 +119,7 @@ export default function ResetPasswordScreen() {
             <View style={styles.innerContent}>
               <Pressable
                 onPress={() => {
-                  if (params.role === 'driver') {
-                    router.replace('/(auth)/sign-in' as any);
-                  } else if (params.role === 'customer') {
-                    router.replace('/(auth)/customer-auth' as any);
-                  } else if (router.canGoBack()) {
+                  if (router.canGoBack()) {
                     router.back();
                   } else {
                     router.replace('/(landing)/role-select');
@@ -151,14 +148,10 @@ export default function ResetPasswordScreen() {
                     Your password has been successfully reset. You can now log in with your new credentials.
                   </Text>
                   <Pressable
-                    onPress={() => {
-                      if (params.role === 'driver') {
-                        router.replace('/(auth)/sign-in' as any);
-                      } else if (params.role === 'customer') {
-                        router.replace('/(auth)/customer-auth' as any);
-                      } else {
-                        router.replace('/(landing)/role-select');
-                      }
+                    onPress={async () => {
+                      clearSession();
+                      await AsyncStorage.removeItem('app_role').catch(() => {});
+                      router.replace('/(landing)/role-select');
                     }}
                     style={({ pressed }) => [
                       styles.submitBtn,

@@ -3,7 +3,7 @@ import { apiClient } from '@/lib/apiClient';
 export interface ApiLastMessage {
   body: string;
   kind?: string;
-  senderRole?: 'driver' | 'customer' | 'admin' | 'system';
+  senderRole?: 'driver' | 'customer' | 'system';
   mine?: boolean;
   createdAt: string;
 }
@@ -13,7 +13,7 @@ export interface ApiChatSummary {
   orderStatus: string;
   open: boolean;
   awaitingDriver: boolean;
-  role: 'driver' | 'customer' | 'admin';
+  role: 'driver' | 'customer';
   counterpartyName?: string;
   pickupAddress?: string;
   deliveryAddress?: string;
@@ -35,7 +35,7 @@ export interface ApiChatMessage {
   id: string;
   orderId: string;
   senderId?: string;
-  senderRole?: 'driver' | 'customer' | 'admin' | 'system';
+  senderRole?: 'driver' | 'customer' | 'system';
   kind?: string;
   body: string;
   mine?: boolean;

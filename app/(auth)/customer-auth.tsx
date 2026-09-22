@@ -146,7 +146,7 @@ export default function CustomerAuthScreen() {
         }
       } else {
         const loggedUser = await login(emailTrimmed, password);
-        if (loggedUser.role !== 'customer' && loggedUser.role !== 'admin' && loggedUser.role !== 'dev') {
+        if (loggedUser.role !== 'customer' && loggedUser.role !== 'dev') {
           await logout();
           showToast('This account is registered as a driver. Please use Driver login.', 'error');
           return;

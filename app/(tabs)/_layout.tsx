@@ -1,4 +1,4 @@
-import { Tabs, router } from 'expo-router';
+import { Tabs, router, useSegments } from 'expo-router';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -44,6 +44,7 @@ function ChatTabIcon({ color, size }: { color: string; size: number }) {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const segments = useSegments();
   const { showToast } = useToast();
   const { user, isAuthenticated, token, isLoading, clearSession } = useAuth();
   const { data: verification, isLoading: isVerifLoading } = useMyVerification(user?.id);
@@ -57,18 +58,18 @@ export default function TabLayout() {
     accreditation?.profile?.accreditationStatus === 'approved' ||
     verification?.status === 'pending';
   useEffect(() => {
+    if (segments[0] !== '(tabs)') return;
+
     if (!isLoading && (!isAuthenticated || !user || !token || user?.status === 'suspended')) {
       if (user?.status === 'suspended') {
         showToast('Your account has been suspended. Please contact support.', 'error');
         clearSession();
       }
-      if (router.canDismiss()) router.dismissAll();
       router.replace('/(landing)/role-select');
       return;
     }
 
     if (user?.role === 'customer') {
-      if (router.canDismiss()) router.dismissAll();
       router.replace('/(customer)/my-orders');
       return;
     }
